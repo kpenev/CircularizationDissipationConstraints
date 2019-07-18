@@ -227,7 +227,7 @@ def test_ic_solver(interpolator) :
 
 if __name__ == '__main__' :
     orbital_evolution_library.read_eccentricity_expansion_coefficients(
-        b'/home/annamtetz/repositories/poet/eccentricity_expansion_coef.txt'
+        b'/home/annamtetz/repositories/poet/eccentricity_expansion_coef_O200.txt'
     )
     serialized_dir = '../stellar_evolution_interpolators'
     manager = StellarEvolutionManager(serialized_dir)
