@@ -3,27 +3,25 @@
 
 """Calculate final eccentricity vs Q on a grid of Q values for a system."""
 
-from matplotlib import pyplot
-import numpy
+import os.path
+from multiprocessing import Pool, Manager
 
+import numpy
 from astropy import units
 from configargparse import ArgumentParser, DefaultsFormatter
 
 from stellar_evolution.manager import StellarEvolutionManager
-from orbital_evolution.transformations import phase_lag
 from orbital_evolution.evolve_interface import library as\
     orbital_evolution_library
 
 from planetary_system_io import read_nasa_planets
-from reproduce_system import find_evolution
 from binary_utils import calculate_secondary_mass
 
-from exoplanet_io import\
+from io_utilities import\
     add_info_cmdline_args,\
     fix_system_units,\
     get_nasa_system
-from plots import plot_eccentricity_vs_period, plot_star_solving
-
+from current_eccentricity_calculator import CurrentEccentricityCalculator
 
 def parse_command_line():
     """Return the parsed command line as attributes of an object."""
@@ -37,8 +35,9 @@ def parse_command_line():
     parser.add_argument(
         '--stellar-evolution-interpolator-dir', '--interpolator-dir',
         default=(
-            '/home/kpenev/projects/git/poet/'
-            'stellar_evolution_interpolators'
+            os.path.expanduser(
+                '~/projects/git/poet/stellar_evolution_interpolators'
+            )
         ),
         help='The directory to read stellar evolution interpolator from.'
     )
@@ -48,45 +47,84 @@ def parse_command_line():
         help='Read system data from a CSV file downloaded from the NASA '
         'exoplanet archive.'
     )
+    parser.add_argument(
+        '--progress-pickle', '--progress',
+        default='progress.pickle',
+        help='The filename to save final eccentricities as soon as calculated '
+        'to allow continuing after interruption.'
+    )
+    parser.add_argument(
+        '--num-parallel-processes',
+        default=4,
+        help='The number of simultaneous processes to use for parallel '
+        'calculation of the evolution of systems.'
+    )
     add_info_cmdline_args(parser)
     result = parser.parse_args()
     if result.system_info_file:
         fix_system_units(result)
     return result
 
-def get_current_eccentricity(system,
-                             interpolator,
-                             lgQ,
-                             initial_eccentricity=0.55):
-    """Return the ecc. at the current age of the given system given lg(Q)."""
+def prepare_nasa_system(system, interpolator):
+    """Add attributes to the given system to allow calculating its evolution."""
 
-    evolution = find_evolution(
-        system=system,
-        interpolator=interpolator,
-        dissipation=dict(
-            primary=None,
-            secondary=dict(
-                reference_phase_lag=phase_lag(lgQ),
-                tidal_frequency_breaks=None,
-                spin_frequency_breaks=None,
-                tidal_frequency_powers=numpy.array([0.0]),
-                spin_frequency_powers=numpy.array([0.0])
-            )
-        ),
-        initial_eccentricity=initial_eccentricity,
-        #False positive.
+    print('Preparing NASA system for evolution:')
+    print(repr(system))
+
+    assert numpy.isfinite(system.orbital_period)
+
+    if (
+            numpy.isfinite(system.db_star_mass
+                           *
+                           system.db_star_age
+                           *
+                           system.db_star_radius)
+    ):
+        system.primary_mass = system.db_star_mass
+        system.age = system.db_star_age
+        system.primary_radius = system.db_star_radius
+    else:
+        mass_age_solutions = interpolator.change_variables(
+            float(system.feh),
+            teff=float(system.teff.to_value('K')),
+            rho=float(system.star_density.to_value('g/cm3'))
+        )
+        assert mass_age_solutions
+
+        star_mass, star_age = mass_age_solutions[0]
+        #False positive
         #pylint: disable=no-member
-        disk_period=(7.0 * units.day),
-        disk_dissipation_age=(5e-3 * units.Gyr),
+        system.primary_mass = star_mass * units.M_sun
+        system.age = star_age * units.Gyr
         #pylint: enable=no-member
-        max_age=system.age
-    )
-    print(evolution.format())
-    assert numpy.allclose(evolution.age[-1],
-                          system.age.to_value('Gyr'),
-                          rtol=1e-10,
-                          atol=1e-10)
-    return evolution.eccentricity[-1]
+        system.primary_radius = interpolator(
+            'radius',
+            star_mass,
+            system.feh
+        )(
+            system.age.to_value('Gyr')
+        ) * units.Unit('solRad')
+
+    assert numpy.isfinite(system.primary_mass)
+
+    if numpy.isfinite(system.db_planet_mass):
+        system.secondary_mass = system.db_planet_mass
+    else:
+        assert numpy.isfinite(system.rv_semi_amplitude)
+        system.secondary_mass = calculate_secondary_mass(
+            primary_mass=system.primary_mass,
+            orbital_period=system.orbital_period,
+            rv_semi_amplitude=system.rv_semi_amplitude,
+            eccentricity=system.eccentricity
+        )
+    if numpy.isfinite(system.db_planet_radius):
+        system.secondary_radius = system.db_planet_radius
+    else:
+        assert numpy.isfinite(system.primary_radius)
+        assert numpy.isfinite(system.planet_to_star_radius_ratio)
+        system.secondary_radius = (system.planet_to_star_radius_ratio
+                                   *
+                                   system.primary_radius)
 
 def main():
     """Calculate the grid specified on the command line."""
@@ -106,56 +144,39 @@ def main():
                                     eliminate=(),
                                     add_units=True,
                                     need_ages=False)
-#        plot_eccentricity_vs_period(systems)
-        system = get_nasa_system('WASP-156', systems)
-    else:
-        system = cmdline_args
-
-    print('System:')
-    print(repr(system))
-    mass_age_solutions = interpolator.change_variables(
-        float(system.feh),
-        teff=float(system.teff.to_value('K')),
-        rho=float(system.star_density.to_value('g/cm3'))
-    )
-#    plot_star_solving(interpolator, system)
-    print('Mass age solutions: ' + repr(mass_age_solutions))
-    if mass_age_solutions:
-        star_mass, star_age = mass_age_solutions[0]
-        #False positive
+        evolution_systems = []
+        #Fales positive
         #pylint: disable=no-member
-        system.primary_mass = star_mass * units.M_sun
-        system.age = star_age * units.Gyr
+        for system_index in numpy.argwhere(systems.pl_discmethod
+                                           ==
+                                           'Transit')[:, 0]:
         #pylint: enable=no-member
-        system.primary_radius = interpolator(
-            'radius',
-            star_mass,
-            system.feh
-        )(
-            system.age
-        ) * units.Unit('solRad')
+            try:
+                system = get_nasa_system(system_index, systems)
+                prepare_nasa_system(system, interpolator)
+                print('Prepared system: ' + repr(system))
+                evolution_systems.append(system)
+            except AssertionError:
+                pass
     else:
-        system.primary_mass = system.db_star_mass
-        system.age = system.db_star_age
-        system.primary_radius = system.db_star_radius
-    print('System:')
-    print(repr(system))
-    system.secondary_mass = calculate_secondary_mass(
-        primary_mass=system.primary_mass,
-        orbital_period=system.orbital_period,
-        rv_semi_amplitude=system.rv_semi_amplitude,
-        eccentricity=system.eccentricity
+        evolution_systems = [prepare_nasa_system(cmdline_args, interpolator)]
+
+    grid_jobs = [
+        (system, lgQ) for system in evolution_systems for lgQ in numpy.arange(3.0, 10.0, 1.0)
+    ]
+
+    pool_manager = Manager()
+    calculate_current_eccentricity = CurrentEccentricityCalculator(
+        initial_eccentricity=0.55,
+        interpolator=interpolator,
+        progress_pickle_fname=cmdline_args.progress_pickle,
+        progress_lock=pool_manager.Lock()
     )
-    system.secondary_radius = (system.planet_to_star_radius_ratio
-                               *
-                               system.primary_radius)
-    print('System:')
-    print(repr(system))
-    plot_lgQ = numpy.arange(3.0, 10.0, 1.0)
-    plot_e = [get_current_eccentricity(system, interpolator, lgQ)
-              for lgQ in plot_lgQ]
-    pyplot.plot(plot_lgQ, plot_e, 'ok')
-    pyplot.show()
+    with Pool(cmdline_args.num_parallel_processes) as magfit_pool:
+        magfit_pool.map(
+            calculate_current_eccentricity,
+            grid_jobs
+        )
 
 if __name__ == '__main__':
     main()
