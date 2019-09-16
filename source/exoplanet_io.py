@@ -1,6 +1,9 @@
 """Utilities for input and output of exoplanet data."""
 
+from types import SimpleNamespace
+
 from astropy import units
+import numpy
 
 from planetary_system_io import QuantityWithErrors
 
@@ -13,6 +16,11 @@ def add_info_cmdline_args(parser):
         help='Specify a configuration file in liu of using command line '
         'options. Any option can still be overriden on the command line. '
         'Default: %(default)s'
+    )
+    parser.add_argument(
+        '--eccentricity-expansion-coefficients', '--e-coef',
+        default='eccentricity_expansion_coef.txt',
+        help='The file to read eccentricity expansion coefficients from.'
     )
     parser.add_argument(
         '--system-info-file',
@@ -60,6 +68,49 @@ def add_info_cmdline_args(parser):
         type=QuantityWithErrors,
         help='relative orbital radius (a/R*)'
     )
+    parser.add_argument(
+        '--orbital-period', '--Porb',
+        type=QuantityWithErrors,
+        help='The present day orbital period of the system.'
+    )
+
+def get_nasa_system(hostname, nasa_systems):
+    """Return a single system from a parsed NASA exoplanets archive file."""
+
+    def get_quantity(system_index, column_name):
+        """Return a properly formatted Quantity instance with errors."""
+
+        result = units.Quantity(
+            getattr(nasa_systems, column_name)[system_index]
+        )[0]
+        result.plus_error = getattr(
+            nasa_systems,
+            column_name+'err1'
+        )[system_index][0]
+        result.minus_error = -getattr(
+            nasa_systems,
+            column_name+'err2'
+        )[system_index][0]
+        print('Result: ' + repr(result))
+        return result
+
+    system_index = numpy.where(nasa_systems.pl_hostname == hostname)[0]
+    result = SimpleNamespace(
+        star_density=get_quantity(system_index, 'st_dens'),
+        db_star_mass=get_quantity(system_index, 'st_mass'),
+        db_star_age=get_quantity(system_index, 'st_age'),
+        db_star_radius=get_quantity(system_index, 'st_rad'),
+        planet_to_star_radius_ratio=get_quantity(system_index,
+                                                 'pl_ratror'),
+        teff=get_quantity(system_index, 'st_teff'),
+        feh=get_quantity(system_index, 'st_metfe'),
+        logg=get_quantity(system_index, 'st_logg'),
+        rv_semi_amplitude=get_quantity(system_index, 'pl_rvamp'),
+        eccentricity=get_quantity(system_index, 'pl_orbeccen'),
+        semimajor_to_rstar_ratio=get_quantity(system_index, 'pl_ratdor'),
+        orbital_period=get_quantity(system_index, 'pl_orbper'),
+    )
+    return result
 
 def fix_system_units(cmdline_args):
     """Add units to the system parameters."""
@@ -67,5 +118,3 @@ def fix_system_units(cmdline_args):
     cmdline_args.star_density *= units.Unit('g/cm3')
     cmdline_args.teff *= units.Unit('K')
     cmdline_args.rv_semi_amplitude *= units.Unit('m/s')
-
-
