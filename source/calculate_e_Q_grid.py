@@ -55,6 +55,7 @@ def parse_command_line():
     )
     parser.add_argument(
         '--num-parallel-processes',
+        type=int,
         default=4,
         help='The number of simultaneous processes to use for parallel '
         'calculation of the evolution of systems.'
@@ -155,7 +156,8 @@ def main():
                 system = get_nasa_system(system_index, systems)
                 prepare_nasa_system(system, interpolator)
                 print('Prepared system: ' + repr(system))
-                evolution_systems.append(system)
+                if system.primary_mass <= 1.2:
+                    evolution_systems.append(system)
             except AssertionError:
                 pass
     else:

@@ -119,20 +119,22 @@ class CurrentEccentricityCalculator:
         print(evolution.format())
         #False positive
         #pylint: disable=no-member
-        assert numpy.allclose(evolution.age[-1],
-                              system.age.to_value('Gyr'),
-                              rtol=1e-10,
-                              atol=1e-10)
-        final_eccentricity = evolution.eccentricity[-1]
-        #pylint: enable=no-member
+        if numpy.allclose(evolution.age[-1],
+                          system.age.to_value('Gyr'),
+                          rtol=1e-10,
+                          atol=1e-10):
+            final_eccentricity = evolution.eccentricity[-1]
+            #pylint: enable=no-member
 
-        self._progress_lock.acquire()
-        pickle_new_result(system.hostname,
-                          lgQ,
-                          self.initial_eccentricity,
-                          final_eccentricity,
-                          self.progress_pickle_fname)
-        self._progress_lock.release()
+            self._progress_lock.acquire()
+            pickle_new_result(system.hostname,
+                              lgQ,
+                              self.initial_eccentricity,
+                              final_eccentricity,
+                              self.progress_pickle_fname)
+            self._progress_lock.release()
 
-        return final_eccentricity
+            return final_eccentricity
+        else:
+            return None
 #pylint: disable=too-few-public-methods
