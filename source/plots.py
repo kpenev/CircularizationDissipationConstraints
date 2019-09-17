@@ -1,11 +1,21 @@
+#!/usr/bin/env python3
+
 """A collection of useful plotting functions."""
 
 from matplotlib import pyplot
 import numpy
+from sys import argv
 
 from astropy import units
 
 from stellar_evolution.change_variables import QuantityEvaluator
+from planetary_system_io import read_nasa_planets
+
+from io_utilities import load_progress_pickle, get_nasa_system
+from process_e_Q_grid import\
+    format_eccentricity_vs_lgQ,\
+    invert_eccentricity_vs_lgQ,\
+    EccentricityEnvelope
 
 def plot_eccentricity_vs_period(systems):
     """Create a plot of eccentricity vs period."""
@@ -71,3 +81,59 @@ def plot_star_solving(interpolator, system):
                 )
     pyplot.plot([2.839], [5314], '+')
     pyplot.show()
+
+def plot_lgQ_vs_eccentricity(system, progress):
+    """Show a plot of the final eccentricity vs lgQ for a system."""
+
+
+    eccentricity_envelope = EccentricityEnvelope()
+    plot_data = format_eccentricity_vs_lgQ(progress[system.hostname])
+    pyplot.plot(plot_data[:, 0], plot_data[:, 1], '-k')
+    pyplot.plot(plot_data[:, 0], plot_data[:, 1], 'ok')
+
+    nominal_eccentricity = system.eccentricity
+    low_eccentricity = (system.eccentricity - system.eccentricity.minus_error)
+    envelope_eccentricity = eccentricity_envelope(
+        system.orbital_period.to_value('day')
+    )
+    pyplot.axhline(y=nominal_eccentricity, color='r')
+    pyplot.axhline(y=low_eccentricity, color='r')
+    pyplot.axhline(envelope_eccentricity, color='b')
+
+    nominal_e_lgQ = invert_eccentricity_vs_lgQ(progress[system.hostname],
+                                               nominal_eccentricity)
+    low_e_lgQ = invert_eccentricity_vs_lgQ(progress[system.hostname],
+                                           low_eccentricity)
+    envelope_e_lgQ = invert_eccentricity_vs_lgQ(progress[system.hostname],
+                                                envelope_eccentricity)
+    pyplot.plot([nominal_e_lgQ], [nominal_eccentricity], 'or')
+    pyplot.plot([low_e_lgQ], [low_eccentricity], 'or')
+    pyplot.plot([envelope_e_lgQ], [envelope_eccentricity], 'ob')
+
+    pyplot.title(
+        host
+        +
+        r'($R_p=%g R_j$, $M_p=%g M_j$, $P_{orb}=%g\,d$)'
+        %
+        (
+            system.db_planet_radius.to_value('R_jup'),
+            system.db_planet_mass.to_value('M_jup'),
+            system.orbital_period.to_value('day')
+        )
+    )
+    pyplot.xlabel(r"$\log_{10}(Q'_\star)$")
+    pyplot.ylabel('Eccentricity')
+    pyplot.show()
+
+if __name__ == '__main__':
+    progress = load_progress_pickle(argv[1])
+    systems = read_nasa_planets('../data/planets_2019.09.03_07.12.43.csv',
+                                eliminate=(),
+                                add_units=True,
+                                need_ages=False)
+
+    for host in progress.keys():
+        plot_lgQ_vs_eccentricity(
+            get_nasa_system(host, systems),
+            progress
+        )

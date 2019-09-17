@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+#pylint: disable=invalid-name
+
+"""Extract limits on log10(Q*') from a pre-calculated grid of eccentricities."""
+
+import numpy
+
+def format_eccentricity_vs_lgQ(eccentricity_vs_lgQ):
+    """
+    Return 2-D numpy array with lgQ in [:, 0] and e in [:, 1].
+
+    Args:
+        eccentricity_lgQ(dict):    The dictionary of pre-computer
+            eccentricity vs log10(Q*') as unpickled from the grid.
+
+    Return:
+        numpy.array:
+            See doc line.
+    """
+
+    data = [(item[0], item[1][1]) for item in eccentricity_vs_lgQ.items()]
+    return numpy.array(sorted(data, key=lambda item: item[1]))
+
+def _solve_line(x0, y0, x1, y1, target_y):
+    """Return x0 < x < x1 where a line crosses a target y value or None."""
+
+    result = (target_y - y0) * (x0 - x1) / (y0 - y1) + x0
+    return (result if result >= x0 and result <= x1 else None)
+
+class EccentricityEnvelope:
+    """Class for working with the eccentricity envelovpe."""
+
+    def _eccentricity_envelope_line(self, orbital_period):
+        """Evaluate the straight line portion of the eccentricity envelope."""
+
+        return (
+            self.max_eccentricity
+            *
+            (orbital_period - self.min_period)
+            /
+            (self.max_period - self.min_period)
+        )
+
+    def __init__(self, min_period=0.8, max_period=5.0, max_eccentricity=0.6):
+        """Setup envelope going from 0 to max_e in the given period range."""
+
+        self.min_period = min_period
+        self.max_period = max_period
+        self.max_eccentricity = max_eccentricity
+
+    def __call__(self, orbital_period):
+        """Return the eccentricity envelovpe at the given orbital period."""
+
+        try:
+            if orbital_period < self.min_period:
+                return 0.0
+            elif orbital_period < self.max_period:
+                return self._eccentricity_envelope_line(orbital_period)
+            else:
+                return self.max_eccentricity
+        except ValueError:
+            result = numpy.zeros(orbital_period.shape, dtype=float)
+            result[
+                numpy.logical_and(
+                    orbital_period > self.min_period,
+                    orbital_period < self.max_period
+                )
+            ] = self._eccentricity_envelope_line(orbital_period)
+            result[orbital_period >= self.max_period] = self.max_eccentricity
+            return result
+
+    def get_period(self, eccentricity):
+        """Return the period where the e-envelope has the given value."""
+
+        if eccentricity < 0 or eccentricity > max_eccentricity:
+            return numpy.nan
+
+        return (
+            eccentricity
+            *
+            (self.max_period - self.min_period)
+            /
+            self.max_eccentricity
+            +
+            self.min_period
+        )
+
+def invert_eccentricity_vs_lgQ(eccentricity_vs_lgQ, eccentricity):
+    """
+    Estimate log10(Q*') which reproduced the given eccentricity for a system.
+
+    Args:
+        eccentricity_lgQ(dict):    The dictionary of pre-computer
+            eccentricity vs log10(Q*') as unpickled from the grid.
+
+        eccentricity(float):     The eccentricity to reproduce.
+
+    Returns:
+        float:
+            An estamite of the value of log10(Q*') at which the given
+            eccentricity is reproduced for the given system.
+    """
+
+    interp_data = format_eccentricity_vs_lgQ(eccentricity_vs_lgQ)
+
+    for i in range(interp_data.shape[0] - 1):
+        result = _solve_line(*interp_data[i: i + 2].flatten(), eccentricity)
+        if result is not None:
+            return result
