@@ -156,7 +156,7 @@ def main():
                 system = get_nasa_system(system_index, systems)
                 prepare_nasa_system(system, interpolator)
                 print('Prepared system: ' + repr(system))
-                if system.primary_mass <= 1.2:
+                if system.primary_mass <= 1.2 * units.M_sun:
                     evolution_systems.append(system)
             except AssertionError:
                 pass
