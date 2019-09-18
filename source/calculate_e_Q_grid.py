@@ -17,10 +17,12 @@ from orbital_evolution.evolve_interface import library as\
 from planetary_system_io import read_nasa_planets
 from binary_utils import calculate_secondary_mass
 
-from io_utilities import\
-    add_info_cmdline_args,\
+from io_utilities import get_nasa_system
+from command_line_utilities import\
     fix_system_units,\
-    get_nasa_system
+    add_info_cmdline_args,\
+    add_assumptions_cmdline_args,\
+    add_path_cmdline_args
 from current_eccentricity_calculator import CurrentEccentricityCalculator
 
 def parse_command_line():
@@ -33,27 +35,6 @@ def parse_command_line():
         ignore_unknown_config_file_keys=True
     )
     parser.add_argument(
-        '--stellar-evolution-interpolator-dir', '--interpolator-dir',
-        default=(
-            os.path.expanduser(
-                '~/projects/git/poet/stellar_evolution_interpolators'
-            )
-        ),
-        help='The directory to read stellar evolution interpolator from.'
-    )
-    parser.add_argument(
-        '--nasa-data',
-        default=None,
-        help='Read system data from a CSV file downloaded from the NASA '
-        'exoplanet archive.'
-    )
-    parser.add_argument(
-        '--progress-pickle', '--progress',
-        default='progress.pickle',
-        help='The filename to save final eccentricities as soon as calculated '
-        'to allow continuing after interruption.'
-    )
-    parser.add_argument(
         '--num-parallel-processes',
         type=int,
         default=4,
@@ -61,14 +42,15 @@ def parse_command_line():
         'calculation of the evolution of systems.'
     )
     add_info_cmdline_args(parser)
+    add_assumptions_cmdline_args(parser)
+    add_path_cmdline_args(parser)
     result = parser.parse_args()
-    if result.system_info_file:
-        fix_system_units(result)
+    fix_system_units(result)
     return result
 
 def prepare_nasa_system(system,
                         interpolator,
-                        small_planet_density=(2.0 * units.Unit('g/cm3'))):
+                        small_planet_density):
     """Add attributes to the given system to allow calculating its evolution."""
 
     def set_primary_properties():
@@ -210,7 +192,9 @@ def main():
         #pylint: enable=no-member
             try:
                 system = get_nasa_system(system_index, systems)
-                prepare_nasa_system(system, interpolator)
+                prepare_nasa_system(system,
+                                    interpolator,
+                                    cmdline_args.small_planet_density)
                 print('Prepared system: ' + repr(system))
                 if system.primary_mass <= 1.2 * units.M_sun:
                     evolution_systems.append(system)

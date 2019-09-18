@@ -4,9 +4,9 @@
 
 from matplotlib import pyplot
 import numpy
-from sys import argv
 
 from astropy import units
+from configargparse import ArgumentParser, DefaultsFormatter
 
 from stellar_evolution.change_variables import QuantityEvaluator
 from planetary_system_io import read_nasa_planets
@@ -18,6 +18,25 @@ from process_e_Q_grid import\
     format_eccentricity_vs_lgQ,\
     invert_eccentricity_vs_lgQ,\
     EccentricityEnvelope
+from command_line_utilities import\
+    fix_system_units,\
+    add_assumptions_cmdline_args,\
+    add_path_cmdline_args
+
+def parse_command_line():
+    """Parse the command line defining the plots to create."""
+
+    parser = ArgumentParser(
+        description=__doc__,
+        default_config_files=['plots.cfg'],
+        formatter_class=DefaultsFormatter,
+        ignore_unknown_config_file_keys=True
+    )
+    add_assumptions_cmdline_args(parser)
+    add_path_cmdline_args(parser)
+    result = parser.parse_args()
+    fix_system_units(result)
+    return result
 
 def plot_eccentricity_vs_period(systems):
     """Create a plot of eccentricity vs period."""
@@ -130,7 +149,7 @@ def plot_lgQ_vs_eccentricity(system, progress):
 def plot_all_systems_lgQ_vs_eccentricity(progress_pickle, system_data):
     """Show sequentially plots of lgQ vs e for all systems."""
 
-    progress = load_progress_pickle(argv[1])
+    progress = load_progress_pickle(progress_pickle)
     systems = read_nasa_planets(system_data,
                                 eliminate=(),
                                 add_units=True,
@@ -141,10 +160,13 @@ def plot_all_systems_lgQ_vs_eccentricity(progress_pickle, system_data):
             progress
         )
 
-def plot_lgQ_vs_period(progress_pickle, system_data, interpolator):
+def plot_lgQ_vs_period(progress_pickle,
+                       system_data,
+                       interpolator,
+                       small_planet_density):
     """Make a plot of the log10(Q*') constraints vs orbital period."""
 
-    progress = load_progress_pickle(argv[1])
+    progress = load_progress_pickle(progress_pickle)
     systems = read_nasa_planets(system_data,
                                 eliminate=(),
                                 add_units=True,
@@ -161,7 +183,7 @@ def plot_lgQ_vs_period(progress_pickle, system_data, interpolator):
     lgQ_range = (3, 9)
     for index, (host, lgQ_vs_period) in enumerate(progress.items()):
         system = get_nasa_system(host, systems)
-        prepare_nasa_system(system, interpolator)
+        prepare_nasa_system(system, interpolator, small_planet_density)
         print('System: ' + repr(system))
 
         nominal_e_lgQ = invert_eccentricity_vs_lgQ(
@@ -258,11 +280,14 @@ def plot_lgQ_vs_period(progress_pickle, system_data, interpolator):
     pyplot.show()
 
 if __name__ == '__main__':
+    cmdline_args = parse_command_line()
     interpolator = StellarEvolutionManager(
-        '/Users/kpenev/projects/git/poet/stellar_evolution_interpolators'
+        cmdline_args.stellar_evolution_interpolator_dir
     ).get_interpolator_by_name(
         'default'
     )
-    plot_lgQ_vs_period('progress.pickle',
-                       '../data/planets_2019.09.03_07.12.43.csv',
-                       interpolator)
+
+    plot_lgQ_vs_period(cmdline_args.progress_pickle,
+                       cmdline_args.nasa_data,
+                       interpolator,
+                       cmdline_args.small_planet_density)
