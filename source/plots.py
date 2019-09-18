@@ -10,8 +10,10 @@ from astropy import units
 
 from stellar_evolution.change_variables import QuantityEvaluator
 from planetary_system_io import read_nasa_planets
+from stellar_evolution.manager import StellarEvolutionManager
 
 from io_utilities import load_progress_pickle, get_nasa_system
+from calculate_e_Q_grid import prepare_nasa_system
 from process_e_Q_grid import\
     format_eccentricity_vs_lgQ,\
     invert_eccentricity_vs_lgQ,\
@@ -139,7 +141,7 @@ def plot_all_systems_lgQ_vs_eccentricity(progress_pickle, system_data):
             progress
         )
 
-def plot_lgQ_vs_period(progress_pickle, system_data):
+def plot_lgQ_vs_period(progress_pickle, system_data, interpolator):
     """Make a plot of the log10(Q*') constraints vs orbital period."""
 
     progress = load_progress_pickle(argv[1])
@@ -147,17 +149,20 @@ def plot_lgQ_vs_period(progress_pickle, system_data):
                                 eliminate=(),
                                 add_units=True,
                                 need_ages=False)
+    print('Systems semimajor: ' + repr(systems.pl_orbsmax))
     eccentricity_envelope = EccentricityEnvelope()
 
-    plot_porb = numpy.empty(len(progress), dtype=float)
-    plot_lgQ_min = numpy.empty(plot_porb.size, dtype=float)
-    plot_lgQ_nominal = numpy.empty(plot_porb.size, dtype=float)
-    plot_lgQ_max = numpy.empty(plot_porb.size, dtype=float)
-    lower_limit = numpy.empty(plot_porb.size, dtype=bool)
-    upper_limit = numpy.empty(plot_porb.size, dtype=bool)
+    plot_x = numpy.empty(len(progress), dtype=float)
+    plot_lgQ_min = numpy.empty(plot_x.size, dtype=float)
+    plot_lgQ_nominal = numpy.empty(plot_x.size, dtype=float)
+    plot_lgQ_max = numpy.empty(plot_x.size, dtype=float)
+    lower_limit = numpy.empty(plot_x.size, dtype=bool)
+    upper_limit = numpy.empty(plot_x.size, dtype=bool)
     lgQ_range = (3, 9)
     for index, (host, lgQ_vs_period) in enumerate(progress.items()):
         system = get_nasa_system(host, systems)
+        prepare_nasa_system(system, interpolator)
+        print('System: ' + repr(system))
 
         nominal_e_lgQ = invert_eccentricity_vs_lgQ(
             lgQ_vs_period,
@@ -172,7 +177,27 @@ def plot_lgQ_vs_period(progress_pickle, system_data):
             eccentricity_envelope(system.orbital_period.to_value('day'))
         )
 
-        plot_porb[index] = system.orbital_period.to_value('day')
+#        plot_x[index] = system.orbital_period.to_value('day')
+        plot_x[index] = (
+            (
+                system.db_planet_radius
+                /
+                system.semimajor
+            )**5.0
+            *
+            (
+                system.db_star_mass
+                /
+                system.db_planet_mass
+            )**1.0
+        ).to_value('')
+#        plot_x[index] = (
+#            3.0 * system.db_planet_mass
+#            /
+#            (4.0 * numpy.pi * system.db_planet_radius**3)
+#        ).to_value('g/cm3')
+        plot_x[index] = system.db_planet_radius.to_value('R_jup')
+
         plot_lgQ_min[index] = low_e_lgQ
         plot_lgQ_nominal[index] = nominal_e_lgQ
         plot_lgQ_max[index] = envelope_e_lgQ
@@ -188,14 +213,18 @@ def plot_lgQ_vs_period(progress_pickle, system_data):
     upper_limit = numpy.logical_and(upper_limit, useful)
     lower_limit = numpy.logical_and(lower_limit, useful)
 
+#    pyplot.xscale('log')
+
     pyplot.errorbar(
-        x=plot_porb[upper_limit],
+        x=plot_x[upper_limit],
         y=plot_lgQ_max[upper_limit],
         yerr=[
             plot_lgQ_max[upper_limit] - lgQ_range[0],
             numpy.zeros(upper_limit.sum())
         ],
-        fmt='vr'
+        fmt='vr',
+        markersize=10,
+        linewidth=0.3
     )
 
     lower_errors = plot_lgQ_nominal - plot_lgQ_min
@@ -204,28 +233,36 @@ def plot_lgQ_vs_period(progress_pickle, system_data):
     print('lgQ min: ' + repr(plot_lgQ_min[lower_limit]))
 
     pyplot.errorbar(
-        x=plot_porb[lower_limit],
+        x=plot_x[lower_limit],
         y=plot_lgQ_nominal[lower_limit],
         yerr=[
             lower_errors[lower_limit],
             lgQ_range[1] - plot_lgQ_nominal[lower_limit]
         ],
-        fmt='^b'
+        fmt='^b',
+        markersize=10,
+        linewidth=0.3
     )
 
 
-    pyplot.xscale('log')
     pyplot.errorbar(
-        x=plot_porb[not_limit],
+        x=plot_x[not_limit],
         y=plot_lgQ_nominal[not_limit],
         yerr=[(plot_lgQ_nominal[not_limit] - plot_lgQ_min[not_limit]),
               (plot_lgQ_max[not_limit] - plot_lgQ_nominal[not_limit])],
         fmt='og',
-        markersize=10
+        markersize=10,
+        linewidth=3
     )
 
     pyplot.show()
 
 if __name__ == '__main__':
+    interpolator = StellarEvolutionManager(
+        '/Users/kpenev/projects/git/poet/stellar_evolution_interpolators'
+    ).get_interpolator_by_name(
+        'default'
+    )
     plot_lgQ_vs_period('progress.pickle',
-                       '../data/planets_2019.09.03_07.12.43.csv')
+                       '../data/planets_2019.09.03_07.12.43.csv',
+                       interpolator)

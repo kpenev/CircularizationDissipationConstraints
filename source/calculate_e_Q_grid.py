@@ -66,66 +66,122 @@ def parse_command_line():
         fix_system_units(result)
     return result
 
-def prepare_nasa_system(system, interpolator):
+def prepare_nasa_system(system,
+                        interpolator,
+                        small_planet_density=(2.0 * units.Unit('g/cm3'))):
     """Add attributes to the given system to allow calculating its evolution."""
+
+    def set_primary_properties():
+        """Set the mass, age and radius of the primary."""
+
+        if (
+                numpy.isfinite(system.db_star_mass
+                               *
+                               system.db_star_age
+                               *
+                               system.db_star_radius)
+        ):
+            system.primary_mass = system.db_star_mass
+            system.age = system.db_star_age
+            system.primary_radius = system.db_star_radius
+        else:
+            mass_age_solutions = interpolator.change_variables(
+                float(system.feh),
+                teff=float(system.teff.to_value('K')),
+                rho=float(system.star_density.to_value('g/cm3'))
+            )
+            assert mass_age_solutions
+
+            star_mass, star_age = mass_age_solutions[0]
+            #False positive
+            #pylint: disable=no-member
+            system.primary_mass = star_mass * units.M_sun
+            system.age = star_age * units.Gyr
+            #pylint: enable=no-member
+            system.primary_radius = interpolator(
+                'radius',
+                star_mass,
+                system.feh
+            )(
+                system.age.to_value('Gyr')
+            ) * units.Unit('solRad')
+
+        assert numpy.isfinite(system.primary_mass)
+
+    def set_secondary_properties():
+        """Set the mass and radius of the secondary."""
+
+        if numpy.isfinite(system.db_planet_radius):
+            system.secondary_radius = system.db_planet_radius
+        else:
+            assert numpy.isfinite(system.primary_radius)
+            assert numpy.isfinite(system.planet_to_star_radius_ratio)
+            system.secondary_radius = (system.planet_to_star_radius_ratio
+                                       *
+                                       system.primary_radius)
+
+        if numpy.isfinite(system.db_planet_mass):
+            system.secondary_mass = system.db_planet_mass
+        else:
+            if numpy.isfinite(system.rv_semi_amplitude):
+                system.secondary_mass = calculate_secondary_mass(
+                    primary_mass=system.primary_mass,
+                    orbital_period=system.orbital_period,
+                    rv_semi_amplitude=system.rv_semi_amplitude,
+                    eccentricity=system.eccentricity
+                )
+            else:
+                assert system.secondary_radius < 5.0 * units.earthRad
+                system.secondary_mass = (
+                    small_planet_density
+                    *
+                    4.0 / 3.0 * numpy.pi * system.secondary_radius**3
+                )
+
+    def fix_eccentricity():
+        """Use backup methods for calculating eccentricity if unknown."""
+
+        if (
+                (
+                    not numpy.isfinite(system.eccentricity)
+                    or
+                    not bool(system.eccentricity)
+                )
+                and
+                numpy.isfinite(system.impact_parameter)
+                and
+                numpy.isfinite(system.transit_duration)
+        ):
+            duration_anomaly = (
+                (
+                    (
+                        (system.primary_radius + system.secondary_radius)**2
+                        -
+                        (system.impact_parameter * system.primary_radius)**2
+                    )**0.5
+                    /
+                    (numpy.pi * system.semimajor)
+                ) * system.orbital_period
+                /
+                system.transit_duration
+            ).to_value('')
+            system.eccentricity = units.Quantity(
+                numpy.abs((duration_anomaly**2 - 1)
+                          /
+                          (duration_anomaly**2 + 1))
+            )
+            system.eccentricity.plus_error = 1.0 - system.eccentricity
+            system.eccentricity.minus_error = 0.0
+            print('Eccentricity fallback used for ' + system.hostname)
 
     print('Preparing NASA system for evolution:')
     print(repr(system))
 
     assert numpy.isfinite(system.orbital_period)
 
-    if (
-            numpy.isfinite(system.db_star_mass
-                           *
-                           system.db_star_age
-                           *
-                           system.db_star_radius)
-    ):
-        system.primary_mass = system.db_star_mass
-        system.age = system.db_star_age
-        system.primary_radius = system.db_star_radius
-    else:
-        mass_age_solutions = interpolator.change_variables(
-            float(system.feh),
-            teff=float(system.teff.to_value('K')),
-            rho=float(system.star_density.to_value('g/cm3'))
-        )
-        assert mass_age_solutions
-
-        star_mass, star_age = mass_age_solutions[0]
-        #False positive
-        #pylint: disable=no-member
-        system.primary_mass = star_mass * units.M_sun
-        system.age = star_age * units.Gyr
-        #pylint: enable=no-member
-        system.primary_radius = interpolator(
-            'radius',
-            star_mass,
-            system.feh
-        )(
-            system.age.to_value('Gyr')
-        ) * units.Unit('solRad')
-
-    assert numpy.isfinite(system.primary_mass)
-
-    if numpy.isfinite(system.db_planet_mass):
-        system.secondary_mass = system.db_planet_mass
-    else:
-        assert numpy.isfinite(system.rv_semi_amplitude)
-        system.secondary_mass = calculate_secondary_mass(
-            primary_mass=system.primary_mass,
-            orbital_period=system.orbital_period,
-            rv_semi_amplitude=system.rv_semi_amplitude,
-            eccentricity=system.eccentricity
-        )
-    if numpy.isfinite(system.db_planet_radius):
-        system.secondary_radius = system.db_planet_radius
-    else:
-        assert numpy.isfinite(system.primary_radius)
-        assert numpy.isfinite(system.planet_to_star_radius_ratio)
-        system.secondary_radius = (system.planet_to_star_radius_ratio
-                                   *
-                                   system.primary_radius)
+    set_primary_properties()
+    set_secondary_properties()
+    fix_eccentricity()
 
 def main():
     """Calculate the grid specified on the command line."""

@@ -95,6 +95,8 @@ def get_nasa_system(system_id, nasa_systems):
     def get_quantity(system_index, column_name):
         """Return a properly formatted Quantity instance with errors."""
 
+        print('Getting ' + column_name + ': ' + repr(getattr(nasa_systems,
+                                                             column_name)[system_index]))
         result = units.Quantity(
             getattr(nasa_systems, column_name)[system_index]
         )
@@ -135,6 +137,9 @@ def get_nasa_system(system_id, nasa_systems):
         eccentricity_limit=(nasa_systems.pl_orbeccenlim[system_index] > 0.5),
         semimajor_to_rstar_ratio=get_quantity(system_index, 'pl_ratdor'),
         orbital_period=get_quantity(system_index, 'pl_orbper'),
+        semimajor=get_quantity(system_index, 'pl_orbsmax'),
+        impact_parameter=get_quantity(system_index, 'pl_imppar'),
+        transit_duration=get_quantity(system_index, 'pl_trandur')
     )
     return result
 
