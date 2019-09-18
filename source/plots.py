@@ -149,8 +149,14 @@ def plot_lgQ_vs_period(progress_pickle, system_data):
                                 need_ages=False)
     eccentricity_envelope = EccentricityEnvelope()
 
-    plot_porb, plot_lgQ_min, plot_lgQ_nominal, plot_lgQ_max = [], [], [], []
-    for host, lgQ_vs_period in progress.items():
+    plot_porb = numpy.empty(len(progress), dtype=float)
+    plot_lgQ_min = numpy.empty(plot_porb.size, dtype=float)
+    plot_lgQ_nominal = numpy.empty(plot_porb.size, dtype=float)
+    plot_lgQ_max = numpy.empty(plot_porb.size, dtype=float)
+    lower_limit = numpy.empty(plot_porb.size, dtype=bool)
+    upper_limit = numpy.empty(plot_porb.size, dtype=bool)
+    lgQ_range = (3, 9)
+    for index, (host, lgQ_vs_period) in enumerate(progress.items()):
         system = get_nasa_system(host, systems)
 
         nominal_e_lgQ = invert_eccentricity_vs_lgQ(
@@ -166,13 +172,58 @@ def plot_lgQ_vs_period(progress_pickle, system_data):
             eccentricity_envelope(system.orbital_period.to_value('day'))
         )
 
-        plot_porb.append(system.orbital_period.to_value('day'))
-        plot_lgQ_min.append(low_e_lgQ)
-        plot_lgQ_nominal.append(nominal_e_lgQ)
-        plot_lgQ_max.append(envelope_e_lgQ)
-    pyplot.semilogx(plot_porb, plot_lgQ_min, 'or')
-    pyplot.semilogx(plot_porb, plot_lgQ_nominal, 'og')
-    pyplot.semilogx(plot_porb, plot_lgQ_max, 'ob')
+        plot_porb[index] = system.orbital_period.to_value('day')
+        plot_lgQ_min[index] = low_e_lgQ
+        plot_lgQ_nominal[index] = nominal_e_lgQ
+        plot_lgQ_max[index] = envelope_e_lgQ
+
+        upper_limit[index] = (system.eccentricity_limit
+                              or
+                              (not bool(low_e_lgQ)))
+        lower_limit[index] = (envelope_e_lgQ is None)
+
+
+    not_limit = numpy.logical_not(numpy.logical_or(lower_limit, upper_limit))
+    useful = numpy.logical_not(numpy.logical_and(lower_limit, upper_limit))
+    upper_limit = numpy.logical_and(upper_limit, useful)
+    lower_limit = numpy.logical_and(lower_limit, useful)
+
+    pyplot.errorbar(
+        x=plot_porb[upper_limit],
+        y=plot_lgQ_max[upper_limit],
+        yerr=[
+            plot_lgQ_max[upper_limit] - lgQ_range[0],
+            numpy.zeros(upper_limit.sum())
+        ],
+        fmt='vr'
+    )
+
+    lower_errors = plot_lgQ_nominal - plot_lgQ_min
+    print('lower_errors: ' + repr(lower_errors[lower_limit]))
+    print('lgQ nominal: ' + repr(plot_lgQ_nominal[lower_limit]))
+    print('lgQ min: ' + repr(plot_lgQ_min[lower_limit]))
+
+    pyplot.errorbar(
+        x=plot_porb[lower_limit],
+        y=plot_lgQ_nominal[lower_limit],
+        yerr=[
+            lower_errors[lower_limit],
+            lgQ_range[1] - plot_lgQ_nominal[lower_limit]
+        ],
+        fmt='^b'
+    )
+
+
+    pyplot.xscale('log')
+    pyplot.errorbar(
+        x=plot_porb[not_limit],
+        y=plot_lgQ_nominal[not_limit],
+        yerr=[(plot_lgQ_nominal[not_limit] - plot_lgQ_min[not_limit]),
+              (plot_lgQ_max[not_limit] - plot_lgQ_nominal[not_limit])],
+        fmt='og',
+        markersize=10
+    )
+
     pyplot.show()
 
 if __name__ == '__main__':

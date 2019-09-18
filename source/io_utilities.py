@@ -132,6 +132,7 @@ def get_nasa_system(system_id, nasa_systems):
         logg=get_quantity(system_index, 'st_logg'),
         rv_semi_amplitude=get_quantity(system_index, 'pl_rvamp'),
         eccentricity=get_quantity(system_index, 'pl_orbeccen'),
+        eccentricity_limit=(nasa_systems.pl_orbeccenlim[system_index] > 0.5),
         semimajor_to_rstar_ratio=get_quantity(system_index, 'pl_ratdor'),
         orbital_period=get_quantity(system_index, 'pl_orbper'),
     )
