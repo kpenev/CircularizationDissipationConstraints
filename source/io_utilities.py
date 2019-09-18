@@ -7,8 +7,6 @@ from types import SimpleNamespace
 from astropy import units
 import numpy
 
-from planetary_system_io import QuantityWithErrors
-
 def get_nasa_system(system_id, nasa_systems):
     """
     Return a single system from a parsed NASA exoplanets archive file.

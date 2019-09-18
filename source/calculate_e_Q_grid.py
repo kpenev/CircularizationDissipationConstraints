@@ -134,6 +134,7 @@ def prepare_nasa_system(system,
                 and
                 numpy.isfinite(system.transit_duration)
         ):
+            print('Applying eccentricity fallback to system: ' + repr(system))
             duration_anomaly = (
                 (
                     (
@@ -143,7 +144,9 @@ def prepare_nasa_system(system,
                     )**0.5
                     /
                     (numpy.pi * system.semimajor)
-                ) * system.orbital_period
+                )
+                *
+                system.orbital_period
                 /
                 system.transit_duration
             ).to_value('')

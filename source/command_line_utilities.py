@@ -3,6 +3,8 @@
 import os.path
 from astropy import units
 
+from planetary_system_io import QuantityWithErrors
+
 def add_info_cmdline_args(parser):
     """Add arguments to a parser to parse required parameters from info file."""
 
@@ -73,14 +75,16 @@ def add_info_cmdline_args(parser):
 def fix_system_units(cmdline_args):
     """Add units to the system parameters."""
 
-    if hasattr(cmdline_args, 'density'):
-        cmdline_args.star_density *= units.Unit('g/cm3')
-    if hasattr(cmdline_args, 'density'):
-        cmdline_args.teff *= units.Unit('K')
-    if hasattr(cmdline_args, 'rv_semi_amplitude'):
-        cmdline_args.rv_semi_amplitude *= units.Unit('m/s')
-    if hasattr(cmdline_args, 'small_planet_density'):
-        cmdline_args.small_planet_density *= units.Unit('g/cm3')
+    for attribute, unit_str in [('density', 'g/cm3'),
+                                ('teff', 'K'),
+                                ('rv_semi_amplitude', 'm/s'),
+                                ('small_planet_density', 'g/cm3')]:
+        if getattr(cmdline_args, attribute, None) is not None:
+            setattr(
+                cmdline_args,
+                attribute,
+                getattr(cmdline_args, attribute) * units.Unit(unit_str)
+            )
 
 def add_assumptions_cmdline_args(parser):
     """Add arguments controlling what assumptions should be made."""
