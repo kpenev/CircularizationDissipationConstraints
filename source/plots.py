@@ -111,7 +111,7 @@ def plot_lgQ_vs_eccentricity(system, progress):
     pyplot.plot([envelope_e_lgQ], [envelope_eccentricity], 'ob')
 
     pyplot.title(
-        host
+        system.hostname
         +
         r'($R_p=%g R_j$, $M_p=%g M_j$, $P_{orb}=%g\,d$)'
         %
@@ -125,15 +125,56 @@ def plot_lgQ_vs_eccentricity(system, progress):
     pyplot.ylabel('Eccentricity')
     pyplot.show()
 
-if __name__ == '__main__':
+def plot_all_systems_lgQ_vs_eccentricity(progress_pickle, system_data):
+    """Show sequentially plots of lgQ vs e for all systems."""
+
     progress = load_progress_pickle(argv[1])
-    systems = read_nasa_planets('../data/planets_2019.09.03_07.12.43.csv',
+    systems = read_nasa_planets(system_data,
                                 eliminate=(),
                                 add_units=True,
                                 need_ages=False)
-
     for host in progress.keys():
         plot_lgQ_vs_eccentricity(
             get_nasa_system(host, systems),
             progress
         )
+
+def plot_lgQ_vs_period(progress_pickle, system_data):
+    """Make a plot of the log10(Q*') constraints vs orbital period."""
+
+    progress = load_progress_pickle(argv[1])
+    systems = read_nasa_planets(system_data,
+                                eliminate=(),
+                                add_units=True,
+                                need_ages=False)
+    eccentricity_envelope = EccentricityEnvelope()
+
+    plot_porb, plot_lgQ_min, plot_lgQ_nominal, plot_lgQ_max = [], [], [], []
+    for host, lgQ_vs_period in progress.items():
+        system = get_nasa_system(host, systems)
+
+        nominal_e_lgQ = invert_eccentricity_vs_lgQ(
+            lgQ_vs_period,
+            system.eccentricity
+        )
+        low_e_lgQ = invert_eccentricity_vs_lgQ(
+            lgQ_vs_period,
+            system.eccentricity - system.eccentricity.minus_error
+        )
+        envelope_e_lgQ = invert_eccentricity_vs_lgQ(
+            lgQ_vs_period,
+            eccentricity_envelope(system.orbital_period.to_value('day'))
+        )
+
+        plot_porb.append(system.orbital_period.to_value('day'))
+        plot_lgQ_min.append(low_e_lgQ)
+        plot_lgQ_nominal.append(nominal_e_lgQ)
+        plot_lgQ_max.append(envelope_e_lgQ)
+    pyplot.semilogx(plot_porb, plot_lgQ_min, 'or')
+    pyplot.semilogx(plot_porb, plot_lgQ_nominal, 'og')
+    pyplot.semilogx(plot_porb, plot_lgQ_max, 'ob')
+    pyplot.show()
+
+if __name__ == '__main__':
+    plot_lgQ_vs_period('progress.pickle',
+                       '../data/planets_2019.09.03_07.12.43.csv')
