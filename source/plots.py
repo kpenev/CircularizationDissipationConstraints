@@ -2,15 +2,17 @@
 
 """A collection of useful plotting functions."""
 
+import pickle
+
 from matplotlib import pyplot
 import numpy
-
 from astropy import units
 from configargparse import ArgumentParser, DefaultsFormatter
+import asteval
 
 from stellar_evolution.change_variables import QuantityEvaluator
-from planetary_system_io import read_nasa_planets
 from stellar_evolution.manager import StellarEvolutionManager
+from planetary_system_io import read_nasa_planets
 
 from io_utilities import load_progress_pickle, get_nasa_system
 from calculate_e_Q_grid import prepare_nasa_system
@@ -18,10 +20,6 @@ from process_e_Q_grid import\
     format_eccentricity_vs_lgQ,\
     invert_eccentricity_vs_lgQ,\
     EccentricityEnvelope
-from command_line_utilities import\
-    fix_system_units,\
-    add_assumptions_cmdline_args,\
-    add_path_cmdline_args
 
 def parse_command_line():
     """Parse the command line defining the plots to create."""
@@ -32,13 +30,46 @@ def parse_command_line():
         formatter_class=DefaultsFormatter,
         ignore_unknown_config_file_keys=True
     )
-    add_assumptions_cmdline_args(parser)
-    add_path_cmdline_args(parser)
+    parser.add_argument(
+        '--plot',
+        action='append',
+        choices=['e_vs_P', 'star_solving', 'lgQ_vs_e', 'lgQ_vs'],
+        help='Add another type of plot to the list of plots to generate.'
+    )
+    parser.add_argument(
+        '--plot-fname',
+        default='%(plot_type).eps',
+        help='A pattern for the filename to save plots under. If empty, plots '
+        'are just displayed to the user, but not saved.'
+    )
+    parser.add_argument(
+        '--lgQ-x-axis',
+        action='append',
+        nargs=2,
+        default=[
+            (
+                '(secondary_radius/semimajor)**5*primary_mass/secondary_mass',
+                ''
+            )
+        ],
+        help="Add plots of lg(Q*') vs different quantities. Two entries must be"
+        " specified: expression and units. The expression can be any "
+        "expression involving system properties that can be converted to the "
+        "specified units. Can be passed multiple times resulting in multiple "
+        "plots. These arguments are ignored if 'lgQ_vs' plot type is not "
+        "included (see --plot)."
+    )
+    parser.add_argument(
+        '--progress-pickle', '--progress',
+        default='progress.pickle',
+        help='The filename where tha calculated eccentricities were saved.'
+    )
     result = parser.parse_args()
-    fix_system_units(result)
     return result
 
-def plot_eccentricity_vs_period(systems):
+#Simplifies command line arguments.
+#pylint: disable=invalid-name
+def plot_e_vs_P(systems):
     """Create a plot of eccentricity vs period."""
 
     def plot_selection(selected, **kwargs):
@@ -74,6 +105,7 @@ def plot_eccentricity_vs_period(systems):
     pyplot.xlim((0.7, 20))
     pyplot.legend()
     pyplot.show()
+#pylint: enable=invalid-name
 
 def plot_star_solving(interpolator, system):
     """Make a plot showing the attempt to solve for stellar mass/age."""
@@ -81,9 +113,9 @@ def plot_star_solving(interpolator, system):
     plot_ages = 10.0**numpy.linspace(-3, 1, 1000)
 
     for feh, style in [
-#            (system.feh - system.feh.minus_error, ':'),
+            #$(system.feh - system.feh.minus_error, ':'),
             (system.feh, '-'),
-#            (system.feh + system.feh.plus_error, '--')
+            #(system.feh + system.feh.plus_error, '--')
     ]:
         evaluator = QuantityEvaluator(interpolator, feh)
         for mass, color in [
@@ -103,7 +135,9 @@ def plot_star_solving(interpolator, system):
     pyplot.plot([2.839], [5314], '+')
     pyplot.show()
 
-def plot_lgQ_vs_eccentricity(system, progress):
+#Simplifies command line arguments.
+#pylint: disable=invalid-name
+def plot_single_lgQ_vs_e(system, progress):
     """Show a plot of the final eccentricity vs lgQ for a system."""
 
 
@@ -145,45 +179,55 @@ def plot_lgQ_vs_eccentricity(system, progress):
     pyplot.xlabel(r"$\log_{10}(Q'_\star)$")
     pyplot.ylabel('Eccentricity')
     pyplot.show()
+#pylint: enable=invalid-name
 
-def plot_all_systems_lgQ_vs_eccentricity(progress_pickle, system_data):
+#Simplifies command line arguments.
+#pylint: disable=invalid-name
+def plot_lgQ_vs_e(progress, cmdline_args, **kwargs):
     """Show sequentially plots of lgQ vs e for all systems."""
 
-    progress = load_progress_pickle(progress_pickle)
-    systems = read_nasa_planets(system_data,
+    systems = read_nasa_planets(cmdline_args.nasa_data,
                                 eliminate=(),
                                 add_units=True,
                                 need_ages=False)
+
+    #Only need the keys
+    #pylint: disable=consider-iterating-dictionary
     for host in progress.keys():
-        plot_lgQ_vs_eccentricity(
+    #pylint: enable=consider-iterating-dictionary
+        plot_single_lgQ_vs_e(
             get_nasa_system(host, systems),
             progress
         )
+#pylint: enable=invalid-name
 
-def plot_lgQ_vs_period(progress_pickle,
-                       system_data,
-                       interpolator,
-                       small_planet_density):
+#Simplifies command line arguments.
+#pylint: disable=invalid-name
+def plot_lgQ_vs(lgQ_x_axes,
+                progress,
+                cmdline_args,
+                interpolator):
     """Make a plot of the log10(Q*') constraints vs orbital period."""
 
-    progress = load_progress_pickle(progress_pickle)
-    systems = read_nasa_planets(system_data,
+    systems = read_nasa_planets(cmdline_args.nasa_data,
                                 eliminate=(),
                                 add_units=True,
                                 need_ages=False)
-    print('Systems semimajor: ' + repr(systems.pl_orbsmax))
     eccentricity_envelope = EccentricityEnvelope()
 
-    plot_x = numpy.empty(len(progress), dtype=float)
-    plot_lgQ_min = numpy.empty(plot_x.size, dtype=float)
-    plot_lgQ_nominal = numpy.empty(plot_x.size, dtype=float)
-    plot_lgQ_max = numpy.empty(plot_x.size, dtype=float)
-    lower_limit = numpy.empty(plot_x.size, dtype=bool)
-    upper_limit = numpy.empty(plot_x.size, dtype=bool)
+    plot_x = numpy.empty((len(lgQ_x_axes), len(progress)), dtype=float)
+    plot_lgQ_min = numpy.empty(plot_x.shape[1], dtype=float)
+    plot_lgQ_nominal = numpy.empty(plot_x.shape[1], dtype=float)
+    plot_lgQ_max = numpy.empty(plot_x.shape[1], dtype=float)
+    lower_limit = numpy.empty(plot_x.shape[1], dtype=bool)
+    upper_limit = numpy.empty(plot_x.shape[1], dtype=bool)
     lgQ_range = (3, 9)
+    x_evaluator = asteval.Interpreter()
     for index, (host, lgQ_vs_period) in enumerate(progress.items()):
         system = get_nasa_system(host, systems)
-        prepare_nasa_system(system, interpolator, small_planet_density)
+        prepare_nasa_system(system,
+                            interpolator,
+                            cmdline_args.small_planet_density)
         print('System: ' + repr(system))
 
         nominal_e_lgQ = invert_eccentricity_vs_lgQ(
@@ -199,26 +243,13 @@ def plot_lgQ_vs_period(progress_pickle,
             eccentricity_envelope(system.orbital_period.to_value('day'))
         )
 
-#        plot_x[index] = system.orbital_period.to_value('day')
-        plot_x[index] = (
-            (
-                system.db_planet_radius
-                /
-                system.semimajor
-            )**5.0
-            *
-            (
-                system.db_star_mass
-                /
-                system.db_planet_mass
-            )**1.0
-        ).to_value('')
-#        plot_x[index] = (
-#            3.0 * system.db_planet_mass
-#            /
-#            (4.0 * numpy.pi * system.db_planet_radius**3)
-#        ).to_value('g/cm3')
-        plot_x[index] = system.db_planet_radius.to_value('R_jup')
+        x_evaluator.symtable = vars(system)
+        for x_expression_index, (x_expr, x_units) in enumerate(lgQ_x_axes):
+            plot_x[x_expression_index, index] = units.Quantity(
+                x_evaluator(x_expr)
+            ).to_value(
+                x_units
+            )
 
         plot_lgQ_min[index] = low_e_lgQ
         plot_lgQ_nominal[index] = nominal_e_lgQ
@@ -235,59 +266,77 @@ def plot_lgQ_vs_period(progress_pickle,
     upper_limit = numpy.logical_and(upper_limit, useful)
     lower_limit = numpy.logical_and(lower_limit, useful)
 
-#    pyplot.xscale('log')
 
-    pyplot.errorbar(
-        x=plot_x[upper_limit],
-        y=plot_lgQ_max[upper_limit],
-        yerr=[
-            plot_lgQ_max[upper_limit] - lgQ_range[0],
-            numpy.zeros(upper_limit.sum())
-        ],
-        fmt='vr',
-        markersize=10,
-        linewidth=0.3
-    )
+    for x_index in range(plot_x.shape[0]):
+        pyplot.xscale('log')
+        pyplot.errorbar(
+            x=plot_x[x_index, upper_limit],
+            y=plot_lgQ_max[upper_limit],
+            yerr=[
+                plot_lgQ_max[upper_limit] - lgQ_range[0],
+                numpy.zeros(upper_limit.sum())
+            ],
+            fmt='vr',
+            markersize=10,
+            linewidth=0.3
+        )
 
-    lower_errors = plot_lgQ_nominal - plot_lgQ_min
-    print('lower_errors: ' + repr(lower_errors[lower_limit]))
-    print('lgQ nominal: ' + repr(plot_lgQ_nominal[lower_limit]))
-    print('lgQ min: ' + repr(plot_lgQ_min[lower_limit]))
+        lower_errors = plot_lgQ_nominal - plot_lgQ_min
+        print('lower_errors: ' + repr(lower_errors[lower_limit]))
+        print('lgQ nominal: ' + repr(plot_lgQ_nominal[lower_limit]))
+        print('lgQ min: ' + repr(plot_lgQ_min[lower_limit]))
 
-    pyplot.errorbar(
-        x=plot_x[lower_limit],
-        y=plot_lgQ_nominal[lower_limit],
-        yerr=[
-            lower_errors[lower_limit],
-            lgQ_range[1] - plot_lgQ_nominal[lower_limit]
-        ],
-        fmt='^b',
-        markersize=10,
-        linewidth=0.3
-    )
+        pyplot.errorbar(
+            x=plot_x[x_index, lower_limit],
+            y=plot_lgQ_nominal[lower_limit],
+            yerr=[
+                lower_errors[lower_limit],
+                lgQ_range[1] - plot_lgQ_nominal[lower_limit]
+            ],
+            fmt='^b',
+            markersize=10,
+            linewidth=0.3
+        )
 
 
-    pyplot.errorbar(
-        x=plot_x[not_limit],
-        y=plot_lgQ_nominal[not_limit],
-        yerr=[(plot_lgQ_nominal[not_limit] - plot_lgQ_min[not_limit]),
-              (plot_lgQ_max[not_limit] - plot_lgQ_nominal[not_limit])],
-        fmt='og',
-        markersize=10,
-        linewidth=3
-    )
+        pyplot.errorbar(
+            x=plot_x[x_index, not_limit],
+            y=plot_lgQ_nominal[not_limit],
+            yerr=[(plot_lgQ_nominal[not_limit] - plot_lgQ_min[not_limit]),
+                  (plot_lgQ_max[not_limit] - plot_lgQ_nominal[not_limit])],
+            fmt='og',
+            markersize=10,
+            linewidth=3
+        )
+        pyplot.xlabel(lgQ_x_axes[x_index][0]
+                      +
+                      ' [' + lgQ_x_axes[x_index][1] + ']')
 
-    pyplot.show()
+        pyplot.show()
+#pylint: enable=invalid-name
 
-if __name__ == '__main__':
+def main():
+    """Avoid adding things to global namespace."""
+
     cmdline_args = parse_command_line()
+    progress_pickle = cmdline_args.progress_pickle
+    with open(progress_pickle, 'rb') as progress_file:
+        pickled_cmdline_args = pickle.load(progress_file)
+        progress = load_progress_pickle(progress_file)
+
     interpolator = StellarEvolutionManager(
-        cmdline_args.stellar_evolution_interpolator_dir
+        pickled_cmdline_args.stellar_evolution_interpolator_dir
     ).get_interpolator_by_name(
         'default'
     )
 
-    plot_lgQ_vs_period(cmdline_args.progress_pickle,
-                       cmdline_args.nasa_data,
-                       interpolator,
-                       cmdline_args.small_planet_density)
+    for plot_type in cmdline_args.plot:
+        globals()['plot_' + plot_type](
+            progress=progress,
+            lgQ_x_axes=cmdline_args.lgQ_x_axis,
+            cmdline_args=pickled_cmdline_args,
+            interpolator=interpolator
+        )
+
+if __name__ == '__main__':
+    main()

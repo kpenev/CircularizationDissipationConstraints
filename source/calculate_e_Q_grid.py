@@ -17,7 +17,7 @@ from orbital_evolution.evolve_interface import library as\
 from planetary_system_io import read_nasa_planets
 from binary_utils import calculate_secondary_mass
 
-from io_utilities import get_nasa_system
+from io_utilities import get_nasa_system, init_progress_pickle
 from command_line_utilities import\
     fix_system_units,\
     add_info_cmdline_args,\
@@ -172,6 +172,8 @@ def main():
     """Calculate the grid specified on the command line."""
 
     cmdline_args = parse_command_line()
+    progress = init_progress_pickle(cmdline_args)
+
     interpolator = StellarEvolutionManager(
         cmdline_args.stellar_evolution_interpolator_dir
     ).get_interpolator_by_name(
@@ -207,13 +209,16 @@ def main():
         evolution_systems = [prepare_nasa_system(cmdline_args, interpolator)]
 
     grid_jobs = [
-        (system, lgQ) for system in evolution_systems for lgQ in numpy.arange(3.0, 10.0, 1.0)
+        (system, lgQ)
+        for system in evolution_systems
+        for lgQ in numpy.arange(3.0, 10.0, 1.0)
     ]
 
     pool_manager = Manager()
     calculate_current_eccentricity = CurrentEccentricityCalculator(
         initial_eccentricity=0.55,
         interpolator=interpolator,
+        progress=progress,
         progress_pickle_fname=cmdline_args.progress_pickle,
         progress_lock=pool_manager.Lock()
     )

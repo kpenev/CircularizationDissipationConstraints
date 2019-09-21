@@ -74,12 +74,42 @@ def get_nasa_system(system_id, nasa_systems):
     )
     return result
 
-def load_progress_pickle(progress_pickle_fname):
+def init_progress_pickle(cmdline_args):
+    """
+    If a pickle file exists check it matches cmdline_args, otherwise create it.
+
+    Args:
+        cmdline_args:    The parsed command line arguments.
+
+    Returns:
+        dict:
+            The pickled calculated eccentricites contained in the given pickle
+            or empty dictionary if the file did not exist.
+    """
+
+    if os.path.exists(cmdline_args.progress_pickle):
+        with open(cmdline_args.progress_pickle, 'rb') as progress_file:
+            pickled_cmdline_args = pickle.load(progress_file)
+            pickled_cfg = vars(pickled_cmdline_args)
+            cmdline_cfg = vars(cmdline_args)
+            for ignore_arg in ['progress_pickle',
+                               'num_parallel_processes']:
+                del pickled_cfg[ignore_arg]
+                del cmdline_cfg[ignore_arg]
+            assert pickled_cfg == cmdline_cfg
+            return load_progress_pickle(progress_file)
+    else:
+        with open(cmdline_args.progress_pickle, 'wb') as progress_file:
+            pickle.dump(cmdline_args, progress_file)
+        return dict()
+
+
+def load_progress_pickle(progress_file):
     """
     Return a dictionary containing previously calculated final eccentricities.
 
     Args:
-        progress_pickle_fname(str):    The filename containing pickles of
+        progress_file:    An already opened file containing pickles of
             previously calculated eccentricities. It should contain sequences of
             pickles containing:
                 * system host star name (e.g. 'HATS-18')
@@ -96,28 +126,26 @@ def load_progress_pickle(progress_pickle_fname):
     """
 
     result = dict()
-    if os.path.exists(progress_pickle_fname):
-        with open(progress_pickle_fname, 'rb') as progress_file:
-            try:
-                while True:
-                    hostname = pickle.load(progress_file)
-                    assert isinstance(hostname, str)
-                    #lgQ is more readable than say lgq or lg_q or ...
-                    #pylint: disable=invalid-name
-                    lgQ = pickle.load(progress_file)
-                    #pylint: enable=invalid-name
-                    assert isinstance(lgQ, float)
-                    initial_eccentricity = pickle.load(progress_file)
-                    assert isinstance(initial_eccentricity, float)
-                    final_eccentricity = pickle.load(progress_file)
-                    assert isinstance(final_eccentricity, float)
-                    if hostname not in result:
-                        result[hostname] = dict()
-                    assert lgQ not in result[hostname]
-                    result[hostname][lgQ] = (initial_eccentricity,
-                                             final_eccentricity)
-            except EOFError:
-                pass
+    try:
+        while True:
+            hostname = pickle.load(progress_file)
+            assert isinstance(hostname, str)
+            #lgQ is more readable than say lgq or lg_q or ...
+            #pylint: disable=invalid-name
+            lgQ = pickle.load(progress_file)
+            #pylint: enable=invalid-name
+            assert isinstance(lgQ, float)
+            initial_eccentricity = pickle.load(progress_file)
+            assert isinstance(initial_eccentricity, float)
+            final_eccentricity = pickle.load(progress_file)
+            assert isinstance(final_eccentricity, float)
+            if hostname not in result:
+                result[hostname] = dict()
+            assert lgQ not in result[hostname]
+            result[hostname][lgQ] = (initial_eccentricity,
+                                     final_eccentricity)
+    except EOFError:
+        pass
 
     return result
 

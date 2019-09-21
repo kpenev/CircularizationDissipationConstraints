@@ -33,6 +33,7 @@ class CurrentEccentricityCalculator:
     def __init__(self,
                  initial_eccentricity,
                  interpolator,
+                 progress,
                  progress_pickle_fname,
                  progress_lock):
         """
@@ -45,6 +46,9 @@ class CurrentEccentricityCalculator:
             interpolator:     A stellar evolution interpolator instance used to
                 create the star in the system.
 
+            progress(dict):    The unpickled results calculated during a
+                previous run (not re-calculated).
+
             progress_pickle_fname(str):     The filename containing previously
                 calculated results and which gets updated with any newly
                 calculated results.
@@ -56,13 +60,11 @@ class CurrentEccentricityCalculator:
             None
         """
 
-
         self.initial_eccentricity = initial_eccentricity
         self.interpolator = interpolator
         self.progress_pickle_fname = progress_pickle_fname
         self._progress_lock = progress_lock
-
-        self.progress = load_progress_pickle(progress_pickle_fname)
+        self.progress = progress
 
     def __call__(self, job):
         """
