@@ -26,8 +26,13 @@ def get_nasa_system(system_id, nasa_systems):
     def get_quantity(system_index, column_name):
         """Return a properly formatted Quantity instance with errors."""
 
-        print('Getting ' + column_name + ': ' + repr(getattr(nasa_systems,
-                                                             column_name)[system_index]))
+        print('Getting '
+              +
+              column_name
+              +
+              ': '
+              +
+              repr(getattr(nasa_systems, column_name)[system_index]))
         result = units.Quantity(
             getattr(nasa_systems, column_name)[system_index]
         )
@@ -90,8 +95,8 @@ def init_progress_pickle(cmdline_args):
     if os.path.exists(cmdline_args.progress_pickle):
         with open(cmdline_args.progress_pickle, 'rb') as progress_file:
             pickled_cmdline_args = pickle.load(progress_file)
-            pickled_cfg = vars(pickled_cmdline_args)
-            cmdline_cfg = vars(cmdline_args)
+            pickled_cfg = dict(vars(pickled_cmdline_args))
+            cmdline_cfg = dict(vars(cmdline_args))
             for ignore_arg in ['progress_pickle',
                                'num_parallel_processes']:
                 del pickled_cfg[ignore_arg]
