@@ -1,0 +1,110 @@
+#
+#   VizieR Astronomical Server vizier.u-strasbg.fr
+#    Date: 2019-09-27T02:21:04 [V1.99+ (14-Oct-2013)]
+#   In case of problem, please report to:	cds-question@unistra.fr
+#
+#
+#Coosys	J2000:	eq_FK5 J2000
+#INFO	votable-version=1.99+ (14-Oct-2013)	
+#INFO	-ref=VIZ5d8d72029713	
+#INFO	-out.max=50	
+#INFO	queryParameters=23	
+#-oc.form=dec
+#-out.max=50
+#-out.all=2
+#-nav=cat:J/AJ/137/3743&tab:{J/AJ/137/3743/phys}&key:source=J/AJ/137/3743/phys&HTTPPRM:&
+#-source=J/AJ/137/3743/phys
+#-order=I
+#-out=F
+#-out=PKM
+#-out=Vmag
+#-out=B-V
+#-out=Rad
+#-out=Prv
+#-out=Ppm
+#-out=l_M1
+#-out=M1
+#-out=M2min
+#-out=l_M2
+#-out=M2
+#-out=VC
+#VC=VC
+#-out=Vel
+#Vel=Vel
+#-out.all=2
+#
+
+#RESOURCE=yCat_51373743
+#Name: J/AJ/137/3743
+#Title: Spectroscopic binary orbits in NGC 188 (Geller+, 2009)
+#Table	J_AJ_137_3743_phys:
+#Name: J/AJ/137/3743/phys
+#Title: Physical parameters for NGC 188 single- and double-lined binaries
+#Column	F	(A1)	Simbad column added by the CDS	[ucd=meta.code]
+#Column	PKM	(I4)	Source identification number (G1)	[ucd=meta.id;meta.main]
+#Column	Vmag	(F6.3)	V magnitude	[ucd=phot.mag;em.opt.V]
+#Column	B-V	(F6.3)	B-V colour index	[ucd=phot.color;em.opt.B;em.opt.V]
+#Column	Rad	(F5.2)	Radius	[ucd=phys.angSize]
+#Column	Prv	(I2)	Membership probability from radial velocity	[ucd=stat]
+#Column	Ppm	(I2)	Membership probability from proper motion	[ucd=stat]
+#Column	l_M1	(A1)	Limit flag on M1	[ucd=meta.code.error]
+#Column	M1	(F5.2)	Mass of the primary	[ucd=phys.mass]
+#Column	M2min	(F5.2)	? Minumum mass of the secondary (only in table3)	[ucd=phys.mass]
+#Column	l_M2	(A1)	Limit flag on M2	[ucd=meta.code.error]
+#Column	M2	(F5.2)	Mass of the secondary	[ucd=phys.mass]
+#Column	VC	(A2)	Velocity curve	[ucd=meta.ref.url]
+#Column	Vel	(A3)	Individual velocities	[ucd=meta.ref.url]
+F|PKM|Vmag|B-V|Rad|Prv|Ppm|l_M1|M1|M2min|l_M2|M2|VC|Vel
+ | |mag|mag|arcmin|%|%| |Msun|Msun| |Msun| |
+-|----|------|------|-----|--|--|-|-----|-----|-|-----|--|---
+M| 880|15.383| 0.684|16.67|97|98| | 1.04| 0.23| | 0.69|VC|Vel
+M|3171|15.077| 0.911|15.79|98|98|<| 1.12| 0.24|<| 0.80|VC|Vel
+M|3732|14.935| 0.687|11.89|98|96| | 1.08| 0.15| | 0.75|VC|Vel
+M|3871|15.300| 0.648|12.78|97|89| | 1.05| 0.16| | 0.45|VC|Vel
+M|4080|15.524| 0.674| 7.76|98|98| | 1.03| 0.39| | 0.60|VC|Vel
+M|4147|15.161| 0.649|13.56|98|98|<| 1.07| 0.21|<| 0.79|VC|Vel
+M|4289|15.303| 0.937| 5.97|98|98|<| 1.12| 0.58|<| 0.78|VC|Vel
+M|4333|15.857| 0.676| 6.11|98|98|<| 1.00| 0.23|<| 0.72|VC|Vel
+M|4369|15.549| 0.660| 6.61|98|98|<| 1.03| 0.25|<| 0.75|VC|Vel
+M|4386|15.442| 0.660| 7.03|98|63| | 1.04| 0.35| | 0.55|VC|Vel
+M|4390|15.662| 0.741| 6.52|98|97| | 0.99| 0.31| | 0.80|VC|Vel
+M|4392|15.191| 0.647| 6.01|98|97| | 1.04| 0.44| | 0.55|VC|Vel
+M|4524|12.434| 1.165| 5.44|98|97| | 1.14| 0.34| | 1.14|VC|Vel
+M|4560|15.061| 0.667| 3.78|97|98| | 1.08| 0.16| | 0.33|VC|Vel
+M|4565|12.416| 1.273| 3.72|98|96|<| 1.14| 0.27|<| 1.10|VC|Vel
+M|4585|15.814| 0.666| 4.41|98|98|<| 1.00| 0.40|<| 0.73|VC|Vel
+M|4595|15.055| 0.660| 2.56|98|97|<| 1.08| 0.40|<| 0.80|VC|Vel
+M|4618|15.772| 0.712| 3.10|98|98| | 1.00| 0.75| | 0.75|VC|Vel
+M|4673|14.880| 0.716| 2.06|95|98| | 1.11| 0.16| | 0.64|VC|Vel
+M|4688|15.079| 0.636| 3.33|98|98|<| 1.07| 0.45|<| 0.80|VC|Vel
+M|4710|14.846| 0.667| 2.89| 1|96| | 1.09| 0.19| | 0.60|VC|Vel
+M|4726|15.302| 0.671| 4.46|98|98|<| 1.05| 0.22|<| 0.78|VC|Vel
+M|4734|14.950| 0.997| 4.74|96|98| | 1.13| 0.55| | 0.64|VC|Vel
+M|4843|11.541| 1.302| 8.77|98|75| | 1.14| 0.34| | 1.14|VC|Vel
+M|4865|14.930| 0.783| 7.64|98|95|<| 1.12| 0.66|<| 0.81|VC|Vel
+M|4904|15.930| 0.733| 5.48|98|96| | 0.97| 0.11| | 0.60|VC|Vel
+M|4965|15.282| 0.693| 2.36|96|85| | 1.03| 0.24| | 0.71|VC|Vel
+M|4999|15.792| 0.664| 0.99|97|97|<| 1.00| 0.22|<| 0.73|VC|Vel
+M|5040|15.009| 0.667| 0.68|92|97| | 1.09| 0.11| | 0.49|VC|Vel
+M|5048|13.869| 1.069| 0.84|98|94| | 1.14| 0.33| | 0.74|VC|Vel
+M|5052|15.916| 0.710| 0.33|98|98| | 0.99| 0.07| | 0.62|VC|Vel
+M|5065|15.754| 0.746| 1.55|97|95| | 0.98| 0.37| | 0.78|VC|Vel
+M|5095|14.992| 0.939| 2.07|98|98| | 1.12| 0.67| | 0.80|VC|Vel
+M|5242|14.880| 0.697| 9.36|98|98| | 1.09| 0.28| | 0.77|VC|Vel
+M|5268|15.317| 0.663| 6.32|98|91| | 1.05| 0.06| | 0.58|VC|Vel
+M|5309|14.965| 0.706| 4.39|98|98| | 1.10| 0.24| | 0.72|VC|Vel
+M|5332|15.047| 0.672| 2.74|98|98| | 1.08| 0.13| | 0.46|VC|Vel
+M|5356|14.272| 0.999| 2.94|98|98| | 1.13| 0.44| | 0.88|VC|Vel
+M|5373|14.380| 1.050| 3.59|96|95|<| 1.14| 0.26|<| 0.87|VC|Vel
+M|5381|15.022| 0.676| 4.94|98|89| | 1.09| 0.12| | 0.39|VC|Vel
+M|5438|13.634| 1.112| 3.21|97|98|<| 1.14| 0.53|<| 0.96|VC|Vel
+M|5463|14.978| 0.664| 4.42|98|98| | 1.08| 0.07| | 0.40|VC|Vel
+M|5467|15.738| 0.640| 5.51|98|98|<| 1.02| 0.20|<| 0.74|VC|Vel
+M|5599|15.101| 0.946| 8.48|98|98|<| 1.13| 0.36|<| 0.80|VC|Vel
+M|5601|15.597| 0.682| 9.44|94|97| | 1.03| 0.06| | 0.67|VC|Vel
+M|5647|16.000| 0.743| 7.37|95|95| | 0.97| 0.73| | 0.73|VC|Vel
+M|5666|15.216| 0.669| 6.02|96|94| | 1.06| 0.29| | 0.51|VC|Vel
+M|5700|14.448| 1.010| 5.59|97|98| | 1.13| 0.41| | 0.89|VC|Vel
+M|5738|15.315| 0.675| 6.77|98|96| | 1.05| 0.07| | 0.44|VC|Vel
+M|5797|15.853| 0.691| 9.13|98|95| | 1.00| 0.26| | 0.60|VC|Vel
+

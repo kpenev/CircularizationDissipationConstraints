@@ -1,0 +1,116 @@
+#
+#   VizieR Astronomical Server vizier.u-strasbg.fr
+#    Date: 2019-09-27T02:19:20 [V1.99+ (14-Oct-2013)]
+#   In case of problem, please report to:	cds-question@unistra.fr
+#
+#
+#Coosys	J2000:	eq_FK5 J2000
+#INFO	votable-version=1.99+ (14-Oct-2013)	
+#INFO	-ref=VIZ5d8d719c5f2a	
+#INFO	-out.max=50	
+#INFO	queryParameters=43	
+#-oc.form=dec
+#-out.max=50
+#-out.all=2
+#-nav=cat:J/AJ/137/3743&tab:{J/AJ/137/3743/orb2}&key:source=J/AJ/137/3743/orb2&HTTPPRM:&
+#-source=J/AJ/137/3743/orb2
+#-order=I
+#-out=F
+#-out=PKM
+#-out=Per
+#-out=e_Per
+#-out=Ncyc
+#-out=gamma
+#-out=e_gamma
+#-out=K1
+#-out=e_K1
+#-out=e
+#-out.all=2
+#-out=e_e
+#-out=omega
+#-out=e_omega
+#-out=T0
+#-out=e_T0
+#-out=asini1
+#-out=e_asini1
+#-out=msin3i1
+#-out=e_msin3i1
+#-out=q
+#-out=e_q
+#-out=sig1
+#-out=N1
+#-out=K2
+#-out=e_K2
+#-out=asini2
+#-out=e_asini2
+#-out=msin3i2
+#-out=e_msin3i2
+#-out=sig2
+#-out=N2
+#-out=VC
+#VC=VC
+#-out=Vel
+#Vel=Vel
+#-out.all=2
+#
+
+#RESOURCE=yCat_51373743
+#Name: J/AJ/137/3743
+#Title: Spectroscopic binary orbits in NGC 188 (Geller+, 2009)
+#Table	J_AJ_137_3743_orb2:
+#Name: J/AJ/137/3743/orb2
+#Title: Orbital parameters for double-lined binaries
+#Column	F	(A1)	Simbad column added by the CDS	[ucd=meta.code]
+#Column	PKM	(I4)	Source identification number (G1)	[ucd=meta.id;meta.main]
+#Column	Per	(F9.5)	Orbital period	[ucd=time.period]
+#Column	e_Per	(F8.5)	rms uncertainty on Per	[ucd=stat.error]
+#Column	Ncyc	(F5.1)	Number of cycles observed	[ucd=meta.number]
+#Column	gamma	(F6.2)	Centre-of-mass radial velocity, {gamma}	[ucd=phys.veloc;pos.heliocentric]
+#Column	e_gamma	(F5.2)	rms uncertainty on gamma	[ucd=stat.error]
+#Column	K1	(F5.2)	Orbital amplitude of the primary	[ucd=src.var.amplitude]
+#Column	e_K1	(F5.2)	rms uncertainty on K1	[ucd=stat.error]
+#Column	e	(F6.3)	Eccentricity	[ucd=src.orbital.eccentricity]
+#Column	e_e	(F6.3)	rms uncertainty on e	[ucd=stat.error]
+#Column	omega	(F5.1)	Longitude of periastron	[ucd=src.orbital.periastron]
+#Column	e_omega	(F4.1)	rms uncertainty on omega	[ucd=stat.error]
+#Column	T0	(F8.2)	Julian date of periastron passage (HJD-2400000)	[ucd=src.orbital.periastron]
+#Column	e_T0	(F5.2)	rms uncertainty on T0	[ucd=stat.error]
+#Column	asini1	(F6.2)	Projected semi-major axis of the primary	[ucd=phys.angSize.smajAxis;src.orbital]
+#Column	e_asini1	(F5.2)	rms uncertainty on asini1	[ucd=stat.error]
+#Column	msin3i1	(F6.3)	Mass (Msin^3^i) of the primary	[ucd=phys.mass]
+#Column	e_msin3i1	(F6.3)	rms uncertainty on msin3i1	[ucd=stat.error]
+#Column	q	(F6.3)	Mass ratio	[ucd=phys.mass]
+#Column	e_q	(F6.3)	rms uncertainty on q	[ucd=stat.error]
+#Column	sig1	(F5.2)	Velocity dispersion of the primary	[ucd=phys.veloc.dispersion]
+#Column	N1	(I2)	Number of RV measurements for the primary	[ucd=meta.number]
+#Column	K2	(F4.1)	Orbital amplitude of the secondary	[ucd=src.var.amplitude]
+#Column	e_K2	(F4.1)	rms uncertainty on K2	[ucd=stat.error]
+#Column	asini2	(F6.2)	Projected semi-major axis of the secondary	[ucd=phys.angSize.smajAxis;src.orbital]
+#Column	e_asini2	(F5.2)	rms uncertainty on asini2	[ucd=stat.error]
+#Column	msin3i2	(F6.3)	Mass (Msin^3^i) of the secondary	[ucd=phys.mass]
+#Column	e_msin3i2	(F6.3)	rms uncertainty on msin3i2	[ucd=stat.error]
+#Column	sig2	(F5.2)	Velocity dispersion of the secondary	[ucd=phys.veloc.dispersion]
+#Column	N2	(I2)	Number of RV measurements for the secondary	[ucd=meta.number]
+#Column	VC	(A2)	Velocity curve	[ucd=meta.ref.url]
+#Column	Vel	(A3)	Individual velocities	[ucd=meta.ref.url]
+F|PKM|Per|e_Per|Ncyc|gamma|e_gamma|K1|e_K1|e|e_e|omega|e_omega|T0|e_T0|asini1|e_asini1|msin3i1|e_msin3i1|q|e_q|sig1|N1|K2|e_K2|asini2|e_asini2|msin3i2|e_msin3i2|sig2|N2|VC|Vel
+ | |d|d| |km/s|km/s|km/s|km/s| | |deg|deg|d|d|10+6km|10+6km|Msun|Msun| | |km/s| |km/s|km/s|10+6km|10+6km|Msun|Msun|km/s| | |
+-|----|---------|--------|-----|------|-----|-----|-----|------|------|-----|----|--------|-----|------|-----|------|------|------|------|-----|--|----|----|------|-----|------|------|-----|--|--|---
+M|3118| 11.90220| 0.00040|133.8|-43.23| 0.20|43.60| 0.30| 0.011| 0.006| 20.0|30.0|50900.30| 1.00|  7.14| 0.06| 0.656| 0.012| 0.795| 0.009| 1.68|44|54.9| 0.4|  8.98| 0.07| 0.521| 0.009| 1.98|36|VC|Vel
+M|3344|126.46000| 0.05000| 24.2|-42.51| 0.23|25.40| 0.60| 0.175| 0.014|338.0| 4.0|50889.00| 1.60| 43.40| 1.10| 0.950| 0.060| 0.930| 0.030| 1.26|28|27.3| 0.7| 46.70| 1.30| 0.880| 0.050| 1.70|20|VC|Vel
+M|4411| 48.87000| 0.03000| 11.8|-42.40| 0.30|33.70| 0.30| 0.433| 0.008|251.6| 1.2|50888.82| 0.21| 20.40| 0.16| 1.050| 0.050| 0.743| 0.018| 0.72|22|45.3| 1.0| 27.40| 0.60| 0.780| 0.030| 2.55|15|VC|Vel
+M|4506|  8.85360| 0.00040|115.7|-42.69| 0.15|33.30| 0.30| 0.007| 0.008|210.0|60.0|50943.70| 1.40|  4.06| 0.04| 0.133| 0.004| 1.012| 0.015| 0.87|21|32.9| 0.4|  4.01| 0.05| 0.134| 0.003| 1.04|20|VC|Vel
+M|4705| 35.17800| 0.00500| 25.7|-42.53| 0.21|47.30| 0.40| 0.487| 0.005|245.4| 1.0|50752.07| 0.07| 19.98| 0.22| 1.130| 0.030| 0.956| 0.013| 1.41|23|49.5| 0.4| 20.90| 0.21| 1.080| 0.030| 1.33|20|VC|Vel
+M|4732| 42.11500| 0.00800| 17.6|-41.46| 0.13|31.56| 0.22| 0.232| 0.006| 86.3| 1.8|50945.87| 0.20| 17.78| 0.13| 0.537| 0.013| 0.970| 0.013| 0.78|29|32.5| 0.3| 18.32| 0.20| 0.521| 0.009| 1.29|28|VC|Vel
+M|4962| 38.64400| 0.00400| 80.4|-43.00| 0.40|30.80| 1.40| 0.445| 0.017| 83.0| 4.0|51636.60| 0.30| 14.70| 0.70| 0.350| 0.030| 0.990| 0.060| 3.22|21|31.3| 1.0| 14.90| 0.50| 0.340| 0.040| 1.91|19|VC|Vel
+M|4986| 30.08600| 0.00400|103.3|-41.40| 0.50|43.80| 1.50| 0.342| 0.020| 82.0| 3.0|53568.95| 0.25| 17.00| 0.70| 0.990| 0.090| 0.940| 0.050| 3.22|18|46.6| 1.4| 18.10| 0.70| 0.930| 0.090| 3.10|17|VC|Vel
+M|5078|  4.78303| 0.00012|191.3|-41.60| 0.30|65.80| 0.40| 0.121| 0.006|317.0| 3.0|50704.13| 0.04|  4.30| 0.03| 1.250| 0.030| 0.678| 0.009| 1.41|23|97.0| 1.0|  6.34| 0.07| 0.846| 0.016| 3.34|18|VC|Vel
+M|5080|550.40000| 1.90000|  6.2|-43.40| 0.30|15.80| 0.50| 0.440| 0.030|153.0| 4.0|52273.00| 7.00|107.00| 4.00| 0.650| 0.090| 1.010| 0.070| 0.95|14|15.7| 0.9|107.00| 7.00| 0.650| 0.070| 2.08|13|VC|Vel
+M|5147|  6.74320| 0.00040| 66.5|-42.45| 0.19|50.20| 0.40| 0.012| 0.006|350.0|30.0|54356.30| 0.50|  4.65| 0.04| 0.362| 0.006| 0.988| 0.011| 1.33|19|50.8| 0.3|  4.71| 0.03| 0.357| 0.007| 0.96|17|VC|Vel
+M|5710|298.80000| 1.30000|  4.1|-42.86| 0.20|15.20| 0.40| 0.215| 0.023| 74.0| 5.0|50775.00| 4.00| 61.00| 1.70| 0.620| 0.040| 0.810| 0.030| 0.98|26|18.7| 0.5| 75.20| 2.20| 0.510| 0.030| 1.08| 9|VC|Vel
+M|5762|  6.50430| 0.00004|421.7|-40.48| 0.19|72.90| 0.40| 0.004| 0.004| 40.0|50.0|51061.20| 1.00|  6.52| 0.04| 1.093| 0.013| 0.977| 0.008| 1.69|32|74.6| 0.3|  6.67| 0.03| 1.067| 0.015| 1.26|29|VC|Vel
+M|7782|  5.32770| 0.00005|426.5|-43.60| 0.30|80.40| 0.80| 0.013| 0.006|250.0|30.0|52206.80| 0.40|  5.89| 0.06| 1.136| 0.020| 1.005| 0.013| 3.12|32|80.0| 0.5|  5.86| 0.04| 1.140| 0.030| 2.12|31|VC|Vel
+M|8894| 14.48470| 0.00150| 43.5|-42.11| 0.24|43.70| 0.40| 0.008| 0.010|360.0|40.0|51017.90| 1.80|  8.71| 0.09| 0.746| 0.019| 0.824| 0.012| 1.41|25|53.1| 0.5| 10.57| 0.12| 0.615| 0.015| 1.78|22|VC|Vel
+F|5629|  4.08675| 0.00005|237.0|-20.60| 0.40|76.60| 0.70| 0.007| 0.007|290.0|60.0|51336.40| 0.70|  4.31| 0.04| 0.600| 0.040| 1.130| 0.040| 1.59|21|67.8| 2.0|  3.81| 0.12| 0.680| 0.030| 5.14|17|VC|Vel
+F|6407| 51.79500| 0.01400| 19.8|-48.08| 0.18|26.50| 0.30| 0.289| 0.009|286.8| 2.1|50937.50| 0.30| 18.10| 0.24| 0.358| 0.013| 0.992| 0.021| 0.97|24|26.8| 0.4| 18.30| 0.30| 0.355| 0.011| 1.27|22|VC|Vel
+
