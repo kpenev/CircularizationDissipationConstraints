@@ -3,7 +3,6 @@
 
 """Calculate final eccentricity vs Q on a grid of Q values for a system."""
 
-import os.path
 from multiprocessing import Pool, Manager
 
 import numpy
@@ -113,12 +112,15 @@ def prepare_nasa_system(system,
                     eccentricity=system.eccentricity
                 )
             else:
+                #False positive
+                #pylint: disable=no-member
                 assert system.secondary_radius < 5.0 * units.earthRad
                 system.secondary_mass = (
                     small_planet_density
                     *
                     4.0 / 3.0 * numpy.pi * system.secondary_radius**3
                 )
+                #pylint: enable=no-member
 
     def fix_eccentricity():
         """Use backup methods for calculating eccentricity if unknown."""
@@ -201,12 +203,18 @@ def main():
                                     interpolator,
                                     cmdline_args.small_planet_density)
                 print('Prepared system: ' + repr(system))
+                #pylint: disable=no-member
                 if system.primary_mass <= 1.2 * units.M_sun:
                     evolution_systems.append(system)
+                #pylint: enable=no-member
             except AssertionError:
                 pass
     else:
-        evolution_systems = [prepare_nasa_system(cmdline_args, interpolator)]
+        evolution_systems = [
+            prepare_nasa_system(cmdline_args,
+                                interpolator,
+                                cmdline_args.small_planet_density)
+        ]
 
     grid_jobs = [
         (system, lgQ)
@@ -217,13 +225,17 @@ def main():
     pool_manager = Manager()
     calculate_current_eccentricity = CurrentEccentricityCalculator(
         initial_eccentricity=0.55,
+        primary_lgQ=cmdline_args.stellar_lgQ,
         interpolator=interpolator,
         progress=progress,
         progress_pickle_fname=cmdline_args.progress_pickle,
+        #False positive
+        #pylint: disable=no-member
         progress_lock=pool_manager.Lock()
+        #pylint: enable=no-member
     )
-    with Pool(cmdline_args.num_parallel_processes) as magfit_pool:
-        magfit_pool.map(
+    with Pool(cmdline_args.num_parallel_processes) as process_pool:
+        process_pool.map(
             calculate_current_eccentricity,
             grid_jobs
         )

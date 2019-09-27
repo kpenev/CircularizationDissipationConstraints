@@ -6,7 +6,7 @@ from astropy import units
 from orbital_evolution.transformations import phase_lag
 from reproduce_system import find_evolution
 
-from io_utilities import load_progress_pickle, pickle_new_result
+from io_utilities import pickle_new_result
 
 #This is intended to serve as the callable for multiprocessing pool.
 #pylint: disable=too-few-public-methods
@@ -22,6 +22,8 @@ class CurrentEccentricityCalculator:
 
         interpolator:    See same name argument to __init__().
 
+        primary_lgQ:    See same name argument to __init__().
+
         progress_pickle_fname(str):    See same name argument to __init__().
 
         _progress_lock:    See same name argument to __init__().
@@ -30,8 +32,12 @@ class CurrentEccentricityCalculator:
             includes results loaded from the progress file supplied to __init__.
     """
 
+    #Suffix _lgQ is most readable.
+    #pylint: disable=invalid-name
     def __init__(self,
+                 *,
                  initial_eccentricity,
+                 primary_lgQ,
                  interpolator,
                  progress,
                  progress_pickle_fname,
@@ -46,6 +52,8 @@ class CurrentEccentricityCalculator:
             interpolator:     A stellar evolution interpolator instance used to
                 create the star in the system.
 
+            primary_lgQ(float):    The value to assume for log10(Q*').
+
             progress(dict):    The unpickled results calculated during a
                 previous run (not re-calculated).
 
@@ -53,8 +61,8 @@ class CurrentEccentricityCalculator:
                 calculated results and which gets updated with any newly
                 calculated results.
 
-            progress_lock:     A lock to guard against multiple processes writing to
-                the progress pickle file at once.
+            progress_lock:     A lock to guard against multiple processes
+                writing to the progress pickle file at once.
 
         Returns:
             None
@@ -62,9 +70,11 @@ class CurrentEccentricityCalculator:
 
         self.initial_eccentricity = initial_eccentricity
         self.interpolator = interpolator
+        self.primary_lgQ = primary_lgQ
         self.progress_pickle_fname = progress_pickle_fname
         self._progress_lock = progress_lock
         self.progress = progress
+    #pylint: enable=invalid-name
 
     def __call__(self, job):
         """
@@ -97,11 +107,22 @@ class CurrentEccentricityCalculator:
                 assert self.initial_eccentricity == progress_entry[0]
                 return progress_entry[1]
 
+        if numpy.isfinite(self.primary_lgQ):
+            primary_dissipation = dict(
+                reference_phase_lag=phase_lag(self.primary_lgQ),
+                tidal_frequency_breaks=None,
+                spin_frequency_breaks=None,
+                tidal_frequency_powers=numpy.array([0.0]),
+                spin_frequency_powers=numpy.array([0.0])
+            )
+        else:
+            primary_dissipation = None
+
         evolution = find_evolution(
             system=system,
             interpolator=self.interpolator,
             dissipation=dict(
-                primary=None,
+                primary=primary_dissipation,
                 secondary=dict(
                     reference_phase_lag=phase_lag(lgQ),
                     tidal_frequency_breaks=None,
@@ -137,6 +158,6 @@ class CurrentEccentricityCalculator:
             self._progress_lock.release()
 
             return final_eccentricity
-        else:
-            return None
+
+        return None
 #pylint: disable=too-few-public-methods

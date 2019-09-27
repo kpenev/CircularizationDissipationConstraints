@@ -1,7 +1,9 @@
 """Functions for processing command line and config file user input."""
 
 import os.path
+
 from astropy import units
+import numpy
 
 from planetary_system_io import QuantityWithErrors
 
@@ -96,6 +98,12 @@ def add_assumptions_cmdline_args(parser):
         help='A default density in g/cm^3 to assume for small planets for which'
         ' mass is unknown'
     )
+    parser.add_argument(
+        '--stellar-lgQ',
+        type=float,
+        default=numpy.inf,
+        help='The dissipation parameter to assume for the star in the system.'
+    )
 
 def add_path_cmdline_args(parser):
     """Add arguments controlling where to find required inputs."""
@@ -121,4 +129,3 @@ def add_path_cmdline_args(parser):
         help='The filename to save final eccentricities as soon as calculated '
         'to allow continuing after interruption.'
     )
-
