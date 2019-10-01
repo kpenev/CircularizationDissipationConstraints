@@ -1,16 +1,16 @@
 #
 #   VizieR Astronomical Server vizier.u-strasbg.fr
-#    Date: 2019-09-27T02:19:20 [V1.99+ (14-Oct-2013)]
+#    Date: 2019-09-27T20:58:37 [V1.99+ (14-Oct-2013)]
 #   In case of problem, please report to:	cds-question@unistra.fr
 #
 #
 #Coosys	J2000:	eq_FK5 J2000
 #INFO	votable-version=1.99+ (14-Oct-2013)	
-#INFO	-ref=VIZ5d8d719c5f2a	
-#INFO	-out.max=50	
+#INFO	-ref=VIZ5d8e77ee032a	
+#INFO	-out.max=unlimited	
 #INFO	queryParameters=43	
 #-oc.form=dec
-#-out.max=50
+#-out.max=unlimited
 #-out.all=2
 #-nav=cat:J/AJ/137/3743&tab:{J/AJ/137/3743/orb2}&key:source=J/AJ/137/3743/orb2&HTTPPRM:&
 #-source=J/AJ/137/3743/orb2
