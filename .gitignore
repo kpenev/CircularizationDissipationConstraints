@@ -1,3 +1,13 @@
+# Analysis by-products.
+*.tmp
+*.eps
+*.pdf
+*.png
+*.bkp
+
+# Vim lock files.
+.*.swp
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
