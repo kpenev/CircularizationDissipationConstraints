@@ -6,6 +6,9 @@ from types import SimpleNamespace
 
 from astropy import units
 import numpy
+import pandas
+
+from planetary_system_io import read_cds_pipe_table
 
 def get_nasa_system(system_id, nasa_systems):
     """
@@ -36,14 +39,20 @@ def get_nasa_system(system_id, nasa_systems):
         result = units.Quantity(
             getattr(nasa_systems, column_name)[system_index]
         )
-        result.plus_error = getattr(
-            nasa_systems,
-            column_name+'err1'
-        )[system_index]
-        result.minus_error = -getattr(
-            nasa_systems,
-            column_name+'err2'
-        )[system_index]
+        result.plus_error = units.Quantity(
+            getattr(
+                nasa_systems,
+                column_name+'err1'
+            )[system_index],
+            unit=result.unit
+        )
+        result.minus_error = units.Quantity(
+            -getattr(
+                nasa_systems,
+                column_name+'err2'
+            )[system_index],
+            unit=result.unit
+        )
         print('Result: ' + repr(result))
         return result
 
@@ -79,6 +88,108 @@ def get_nasa_system(system_id, nasa_systems):
     )
     return result
 
+def read_geller_et_al_2009_binaries(
+        single_lined_orbits_fname=(
+            '../data/Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
+        ),
+        double_lined_orbits_fname=(
+            '../data/Geller_et_al_2009_WIYN_double_lined_orbits.tsv'
+        ),
+        physical_parameters_fname=(
+            '../data/Geller_et_al_2009_WIYN_physical_parameters.tsv'
+        )
+):
+    """Read the Geller et al 2009 NGC 188 binaries to pandas data frame."""
+
+    def get_quantity(value, plus_error, minus_error, unit):
+        """Return a properly formatted Quantity instance with errors."""
+
+        result = units.Quantity(
+            value,
+            unit=unit
+        )
+        result.plus_error = units.Quantity(
+            plus_error,
+            unit=unit
+        )
+        result.minus_error = units.Quantity(
+            minus_error,
+            unit=unit
+        )
+        return result
+
+    def create_system(record):
+        """Return a properly created system from the given record."""
+
+        m1_plus_error = m1_minus_error = 0.1
+        m2_plus_error = m2_minus_error = 0.15
+        if record['l_M1']:
+            m1_minus_error = record['M1']
+            m2_minus_error = record['M2']
+
+        return SimpleNamespace(
+            hostname=record['PKM'],
+            age=get_quantity(6.3, 0.2, 0.2, 'Gyr'),
+            eccentricity=get_quantity(record['e'],
+                                      record['e_e'],
+                                      record['e_e'],
+                                      ''),
+            eccentricity_limit=False,
+            feh=get_quantity(0.21, 0.03, 0.03, ''),
+            orbital_period=get_quantity(record['Per'],
+                                        record['e_Per'],
+                                        record['e_Per'],
+                                        'day'),
+            primary_mass=get_quantity(record['M1'],
+                                      m1_plus_error,
+                                      m1_minus_error,
+                                      'M_sun'),
+            secondary_mass=get_quantity(record['M2'],
+                                        m2_plus_error,
+                                        m2_minus_error,
+                                        'M_sun')
+        )
+
+        #Parameters defined for planetary systems but not here.
+        #impact_parameter=<Quantity nan>,
+        #logg=<Quantity 4.7>,
+        #planet_to_star_radius_ratio=<Quantity 0.02704>,
+        #primary_radius=<Quantity 0.57 solRad>,
+        #rv_semi_amplitude=<Quantity nan m / s>,
+        #secondary_radius=<Quantity 0.15 jupiterRad>,
+        #semimajor=<Quantitynan AU>,
+        #semimajor_to_rstar_ratio=<Quantity nan>,
+        #star_density=<Quantity nan g / cm3>,
+        #teff=<Quantity 4128. K>,
+        #transit_duration=<Quantity 0.0804 d>
+
+    physical_parameters = pandas.DataFrame(
+        read_cds_pipe_table(physical_parameters_fname)
+    )
+
+    single_lined_data = pandas.merge(
+        physical_parameters,
+        pandas.DataFrame(
+            read_cds_pipe_table(single_lined_orbits_fname)
+        ),
+        on='PKM'
+    )
+    double_lined_data = pandas.merge(
+        physical_parameters,
+        pandas.DataFrame(
+            read_cds_pipe_table(double_lined_orbits_fname)
+        ),
+        on='PKM'
+    )
+    print('single lined data: ' + repr(single_lined_data))
+    print('first entry: ' + repr(single_lined_data.iloc(0)))
+
+    return (
+        [create_system(record[1]) for record in double_lined_data.iterrows()]
+        +
+        [create_system(record[1]) for record in single_lined_data.iterrows()]
+    )
+
 def init_progress_pickle(cmdline_args):
     """
     If a pickle file exists check it matches cmdline_args, otherwise create it.
@@ -98,9 +209,14 @@ def init_progress_pickle(cmdline_args):
             pickled_cfg = dict(vars(pickled_cmdline_args))
             cmdline_cfg = dict(vars(cmdline_args))
             for ignore_arg in ['progress_pickle',
-                               'num_parallel_processes']:
-                del pickled_cfg[ignore_arg]
-                del cmdline_cfg[ignore_arg]
+                               'num_parallel_processes',
+                               'use_binary_stars']:
+                if ignore_arg in pickled_cfg:
+                    del pickled_cfg[ignore_arg]
+                if ignore_arg in cmdline_cfg:
+                    del cmdline_cfg[ignore_arg]
+            print('Pickled config: ' + repr(pickled_cfg))
+            print('Command line config: ' + repr(cmdline_cfg))
             assert pickled_cfg == cmdline_cfg
             return load_progress_pickle(progress_file)
     else:
