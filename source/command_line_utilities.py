@@ -124,6 +124,12 @@ def add_path_cmdline_args(parser):
         'exoplanet archive.'
     )
     parser.add_argument(
+        '--use-binary-stars',
+        action='store_true',
+        default=False,
+        help='Read binary stellar system data from a default set of files.'
+    )
+    parser.add_argument(
         '--progress-pickle', '--progress',
         default='progress.pickle',
         help='The filename to save final eccentricities as soon as calculated '

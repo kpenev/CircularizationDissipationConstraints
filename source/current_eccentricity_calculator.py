@@ -4,7 +4,7 @@ import numpy
 from astropy import units
 
 from orbital_evolution.transformations import phase_lag
-from reproduce_system import find_evolution
+from reproduce_system import find_evolution, secondary_is_star
 
 from io_utilities import pickle_new_result
 
@@ -97,48 +97,61 @@ class CurrentEccentricityCalculator:
 
         #lgQ is more readable than alternatives
         #pylint: disable=invalid-name
-        system, lgQ = job
+        system, lgQ_star = job
         #pylint: enable=invalid-name
+
+        print('Trying %s, lgQ = %g' % (system.hostname, lgQ_star))
+
+        default_dissipation = dict(
+            tidal_frequency_breaks=None,
+            spin_frequency_breaks=None,
+            tidal_frequency_powers=numpy.array([0.0]),
+            spin_frequency_powers=numpy.array([0.0])
+        )
 
         if system.hostname in self.progress:
             progress_entry = self.progress[system.hostname]
-            if lgQ in progress_entry:
-                progress_entry = progress_entry[lgQ]
+            if lgQ_star in progress_entry:
+                progress_entry = progress_entry[lgQ_star]
                 assert self.initial_eccentricity == progress_entry[0]
                 return progress_entry[1]
 
         if numpy.isfinite(self.primary_lgQ):
             primary_dissipation = dict(
-                reference_phase_lag=phase_lag(self.primary_lgQ),
-                tidal_frequency_breaks=None,
-                spin_frequency_breaks=None,
-                tidal_frequency_powers=numpy.array([0.0]),
-                spin_frequency_powers=numpy.array([0.0])
+                default_dissipation,
+                reference_phase_lag=phase_lag(self.primary_lgQ)
+            )
+        elif secondary_is_star(system):
+            primary_dissipation = dict(
+                default_dissipation,
+                reference_phase_lag=phase_lag(lgQ_star)
             )
         else:
             primary_dissipation = None
 
-        evolution = find_evolution(
-            system=system,
-            interpolator=self.interpolator,
-            dissipation=dict(
-                primary=primary_dissipation,
-                secondary=dict(
-                    reference_phase_lag=phase_lag(lgQ),
-                    tidal_frequency_breaks=None,
-                    spin_frequency_breaks=None,
-                    tidal_frequency_powers=numpy.array([0.0]),
-                    spin_frequency_powers=numpy.array([0.0])
-                )
-            ),
-            initial_eccentricity=self.initial_eccentricity,
-            #False positive.
-            #pylint: disable=no-member
-            disk_period=(7.0 * units.day),
-            disk_dissipation_age=(5e-3 * units.Gyr),
-            #pylint: enable=no-member
-            max_age=system.age
-        )
+        try:
+            evolution = find_evolution(
+                system=system,
+                interpolator=self.interpolator,
+                dissipation=dict(
+                    primary=primary_dissipation,
+                    secondary=dict(default_dissipation,
+                                   reference_phase_lag=phase_lag(lgQ_star))
+                ),
+                initial_eccentricity=self.initial_eccentricity,
+                #False positive.
+                #pylint: disable=no-member
+                disk_period=(7.0 * units.day),
+                disk_dissipation_age=(5e-3 * units.Gyr),
+                #pylint: enable=no-member
+                max_age=system.age
+            )
+        except AssertionError:
+            print('Failed %s, lgQ = %g, e0 = %g' % (system.hostname,
+                                                    lgQ_star,
+                                                    self.initial_eccentricity))
+            return None
+
         print(evolution.format())
         #False positive
         #pylint: disable=no-member
@@ -146,18 +159,28 @@ class CurrentEccentricityCalculator:
                           system.age.to_value('Gyr'),
                           rtol=1e-10,
                           atol=1e-10):
+
             final_eccentricity = evolution.eccentricity[-1]
             #pylint: enable=no-member
 
+            print(
+                'Solved %s, lgQ = %g, e0 = %g, ef = %g'
+                %
+                (
+                    system.hostname,
+                    lgQ_star,
+                    self.initial_eccentricity,
+                    final_eccentricity
+                )
+            )
+
             self._progress_lock.acquire()
             pickle_new_result(system.hostname,
-                              lgQ,
+                              lgQ_star,
                               self.initial_eccentricity,
                               final_eccentricity,
                               self.progress_pickle_fname)
             self._progress_lock.release()
 
             return final_eccentricity
-
-        return None
 #pylint: disable=too-few-public-methods
