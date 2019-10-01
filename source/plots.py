@@ -205,7 +205,7 @@ def plot_lgQ_vs_e(progress, cmdline_args, plot_fname=None, **_):
 
     #Only need the keys
     #pylint: disable=consider-iterating-dictionary
-    for host in progress.keys():
+    for host in sorted(progress.keys()):
     #pylint: enable=consider-iterating-dictionary
         plot_single_lgQ_vs_e(
             get_nasa_system(host, systems),
