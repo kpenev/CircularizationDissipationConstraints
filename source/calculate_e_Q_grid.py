@@ -6,7 +6,7 @@
 from multiprocessing import Pool, Manager
 
 import numpy
-from astropy import units
+from astropy import units, constants
 from configargparse import ArgumentParser, DefaultsFormatter
 
 from stellar_evolution.manager import StellarEvolutionManager
@@ -16,7 +16,10 @@ from orbital_evolution.evolve_interface import library as\
 from planetary_system_io import read_nasa_planets
 from binary_utils import calculate_secondary_mass
 
-from io_utilities import get_nasa_system, init_progress_pickle
+from io_utilities import\
+    get_nasa_system,\
+    read_geller_et_al_2009_binaries,\
+    init_progress_pickle
 from command_line_utilities import\
     fix_system_units,\
     add_info_cmdline_args,\
@@ -161,14 +164,28 @@ def prepare_nasa_system(system,
             system.eccentricity.minus_error = 0.0
             print('Eccentricity fallback used for ' + system.hostname)
 
+    def fix_semimajor():
+        """Calculate the semimajor axis if not already in the system."""
+
+        if not numpy.isfinite(system.semimajor):
+            system.semimajor = (
+                constants.G * (system.primary_mass + system.secondary_mass)
+                *
+                (system.orbital_period)**2
+                /
+                (4.0 * numpy.pi**2)
+            )**(1.0 / 3.0)
+
+
     print('Preparing NASA system for evolution:')
     print(repr(system))
 
-    assert numpy.isfinite(system.orbital_period)
+    assert numpy.isfinite(system.orbital_period.to_value('day'))
 
     set_primary_properties()
     set_secondary_properties()
     fix_eccentricity()
+    fix_semimajor()
 
 def main():
     """Calculate the grid specified on the command line."""
@@ -185,12 +202,12 @@ def main():
         cmdline_args.eccentricity_expansion_coefficients.encode('ascii')
     )
 
+    evolution_systems = []
     if cmdline_args.nasa_data:
         systems = read_nasa_planets(cmdline_args.nasa_data,
                                     eliminate=(),
                                     add_units=True,
                                     need_ages=False)
-        evolution_systems = []
         #Fales positive
         #pylint: disable=no-member
         for system_index in numpy.argwhere(systems.pl_discmethod
@@ -209,12 +226,15 @@ def main():
                 #pylint: enable=no-member
             except AssertionError:
                 pass
-    else:
-        evolution_systems = [
+    if cmdline_args.use_binary_stars:
+        evolution_systems.extend(read_geller_et_al_2009_binaries())
+
+    if cmdline_args.orbital_period is not None:
+        evolution_systems.append(
             prepare_nasa_system(cmdline_args,
                                 interpolator,
                                 cmdline_args.small_planet_density)
-        ]
+        )
 
     grid_jobs = [
         (system, lgQ)
@@ -234,11 +254,15 @@ def main():
         progress_lock=pool_manager.Lock()
         #pylint: enable=no-member
     )
-    with Pool(cmdline_args.num_parallel_processes) as process_pool:
-        process_pool.map(
-            calculate_current_eccentricity,
-            grid_jobs
-        )
+    if cmdline_args.num_parallel_processes == 1:
+        for job in grid_jobs:
+            calculate_current_eccentricity(job)
+    else:
+        with Pool(cmdline_args.num_parallel_processes) as process_pool:
+            process_pool.map(
+                calculate_current_eccentricity,
+                grid_jobs
+            )
 
 if __name__ == '__main__':
     main()
