@@ -182,7 +182,7 @@ def read_geller_et_al_2009_binaries(
         on='PKM'
     )
     print('single lined data: ' + repr(single_lined_data))
-    print('first entry: ' + repr(single_lined_data.iloc(0)))
+    print('double lined data: ' + repr(double_lined_data))
 
     return (
         [create_system(record[1]) for record in double_lined_data.iterrows()]
@@ -208,6 +208,8 @@ def init_progress_pickle(cmdline_args):
             pickled_cmdline_args = pickle.load(progress_file)
             pickled_cfg = dict(vars(pickled_cmdline_args))
             cmdline_cfg = dict(vars(cmdline_args))
+            if 'initial_eccentricity' not in pickled_cfg:
+                pickled_cfg['initial_eccentricity'] = 0.55
             for ignore_arg in ['progress_pickle',
                                'num_parallel_processes',
                                'use_binary_stars']:
@@ -250,7 +252,6 @@ def load_progress_pickle(progress_file):
     try:
         while True:
             hostname = pickle.load(progress_file)
-            assert isinstance(hostname, str)
             #lgQ is more readable than say lgq or lg_q or ...
             #pylint: disable=invalid-name
             lgQ = pickle.load(progress_file)

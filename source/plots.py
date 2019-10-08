@@ -3,6 +3,7 @@
 """A collection of useful plotting functions."""
 
 import pickle
+import collections
 
 from matplotlib import pyplot
 import numpy
@@ -14,7 +15,10 @@ from stellar_evolution.change_variables import QuantityEvaluator
 from stellar_evolution.manager import StellarEvolutionManager
 from planetary_system_io import read_nasa_planets
 
-from io_utilities import load_progress_pickle, get_nasa_system
+from io_utilities import\
+    load_progress_pickle,\
+    get_nasa_system,\
+    read_geller_et_al_2009_binaries
 from calculate_e_Q_grid import prepare_nasa_system
 from process_e_Q_grid import\
     format_eccentricity_vs_lgQ,\
@@ -69,10 +73,12 @@ def parse_command_line():
 
 #Simplifies command line arguments.
 #pylint: disable=invalid-name
-def plot_e_vs_P(systems, plot_fname=None):
+#kwargs only accepted to homogenize call signatures across plotters
+#pylint: disable=unused-argument
+def plot_e_vs_P(cmdline_args, plot_fname=None, **kwargs):
     """Create a plot of eccentricity vs period."""
 
-    def plot_selection(selected, **kwargs):
+    def plot_selection(systems, selected, **kwargs):
         """Plot one selection of points."""
 
         errors = numpy.dstack(
@@ -91,18 +97,117 @@ def plot_e_vs_P(systems, plot_fname=None):
             **kwargs
         )
 
-    threshold_density = 2.0 * units.Unit('g/cm3')
-    dense = systems.pl_dens > threshold_density
-    fluffy = systems.pl_dens < threshold_density
-    unknown = numpy.logical_and(numpy.logical_not(dense),
-                                numpy.logical_not(fluffy))
+    def read_systems():
+        """Return the systems to plot as objct with attributes."""
+
+        if cmdline_args.nasa_data is not None:
+            return read_nasa_planets(cmdline_args.nasa_data,
+                                     eliminate=(),
+                                     add_units=True,
+                                     need_ages=False)
+        if cmdline_args.use_binary_stars:
+            systems = read_geller_et_al_2009_binaries()
+
+            field_names = ['pl_orbper',
+                           'pl_orbeccen',
+                           'pl_orbeccenlim',
+                           'pl_orbeccenerr1',
+                           'pl_orbeccenerr2',
+                           'primary_mass',
+                           'secondary_mass']
+            field_units = [units.Unit('day'),
+                           1,
+                           1,
+                           1,
+                           1,
+                           units.M_sun,
+                           units.M_sun]
+            PlotSystem = collections.namedtuple('PlotSystem',
+                                                field_names)
+            num_systems = len(systems)
+
+            result = PlotSystem(*(numpy.empty(num_systems, dtype=float) * unit
+                                  for unit in field_units))
+            for sys_index, system in enumerate(systems):
+                result.pl_orbper[sys_index] = system.orbital_period
+                result.pl_orbeccen[sys_index] = system.eccentricity
+                result.pl_orbeccenlim[sys_index] = False
+                result.pl_orbeccenerr1[sys_index] = (
+                    system.eccentricity.plus_error
+                )
+                result.pl_orbeccenerr2[sys_index] = (
+                    system.eccentricity.minus_error
+                )
+                result.primary_mass[sys_index] = system.primary_mass
+                result.secondary_mass[sys_index] = system.secondary_mass
+
+            return result
+
+        raise IOError('At least one input source must be specified for e(P) '
+                      'plotting')
+
+    def plot_exoplanets(systems):
+        """Create e(P) plot for exoplanet systems, i.e. marking density."""
+
+        threshold_density = 2.0 * units.Unit('g/cm3')
+        dense = systems.pl_dens > threshold_density
+        fluffy = systems.pl_dens < threshold_density
+        unknown = numpy.logical_and(numpy.logical_not(dense),
+                                    numpy.logical_not(fluffy))
+
+        plot_selection(systems,
+                       fluffy,
+                       fmt='or',
+                       markersize=10,
+                       label='fluffy')
+        plot_selection(systems,
+                       dense,
+                       fmt='sb',
+                       markersize=15,
+                       label='dense')
+        plot_selection(systems,
+                       unknown,
+                       fmt='vg',
+                       markersize=15,
+                       label='unknown')
+
+        pyplot.plot([0.8, 5.0], [0, 0.6], '-k')
+        pyplot.xlim((0.7, 20))
+
+    def plot_binaries(systems):
+        """Create e(p) plot for binary stars, i.e. marking primary mass."""
+
+        hot = systems.primary_mass > 1.4 * units.M_sun
+        cool = systems.primary_mass < 1.2 * units.M_sun
+        unknown = numpy.logical_and(numpy.logical_not(cool),
+                                    numpy.logical_not(hot))
+        plot_selection(systems,
+                       cool,
+                       fmt='or',
+                       markersize=10,
+                       label='cool')
+        plot_selection(systems,
+                       hot,
+                       fmt='sb',
+                       markersize=15,
+                       label='hot')
+        plot_selection(systems,
+                       unknown,
+                       fmt='vg',
+                       markersize=15,
+                       label='unknown')
+        pyplot.plot([3.0, 13.0], [0, 0.5], '-k')
+        pyplot.xlim((2.0, 100))
+
+
+    systems = read_systems()
+
     pyplot.xscale('log')
-    plot_selection(fluffy, fmt='or', markersize=10, label='fluffy')
-    plot_selection(dense, fmt='sb', markersize=15, label='dense')
-    plot_selection(unknown, fmt='vg', markersize=15, label='unknown')
-    pyplot.plot([0.8, 5.0], [0, 0.6], '-k')
+    if cmdline_args.nasa_data is not None:
+        plot_exoplanets(systems)
+    else:
+        plot_binaries(systems)
     pyplot.ylim((0, 0.6))
-    pyplot.xlim((0.7, 20))
     pyplot.legend()
     if plot_fname is None:
         pyplot.show()
@@ -110,6 +215,7 @@ def plot_e_vs_P(systems, plot_fname=None):
         pyplot.savefig(plot_fname)
         pyplot.cla()
 #pylint: enable=invalid-name
+#pylint: enable=unused-argument
 
 def plot_star_solving(interpolator, system, plot_fname=None):
     """Make a plot showing the attempt to solve for stellar mass/age."""
@@ -149,6 +255,7 @@ def plot_single_lgQ_vs_e(system, progress, plot_fname=None):
     """Show a plot of the final eccentricity vs lgQ for a system."""
 
 
+    print('System: ' + repr(system))
     eccentricity_envelope = EccentricityEnvelope()
     plot_data = format_eccentricity_vs_lgQ(progress[system.hostname])
     pyplot.plot(plot_data[:, 0], plot_data[:, 1], '-k')
@@ -173,14 +280,22 @@ def plot_single_lgQ_vs_e(system, progress, plot_fname=None):
     pyplot.plot([low_e_lgQ], [low_eccentricity], 'or')
     pyplot.plot([envelope_e_lgQ], [envelope_eccentricity], 'ob')
 
+    rplanet = getattr(system, 'db_planet_radius', numpy.nan)
+    if numpy.isfinite(rplanet):
+        rplanet = rplanet.to_value('R_jup')
+
+    mplanet = getattr(system, 'db_planet_mass', numpy.nan)
+    if numpy.isfinite(mplanet):
+        mplanet = mplanet.to_value('M_jup')
+
     pyplot.title(
-        system.hostname
+        str(system.hostname)
         +
         r'($R_p=%g R_j$, $M_p=%g M_j$, $P_{orb}=%g\,d$)'
         %
         (
-            system.db_planet_radius.to_value('R_jup'),
-            system.db_planet_mass.to_value('M_jup'),
+            rplanet,
+            mplanet,
             system.orbital_period.to_value('day')
         )
     )
@@ -198,20 +313,31 @@ def plot_single_lgQ_vs_e(system, progress, plot_fname=None):
 def plot_lgQ_vs_e(progress, cmdline_args, plot_fname=None, **_):
     """Show sequentially plots of lgQ vs e for all systems."""
 
-    systems = read_nasa_planets(cmdline_args.nasa_data,
-                                eliminate=(),
-                                add_units=True,
-                                need_ages=False)
+    systems = []
+    if cmdline_args.nasa_data:
+        nasa_systems = read_nasa_planets(cmdline_args.nasa_data,
+                                         eliminate=(),
+                                         add_units=True,
+                                         need_ages=False)
+        systems.extend(
+            [
+                get_nasa_system(host, nasa_systems)
+                for host in sorted(progress.keys())
+            ]
+        )
+    if getattr(cmdline_args, 'use_binary_stars', None):
+        systems.extend(read_geller_et_al_2009_binaries())
 
     #Only need the keys
     #pylint: disable=consider-iterating-dictionary
-    for host in sorted(progress.keys()):
+    for plot_sys in systems:
     #pylint: enable=consider-iterating-dictionary
-        plot_single_lgQ_vs_e(
-            get_nasa_system(host, systems),
-            progress,
-            plot_fname
-        )
+        if plot_sys.hostname in progress:
+            plot_single_lgQ_vs_e(
+                plot_sys,
+                progress,
+                plot_fname
+            )
 #pylint: enable=invalid-name
 
 #Simplifies command line arguments.
@@ -325,6 +451,7 @@ def plot_lgQ_vs(lgQ_x_axes,
     lgQ_range = (3, 9)
     for x_index in range(plot_x.shape[0]):
         pyplot.xscale('log')
+
         pyplot.errorbar(
             x=plot_x[x_index, limit_flags['upper']],
             y=plot_lgQ['max'][limit_flags['upper']],
@@ -333,8 +460,9 @@ def plot_lgQ_vs(lgQ_x_axes,
                 numpy.zeros(limit_flags['upper'].sum())
             ],
             fmt='vr',
-            markersize=10,
-            linewidth=0.3
+            markersize=5,
+            linewidth=0.3,
+            zorder=0
         )
 
         lower_errors = plot_lgQ['nominal'] - plot_lgQ['min']
@@ -350,10 +478,10 @@ def plot_lgQ_vs(lgQ_x_axes,
                 lgQ_range[1] - plot_lgQ['nominal'][limit_flags['lower']]
             ],
             fmt='^b',
-            markersize=10,
-            linewidth=0.3
+            markersize=5,
+            linewidth=0.3,
+            zorder=1
         )
-
 
         pyplot.errorbar(
             x=plot_x[x_index, limit_flags['two_sided']],
@@ -371,12 +499,14 @@ def plot_lgQ_vs(lgQ_x_axes,
                 )
             ],
             fmt='og',
-            markersize=10,
-            linewidth=3
+            markersize=5,
+            linewidth=2,
+            zorder=2
         )
         pyplot.xlabel(lgQ_x_axes[x_index][0]
                       +
                       ' [' + lgQ_x_axes[x_index][1] + ']')
+
 
 
         if plot_fname is None:
