@@ -244,7 +244,7 @@ def main():
 
     pool_manager = Manager()
     calculate_current_eccentricity = CurrentEccentricityCalculator(
-        initial_eccentricity=0.55,
+        initial_eccentricity=cmdline_args.initial_eccentricity,
         primary_lgQ=cmdline_args.stellar_lgQ,
         interpolator=interpolator,
         progress=progress,

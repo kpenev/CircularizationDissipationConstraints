@@ -104,6 +104,12 @@ def add_assumptions_cmdline_args(parser):
         default=numpy.inf,
         help='The dissipation parameter to assume for the star in the system.'
     )
+    parser.add_argument(
+        '--initial-eccentricity',
+        type=float,
+        default=0.55,
+        help='The initial eccentrcicity to assume.'
+    )
 
 def add_path_cmdline_args(parser):
     """Add arguments controlling where to find required inputs."""
