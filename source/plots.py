@@ -19,7 +19,7 @@ from io_utilities import\
     load_progress_pickle,\
     get_nasa_system,\
     read_geller_et_al_2009_binaries
-from calculate_e_Q_grid import prepare_nasa_system
+from calculate_e_Q_grid import prepare_nasa_system, fix_semimajor
 from process_e_Q_grid import\
     format_eccentricity_vs_lgQ,\
     invert_eccentricity_vs_lgQ,\
@@ -70,6 +70,15 @@ def parse_command_line():
     )
     result = parser.parse_args()
     return result
+
+def get_eccentricity_envelope(cmdline_args):
+    """Return an EccentricityEnvelope instance set-up per the command line."""
+
+    return EccentricityEnvelope(
+        min_period=(3.0 if cmdline_args.nasa_data is None else 0.8),
+        max_period=(13.0 if cmdline_args.nasa_data is None else 5.0),
+        max_eccentricity=(0.5 if cmdline_args.nasa_data is None else 0.6)
+    )
 
 #Simplifies command line arguments.
 #pylint: disable=invalid-name
@@ -177,8 +186,11 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, **kwargs):
     def plot_binaries(systems):
         """Create e(p) plot for binary stars, i.e. marking primary mass."""
 
+        #False positive
+        #pylint: disable=no-member
         hot = systems.primary_mass > 1.4 * units.M_sun
         cool = systems.primary_mass < 1.2 * units.M_sun
+        #pylint: enable=no-member
         unknown = numpy.logical_and(numpy.logical_not(cool),
                                     numpy.logical_not(hot))
         plot_selection(systems,
@@ -251,12 +263,14 @@ def plot_star_solving(interpolator, system, plot_fname=None):
 
 #Simplifies command line arguments.
 #pylint: disable=invalid-name
-def plot_single_lgQ_vs_e(system, progress, plot_fname=None):
+def plot_single_lgQ_vs_e(system,
+                         progress,
+                         eccentricity_envelope,
+                         plot_fname=None):
     """Show a plot of the final eccentricity vs lgQ for a system."""
 
 
     print('System: ' + repr(system))
-    eccentricity_envelope = EccentricityEnvelope()
     plot_data = format_eccentricity_vs_lgQ(progress[system.hostname])
     pyplot.plot(plot_data[:, 0], plot_data[:, 1], '-k')
     pyplot.plot(plot_data[:, 0], plot_data[:, 1], 'ok')
@@ -308,10 +322,8 @@ def plot_single_lgQ_vs_e(system, progress, plot_fname=None):
         pyplot.cla()
 #pylint: enable=invalid-name
 
-#Simplifies command line arguments.
-#pylint: disable=invalid-name
-def plot_lgQ_vs_e(progress, cmdline_args, plot_fname=None, **_):
-    """Show sequentially plots of lgQ vs e for all systems."""
+def get_system_list(cmdline_args):
+    """Return a list of systems for plotting."""
 
     systems = []
     if cmdline_args.nasa_data:
@@ -328,6 +340,16 @@ def plot_lgQ_vs_e(progress, cmdline_args, plot_fname=None, **_):
     if getattr(cmdline_args, 'use_binary_stars', None):
         systems.extend(read_geller_et_al_2009_binaries())
 
+    return systems
+
+#Simplifies command line arguments.
+#pylint: disable=invalid-name
+def plot_lgQ_vs_e(progress, cmdline_args, plot_fname=None, **_):
+    """Show sequentially plots of lgQ vs e for all systems."""
+
+    systems = get_system_list(cmdline_args)
+    eccentricity_envelope = get_eccentricity_envelope(cmdline_args)
+
     #Only need the keys
     #pylint: disable=consider-iterating-dictionary
     for plot_sys in systems:
@@ -336,6 +358,7 @@ def plot_lgQ_vs_e(progress, cmdline_args, plot_fname=None, **_):
             plot_single_lgQ_vs_e(
                 plot_sys,
                 progress,
+                eccentricity_envelope,
                 plot_fname
             )
 #pylint: enable=invalid-name
@@ -349,14 +372,28 @@ def plot_lgQ_vs(lgQ_x_axes,
                 plot_fname=None):
     """Make a plot of the log10(Q*') constraints vs orbital period."""
 
+    def add_stellar_properties(system):
+        """Augment the given system with info about its star(s) & orbit."""
+
+        system.primary_radius = interpolator(
+            'radius',
+            system.primary_mass.to_value('M_sun'),
+            system.feh.to_value('')
+        )(system.age.to_value('Gyr')) * units.R_sun
+
+        system.secondary_radius = interpolator(
+            'radius',
+            system.secondary_mass.to_value('M_sun'),
+            system.feh.to_value('')
+        )(system.age.to_value('Gyr')) * units.R_sun
+
+        fix_semimajor(system)
+
     def prepare_data():
         """Collect and calculate the data required for the plots."""
 
-        systems = read_nasa_planets(cmdline_args.nasa_data,
-                                    eliminate=(),
-                                    add_units=True,
-                                    need_ages=False)
-        eccentricity_envelope = EccentricityEnvelope()
+        systems = get_system_list(cmdline_args)
+        eccentricity_envelope = get_eccentricity_envelope(cmdline_args)
 
         plot_x = numpy.empty((len(lgQ_x_axes), len(progress)), dtype=float)
         plot_lgQ = numpy.empty(plot_x.shape[1], dtype=[('min', float),
@@ -369,11 +406,12 @@ def plot_lgQ_vs(lgQ_x_axes,
         )
 
         x_evaluator = asteval.Interpreter()
-        for index, (host, lgQ_vs_period) in enumerate(progress.items()):
-            system = get_nasa_system(host, systems)
-            prepare_nasa_system(system,
-                                interpolator,
-                                cmdline_args.small_planet_density)
+        index = 0
+        for system in systems:
+            if system.hostname not in progress:
+                continue
+            add_stellar_properties(system)
+            lgQ_vs_period = progress[system.hostname]
             print('System: ' + repr(system))
 
             plot_lgQ['nominal'][index] = invert_eccentricity_vs_lgQ(
@@ -407,6 +445,7 @@ def plot_lgQ_vs(lgQ_x_axes,
             limit_flags['lower'][index] = numpy.isnan(plot_lgQ['max'][index])
             print('lgQ constraints: ' + repr(plot_lgQ[index]))
             print('Flags: ' + repr(limit_flags[index]))
+            index += 1
 
         limit_flags['two_sided'] = numpy.copy(
             numpy.logical_not(

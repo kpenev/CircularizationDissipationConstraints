@@ -50,6 +50,18 @@ def parse_command_line():
     fix_system_units(result)
     return result
 
+def fix_semimajor(system):
+    """Calculate the semimajor axis if not already in the system."""
+
+    if not numpy.isfinite(getattr(system, 'semimajor', numpy.nan)):
+        system.semimajor = (
+            constants.G * (system.primary_mass + system.secondary_mass)
+            *
+            (system.orbital_period)**2
+            /
+            (4.0 * numpy.pi**2)
+        )**(1.0 / 3.0)
+
 def prepare_nasa_system(system,
                         interpolator,
                         small_planet_density):
@@ -164,19 +176,6 @@ def prepare_nasa_system(system,
             system.eccentricity.minus_error = 0.0
             print('Eccentricity fallback used for ' + system.hostname)
 
-    def fix_semimajor():
-        """Calculate the semimajor axis if not already in the system."""
-
-        if not numpy.isfinite(system.semimajor):
-            system.semimajor = (
-                constants.G * (system.primary_mass + system.secondary_mass)
-                *
-                (system.orbital_period)**2
-                /
-                (4.0 * numpy.pi**2)
-            )**(1.0 / 3.0)
-
-
     print('Preparing NASA system for evolution:')
     print(repr(system))
 
@@ -185,7 +184,7 @@ def prepare_nasa_system(system,
     set_primary_properties()
     set_secondary_properties()
     fix_eccentricity()
-    fix_semimajor()
+    fix_semimajor(system)
 
 def main():
     """Calculate the grid specified on the command line."""
