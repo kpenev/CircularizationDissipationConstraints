@@ -5,8 +5,6 @@ from matplotlib import pyplot
 import scipy
 import scipy.interpolate
 
-from  planetary_system_io import read_cds_pipe_table
-
 class IsochroneFileIterator:
     """
     Iterate over the sections of the isochrone grid file with line generators.
@@ -16,7 +14,7 @@ class IsochroneFileIterator:
 
         _line:    The last line read from the file.
 
-        _header:    The collection of comment lines in the beginning of the
+        header:    The collection of comment lines in the beginning of the
             isochrone file.
     """
 
@@ -25,13 +23,13 @@ class IsochroneFileIterator:
 
         self._isochrone = open(isochrone_fname, 'r')
         self._line = ''
-        self._header = []
+        self.header = []
         while True:
             self._line = self._isochrone.readline()
             assert self._line[0] == '#'
             if self._line.startswith('# Zini'):
                 break
-            self._header.append(self._line)
+            self.header.append(self._line)
 
     def __enter__(self):
         """Just return self."""
@@ -73,6 +71,9 @@ class CMDInterpolator:
     Use interpolation to estimate quantities at any mass/[Fe/H] from a CMD grid.
 
     Attributes:
+        header([str]):    The comment lines in the beginning of the isochrone
+            file.
+
         data([scipy field array]):    A the data contained in the isochrone
             file downloaded from the CMD interface, organized as a list of
             scipy field arrays, one for each section (corresponding to a
@@ -85,6 +86,7 @@ class CMDInterpolator:
         with IsochroneFileIterator(isochrone_fname) as isochrone:
             self.data = [scipy.genfromtxt(section, names=True)
                          for section in isochrone]
+            self.header = isochrone.header
 
         for section_data in self.data:
             assert scipy.unique(section_data['MH']).size == 1
@@ -162,53 +164,4 @@ def plot_isochrone():
     pyplot.show()
 
 if __name__ == '__main__':
-    from planetary_system_io import read_cds_pipe_table
-    from magnitude_transformations import sdss_to_usno, deredden_usno
-
-    ngc_188_photometry = read_cds_pipe_table(
-        '../data/Fornal_et_al_2006_NGC188_photometry.tsv'
-    )
-    cluster_members = ngc_188_photometry[ngc_188_photometry['Mm'] > 0.5]
-    observed_usno_ugriz = scipy.array((cluster_members["u'mag"],
-                                       cluster_members["g'mag"],
-                                       cluster_members["r'mag"],
-                                       cluster_members["i'mag"],
-                                       cluster_members["z'mag"]))
-    pyplot.plot(observed_usno_ugriz[1] - observed_usno_ugriz[2],
-                -observed_usno_ugriz[1],
-                'ok')
-
-    interp_masses = scipy.linspace(0.6, 1.12, 100)
-    for interp_fname, color in zip(
-            [
-#                '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.dat',
-                '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat',
-#                '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.2.dat'
-            ],
-            'rgb'
-    ):
-        interpolator = CMDInterpolator(interp_fname)
-
-        predicted_sdss_ugriz = scipy.empty(shape=(5, interp_masses.size),
-                                           dtype=float)
-        predicted_sdss_ugriz[0] = interpolator.get_interpolated('umag',
-                                                                interp_masses,
-                                                                0.0)
-        predicted_sdss_ugriz[1] = interpolator.get_interpolated('gmag',
-                                                                interp_masses,
-                                                                0.0)
-        predicted_sdss_ugriz[2] = interpolator.get_interpolated('rmag',
-                                                                interp_masses,
-                                                                0.0)
-        predicted_sdss_ugriz[3] = interpolator.get_interpolated('imag',
-                                                                interp_masses,
-                                                                0.0)
-        predicted_sdss_ugriz[4] = interpolator.get_interpolated('zmag',
-                                                                interp_masses,
-                                                                0.0)
-        predicted_usno_ugriz = sdss_to_usno(predicted_sdss_ugriz)
-
-        pyplot.plot(predicted_usno_ugriz[1] - predicted_usno_ugriz[2],
-                    -predicted_usno_ugriz[1] - 11.3, '-' + color)
-
-    pyplot.show()
+    plot_isochrone()
