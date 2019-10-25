@@ -76,8 +76,8 @@ def get_eccentricity_envelope(cmdline_args):
 
     return EccentricityEnvelope(
         min_period=(3.0 if cmdline_args.nasa_data is None else 0.8),
-        max_period=(13.0 if cmdline_args.nasa_data is None else 5.0),
-        max_eccentricity=(0.5 if cmdline_args.nasa_data is None else 0.6)
+        max_period=(20.0 if cmdline_args.nasa_data is None else 5.0),
+        max_eccentricity=0.6
     )
 
 #Simplifies command line arguments.
@@ -208,7 +208,7 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, **kwargs):
                        fmt='vg',
                        markersize=15,
                        label='unknown')
-        pyplot.plot([3.0, 13.0], [0, 0.5], '-k')
+        pyplot.plot([3.0, 20.0], [0, 0.6], '-k')
         pyplot.xlim((2.0, 100))
 
 
@@ -322,7 +322,7 @@ def plot_single_lgQ_vs_e(system,
         pyplot.cla()
 #pylint: enable=invalid-name
 
-def get_system_list(cmdline_args):
+def get_system_list(cmdline_args, interpolator=None):
     """Return a list of systems for plotting."""
 
     systems = []
@@ -331,12 +331,23 @@ def get_system_list(cmdline_args):
                                          eliminate=(),
                                          add_units=True,
                                          need_ages=False)
-        systems.extend(
-            [
+        if interpolator is None:
+            systems.extend([
                 get_nasa_system(host, nasa_systems)
-                for host in sorted(progress.keys())
-            ]
-        )
+                for host in sorted(nasa_systems.pl_hostname)
+            ])
+        else:
+            transiting = nasa_systems.pl_discmethod == 'Transit'
+            for host in sorted(nasa_systems.pl_hostname[transiting]):
+                try:
+                    this_system = get_nasa_system(host, nasa_systems)
+                    prepare_nasa_system(this_system,
+                                        interpolator,
+                                        cmdline_args.small_planet_density)
+                    systems.append(this_system)
+                except AssertionError:
+                    pass
+
     if getattr(cmdline_args, 'use_binary_stars', None):
         systems.extend(read_geller_et_al_2009_binaries())
 
@@ -375,24 +386,27 @@ def plot_lgQ_vs(lgQ_x_axes,
     def add_stellar_properties(system):
         """Augment the given system with info about its star(s) & orbit."""
 
-        system.primary_radius = interpolator(
-            'radius',
-            system.primary_mass.to_value('M_sun'),
-            system.feh.to_value('')
-        )(system.age.to_value('Gyr')) * units.R_sun
+        print('System: ' + repr(system))
+        if not hasattr(system, 'primary_radius'):
+            system.primary_radius = interpolator(
+                'radius',
+                system.primary_mass.to_value('M_sun'),
+                system.feh.to_value('')
+            )(system.age.to_value('Gyr')) * units.R_sun
 
-        system.secondary_radius = interpolator(
-            'radius',
-            system.secondary_mass.to_value('M_sun'),
-            system.feh.to_value('')
-        )(system.age.to_value('Gyr')) * units.R_sun
+        if not hasattr(system, 'secondary_radius'):
+            system.secondary_radius = interpolator(
+                'radius',
+                system.secondary_mass.to_value('M_sun'),
+                system.feh.to_value('')
+            )(system.age.to_value('Gyr')) * units.R_sun
 
         fix_semimajor(system)
 
     def prepare_data():
         """Collect and calculate the data required for the plots."""
 
-        systems = get_system_list(cmdline_args)
+        systems = get_system_list(cmdline_args, interpolator)
         eccentricity_envelope = get_eccentricity_envelope(cmdline_args)
 
         plot_x = numpy.empty((len(lgQ_x_axes), len(progress)), dtype=float)
