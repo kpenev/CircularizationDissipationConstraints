@@ -209,9 +209,11 @@ def main():
                                     need_ages=False)
         #Fales positive
         #pylint: disable=no-member
-        for system_index in numpy.argwhere(systems.pl_discmethod
-                                           ==
-                                           'Transit')[:, 0]:
+        for system_index in numpy.argwhere(
+                systems.pl_discmethod == 'Transit'
+                and
+                systems.pl_orbper < 50.0 * units.day
+        )[:, 0]:
         #pylint: enable=no-member
             try:
                 system = get_nasa_system(system_index, systems)
@@ -226,7 +228,10 @@ def main():
             except AssertionError:
                 pass
     if cmdline_args.use_binary_stars:
-        evolution_systems.extend(read_geller_et_al_2009_binaries())
+        evolution_systems.extend(
+            filter(lambda s: s.orbital_period < 50.0 * units.day,
+                   read_geller_et_al_2009_binaries())
+        )
 
     if cmdline_args.orbital_period is not None:
         evolution_systems.append(
