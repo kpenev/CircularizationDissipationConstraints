@@ -210,6 +210,8 @@ def init_progress_pickle(cmdline_args):
             cmdline_cfg = dict(vars(cmdline_args))
             if 'initial_eccentricity' not in pickled_cfg:
                 pickled_cfg['initial_eccentricity'] = 0.55
+            if 'stellar_lgQ' not in pickled_cfg:
+                pickled_cfg['stellar_lgQ'] = numpy.inf
             for ignore_arg in ['progress_pickle',
                                'num_parallel_processes',
                                'use_binary_stars']:
