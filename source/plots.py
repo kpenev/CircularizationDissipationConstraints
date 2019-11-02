@@ -43,7 +43,8 @@ def parse_command_line():
     parser.add_argument(
         '--plot-fname',
         default=None,
-        help='A pattern for the filename to save plots under. If empty, plots '
+        help='A pattern for the filename to save plots under. It may include a '
+        '%%(x_label)s substitution If empty, plots '
         'are just displayed to the user, but not saved.'
     )
     parser.add_argument(
@@ -129,8 +130,11 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, **kwargs):
                            1,
                            1,
                            1,
+                           #False positive
+                           #pylint: disable=no-member
                            units.M_sun,
                            units.M_sun]
+                           #pylint: enable=no-member
             PlotSystem = collections.namedtuple('PlotSystem',
                                                 field_names)
             num_systems = len(systems)
@@ -326,6 +330,8 @@ def get_system_list(cmdline_args, interpolator=None):
     """Return a list of systems for plotting."""
 
     systems = []
+    #False positive
+    #pylint: disable=no-member
     if cmdline_args.nasa_data:
         nasa_systems = read_nasa_planets(cmdline_args.nasa_data,
                                          eliminate=(),
@@ -347,6 +353,7 @@ def get_system_list(cmdline_args, interpolator=None):
                     systems.append(this_system)
                 except AssertionError:
                     pass
+    #pylint: enable=no-member
 
     if getattr(cmdline_args, 'use_binary_stars', None):
         systems.extend(read_geller_et_al_2009_binaries())
@@ -388,18 +395,24 @@ def plot_lgQ_vs(lgQ_x_axes,
 
         print('System: ' + repr(system))
         if not hasattr(system, 'primary_radius'):
+            #False positive
+            #pylint: disable=no-member
             system.primary_radius = interpolator(
                 'radius',
                 system.primary_mass.to_value('M_sun'),
                 system.feh.to_value('')
             )(system.age.to_value('Gyr')) * units.R_sun
+            #pylint: enable=no-member
 
         if not hasattr(system, 'secondary_radius'):
+            #False positive
+            #pylint: disable=no-member
             system.secondary_radius = interpolator(
                 'radius',
                 system.secondary_mass.to_value('M_sun'),
                 system.feh.to_value('')
             )(system.age.to_value('Gyr')) * units.R_sun
+            #pylint: enable=no-member
 
         fix_semimajor(system)
 
@@ -418,6 +431,8 @@ def plot_lgQ_vs(lgQ_x_axes,
             plot_x.shape[1],
             dtype=[('two_sided', bool), ('upper', bool), ('lower', bool)]
         )
+        assumed_default_density = numpy.empty(plot_x.shape[1],
+                                              dtype=bool)
 
         x_evaluator = asteval.Interpreter()
         index = 0
@@ -427,6 +442,8 @@ def plot_lgQ_vs(lgQ_x_axes,
             add_stellar_properties(system)
             lgQ_vs_period = progress[system.hostname]
             print('System: ' + repr(system))
+
+            assumed_default_density[index] = system.assumed_default_density
 
             plot_lgQ['nominal'][index] = invert_eccentricity_vs_lgQ(
                 lgQ_vs_period,
@@ -492,9 +509,36 @@ def plot_lgQ_vs(lgQ_x_axes,
         print(100 * '*')
 
 
-        return plot_x, plot_lgQ, limit_flags
+        return plot_x, plot_lgQ, limit_flags, assumed_default_density
 
-    plot_x, plot_lgQ, limit_flags = prepare_data()
+    def add_points(plot_x, plot_y, plot_errors, limit=False):
+        """Add a set of points to the plot color-coding for default density."""
+
+        linewidth = 0.3
+        if limit == 'upper':
+            point_fmt = 'vr'
+            zorder = 0
+        elif limit == 'lower':
+            point_fmt = '^r'
+            zorder = 1
+        else:
+            assert not limit
+            point_fmt = 'og'
+            linewidth = 2
+            zorder = 2
+
+        pyplot.errorbar(
+            x=plot_x,
+            y=plot_y,
+            yerr=plot_errors,
+            fmt=point_fmt,
+            markersize=5,
+            linewidth=linewidth,
+            zorder=zorder
+        )
+
+
+    plot_x, plot_lgQ, limit_flags, assumed_default_density = prepare_data()
 
     print(100 * '*')
     print('Constraints:')
@@ -504,42 +548,36 @@ def plot_lgQ_vs(lgQ_x_axes,
     lgQ_range = (3, 9)
     for x_index in range(plot_x.shape[0]):
         pyplot.xscale('log')
-
-        pyplot.errorbar(
-            x=plot_x[x_index, limit_flags['upper']],
-            y=plot_lgQ['max'][limit_flags['upper']],
-            yerr=[
+        add_points(
+            plot_x=plot_x[x_index, limit_flags['upper']],
+            plot_y=plot_lgQ['max'][limit_flags['upper']],
+            plot_errors=[
                 plot_lgQ['max'][limit_flags['upper']] - lgQ_range[0],
                 numpy.zeros(limit_flags['upper'].sum())
             ],
-            fmt='vr',
-            markersize=5,
-            linewidth=0.3,
-            zorder=0
+            limit='upper'
         )
+
 
         lower_errors = plot_lgQ['nominal'] - plot_lgQ['min']
         print('lower_errors: ' + repr(lower_errors[limit_flags['lower']]))
         print('lgQ nominal: ' + repr(plot_lgQ['nominal'][limit_flags['lower']]))
         print('lgQ min: ' + repr(plot_lgQ['min'][limit_flags['lower']]))
 
-        pyplot.errorbar(
-            x=plot_x[x_index, limit_flags['lower']],
-            y=plot_lgQ['nominal'][limit_flags['lower']],
-            yerr=[
+        add_points(
+            plot_x=plot_x[x_index, limit_flags['lower']],
+            plot_y=plot_lgQ['nominal'][limit_flags['lower']],
+            plot_errors=[
                 lower_errors[limit_flags['lower']],
                 lgQ_range[1] - plot_lgQ['nominal'][limit_flags['lower']]
             ],
-            fmt='^b',
-            markersize=5,
-            linewidth=0.3,
-            zorder=1
+            limit='lower'
         )
 
-        pyplot.errorbar(
-            x=plot_x[x_index, limit_flags['two_sided']],
-            y=plot_lgQ['nominal'][limit_flags['two_sided']],
-            yerr=[
+        add_points(
+            plot_x=plot_x[x_index, limit_flags['two_sided']],
+            plot_y=plot_lgQ['nominal'][limit_flags['two_sided']],
+            plot_errors=[
                 (
                     plot_lgQ['nominal'][limit_flags['two_sided']]
                     -
@@ -550,12 +588,9 @@ def plot_lgQ_vs(lgQ_x_axes,
                     -
                     plot_lgQ['nominal'][limit_flags['two_sided']]
                 )
-            ],
-            fmt='og',
-            markersize=5,
-            linewidth=2,
-            zorder=2
+            ]
         )
+
         pyplot.xlabel(lgQ_x_axes[x_index][0]
                       +
                       ' [' + lgQ_x_axes[x_index][1] + ']')

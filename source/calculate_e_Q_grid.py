@@ -116,6 +116,7 @@ def prepare_nasa_system(system,
                                        *
                                        system.primary_radius)
 
+        system.assumed_default_density = True
         if numpy.isfinite(system.db_planet_mass):
             system.secondary_mass = system.db_planet_mass
         else:
@@ -135,6 +136,7 @@ def prepare_nasa_system(system,
                     *
                     4.0 / 3.0 * numpy.pi * system.secondary_radius**3
                 )
+                system.assumed_default_density = True
                 #pylint: enable=no-member
 
     def fix_eccentricity():
