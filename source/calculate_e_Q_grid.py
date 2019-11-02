@@ -210,9 +210,10 @@ def main():
         #Fales positive
         #pylint: disable=no-member
         for system_index in numpy.argwhere(
-                systems.pl_discmethod == 'Transit'
-                and
-                systems.pl_orbper < 50.0 * units.day
+                numpy.logical_and(
+                    systems.pl_discmethod == 'Transit',
+                    systems.pl_orbper < 50.0 * units.day
+                )
         )[:, 0]:
         #pylint: enable=no-member
             try:
