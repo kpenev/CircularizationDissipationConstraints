@@ -10,7 +10,7 @@ def format_eccentricity_vs_lgQ(eccentricity_vs_lgQ):
     Return 2-D numpy array with lgQ in [:, 0] and e in [:, 1].
 
     Args:
-        eccentricity_lgQ(dict):    The dictionary of pre-computer
+        eccentricity_lgQ(dict):    The dictionary of pre-computed
             eccentricity vs log10(Q*') as unpickled from the grid.
 
     Return:

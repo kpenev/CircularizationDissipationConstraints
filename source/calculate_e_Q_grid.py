@@ -116,7 +116,6 @@ def prepare_nasa_system(system,
                                        *
                                        system.primary_radius)
 
-        system.assumed_default_density = True
         if numpy.isfinite(system.db_planet_mass):
             system.secondary_mass = system.db_planet_mass
         else:

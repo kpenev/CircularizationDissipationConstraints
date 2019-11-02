@@ -433,6 +433,8 @@ def plot_lgQ_vs(lgQ_x_axes,
         )
         assumed_default_density = numpy.empty(plot_x.shape[1],
                                               dtype=bool)
+        is_giant = numpy.empty(plot_x.shape[1],
+                               dtype=bool)
 
         x_evaluator = asteval.Interpreter()
         index = 0
@@ -443,7 +445,10 @@ def plot_lgQ_vs(lgQ_x_axes,
             lgQ_vs_period = progress[system.hostname]
             print('System: ' + repr(system))
 
-            assumed_default_density[index] = system.assumed_default_density
+            assumed_default_density[index] = getattr(system,
+                                                     'assumed_default_density',
+                                                     False)
+            is_giant[index] = system.secondary_radius > 0.3 * units.R_jup
 
             plot_lgQ['nominal'][index] = invert_eccentricity_vs_lgQ(
                 lgQ_vs_period,
@@ -509,36 +514,64 @@ def plot_lgQ_vs(lgQ_x_axes,
         print(100 * '*')
 
 
-        return plot_x, plot_lgQ, limit_flags, assumed_default_density
+        return plot_x, plot_lgQ, limit_flags, assumed_default_density, is_giant
 
-    def add_points(plot_x, plot_y, plot_errors, limit=False):
+    def add_points(plot_x,
+                   plot_y,
+                   plot_errors,
+                   assumed_default_density,
+                   limit=False,
+                   distinguish=None):
         """Add a set of points to the plot color-coding for default density."""
 
-        linewidth = 0.3
+        plot_style = dict(
+            markersize=5,
+            linewidth=0.3
+        )
         if limit == 'upper':
-            point_fmt = 'vr'
-            zorder = 0
+            plot_style['fmt'] = 'v'
+            colors = ['red', 'orange']
+            plot_style['zorder'] = 0
         elif limit == 'lower':
-            point_fmt = '^r'
-            zorder = 1
+            plot_style['fmt'] = '^'
+            colors = ['blue', 'cyan']
+            plot_style['zorder']= 1
         else:
             assert not limit
-            point_fmt = 'og'
-            linewidth = 2
-            zorder = 2
+            plot_style['fmt'] = 'o'
+            colors = ['green', 'magenta']
+            plot_style['linewidth'] = 2
+            plot_style['zorder'] = 2
 
-        pyplot.errorbar(
-            x=plot_x,
-            y=plot_y,
-            yerr=plot_errors,
-            fmt=point_fmt,
-            markersize=5,
-            linewidth=linewidth,
-            zorder=zorder
-        )
+        for color_index, include in enumerate(
+                [
+                    numpy.logical_not(assumed_default_density),
+                    assumed_default_density
+                ]
+        ):
+            plot_style['markeredgecolor'] = colors[color_index]
+            plot_style['ecolor'] = colors[color_index]
+            plot_style['markerfacecolor'] = colors[color_index]
 
+            if distinguish is None:
+                sub_include_list = [include]
+            else:
+                sub_include_list = [
+                    numpy.logical_and(distinguish, include),
+                    numpy.logical_and(numpy.logical_not(distinguish), include)
+                ]
 
-    plot_x, plot_lgQ, limit_flags, assumed_default_density = prepare_data()
+            for sub_include in sub_include_list:
+                pyplot.errorbar(
+                    x=plot_x[sub_include],
+                    y=plot_y[sub_include],
+                    yerr=[err[sub_include] for err in plot_errors],
+                    **plot_style
+                )
+                plot_style['markerfacecolor'] = 'none'
+                plot_style['zorder'] -= 10
+
+    plot_x, plot_lgQ, limit_flags, assumed_default_density, is_giant = prepare_data()
 
     print(100 * '*')
     print('Constraints:')
@@ -555,9 +588,12 @@ def plot_lgQ_vs(lgQ_x_axes,
                 plot_lgQ['max'][limit_flags['upper']] - lgQ_range[0],
                 numpy.zeros(limit_flags['upper'].sum())
             ],
-            limit='upper'
+            assumed_default_density=assumed_default_density[
+                limit_flags['upper']
+            ],
+            limit='upper',
+            distinguish=is_giant[limit_flags['upper']]
         )
-
 
         lower_errors = plot_lgQ['nominal'] - plot_lgQ['min']
         print('lower_errors: ' + repr(lower_errors[limit_flags['lower']]))
@@ -571,7 +607,11 @@ def plot_lgQ_vs(lgQ_x_axes,
                 lower_errors[limit_flags['lower']],
                 lgQ_range[1] - plot_lgQ['nominal'][limit_flags['lower']]
             ],
-            limit='lower'
+            assumed_default_density=assumed_default_density[
+                limit_flags['lower']
+            ],
+            limit='lower',
+            distinguish=is_giant[limit_flags['lower']]
         )
 
         add_points(
@@ -588,7 +628,11 @@ def plot_lgQ_vs(lgQ_x_axes,
                     -
                     plot_lgQ['nominal'][limit_flags['two_sided']]
                 )
-            ]
+            ],
+            assumed_default_density=assumed_default_density[
+                limit_flags['two_sided']
+            ],
+            distinguish=is_giant[limit_flags['two_sided']]
         )
 
         pyplot.xlabel(lgQ_x_axes[x_index][0]
