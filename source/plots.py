@@ -267,6 +267,22 @@ def plot_star_solving(interpolator, system, plot_fname=None):
 
 #Simplifies command line arguments.
 #pylint: disable=invalid-name
+def solve_lgQ_limits(lgQ_vs_period,
+                     nominal_eccentricity,
+                     low_eccentricity,
+                     envelope_eccentricity):
+    """Return lgQ to reproduce nominal, low and envolpe eccentricity."""
+
+    return (
+        invert_eccentricity_vs_lgQ(lgQ_vs_period,
+                                   nominal_eccentricity),
+        invert_eccentricity_vs_lgQ(lgQ_vs_period,
+                                   low_eccentricity),
+        invert_eccentricity_vs_lgQ(lgQ_vs_period,
+                                   envelope_eccentricity,
+                                   default_min=min(lgQ_vs_period.keys()))
+    )
+
 def plot_single_lgQ_vs_e(system,
                          progress,
                          eccentricity_envelope,
@@ -288,12 +304,13 @@ def plot_single_lgQ_vs_e(system,
     pyplot.axhline(y=low_eccentricity, color='r')
     pyplot.axhline(envelope_eccentricity, color='b')
 
-    nominal_e_lgQ = invert_eccentricity_vs_lgQ(progress[system.hostname],
-                                               nominal_eccentricity)
-    low_e_lgQ = invert_eccentricity_vs_lgQ(progress[system.hostname],
-                                           low_eccentricity)
-    envelope_e_lgQ = invert_eccentricity_vs_lgQ(progress[system.hostname],
-                                                envelope_eccentricity)
+    nominal_e_lgQ, low_e_lgQ, envelope_e_lgQ = solve_lgQ_limits(
+        progress[system.hostname],
+        nominal_eccentricity,
+        low_eccentricity,
+        envelope_eccentricity
+    )
+
     pyplot.plot([nominal_e_lgQ], [nominal_eccentricity], 'or')
     pyplot.plot([low_e_lgQ], [low_eccentricity], 'or')
     pyplot.plot([envelope_e_lgQ], [envelope_eccentricity], 'ob')
@@ -453,18 +470,15 @@ def plot_lgQ_vs(lgQ_x_axes,
             is_giant[index] = system.secondary_radius > 0.3 * units.R_jup
             #pylint: enable=no-member
 
-            plot_lgQ['nominal'][index] = invert_eccentricity_vs_lgQ(
+            (
+                plot_lgQ['nominal'][index],
+                plot_lgQ['min'][index],
+                plot_lgQ['max'][index]
+            ) = solve_lgQ_limits(
                 lgQ_vs_period,
-                system.eccentricity
-            )
-            plot_lgQ['min'][index] = invert_eccentricity_vs_lgQ(
-                lgQ_vs_period,
-                system.eccentricity - system.eccentricity.minus_error
-            )
-            plot_lgQ['max'][index] = invert_eccentricity_vs_lgQ(
-                lgQ_vs_period,
+                system.eccentricity,
+                system.eccentricity - system.eccentricity.minus_error,
                 eccentricity_envelope(system.orbital_period.to_value('day')),
-                default_min=min(lgQ_vs_period.keys())
             )
 
             x_evaluator.symtable = vars(system)
