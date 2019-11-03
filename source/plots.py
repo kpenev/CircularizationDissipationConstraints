@@ -460,7 +460,8 @@ def plot_lgQ_vs(lgQ_x_axes,
             )
             plot_lgQ['max'][index] = invert_eccentricity_vs_lgQ(
                 lgQ_vs_period,
-                eccentricity_envelope(system.orbital_period.to_value('day'))
+                eccentricity_envelope(system.orbital_period.to_value('day')),
+                default_min=min(lgQ_vs_period.keys())
             )
 
             x_evaluator.symtable = vars(system)

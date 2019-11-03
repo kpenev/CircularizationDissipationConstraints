@@ -85,7 +85,10 @@ class EccentricityEnvelope:
             self.min_period
         )
 
-def invert_eccentricity_vs_lgQ(eccentricity_vs_lgQ, eccentricity):
+def invert_eccentricity_vs_lgQ(eccentricity_vs_lgQ,
+                               eccentricity,
+                               default_min=None,
+                               default_max=None):
     """
     Estimate log10(Q*') which reproduced the given eccentricity for a system.
 
@@ -103,7 +106,15 @@ def invert_eccentricity_vs_lgQ(eccentricity_vs_lgQ, eccentricity):
 
     interp_data = format_eccentricity_vs_lgQ(eccentricity_vs_lgQ)
 
+    if interp_data[:, 1].max() < eccentricity:
+        return defalut_min
+
+    if interp_data[:, 1].min() > eccentricity:
+        return defalut_max
+
     for i in range(interp_data.shape[0] - 1):
         result = _solve_line(*interp_data[i: i + 2].flatten(), eccentricity)
         if result is not None:
             return result
+
+    assert False
