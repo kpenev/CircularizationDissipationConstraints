@@ -116,5 +116,6 @@ def invert_eccentricity_vs_lgQ(eccentricity_vs_lgQ,
         if result is not None:
             return result
 
+    print('Something weird is going on with data: ' + repr(interp_data))
     assert False
     return None
