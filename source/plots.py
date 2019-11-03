@@ -448,7 +448,10 @@ def plot_lgQ_vs(lgQ_x_axes,
             assumed_default_density[index] = getattr(system,
                                                      'assumed_default_density',
                                                      False)
+            #False positive
+            #pylint: disable=no-member
             is_giant[index] = system.secondary_radius > 0.3 * units.R_jup
+            #pylint: enable=no-member
 
             plot_lgQ['nominal'][index] = invert_eccentricity_vs_lgQ(
                 lgQ_vs_period,
@@ -536,7 +539,7 @@ def plot_lgQ_vs(lgQ_x_axes,
         elif limit == 'lower':
             plot_style['fmt'] = '^'
             colors = ['blue', 'cyan']
-            plot_style['zorder']= 1
+            plot_style['zorder'] = 1
         else:
             assert not limit
             plot_style['fmt'] = 'o'

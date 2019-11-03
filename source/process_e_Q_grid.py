@@ -25,7 +25,7 @@ def _solve_line(x0, y0, x1, y1, target_y):
     """Return x0 < x < x1 where a line crosses a target y value or None."""
 
     result = (target_y - y0) * (x0 - x1) / (y0 - y1) + x0
-    return (result if result >= x0 and result <= x1 else None)
+    return result if x0 <= result <= x1 else None
 
 class EccentricityEnvelope:
     """Class for working with the eccentricity envelovpe."""
@@ -54,10 +54,9 @@ class EccentricityEnvelope:
         try:
             if orbital_period < self.min_period:
                 return 0.0
-            elif orbital_period < self.max_period:
+            if orbital_period < self.max_period:
                 return self._eccentricity_envelope_line(orbital_period)
-            else:
-                return self.max_eccentricity
+            return self.max_eccentricity
         except ValueError:
             result = numpy.zeros(orbital_period.shape, dtype=float)
             result[
@@ -72,7 +71,7 @@ class EccentricityEnvelope:
     def get_period(self, eccentricity):
         """Return the period where the e-envelope has the given value."""
 
-        if eccentricity < 0 or eccentricity > max_eccentricity:
+        if eccentricity < 0 or eccentricity > self.max_eccentricity:
             return numpy.nan
 
         return (
@@ -107,10 +106,10 @@ def invert_eccentricity_vs_lgQ(eccentricity_vs_lgQ,
     interp_data = format_eccentricity_vs_lgQ(eccentricity_vs_lgQ)
 
     if interp_data[:, 1].max() < eccentricity:
-        return defalut_min
+        return default_min
 
     if interp_data[:, 1].min() > eccentricity:
-        return defalut_max
+        return default_max
 
     for i in range(interp_data.shape[0] - 1):
         result = _solve_line(*interp_data[i: i + 2].flatten(), eccentricity)
@@ -118,3 +117,4 @@ def invert_eccentricity_vs_lgQ(eccentricity_vs_lgQ,
             return result
 
     assert False
+    return None
