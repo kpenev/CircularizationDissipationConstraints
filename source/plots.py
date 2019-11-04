@@ -4,8 +4,9 @@
 
 import pickle
 import collections
+import os.path
 
-from matplotlib import pyplot
+from matplotlib import pyplot, rcParams
 import numpy
 from astropy import units
 from configargparse import ArgumentParser, DefaultsFormatter
@@ -69,6 +70,33 @@ def parse_command_line():
         default='progress.pickle',
         help='The filename where tha calculated eccentricities were saved.'
     )
+    parser.add_argument(
+        '--pickle-systems',
+        default='plot_systems.pickle',
+        help='A file to store prepared systems for reuse in subsequent '
+        'plotting. Default: %(default)s.'
+    )
+    parser.add_argument(
+        '--font-size',
+        type=int,
+        default=16,
+        help='The font size to use for the plots generated. Default: '
+        '%(default)s.'
+    )
+    parser.add_argument(
+        '--figure-size',
+        nargs=2,
+        type=float,
+        default=(6.5, 4.0),
+        help='the size of the figure in inches. Default: %(default)s'
+    )
+    parser.add_argument(
+        '--axes-vshift',
+        type=float,
+        default=0.15,
+        help='The vertical shift of the figure axes from the bottom of the '
+        'figure. Default %(default)s.'
+    )
     result = parser.parse_args()
     return result
 
@@ -80,6 +108,53 @@ def get_eccentricity_envelope(cmdline_args):
         max_period=(20.0 if cmdline_args.nasa_data is None else 5.0),
         max_eccentricity=0.6
     )
+
+#Handling the multiple cases is the whole point
+#pylint: disable=too-many-return-statements
+#False positive with astropy
+#pylint: disable=no-member
+def get_unit_label(axis_units):
+    """Return the given units properly formatted for plot label."""
+
+    if axis_units == units.day:
+        return r'[$days$]'
+    if axis_units == units.M_earth:
+        return r'[$M_\oplus$]'
+    if axis_units == units.R_earth:
+        return r'[$R_\oplus$]'
+    if axis_units == units.M_jup:
+        return r'[$M_j$]'
+    if axis_units == units.R_jup:
+        return r'[$R_j$]'
+    if axis_units == units.M_sun:
+        return r'[$M_\odot$]'
+    if axis_units == units.R_sun:
+        return r'[$R_\odot$]'
+    if axis_units == '':
+        return ''
+    return '[' + str(axis_units) + ']'
+#pylint: enable=too-many-return-statements
+
+def get_quantity_label(axis_quantity, planet=False):
+    """Format the given quantity for plot label."""
+
+    if axis_quantity == 'lgQ':
+        return r"$log_{10}Q'_%s$" % (r'p' if planet else r'\star')
+    if axis_quantity == 'orbital_period':
+        return r'$P_{orb}$'
+    if axis_quantity == 'eccentricity':
+        return r'e'
+    if axis_quantity == 'secondary_mass':
+        return r'$M_p$' if planet else r'$M_2$'
+    if axis_quantity == 'secondary_radius':
+        return r'$R_p$' if planet else r'$R_2$'
+    return str(axis_quantity)
+#pylint: enable=no-member
+
+def get_axis_label(axis_quantity, axis_units):
+    """Return the axis label for the given quantity and units."""
+
+    return get_quantity_label(axis_quantity) + ' '  + get_unit_label(axis_units)
 
 #Simplifies command line arguments.
 #pylint: disable=invalid-name
@@ -334,8 +409,8 @@ def plot_single_lgQ_vs_e(system,
             system.orbital_period.to_value('day')
         )
     )
-    pyplot.xlabel(r"$\log_{10}(Q'_\star)$")
-    pyplot.ylabel('Eccentricity')
+    pyplot.xlabel(get_axis_label('lgQ', ''))
+    pyplot.ylabel(get_axis_label('eccentricity', ''))
     if plot_fname is None:
         pyplot.show()
     else:
@@ -346,14 +421,20 @@ def plot_single_lgQ_vs_e(system,
 def get_system_list(cmdline_args, interpolator=None):
     """Return a list of systems for plotting."""
 
-    if cmdline_args.pickle_systems is not None:
+    if (
+            cmdline_args.pickle_systems
+            and
+            os.path.exists(cmdline_args.pickle_systems)
+    ):
         with open(cmdline_args.pickle_systems, 'rb') as system_pickle:
             while True:
-                pickled_cmdline_args = pickle.load(progress_file)
-                if pickled_cmdline_args is None:
+                try:
+                    pickled_cmdline_args = pickle.load(system_pickle)
+                except EOFError:
                     break
+                systems = pickle.load(system_pickle)
                 if vars(pickled_cmdline_args) == vars(cmdline_args):
-                    return pickle.load(progress_file)
+                    return systems
     systems = []
     #False positive
     #pylint: disable=no-member
@@ -383,10 +464,10 @@ def get_system_list(cmdline_args, interpolator=None):
     if getattr(cmdline_args, 'use_binary_stars', None):
         systems.extend(read_geller_et_al_2009_binaries())
 
-    if cmdline_args.pickle_systems is not None:
+    if cmdline_args.pickle_systems:
         with open(cmdline_args.pickle_systems, 'ab') as system_pickle:
-            pickle.dump(cmdline_args)
-            pickle.dump(systems)
+            pickle.dump(cmdline_args, system_pickle)
+            pickle.dump(systems, system_pickle)
 
     return systems
 
@@ -480,7 +561,7 @@ def plot_lgQ_vs(lgQ_x_axes,
                                                      False)
             #False positive
             #pylint: disable=no-member
-            is_giant[index] = system.secondary_radius > 0.3 * units.R_jup
+            is_giant[index] = system.secondary_radius > 6 * units.R_earth
             #pylint: enable=no-member
 
             (
@@ -491,7 +572,12 @@ def plot_lgQ_vs(lgQ_x_axes,
                 lgQ_vs_period,
                 system.eccentricity,
                 system.eccentricity - system.eccentricity.minus_error,
-                eccentricity_envelope(system.orbital_period.to_value('day')),
+                max(
+                    eccentricity_envelope(
+                        system.orbital_period.to_value('day')
+                    ),
+                    system.eccentricity
+                )
             )
 
             x_evaluator.symtable = vars(system)
@@ -611,7 +697,17 @@ def plot_lgQ_vs(lgQ_x_axes,
 
     lgQ_range = (3, 9)
     for x_index in range(plot_x.shape[0]):
-        pyplot.xscale('log')
+        print('Plotting lgQ vs ' + repr(lgQ_x_axes[x_index]))
+        if lgQ_x_axes[x_index][0] == 'orbital_period':
+            if cmdline_args.nasa_data:
+                pyplot.xscale('linear')
+                pyplot.xlim(1, 4.5)
+            else:
+                pyplot.xscale('linear')
+                pyplot.xlim(3, 50)
+        else:
+            pyplot.xscale('log')
+            pyplot.autoscale()
         add_points(
             plot_x=plot_x[x_index, limit_flags['upper']],
             plot_y=plot_lgQ['max'][limit_flags['upper']],
@@ -666,11 +762,10 @@ def plot_lgQ_vs(lgQ_x_axes,
             distinguish=is_giant[limit_flags['two_sided']]
         )
 
-        pyplot.xlabel(lgQ_x_axes[x_index][0]
-                      +
-                      ' [' + lgQ_x_axes[x_index][1] + ']')
-
-
+        pyplot.xlabel(get_axis_label(*lgQ_x_axes[x_index]))
+        pyplot.ylabel(get_axis_label('lgQ', ''))
+        if cmdline_args.nasa_data:
+            pyplot.axhspan(6, 7, color = 'lightgrey', zorder=-100)
 
         if plot_fname is None:
             pyplot.show()
@@ -687,10 +782,19 @@ def main():
     """Avoid adding things to global namespace."""
 
     cmdline_args = parse_command_line()
+
+    rcParams['font.size'] = cmdline_args.font_size
+    figure = pyplot.figure(figsize=cmdline_args.figure_size)
+    axes = figure.add_axes([0.08,
+                            cmdline_args.axes_vshift,
+                            0.89,
+                            0.98 - cmdline_args.axes_vshift])
+
     progress_pickle = cmdline_args.progress_pickle
     with open(progress_pickle, 'rb') as progress_file:
         pickled_cmdline_args = pickle.load(progress_file)
         progress = load_progress_pickle(progress_file)
+        pickled_cmdline_args.pickle_systems = cmdline_args.pickle_systems
 
     interpolator = StellarEvolutionManager(
         pickled_cmdline_args.stellar_evolution_interpolator_dir

@@ -105,13 +105,17 @@ def invert_eccentricity_vs_lgQ(eccentricity_vs_lgQ,
 
     interp_data = format_eccentricity_vs_lgQ(eccentricity_vs_lgQ)
 
-    if not numpy.isfinite(eccentricity):
+    if (
+            not numpy.isfinite(eccentricity)
+            or
+            not numpy.isfinite(interp_data[:, 1]).any()
+    ):
         return None
 
-    if interp_data[:, 1].max() < eccentricity:
+    if numpy.nanmax(interp_data[:, 1]) < eccentricity:
         return default_max
 
-    if interp_data[:, 1].min() > eccentricity:
+    if numpy.nanmin(interp_data[:, 1]) > eccentricity:
         return default_min
 
     for i in range(interp_data.shape[0] - 1):
