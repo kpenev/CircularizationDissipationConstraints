@@ -105,6 +105,9 @@ def invert_eccentricity_vs_lgQ(eccentricity_vs_lgQ,
 
     interp_data = format_eccentricity_vs_lgQ(eccentricity_vs_lgQ)
 
+    if not numpy.isfinite(eccentricity):
+        return None
+
     if interp_data[:, 1].max() < eccentricity:
         return default_max
 
@@ -116,6 +119,10 @@ def invert_eccentricity_vs_lgQ(eccentricity_vs_lgQ,
         if result is not None:
             return result
 
-    print('Something weird is going on with data: ' + repr(interp_data))
+    print('Something weird is going on when solvirg for e=%.16f with data: '
+          %
+          eccentricity
+          +
+          repr(interp_data))
     assert False
     return None

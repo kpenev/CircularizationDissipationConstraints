@@ -346,6 +346,14 @@ def plot_single_lgQ_vs_e(system,
 def get_system_list(cmdline_args, interpolator=None):
     """Return a list of systems for plotting."""
 
+    if cmdline_args.pickle_systems is not None:
+        with open(cmdline_args.pickle_systems, 'rb') as system_pickle:
+            while True:
+                pickled_cmdline_args = pickle.load(progress_file)
+                if pickled_cmdline_args is None:
+                    break
+                if vars(pickled_cmdline_args) == vars(cmdline_args):
+                    return pickle.load(progress_file)
     systems = []
     #False positive
     #pylint: disable=no-member
@@ -374,6 +382,11 @@ def get_system_list(cmdline_args, interpolator=None):
 
     if getattr(cmdline_args, 'use_binary_stars', None):
         systems.extend(read_geller_et_al_2009_binaries())
+
+    if cmdline_args.pickle_systems is not None:
+        with open(cmdline_args.pickle_systems, 'ab') as system_pickle:
+            pickle.dump(cmdline_args)
+            pickle.dump(systems)
 
     return systems
 
