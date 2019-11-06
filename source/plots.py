@@ -38,7 +38,7 @@ def parse_command_line():
     parser.add_argument(
         '--plot',
         action='append',
-        choices=['e_vs_P', 'star_solving', 'lgQ_vs_e', 'lgQ_vs'],
+        choices=['e_vs_P', 'star_solving', 'lgQ_vs_e', 'lgQ_vs', 'lgQ_change_vs'],
         help='Add another type of plot to the list of plots to generate.'
     )
     parser.add_argument(
@@ -68,7 +68,20 @@ def parse_command_line():
     parser.add_argument(
         '--progress-pickle', '--progress',
         default='progress.pickle',
-        help='The filename where tha calculated eccentricities were saved.'
+        help='The filename where the calculated eccentricities were saved, or '
+        'one of these files for plot type lgQ_change_vs. Default: %(default)s.'
+    )
+    parser.add_argument(
+        '--second-progress-pickle',
+        default=None,
+        help='Only useful for plot type lgQ_change_vs, and specifies the second'
+        ' pickle to compare to.'
+    )
+    parser.add_argument(
+        '--overwrite-interpolator',
+        default=None,
+        help='If passed, the interpolator directory specified in the unpickled '
+        'commandline arguments is ovrewritted with the given value.'
     )
     parser.add_argument(
         '--pickle-systems',
@@ -96,6 +109,20 @@ def parse_command_line():
         default=0.15,
         help='The vertical shift of the figure axes from the bottom of the '
         'figure. Default %(default)s.'
+    )
+    parser.add_argument(
+        '--axes-hshift',
+        type=float,
+        default=0.1,
+        help='The vertical shift of the figure axes from the bottom of the '
+        'figure. Default %(default)s.'
+    )
+    parser.add_argument(
+        '--pretend-min-eccentricity', '--pretend-emin',
+        type=float,
+        default=None,
+        help='If passed plots are generated assuming all systems minimum '
+        'eccentricity has the given value.'
     )
     result = parser.parse_args()
     return result
@@ -151,10 +178,16 @@ def get_quantity_label(axis_quantity, planet=False):
     return str(axis_quantity)
 #pylint: enable=no-member
 
-def get_axis_label(axis_quantity, axis_units):
+def get_axis_label(axis_quantity, axis_units, planet):
     """Return the axis label for the given quantity and units."""
 
-    return get_quantity_label(axis_quantity) + ' '  + get_unit_label(axis_units)
+    return (
+        get_quantity_label(axis_quantity, planet)
+        +
+        ' '
+        +
+        get_unit_label(axis_units)
+    )
 
 #Simplifies command line arguments.
 #pylint: disable=invalid-name
@@ -409,8 +442,8 @@ def plot_single_lgQ_vs_e(system,
             system.orbital_period.to_value('day')
         )
     )
-    pyplot.xlabel(get_axis_label('lgQ', ''))
-    pyplot.ylabel(get_axis_label('eccentricity', ''))
+    pyplot.xlabel(get_axis_label('lgQ', '', True))
+    pyplot.ylabel(get_axis_label('eccentricity', '', True))
     if plot_fname is None:
         pyplot.show()
     else:
@@ -490,16 +523,13 @@ def plot_lgQ_vs_e(progress, cmdline_args, plot_fname=None, **_):
                 eccentricity_envelope,
                 plot_fname
             )
-#pylint: enable=invalid-name
 
-#Simplifies command line arguments.
-#pylint: disable=invalid-name
-def plot_lgQ_vs(lgQ_x_axes,
-                progress,
-                cmdline_args,
-                interpolator,
-                plot_fname=None):
-    """Make a plot of the log10(Q*') constraints vs orbital period."""
+def get_lgQ_constraints(lgQ_x_axes,
+                        progress,
+                        cmdline_args,
+                        interpolator,
+                        get_hostnames=False):
+    """Collect and calculate the data for lgQ_vs and lgQ_change_vs plots."""
 
     def add_stellar_properties(system):
         """Augment the given system with info about its star(s) & orbit."""
@@ -527,113 +557,150 @@ def plot_lgQ_vs(lgQ_x_axes,
 
         fix_semimajor(system)
 
-    def prepare_data():
-        """Collect and calculate the data required for the plots."""
+    systems = get_system_list(cmdline_args, interpolator)
+    eccentricity_envelope = get_eccentricity_envelope(cmdline_args)
 
-        systems = get_system_list(cmdline_args, interpolator)
-        eccentricity_envelope = get_eccentricity_envelope(cmdline_args)
+    plot_x = numpy.empty((len(lgQ_x_axes), len(progress)), dtype=float)
+    plot_lgQ = numpy.empty(plot_x.shape[1], dtype=[('min', float),
+                                                   ('nominal', float),
+                                                   ('max', float)])
 
-        plot_x = numpy.empty((len(lgQ_x_axes), len(progress)), dtype=float)
-        plot_lgQ = numpy.empty(plot_x.shape[1], dtype=[('min', float),
-                                                       ('nominal', float),
-                                                       ('max', float)])
+    limit_flags = numpy.empty(
+        plot_x.shape[1],
+        dtype=[('two_sided', bool), ('upper', bool), ('lower', bool)]
+    )
+    assumed_default_density = numpy.empty(plot_x.shape[1],
+                                          dtype=bool)
+    is_giant = numpy.empty(plot_x.shape[1],
+                           dtype=bool)
 
-        limit_flags = numpy.empty(
-            plot_x.shape[1],
-            dtype=[('two_sided', bool), ('upper', bool), ('lower', bool)]
-        )
-        assumed_default_density = numpy.empty(plot_x.shape[1],
-                                              dtype=bool)
-        is_giant = numpy.empty(plot_x.shape[1],
-                               dtype=bool)
+    x_evaluator = asteval.Interpreter()
+    index = 0
+    hostnames = []
+    for system in systems:
+        if system.hostname not in progress:
+            continue
+        hostnames.append(system.hostname)
+        add_stellar_properties(system)
+        lgQ_vs_period = progress[system.hostname]
+        print('System: ' + repr(system))
 
-        x_evaluator = asteval.Interpreter()
-        index = 0
-        for system in systems:
-            if system.hostname not in progress:
-                continue
-            add_stellar_properties(system)
-            lgQ_vs_period = progress[system.hostname]
-            print('System: ' + repr(system))
+        assumed_default_density[index] = getattr(system,
+                                                 'assumed_default_density',
+                                                 False)
+        #False positive
+        #pylint: disable=no-member
+        is_giant[index] = system.secondary_radius > 6 * units.R_earth
+        #pylint: enable=no-member
 
-            assumed_default_density[index] = getattr(system,
-                                                     'assumed_default_density',
-                                                     False)
-            #False positive
-            #pylint: disable=no-member
-            is_giant[index] = system.secondary_radius > 6 * units.R_earth
-            #pylint: enable=no-member
+        nominal_eccentricity = system.eccentricity
+        min_eccenticity = system.eccentricity - system.eccentricity.minus_error
+        if cmdline_args.pretend_min_eccentricity:
+            nominal_eccentricity = numpy.nanmin((
+                nominal_eccentricity,
+                cmdline_args.pretend_min_eccentricity
+            ))
+            min_eccenticity = numpy.nanmin((
+                min_eccenticity,
+                cmdline_args.pretend_min_eccentricity
+            ))
+            system.eccentricity_limit = False
 
-            (
-                plot_lgQ['nominal'][index],
-                plot_lgQ['min'][index],
-                plot_lgQ['max'][index]
-            ) = solve_lgQ_limits(
-                lgQ_vs_period,
-                system.eccentricity,
-                system.eccentricity - system.eccentricity.minus_error,
-                max(
-                    eccentricity_envelope(
-                        system.orbital_period.to_value('day')
-                    ),
-                    system.eccentricity
-                )
-            )
-
-            x_evaluator.symtable = vars(system)
-            for x_expression_index, (x_expr, x_units) in enumerate(lgQ_x_axes):
-                plot_x[x_expression_index, index] = units.Quantity(
-                    x_evaluator(x_expr)
-                ).to_value(
-                    x_units
-                )
-
-            limit_flags['upper'][index] = (
-                system.eccentricity_limit
-                or
-                plot_lgQ['min'][index] == 0
-                or
-                numpy.isnan(plot_lgQ['min'][index])
-            )
-            limit_flags['lower'][index] = numpy.isnan(plot_lgQ['max'][index])
-            print('lgQ constraints: ' + repr(plot_lgQ[index]))
-            print('Flags: ' + repr(limit_flags[index]))
-            index += 1
-
-        limit_flags['two_sided'] = numpy.copy(
-            numpy.logical_not(
-                numpy.logical_or(
-                    limit_flags['lower'],
-                    limit_flags['upper']
-                )
+        (
+            plot_lgQ['nominal'][index],
+            plot_lgQ['min'][index],
+            plot_lgQ['max'][index]
+        ) = solve_lgQ_limits(
+            lgQ_vs_period,
+            nominal_eccentricity,
+            min_eccenticity,
+            max(
+                eccentricity_envelope(
+                    system.orbital_period.to_value('day')
+                ),
+                system.eccentricity
             )
         )
-        useful = numpy.copy(
-            numpy.logical_not(
-                numpy.logical_and(
-                    limit_flags['lower'],
-                    limit_flags['upper']
-                )
+
+        x_evaluator.symtable = vars(system)
+        for x_expression_index, (x_expr, x_units) in enumerate(lgQ_x_axes):
+            plot_x[x_expression_index, index] = units.Quantity(
+                x_evaluator(x_expr)
+            ).to_value(
+                x_units
+            )
+
+        limit_flags['upper'][index] = (
+            system.eccentricity_limit
+            or
+            plot_lgQ['min'][index] == 0
+            or
+            numpy.isnan(plot_lgQ['min'][index])
+        )
+        limit_flags['lower'][index] = numpy.isnan(plot_lgQ['max'][index])
+        print('lgQ constraints: ' + repr(plot_lgQ[index]))
+        print('Flags: ' + repr(limit_flags[index]))
+        index += 1
+
+    limit_flags['two_sided'] = numpy.copy(
+        numpy.logical_not(
+            numpy.logical_or(
+                limit_flags['lower'],
+                limit_flags['upper']
             )
         )
-        limit_flags['upper'] = numpy.logical_and(
-            limit_flags['upper'],
-            useful
-        )[:]
-        limit_flags['lower'] = numpy.logical_and(
-            limit_flags['lower'],
-            useful
-        )[:]
+    )
+    useful = numpy.copy(
+        numpy.logical_not(
+            numpy.logical_and(
+                limit_flags['lower'],
+                limit_flags['upper']
+            )
+        )
+    )
+    limit_flags['upper'] = numpy.logical_and(
+        limit_flags['upper'],
+        useful
+    )[:]
+    limit_flags['lower'] = numpy.logical_and(
+        limit_flags['lower'],
+        useful
+    )[:]
 
-        print(100 * '*')
-        print('Lower limit flags:')
-        print(repr(useful))
-        print(100 * '*')
+    print(100 * '*')
+    print('Lower limit flags:')
+    print(repr(useful))
+    print(100 * '*')
 
 
-        return plot_x, plot_lgQ, limit_flags, assumed_default_density, is_giant
+    result = plot_x, plot_lgQ, limit_flags, assumed_default_density, is_giant
+    if get_hostnames:
+        return result + (numpy.array(hostnames),)
+    return result
 
-    def add_points(plot_x,
+def set_x_axis(quantity, planets):
+    """Set the x axis appropriately for the givne quantity."""
+
+    if quantity == 'orbital_period':
+        if planets:
+            pyplot.xscale('linear')
+            pyplot.xlim(1, 4.5)
+        else:
+            pyplot.xscale('linear')
+            pyplot.xlim(3, 50)
+    else:
+        pyplot.xscale('log')
+        pyplot.autoscale()
+
+def plot_lgQ_vs(lgQ_x_axes,
+                progress,
+                cmdline_args,
+                interpolator,
+                plot_fname=None):
+    """Make a plot of the log10(Q*') constraints vs orbital period."""
+
+    def add_points(*,
+                   plot_x,
                    plot_y,
                    plot_errors,
                    assumed_default_density,
@@ -644,6 +711,247 @@ def plot_lgQ_vs(lgQ_x_axes,
         plot_style = dict(
             markersize=5,
             linewidth=0.3
+        )
+        if limit == 'upper':
+            plot_style['fmt'] = 'v'
+            colors = ['red', 'orange']
+            plot_style['zorder'] = 0
+        elif limit == 'lower':
+            plot_style['fmt'] = '^'
+            colors = ['blue', 'cyan']
+            plot_style['zorder'] = 1
+        else:
+            assert not limit
+            plot_style['fmt'] = 'o'
+            colors = ['green', 'orange']
+            plot_style['linewidth'] = 2
+            plot_style['zorder'] = 2
+
+        for color_index, include in enumerate(
+                [
+                    numpy.logical_not(assumed_default_density),
+                    assumed_default_density
+                ]
+        ):
+            plot_style['markeredgecolor'] = colors[color_index]
+            plot_style['ecolor'] = colors[color_index]
+            plot_style['markerfacecolor'] = colors[color_index]
+
+            if distinguish is None:
+                sub_include_list = [include]
+            else:
+                sub_include_list = [
+                    numpy.logical_and(distinguish, include),
+                    numpy.logical_and(numpy.logical_not(distinguish), include)
+                ]
+
+            for sub_include in sub_include_list:
+                pyplot.errorbar(
+                    x=plot_x[sub_include],
+                    y=plot_y[sub_include],
+                    yerr=[err[sub_include] for err in plot_errors],
+                    **plot_style
+                )
+                plot_style['markerfacecolor'] = 'none'
+                plot_style['zorder'] -= 10
+
+    (
+        plot_x,
+        plot_lgQ,
+        limit_flags,
+        assumed_default_density,
+        is_giant
+    ) = get_lgQ_constraints(lgQ_x_axes, progress, cmdline_args, interpolator)
+
+    print(100 * '*')
+    print('Constraints:')
+    print(repr(plot_lgQ))
+    print(100 * '*')
+
+    lgQ_range = (3, 9)
+    for x_index in range(plot_x.shape[0]):
+        print('Plotting lgQ vs ' + repr(lgQ_x_axes[x_index]))
+        set_x_axis(lgQ_x_axes[x_index][0], cmdline_args.nasa_data)
+
+        add_points(
+            plot_x=plot_x[x_index, limit_flags['upper']],
+            plot_y=plot_lgQ['max'][limit_flags['upper']],
+            plot_errors=[
+                plot_lgQ['max'][limit_flags['upper']] - lgQ_range[0],
+                numpy.zeros(limit_flags['upper'].sum())
+            ],
+            assumed_default_density=assumed_default_density[
+                limit_flags['upper']
+            ],
+            limit='upper',
+            distinguish=is_giant[limit_flags['upper']]
+        )
+
+        lower_errors = plot_lgQ['nominal'] - plot_lgQ['min']
+        print('lower_errors: ' + repr(lower_errors[limit_flags['lower']]))
+        print('lgQ nominal: ' + repr(plot_lgQ['nominal'][limit_flags['lower']]))
+        print('lgQ min: ' + repr(plot_lgQ['min'][limit_flags['lower']]))
+
+        add_points(
+            plot_x=plot_x[x_index, limit_flags['lower']],
+            plot_y=plot_lgQ['nominal'][limit_flags['lower']],
+            plot_errors=[
+                lower_errors[limit_flags['lower']],
+                lgQ_range[1] - plot_lgQ['nominal'][limit_flags['lower']]
+            ],
+            assumed_default_density=assumed_default_density[
+                limit_flags['lower']
+            ],
+            limit='lower',
+            distinguish=is_giant[limit_flags['lower']]
+        )
+
+        selected = numpy.logical_and(plot_lgQ['nominal'] > 3.5,
+                                     limit_flags['two_sided'])
+        add_points(
+            plot_x=plot_x[x_index, selected],
+            plot_y=plot_lgQ['nominal'][selected],
+            plot_errors=[
+                (
+                    plot_lgQ['nominal'][selected]
+                    -
+                    plot_lgQ['min'][selected]
+                ),
+                (
+                    plot_lgQ['max'][selected]
+                    -
+                    plot_lgQ['nominal'][selected]
+                )
+            ],
+            assumed_default_density=assumed_default_density[
+                selected
+            ],
+            distinguish=is_giant[selected]
+        )
+
+        pyplot.xlabel(
+            get_axis_label(*lgQ_x_axes[x_index], cmdline_args.nasa_data)
+        )
+        pyplot.ylabel(get_axis_label('lgQ', '', cmdline_args.nasa_data))
+        if cmdline_args.nasa_data:
+            pyplot.axhspan(6, 7, color='lightgrey', zorder=-100)
+
+        if plot_fname is None:
+            pyplot.show()
+        else:
+            pyplot.savefig(
+                plot_fname
+                %
+                dict(x_label=lgQ_x_axes[x_index][0].replace('/', ':'))
+            )
+            pyplot.cla()
+
+def plot_lgQ_change_vs(*,
+                       lgQ_x_axes,
+                       progress,
+                       second_progress,
+                       cmdline_args,
+                       interpolator,
+                       plot_fname=None):
+    """Create a plot of how the lg(Q') constraints change between two runs."""
+
+    def get_matched_constraints():
+        """Match the data from the first and second progress pickle."""
+        (
+            first_plot_x,
+            first_lgQ,
+            first_limit_flags,
+            first_assumed_default_density,
+            first_is_giant,
+            first_hostnames
+        ) = get_lgQ_constraints(lgQ_x_axes,
+                                progress,
+                                cmdline_args,
+                                interpolator,
+                                get_hostnames=True)
+
+        (
+            second_plot_x,
+            second_lgQ,
+            second_limit_flags,
+            second_assumed_default_density,
+            second_is_giant,
+            second_hostnames
+        ) = get_lgQ_constraints(lgQ_x_axes,
+                                second_progress,
+                                cmdline_args,
+                                interpolator,
+                                get_hostnames=True)
+        print('1st set of hostnames: ' + repr(first_hostnames))
+        print('2nd set of hostnames: ' + repr(second_hostnames))
+
+        first_in_second = numpy.in1d(first_hostnames, second_hostnames)
+        second_in_first = numpy.in1d(second_hostnames, first_hostnames)
+
+        plot_x = first_plot_x[:, first_in_second]
+        limit_flags = first_limit_flags[first_in_second]
+        second_limit_flags = second_limit_flags[second_in_first]
+        assumed_default_density = first_assumed_default_density[first_in_second]
+        is_giant = first_is_giant[first_in_second]
+
+        limit_flags['two_sided'] = numpy.logical_and(
+            limit_flags['two_sided'],
+            second_limit_flags['two_sided']
+        )
+        limit_flags['upper'] = numpy.logical_and(
+            numpy.logical_or(
+                numpy.logical_or(
+                    limit_flags['upper'],
+                    limit_flags['two_sided']
+                ),
+                numpy.logical_or(
+                    second_limit_flags['upper'],
+                    second_limit_flags['two_sided']
+                )
+            ),
+            numpy.logical_not(limit_flags['two_sided'])
+        )
+        limit_flags['lower'] = numpy.logical_and(
+            numpy.logical_or(
+                numpy.logical_or(
+                    limit_flags['lower'],
+                    limit_flags['two_sided']
+                ),
+                numpy.logical_or(
+                    second_limit_flags['lower'],
+                    second_limit_flags['two_sided']
+                )
+            ),
+            numpy.logical_not(limit_flags['two_sided'])
+        )
+
+        assert (second_plot_x[:, second_in_first] == plot_x).all()
+        assert (second_assumed_default_density[second_in_first]
+                ==
+                assumed_default_density).all()
+        assert (second_is_giant[second_in_first] == is_giant).all()
+        assert (first_hostnames[first_in_second]
+                ==
+                second_hostnames[second_in_first]).all()
+
+        return (plot_x,
+                first_lgQ[first_in_second],
+                second_lgQ[second_in_first],
+                limit_flags,
+                assumed_default_density,
+                is_giant)
+
+    def add_points(*,
+                   plot_x,
+                   plot_y1,
+                   plot_y2,
+                   assumed_default_density,
+                   limit=False,
+                   distinguish=None):
+
+        plot_style = dict(
+            markersize=5,
+            linewidth=1.0
         )
         if limit == 'upper':
             plot_style['fmt'] = 'v'
@@ -679,42 +987,39 @@ def plot_lgQ_vs(lgQ_x_axes,
                 ]
 
             for sub_include in sub_include_list:
+                plot_include = numpy.logical_and(
+                    sub_include,
+                    numpy.abs(plot_y2 - plot_y1) < 1
+                )
                 pyplot.errorbar(
-                    x=plot_x[sub_include],
-                    y=plot_y[sub_include],
-                    yerr=[err[sub_include] for err in plot_errors],
+                    x=plot_x[plot_include],
+                    y=plot_y1[plot_include],
+                    yerr=[
+                        plot_y1[plot_include] * 0,
+                        numpy.abs(plot_y2[plot_include] - plot_y1[plot_include])
+                    ],
                     **plot_style
                 )
+
                 plot_style['markerfacecolor'] = 'none'
                 plot_style['zorder'] -= 10
 
-    plot_x, plot_lgQ, limit_flags, assumed_default_density, is_giant = prepare_data()
+    (
+        plot_x,
+        first_lgQ,
+        second_lgQ,
+        limit_flags,
+        assumed_default_density,
+        is_giant
+    ) = get_matched_constraints()
 
-    print(100 * '*')
-    print('Constraints:')
-    print(repr(plot_lgQ))
-    print(100 * '*')
-
-    lgQ_range = (3, 9)
     for x_index in range(plot_x.shape[0]):
-        print('Plotting lgQ vs ' + repr(lgQ_x_axes[x_index]))
-        if lgQ_x_axes[x_index][0] == 'orbital_period':
-            if cmdline_args.nasa_data:
-                pyplot.xscale('linear')
-                pyplot.xlim(1, 4.5)
-            else:
-                pyplot.xscale('linear')
-                pyplot.xlim(3, 50)
-        else:
-            pyplot.xscale('log')
-            pyplot.autoscale()
+        set_x_axis(lgQ_x_axes[x_index][0], cmdline_args.nasa_data)
+
         add_points(
             plot_x=plot_x[x_index, limit_flags['upper']],
-            plot_y=plot_lgQ['max'][limit_flags['upper']],
-            plot_errors=[
-                plot_lgQ['max'][limit_flags['upper']] - lgQ_range[0],
-                numpy.zeros(limit_flags['upper'].sum())
-            ],
+            plot_y1=first_lgQ['max'][limit_flags['upper']],
+            plot_y2=second_lgQ['max'][limit_flags['upper']],
             assumed_default_density=assumed_default_density[
                 limit_flags['upper']
             ],
@@ -722,18 +1027,10 @@ def plot_lgQ_vs(lgQ_x_axes,
             distinguish=is_giant[limit_flags['upper']]
         )
 
-        lower_errors = plot_lgQ['nominal'] - plot_lgQ['min']
-        print('lower_errors: ' + repr(lower_errors[limit_flags['lower']]))
-        print('lgQ nominal: ' + repr(plot_lgQ['nominal'][limit_flags['lower']]))
-        print('lgQ min: ' + repr(plot_lgQ['min'][limit_flags['lower']]))
-
         add_points(
             plot_x=plot_x[x_index, limit_flags['lower']],
-            plot_y=plot_lgQ['nominal'][limit_flags['lower']],
-            plot_errors=[
-                lower_errors[limit_flags['lower']],
-                lgQ_range[1] - plot_lgQ['nominal'][limit_flags['lower']]
-            ],
+            plot_y1=first_lgQ['nominal'][limit_flags['lower']],
+            plot_y2=second_lgQ['nominal'][limit_flags['lower']],
             assumed_default_density=assumed_default_density[
                 limit_flags['lower']
             ],
@@ -741,31 +1038,21 @@ def plot_lgQ_vs(lgQ_x_axes,
             distinguish=is_giant[limit_flags['lower']]
         )
 
+        selected = numpy.logical_and(first_lgQ['nominal'] > 3.5,
+                                     limit_flags['two_sided'])
+
         add_points(
-            plot_x=plot_x[x_index, limit_flags['two_sided']],
-            plot_y=plot_lgQ['nominal'][limit_flags['two_sided']],
-            plot_errors=[
-                (
-                    plot_lgQ['nominal'][limit_flags['two_sided']]
-                    -
-                    plot_lgQ['min'][limit_flags['two_sided']]
-                ),
-                (
-                    plot_lgQ['max'][limit_flags['two_sided']]
-                    -
-                    plot_lgQ['nominal'][limit_flags['two_sided']]
-                )
-            ],
-            assumed_default_density=assumed_default_density[
-                limit_flags['two_sided']
-            ],
-            distinguish=is_giant[limit_flags['two_sided']]
+            plot_x=plot_x[x_index, selected],
+            plot_y1=first_lgQ['nominal'][selected],
+            plot_y2=second_lgQ['nominal'][selected],
+            assumed_default_density=assumed_default_density[selected],
+            distinguish=is_giant[selected]
         )
 
-        pyplot.xlabel(get_axis_label(*lgQ_x_axes[x_index]))
-        pyplot.ylabel(get_axis_label('lgQ', ''))
-        if cmdline_args.nasa_data:
-            pyplot.axhspan(6, 7, color = 'lightgrey', zorder=-100)
+        pyplot.xlabel(
+            get_axis_label(*lgQ_x_axes[x_index], cmdline_args.nasa_data)
+        )
+        pyplot.ylabel(get_axis_label('lgQ', '', cmdline_args.nasa_data))
 
         if plot_fname is None:
             pyplot.show()
@@ -778,6 +1065,14 @@ def plot_lgQ_vs(lgQ_x_axes,
             pyplot.cla()
 #pylint: enable=invalid-name
 
+def load_progress(progress_pickle):
+    """Return a pickled progress and command line arguments."""
+
+    with open(progress_pickle, 'rb') as progress_file:
+        pickled_cmdline_args = pickle.load(progress_file)
+        progress = load_progress_pickle(progress_file)
+    return pickled_cmdline_args, progress
+
 def main():
     """Avoid adding things to global namespace."""
 
@@ -785,19 +1080,27 @@ def main():
 
     rcParams['font.size'] = cmdline_args.font_size
     figure = pyplot.figure(figsize=cmdline_args.figure_size)
-    axes = figure.add_axes([0.08,
+    #The axes become the default axes so they do get used.
+    #pylint: disable=unused-variable
+    axes = figure.add_axes([cmdline_args.axes_hshift,
                             cmdline_args.axes_vshift,
-                            0.89,
+                            0.98 - cmdline_args.axes_hshift,
                             0.98 - cmdline_args.axes_vshift])
+    #pylint: enable=unused-variable
 
-    progress_pickle = cmdline_args.progress_pickle
-    with open(progress_pickle, 'rb') as progress_file:
-        pickled_cmdline_args = pickle.load(progress_file)
-        progress = load_progress_pickle(progress_file)
-        pickled_cmdline_args.pickle_systems = cmdline_args.pickle_systems
+    pickled_cmdline_args, progress = load_progress(cmdline_args.progress_pickle)
+    pickled_cmdline_args.pickle_systems = cmdline_args.pickle_systems
+    pickled_cmdline_args.pretend_min_eccentricity = (
+        cmdline_args.pretend_min_eccentricity
+    )
+
+    if getattr(cmdline_args, 'second_progress_pickle', None):
+        second_progress = load_progress(cmdline_args.second_progress_pickle)[1]
 
     interpolator = StellarEvolutionManager(
         pickled_cmdline_args.stellar_evolution_interpolator_dir
+        if cmdline_args.overwrite_interpolator is None else
+        cmdline_args.overwrite_interpolator
     ).get_interpolator_by_name(
         'default'
     )
@@ -810,13 +1113,16 @@ def main():
                 plot_type=plot_type,
                 x_label=('%(x_label)s' if plot_type == 'lgQ_vs' else '')
             )
-        globals()['plot_' + plot_type](
-            progress=progress,
-            lgQ_x_axes=cmdline_args.lgQ_x_axis,
-            cmdline_args=pickled_cmdline_args,
-            interpolator=interpolator,
-            plot_fname=plot_fname
-        )
+        arguments = dict(progress=progress,
+                         lgQ_x_axes=cmdline_args.lgQ_x_axis,
+                         cmdline_args=pickled_cmdline_args,
+                         interpolator=interpolator,
+                         plot_fname=plot_fname)
+        if plot_type == 'lgQ_change_vs':
+            arguments['second_progress'] = second_progress
+
+        globals()['plot_' + plot_type](**arguments)
+
 
 if __name__ == '__main__':
     main()
