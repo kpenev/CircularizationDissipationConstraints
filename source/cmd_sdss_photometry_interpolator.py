@@ -86,10 +86,29 @@ class CMDSDSSPhotometryInterpolator(CMDInterpolator):
         return (self.get_interpolated(mag_letter + 'mag', interp_mass, None)
                 for mag_letter in 'ugriz')
 
+    def get_binary_magnitudes(self, primary_mass, secondary_mass):
+        """Estimate SDSS u, g, r, i, z for a binary, given mass(es)."""
+
+        primary_mags = scipy.stack(self(primary_mass))
+        secondary_mags = scipy.stack(self(secondary_mass))
+        print('primary mags: ' + repr(primary_mags))
+        return -2.5 * scipy.log10(10.0**(-primary_mags/2.5)
+                                  +
+                                  10.0**(-secondary_mags/2.5))
+
     def get_usno_magnitudes(self, interp_mass):
         """Estimate UNSO u', g', r', i', z' photometry for given mass(es)."""
 
         return sdss_to_usno(scipy.stack(self(interp_mass)))
+
+    def get_binary_usno_magnitudes(self, primary_mass, secondary_mass):
+        """Estimate UNSO u', g', r', i', z' for a binary, given mass(es)."""
+
+        return sdss_to_usno(
+            scipy.stack(
+                self.get_binary_magnitudes(primary_mass, secondary_mass)
+            )
+        )
 
     def usno_best_fit_mass(self,
                            photometry,
@@ -195,7 +214,13 @@ if __name__ == '__main__':
 
     predicted_sdss_ugriz = scipy.stack(interpolator(interp_masses))
 
-    predicted_usno_ugriz = sdss_to_usno(predicted_sdss_ugriz)
+    predicted_usno_ugriz = interpolator.get_usno_magnitudes(interp_masses)
+    predicted_q1_binary_usno_ugriz = (
+        interpolator.get_binary_usno_magnitudes(
+            interp_masses,
+            interp_masses
+        )
+    )
 
     mfit = interpolator.usno_best_fit_mass(
         {
@@ -211,5 +236,15 @@ if __name__ == '__main__':
                 -predicted_usno_ugriz[1] - 11.3, 'or', markersize=10)
     pyplot.plot(predicted_usno_ugriz[1] - predicted_usno_ugriz[2],
                 -predicted_usno_ugriz[1] - 11.3, '-r', linewidth=3)
+    pyplot.plot(
+        (
+            predicted_q1_binary_usno_ugriz[1]
+            -
+            predicted_q1_binary_usno_ugriz[2]
+        ),
+        -predicted_q1_binary_usno_ugriz[1] - 11.3,
+        '-g',
+        linewidth=3
+    )
 
     pyplot.show()
