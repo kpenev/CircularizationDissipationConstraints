@@ -2,7 +2,7 @@
 
 """Functions to fit for single and binary star masses given photometry."""
 
-import scipy
+import scipy, scipy.integrate
 
 from cmd_sdss_photometry_interpolator import CMDSDSSPhotometryInterpolator
 
@@ -97,6 +97,66 @@ def usno_fit_single_mass(usno_photometry_interp,
         method='bounded'
     ).x
 
+def mass_function_log_likelihood(primary_mass,
+                                 secondary_mass,
+                                 observed_mass_function,
+                                 observed_mass_function_err):
+    r"""
+    Return unnormalized log-likelihood of observing mass func. given masses.
+
+    Args:
+        primary_mass(float):    The mass of the primary star.
+
+        secondary_mass(float):    The mass of the secondary star.
+
+        observed_mass_function(float):    The observed value of the mass
+            function.
+
+        observed_mass_function_err(float):    Error estimate of the observed
+            mass function, if a single value, the error is assumed to follow
+            symmetric Gaussian distribution. If a 2-tuple the first value
+            specifies the positive standard deviation and the second value
+            specifies the negative one.
+
+    Returns:
+        float:
+            The log-likelihood of observing the given value of the mass function
+            if the true masses in the system are ``primary_mass`` and
+            ``secondary_mass``, after marginalizing over inclination assumed to
+            be distributed uniformly on a sphere.
+
+            The expression is: :math:`\int_0^\pi/2 e^{-\frac{(\mu \sin^3i -
+            \bar{\mu})^2}{2\sigma^2}} \sin i di`, where
+            :math:`\mu\equiv\frac{M_2^3}{(M_1+M_2)^2}`, :math:`\bar{\mu}` is the
+            measured value of the mass function and :math:`\sigma` is the
+            estimated standard deviation in the mass function measurement.
+    """
+
+    predicted_mass_function = (secondary_mass**3
+                               /
+                               (primary_mass + secondary_mass)**2)
+    try:
+        sigma = float(observed_mass_function_err)
+    except TypeError:
+        sigma = observed_mass_function_err[
+            0 if predicted_mass_function <= observed_mass_function else 1
+        ]
+
+    integrand = lambda i: (
+        scipy.exp(
+            -(
+                predicted_mass_function * scipy.sin(i)**3
+                -
+                observed_mass_function
+            )**2
+            /
+            (2.0 * sigma**2)
+        )
+        *
+        scipy.sin(i)
+    )
+    return scipy.integrate.quad(integrand, 0, scipy.pi/2)
+
 def usno_fit_binary_masses(usno_photometry_interp,
                            photometry,
                            mass_function,
@@ -147,6 +207,7 @@ def usno_fit_binary_masses(usno_photometry_interp,
         )
 
 if __name__ == '__main__':
+    print('LL: ' + repr(mass_function_log_likelihood(1.0, 0.5, 0.1, 0.1)))
     interpolator = CMDSDSSPhotometryInterpolator(
         '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat'
     )
