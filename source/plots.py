@@ -118,6 +118,20 @@ def parse_command_line():
         'figure. Default %(default)s.'
     )
     parser.add_argument(
+        '--axes-hspan',
+        type=float,
+        default=0.98,
+        help='The horizontal maximum vertical position to which the axis should'
+        ' extend. Default %(default)s.'
+    )
+    parser.add_argument(
+        '--axes-vspan',
+        type=float,
+        default=0.98,
+        help='The vertical maximum vertical position to which the axis should '
+        'extend. Default %(default)s.'
+    )
+    parser.add_argument(
         '--pretend-min-eccentricity', '--pretend-emin',
         type=float,
         default=None,
@@ -1084,8 +1098,8 @@ def main():
     #pylint: disable=unused-variable
     axes = figure.add_axes([cmdline_args.axes_hshift,
                             cmdline_args.axes_vshift,
-                            0.98 - cmdline_args.axes_hshift,
-                            0.98 - cmdline_args.axes_vshift])
+                            cmdline_args.axes_hspan - cmdline_args.axes_hshift,
+                            cmdline_args.axes_vspan - cmdline_args.axes_vshift])
     #pylint: enable=unused-variable
 
     pickled_cmdline_args, progress = load_progress(cmdline_args.progress_pickle)
