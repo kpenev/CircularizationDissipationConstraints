@@ -141,7 +141,7 @@ class CurrentEccentricityCalculator:
                 initial_eccentricity=self.initial_eccentricity,
                 #False positive.
                 #pylint: disable=no-member
-                disk_period=(7.0 * units.day),
+                disk_period=(4.0 * units.day),
                 disk_dissipation_age=(5e-3 * units.Gyr),
                 #pylint: enable=no-member
                 max_age=system.age
