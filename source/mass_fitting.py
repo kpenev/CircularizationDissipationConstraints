@@ -155,7 +155,7 @@ def mass_function_log_likelihood(primary_mass,
         *
         scipy.sin(i)
     )
-    return scipy.integrate.quad(integrand, 0, scipy.pi/2)
+    return scipy.log(scipy.integrate.quad(integrand, 0, scipy.pi/2))
 
 def usno_fit_binary_masses(usno_photometry_interp,
                            photometry,
@@ -181,8 +181,9 @@ def usno_fit_binary_masses(usno_photometry_interp,
             ``mass_function`` argument.
 
         min_mag_difference(dict):    Minimal difference in magnitudes between
-            primary and secondary to impose on the result. Keys should be names
-            of USNO filters.
+            primary and secondary to impose on the result. Keys should be
+            filter characters, i.e. one of: ``'u'``, ``'g'``, ``'r``, ``'i``,
+            ``'z``.
 
         magnitude_template:    See same name argument to
             :func:`usno_fit_single_mass`.
@@ -196,20 +197,62 @@ def usno_fit_binary_masses(usno_photometry_interp,
             are Gaussian.
     """
 
-    def negative_log_likelihood(primary_mass, secondary_mass):
+    def negative_log_likelihood(masses):
         """Return -log(likelihood) of the data given stellar masses."""
 
-        primary_mags = usno_photometry_interp.get_usno_magnitudes(
-            primary_mass
+        predicted_photometry = usno_photometry_interp.get_binary_magnitudes(
+            *masses
         )
-        secondary_mags = usno_photometry_interp.get_usno_magnitudes(
-            secondary_mass
+        result = -mass_function_log_likelihood(*masses)
+        for filchar, predicted in zip('ugriz', predicted_photometry):
+            try:
+                observed = photometry[magnitude_template
+                                      %
+                                      dict(filchar=filchar)]
+                stdev = photometry[error_template
+                                   %
+                                   dict(filchar=filchar)]
+            except KeyError:
+                continue
+
+            try:
+                sigma = float(stddev)
+            except TypeError:
+                sigma = stddev[0 if predicted <= observed else 1]
+
+            result -= (observed - predicted)**2 / (2.0 * sigma**2)
+
+        return result
+
+    def mag_differences(masses):
+        """Return the secondary - primary mags for min mag constraints."""
+
+        magnitudes = usno_photometry_interp.get_usno_magnitudes(masses)
+        mag_differences = magnitudes[:, 1] - magnitudes[:, 0]
+        return [
+            mag_differences['ugriz'.index(filchar)]
+            for filchar in sorted(min_mag_difference.keys())
+        ]
+
+    return scipy.optimize.minimize(
+        negative_log_likelihood,
+        scipy.array([usno_photometry_interp.max_mass,
+                     usno_photometry_interp.min_mass]),
+        method='trust-constr',
+        constraints=scipy.optimize.NonlinearConstraint(
+            mag_differences,
+            [
+                min_mag_difference[filchar]
+                for filchar in sorted(min_mag_difference.keys())
+            ],
+            scipy.inf
         )
+    )
 
 if __name__ == '__main__':
     print('LL: ' + repr(mass_function_log_likelihood(1.0, 0.5, 0.1, 0.1)))
     interpolator = CMDSDSSPhotometryInterpolator(
-        '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat'
+        '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.dat'
     )
 
     predicted_usno_ugriz = interpolator.get_usno_magnitudes(0.7)
@@ -224,3 +267,5 @@ if __name__ == '__main__':
         }
     )
     print('Best fit mass = ' + repr(mfit))
+
+
