@@ -4,97 +4,30 @@
 Define a class that works with interpolated SDSS photometry from CMD isochrones.
 """
 
-import re
-
 from matplotlib import pyplot
-from astropy import units
 import scipy
-import scipy.optimize
 
 from planetary_system_io import read_cds_pipe_table
 from magnitude_transformations import sdss_to_usno
 
-from cmd_isochrone_interpolator import CMDInterpolator
+from cmd_photometry_interpolator import CMDPhotometryInterpolator
 
-class CMDSDSSPhotometryInterpolator(CMDInterpolator):
-    """
-    Interpolate SDSS photometry from CMD isochrones for a single cluster.
-
-    Attributes:
-        age(float):    The age of the isochrones.
-
-        feh(float):    The metallicity ([Fe/H]) of the isochrones.
-
-        min_mass(astropy Quantity):    The minimum stellar mass in the
-            isochrones.
-
-        max_mass(astropy Quantity):    The maximum stellar mass in the
-            isochrones.
-
-        extinction(float):    The assumed extinction (Av) applied to the
-            isochrone by the CMD interface.
-
-        grid_usno_magnitudes:    The estimated magnitudes for the grid stars in
-            the USNO 1m u', g', r', i', and z' system.
-    """
-
-    def _parse_header(self):
-        """Extract the useful information from the isochrone file header."""
-
-        extinction_parse_rex = re.compile(
-            'photometry includes extinction of Av=(?P<Av>[^ ,]*)[, ]'
-        )
-        for line in self.header:
-            if ':' in line:
-                keyword, value = line[1:].strip().split(':', 1)
-                if keyword.strip() == 'Photometric system':
-                    assert value.strip() == 'SDSS <i>ugriz</i>'
-                if keyword.strip() == 'Attention':
-                    parsed_extinction = extinction_parse_rex.match(value.strip())
-                    assert parsed_extinction
-                    self.extinction = float(parsed_extinction['Av'])
+class CMDSDSSPhotometryInterpolator(CMDPhotometryInterpolator):
+    """Interpolate SDSS photometry from CMD isochrones for a single cluster."""
 
     def __init__(self, isochrone_fname):
         """Interpolate within the given isochrone grid."""
 
         super().__init__(isochrone_fname)
-        self._parse_header()
-        assert len(self.data) == 1
-        #False positive
-        #pylint: disable=no-member
-        self.min_mass = self.data[0]['Mini'][0] * units.M_sun
-        self.max_mass = self.data[0]['Mini'][-1] * units.M_sun
-        self.feh = self.data[0]['MH'][0]
-        #pylint: enable=no-member
-        assert scipy.unique(self.data[0]['logAge']).size == 1
-        #False positive
-        #pylint: disable=no-member
-        self.age = 10.0**(self.data[0]['logAge'][0] - 9.0) * units.Gyr
-        #pylint: enable=no-member
+
+        assert self.filchars == 'ugriz'
 
         self.grid_usno_mag = sdss_to_usno(
             scipy.stack(
                 self.data[0][filchar + 'mag']
-                for filchar in 'ugriz'
+                for filchar in self.filchars
             )
         )
-
-
-    def __call__(self, interp_mass):
-        """Return the SDSS u, g, r, i, z photometry for the given mass(es)."""
-
-        return (self.get_interpolated(mag_letter + 'mag', interp_mass, None)
-                for mag_letter in 'ugriz')
-
-    def get_binary_magnitudes(self, primary_mass, secondary_mass):
-        """Estimate SDSS u, g, r, i, z for a binary, given mass(es)."""
-
-        primary_mags = scipy.stack(self(primary_mass))
-        secondary_mags = scipy.stack(self(secondary_mass))
-        print('primary mags: ' + repr(primary_mags))
-        return -2.5 * scipy.log10(10.0**(-primary_mags/2.5)
-                                  +
-                                  10.0**(-secondary_mags/2.5))
 
     def get_usno_magnitudes(self, interp_mass):
         """Estimate UNSO u', g', r', i', z' photometry for given mass(es)."""
