@@ -136,7 +136,11 @@ def mass_function_log_likelihood(primary_mass,
                                /
                                (primary_mass + secondary_mass)**2)
 
-    if predicted_mass_function > observed_mass_function:
+    if (
+            isinstance(predicted_mass_function, float)
+            and
+            predicted_mass_function > observed_mass_function
+    ):
         return 0.0
 
     try:
@@ -145,10 +149,13 @@ def mass_function_log_likelihood(primary_mass,
         sigma = observed_mass_function_err[0]
 
     return -(
-        (
-            predicted_mass_function
-            -
-            observed_mass_function
+        scipy.minimum(
+            0,
+            (
+                predicted_mass_function
+                -
+                observed_mass_function
+            )
         )**2
         /
         (2.0 * sigma**2)
@@ -238,33 +245,40 @@ def fit_binary_masses(photometry_interp,
             for filchar in sorted(min_mag_difference.keys())
         ]
 
-    interp_mass_range = (photometry_interp.min_mass.to_value('M_sun') + 0.01,
-                         photometry_interp.max_mass.to_value('M_sun') - 0.01)
-    if min_mag_difference:
-        constraints = scipy.optimize.NonlinearConstraint(
-            fun=mag_differences,
-            lb=[
-                min_mag_difference[filchar]
-                for filchar in sorted(min_mag_difference.keys())
-            ],
-            ub=[scipy.inf for filchar in sorted(min_mag_difference.keys())]
-        )
-    else:
-        constraints = ()
-    print('-LL(0.9, 0.6) = '
-          +
-          repr(negative_log_likelihood(scipy.array([0.9, 0.6]))))
+    mass_grid = scipy.meshgrid(
+        photometry_interp.data[0]['Mini'],
+        photometry_interp.data[0]['Mini']
+    )
 
-    print('Bounds: ' + repr(scipy.optimize.Bounds(*interp_mass_range,
-                                                  keep_feasible=True)))
+    log_likelihood_grid = negative_log_likelihood((
+        mass_grid
+    ))
+    best_indices = scipy.stack(
+        reversed(
+            sorted(
+                scipy.unravel_index(scipy.argmin(log_likelihood_grid),
+                                    log_likelihood_grid.shape)
+            )
+        )
+    )
+    best_masses = photometry_interp.data[0]['Mini'][best_indices]
+
+    print('Best masses: ' + repr(best_masses))
+
+    mass_bounds = scipy.optimize.Bounds(
+        lb = photometry_interp.data[0]['Mini'][0] + 0.01,
+        ub = photometry_interp.data[0]['Mini'][
+            photometry_interp.data[0]['Mini'].size - 1,
+        ] - 0.01,
+        keep_feasible = True
+    )
     return scipy.optimize.minimize(
         fun=negative_log_likelihood,
-        x0=scipy.array([1.0, 0.5]),
-#        method='SLSQP',
-        bounds=scipy.optimize.Bounds(*interp_mass_range,
-                                     keep_feasible=True),
-        constraints=constraints,
+        x0=best_masses,
+#        method='trust-constr',
+        bounds=mass_bounds,
 #        options=dict(gtol=0.0, maxiter=1e6, initial_tr_radius=0.1, verbose=3)
+        options=dict(maxiter=1e6, disp=True)
     )
 
 if __name__ == '__main__':
@@ -286,8 +300,8 @@ if __name__ == '__main__':
     )
     print('Best fit mass = ' + repr(mfit))
 
-    m1, m2 = 1.1, 1.1
-    fmass = (m2**3 / 10.0)/((m1+m2)**2)
+    m1, m2 = scipy.pi/3, scipy.pi/20
+    fmass = (m2**3 / 3.0)/((m1+m2)**2)
     binary_mag = {
         fc + 'mag': mag for fc, mag in zip(
             interpolator.filchars,
@@ -305,5 +319,4 @@ if __name__ == '__main__':
                               0.1 * fmass)
         )
     )
-
-
+    print('Correct answer: m1=%s, m2=%s' % (repr(m1), repr(m2)))
