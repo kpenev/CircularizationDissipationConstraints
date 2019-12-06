@@ -4,18 +4,19 @@
 
 import scipy, scipy.integrate
 
-from cmd_sdss_photometry_interpolator import CMDSDSSPhotometryInterpolator
+from cmd_photometry_interpolator import CMDPhotometryInterpolator
+from cmd_usno_photometry_interpolator import CMDUSNOPhotometryInterpolator
 
-def usno_fit_single_mass(usno_photometry_interp,
-                         photometry,
-                         magnitude_template="%(filchar)c'mag",
-                         error_template="e_%(filchar)c'mag"):
+def fit_single_mass(photometry_interp,
+                    photometry,
+                    magnitude_template="%(filchar)c'mag",
+                    error_template="e_%(filchar)c'mag"):
     """
     Find single star best fit mass for a subset of USNO u', g', r', i', z' mags.
 
     Args:
-        usno_photometry_interp(CMDSDSSPhotometryInterpolator):    Object able to
-            predict USNO magnitudes for a given stellar mass.
+        photometry_interp(CMDPhotometryInterpolator):    Object able to
+            predict relevant magnitudes for a given stellar mass or binary.
 
         photometry(dict):    A subset of u', g', r', i', z' magnitudes and
             errors measured for the star to fit. The key <-> magnitude or
@@ -54,18 +55,20 @@ def usno_fit_single_mass(usno_photometry_interp,
             error_template % dict(filchar=filchar) in photometry
         )
 
-    def get_square_diff(theoretical_usno_magnitudes):
+    def get_square_diff(theoretical_magnitudes):
         """
         Return the normalized square difference b/w theory and measurement.
         """
 
-        grid_square_diff = scipy.zeros(theoretical_usno_magnitudes[0].shape,
+        grid_square_diff = scipy.zeros(theoretical_magnitudes[0].shape,
                                        dtype=float)
-        for filter_index, filter_character in enumerate('ugriz'):
+        for filter_index, filter_character in enumerate(
+                photometry_interp.filchars
+        ):
             if check_magnitude(filter_character):
                 grid_square_diff += (
                     (
-                        theoretical_usno_magnitudes[filter_index]
+                        theoretical_magnitudes[filter_index]
                         -
                         get_magnitude(filter_character)
                     )
@@ -75,23 +78,20 @@ def usno_fit_single_mass(usno_photometry_interp,
         return grid_square_diff
 
     best_grid_index = get_square_diff(
-        usno_photometry_interp.grid_usno_mag
+        photometry_interp.grid_mag
     ).argmin()
-    min_search_mass = usno_photometry_interp.data[0]['Mini'][
+    min_search_mass = photometry_interp.data[0]['Mini'][
         max(0, best_grid_index - 1)
     ]
-    max_search_mass = usno_photometry_interp.data[0]['Mini'][
+    max_search_mass = photometry_interp.data[0]['Mini'][
         min(
             best_grid_index + 1,
-            usno_photometry_interp.data[0]['Mini'].size
+            photometry_interp.data[0]['Mini'].size
         )
     ]
     return scipy.optimize.minimize_scalar(
-        lambda m:
-        get_square_diff(
-            usno_photometry_interp.get_usno_magnitudes(
-                scipy.full(fill_value=m, shape=1)
-            )
+        lambda m: get_square_diff(
+            photometry_interp(scipy.full(fill_value=m, shape=1))
         ),
         bounds=(min_search_mass, max_search_mass),
         method='bounded'
@@ -135,43 +135,40 @@ def mass_function_log_likelihood(primary_mass,
     predicted_mass_function = (secondary_mass**3
                                /
                                (primary_mass + secondary_mass)**2)
+
+    if predicted_mass_function > observed_mass_function:
+        return 0.0
+
     try:
         sigma = float(observed_mass_function_err)
     except TypeError:
-        sigma = observed_mass_function_err[
-            0 if predicted_mass_function <= observed_mass_function else 1
-        ]
+        sigma = observed_mass_function_err[0]
 
-    integrand = lambda i: (
-        scipy.exp(
-            -(
-                predicted_mass_function * scipy.sin(i)**3
-                -
-                observed_mass_function
-            )**2
-            /
-            (2.0 * sigma**2)
-        )
-        *
-        scipy.sin(i)
+    return -(
+        (
+            predicted_mass_function
+            -
+            observed_mass_function
+        )**2
+        /
+        (2.0 * sigma**2)
     )
-    return scipy.log(scipy.integrate.quad(integrand, 0, scipy.pi/2))
 
-def usno_fit_binary_masses(usno_photometry_interp,
-                           photometry,
-                           mass_function,
-                           mass_function_error,
-                           min_mag_difference=dict(),
-                           magnitude_template="%(filchar)c'mag",
-                           error_template="e_%(filchar)c'mag"):
+def fit_binary_masses(photometry_interp,
+                      photometry,
+                      mass_function,
+                      mass_function_error,
+                      min_mag_difference=dict(),
+                      magnitude_template="%(filchar)cmag",
+                      error_template="e_%(filchar)cmag"):
     r"""
     Find the best fit masses for stars in a binary given RV and photometry.
 
     Args:
-        usno_photometry_interp:    See same name argument to
-            :func:`usno_fit_single_mass`.
+        photometry_interp:    See same name argument to
+            :func:`fit_single_mass`.
 
-        photometry:    See same name argument to :func:`usno_fit_single_mass`.
+        photometry:    See same name argument to :func:`fit_single_mass`.
 
         mass_function(float):    The value of the mass function
             (:math:`\frac{M_2^2\sin^3i}{M_1+M_2)}`), presumably from RV
@@ -186,10 +183,10 @@ def usno_fit_binary_masses(usno_photometry_interp,
             ``'z``.
 
         magnitude_template:    See same name argument to
-            :func:`usno_fit_single_mass`.
+            :func:`fit_single_mass`.
 
         error_template:    See same name argument to
-            :func:`usno_fit_single_mass`.
+            :func:`fit_single_mass`.
 
     Returns:
         (float, float):
@@ -200,18 +197,20 @@ def usno_fit_binary_masses(usno_photometry_interp,
     def negative_log_likelihood(masses):
         """Return -log(likelihood) of the data given stellar masses."""
 
-        predicted_photometry = usno_photometry_interp.get_binary_magnitudes(
-            *masses
-        )
-        result = -mass_function_log_likelihood(*masses)
-        for filchar, predicted in zip('ugriz', predicted_photometry):
+        print('LL(m1=%s, m2=%s)' % (repr(masses[0]), repr(masses[1])))
+        predicted_photometry = photometry_interp.get_binary_magnitudes(*masses)
+        result = -mass_function_log_likelihood(*masses,
+                                               mass_function,
+                                               mass_function_error)
+        for filchar, predicted in zip(photometry_interp.filchars,
+                                      predicted_photometry):
             try:
                 observed = photometry[magnitude_template
                                       %
                                       dict(filchar=filchar)]
-                stdev = photometry[error_template
-                                   %
-                                   dict(filchar=filchar)]
+                stddev = photometry[error_template
+                                    %
+                                    dict(filchar=filchar)]
             except KeyError:
                 continue
 
@@ -220,52 +219,91 @@ def usno_fit_binary_masses(usno_photometry_interp,
             except TypeError:
                 sigma = stddev[0 if predicted <= observed else 1]
 
-            result -= (observed - predicted)**2 / (2.0 * sigma**2)
+            result += (observed - predicted)**2 / (2.0 * sigma**2)
+
+        print('LL(m1=%s, m2=%s)=%s (q=%s)' % (repr(masses[0]),
+                                              repr(masses[1]),
+                                              repr(-result),
+                                              repr(masses[1]/masses[0])))
 
         return result
 
     def mag_differences(masses):
         """Return the secondary - primary mags for min mag constraints."""
 
-        magnitudes = usno_photometry_interp.get_usno_magnitudes(masses)
+        magnitudes = photometry_interp(masses)
         mag_differences = magnitudes[:, 1] - magnitudes[:, 0]
         return [
-            mag_differences['ugriz'.index(filchar)]
+            mag_differences[photometry_interp.filchars.index(filchar)]
             for filchar in sorted(min_mag_difference.keys())
         ]
 
-    return scipy.optimize.minimize(
-        negative_log_likelihood,
-        scipy.array([usno_photometry_interp.max_mass,
-                     usno_photometry_interp.min_mass]),
-        method='trust-constr',
-        constraints=scipy.optimize.NonlinearConstraint(
-            mag_differences,
-            [
+    interp_mass_range = (photometry_interp.min_mass.to_value('M_sun') + 0.01,
+                         photometry_interp.max_mass.to_value('M_sun') - 0.01)
+    if min_mag_difference:
+        constraints = scipy.optimize.NonlinearConstraint(
+            fun=mag_differences,
+            lb=[
                 min_mag_difference[filchar]
                 for filchar in sorted(min_mag_difference.keys())
             ],
-            scipy.inf
+            ub=[scipy.inf for filchar in sorted(min_mag_difference.keys())]
         )
+    else:
+        constraints = ()
+    print('-LL(0.9, 0.6) = '
+          +
+          repr(negative_log_likelihood(scipy.array([0.9, 0.6]))))
+
+    print('Bounds: ' + repr(scipy.optimize.Bounds(*interp_mass_range,
+                                                  keep_feasible=True)))
+    return scipy.optimize.minimize(
+        fun=negative_log_likelihood,
+        x0=scipy.array([1.0, 0.5]),
+#        method='SLSQP',
+        bounds=scipy.optimize.Bounds(*interp_mass_range,
+                                     keep_feasible=True),
+        constraints=constraints,
+#        options=dict(gtol=0.0, maxiter=1e6, initial_tr_radius=0.1, verbose=3)
     )
 
 if __name__ == '__main__':
     print('LL: ' + repr(mass_function_log_likelihood(1.0, 0.5, 0.1, 0.1)))
-    interpolator = CMDSDSSPhotometryInterpolator(
-        '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.dat'
+    interpolator = CMDPhotometryInterpolator(
+        '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat'
     )
 
-    predicted_usno_ugriz = interpolator.get_usno_magnitudes(0.7)
-    print('Predicted magnitudes: ' + repr(predicted_usno_ugriz))
-    mfit = usno_fit_single_mass(
+    predicted_magnitudes = interpolator(0.7)
+    print('Predicted magnitudes: ' + repr(predicted_magnitudes))
+    mfit = fit_single_mass(
         interpolator,
         {
-            "g'mag": predicted_usno_ugriz[1],
-            "r'mag": predicted_usno_ugriz[2],
+            "g'mag": predicted_magnitudes[1],
+            "r'mag": predicted_magnitudes[2],
             "e_g'mag": 0.01,
             "e_r'mag": 0.01
         }
     )
     print('Best fit mass = ' + repr(mfit))
+
+    m1, m2 = 1.1, 1.1
+    fmass = (m2**3 / 10.0)/((m1+m2)**2)
+    binary_mag = {
+        fc + 'mag': mag for fc, mag in zip(
+            interpolator.filchars,
+            interpolator.get_binary_magnitudes(m1, m2)
+        )
+    }
+    for fc in interpolator.filchars:
+        binary_mag['e_%cmag' % fc] = 0.1
+    print('Binary mag: ' + repr(binary_mag))
+    print(
+        repr(
+            fit_binary_masses(interpolator,
+                              binary_mag,
+                              fmass,
+                              0.1 * fmass)
+        )
+    )
 
 

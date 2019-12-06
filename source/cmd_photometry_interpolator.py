@@ -40,7 +40,7 @@ class CMDPhotometryInterpolator(CMDInterpolator):
             'photometry includes extinction of Av=(?P<Av>[^ ,]*)[, ]'
         )
         filchar_rex = re.compile(
-            '<i>(?P<filchars>[a-zA-Z]*)</i>'
+            '.* <i>(?P<filchars>[a-zA-Z]*)</i>'
         )
         for line in self.header:
             if ':' in line:
@@ -73,18 +73,23 @@ class CMDPhotometryInterpolator(CMDInterpolator):
         self.age = 10.0**(self.data[0]['logAge'][0] - 9.0) * units.Gyr
         #pylint: enable=no-member
 
+        self.grid_mag = scipy.stack(
+            self.data[0][filchar + 'mag'] for filchar in self.filchars
+        )
+
     def __call__(self, interp_mass):
         """Return the available photometry for the given mass(es)."""
 
-        return (self.get_interpolated(mag_letter + 'mag', interp_mass, None)
-                for mag_letter in self.filchars)
+        return scipy.stack(
+            self.get_interpolated(mag_letter + 'mag', interp_mass, None)
+            for mag_letter in self.filchars
+        )
 
     def get_binary_magnitudes(self, primary_mass, secondary_mass):
         """Estimate SDSS u, g, r, i, z for a binary, given mass(es)."""
 
-        primary_mags = scipy.stack(self(primary_mass))
-        secondary_mags = scipy.stack(self(secondary_mass))
-        print('primary mags: ' + repr(primary_mags))
+        primary_mags = self(primary_mass)
+        secondary_mags = self(secondary_mass)
         return -2.5 * scipy.log10(10.0**(-primary_mags/2.5)
                                   +
                                   10.0**(-secondary_mags/2.5))
@@ -100,16 +105,12 @@ if __name__ == '__main__':
                                   cluster_members["Rmag"],
                                   cluster_members["Imag"]))
 
-    pyplot.plot(observed_ubvri[1] - observed_ubvri[2],
-                -observed_ubvri[2],
-                'ok')
-
     interpolator = CMDPhotometryInterpolator(
-        '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.1_UBVRIJHK.dat'
+        '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.2_UBVRIJHK.dat'
     )
 
     interp_masses = interpolator.data[0]['Mini']
-    predicted_ubvrijhk = scipy.stack(interpolator(interp_masses))
+    predicted_ubvrijhk = interpolator(interp_masses)
 
     predicted_q1_binary_ubvrijhk = (
         interpolator.get_binary_magnitudes(
@@ -118,20 +119,17 @@ if __name__ == '__main__':
         )
     )
 
-    pyplot.plot(predicted_ubvrijhk[1] - predicted_ubvrijhk[2],
-                -predicted_ubvrijhk[2] - 11.3, 'or', markersize=10)
-    pyplot.plot(predicted_ubvrijhk[1] - predicted_ubvrijhk[2],
-                -predicted_ubvrijhk[2] - 11.3, '-r', linewidth=3)
+#    pyplot.plot(predicted_ubvrijhk[1] - predicted_ubvrijhk[2],
+#                -predicted_ubvrijhk[2] - 11.23, 'or', markersize=10)
 
-    pyplot.plot(
-        (
-            predicted_q1_binary_ubvrijhk[1]
-            -
-            predicted_q1_binary_ubvrijhk[2]
-        ),
-        -predicted_q1_binary_ubvrijhk[2] - 11.3,
-        '-g',
-        linewidth=3
-    )
+    for left in range(5):
+        for right in range(left + 1, 5):
+            pyplot.plot(observed_ubvri[left] - observed_ubvri[right],
+                        -observed_ubvri[2],
+                        'ok')
+            pyplot.plot(predicted_ubvrijhk[left] - predicted_ubvrijhk[right],
+                        -predicted_ubvrijhk[2] - 11.23, '-r', linewidth=3)
+            pyplot.xlabel('%s - %s [mag]' % ('UBVRI'[left], 'UBVRI'[right]))
+            pyplot.ylabel('-V [mag]')
 
-    pyplot.show()
+            pyplot.show()

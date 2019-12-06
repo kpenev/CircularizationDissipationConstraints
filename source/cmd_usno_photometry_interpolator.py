@@ -12,7 +12,7 @@ from magnitude_transformations import sdss_to_usno
 
 from cmd_photometry_interpolator import CMDPhotometryInterpolator
 
-class CMDSDSSPhotometryInterpolator(CMDPhotometryInterpolator):
+class CMDUSNOPhotometryInterpolator(CMDPhotometryInterpolator):
     """Interpolate SDSS photometry from CMD isochrones for a single cluster."""
 
     def __init__(self, isochrone_fname):
@@ -22,31 +22,22 @@ class CMDSDSSPhotometryInterpolator(CMDPhotometryInterpolator):
 
         assert self.filchars == 'ugriz'
 
-        self.grid_usno_mag = sdss_to_usno(
-            scipy.stack(
-                self.data[0][filchar + 'mag']
-                for filchar in self.filchars
-            )
-        )
+        self.grid_mag = sdss_to_usno(self.grid_mag)
 
-    def get_usno_magnitudes(self, interp_mass):
+    def __call__(self, interp_mass):
         """Estimate UNSO u', g', r', i', z' photometry for given mass(es)."""
 
         return sdss_to_usno(
-            scipy.stack(
-                self(
-                    scipy.array(interp_mass, copy=False, ndmin=1)
-                )
+            super().__call__(
+                scipy.array(interp_mass, copy=False, ndmin=1)
             )
         )
 
-    def get_binary_usno_magnitudes(self, primary_mass, secondary_mass):
+    def get_binary_magnitudes(self, primary_mass, secondary_mass):
         """Estimate UNSO u', g', r', i', z' for a binary, given mass(es)."""
 
         return sdss_to_usno(
-            scipy.stack(
-                self.get_binary_magnitudes(primary_mass, secondary_mass)
-            )
+            super().get_binary_magnitudes(primary_mass, secondary_mass)
         )
 
 if __name__ == '__main__':
@@ -68,7 +59,7 @@ if __name__ == '__main__':
     )
     interp_masses = interpolator.data[0]['Mini']
 
-    predicted_sdss_ugriz = scipy.stack(interpolator(interp_masses))
+    predicted_sdss_ugriz = interpolator(interp_masses)
 
     predicted_usno_ugriz = interpolator.get_usno_magnitudes(interp_masses)
     predicted_q1_binary_usno_ugriz = (
