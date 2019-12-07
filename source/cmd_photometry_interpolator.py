@@ -40,7 +40,7 @@ class CMDPhotometryInterpolator(CMDInterpolator):
             'photometry includes extinction of Av=(?P<Av>[^ ,]*)[, ]'
         )
         filchar_rex = re.compile(
-            '.* <i>(?P<filchars>[a-zA-Z]*)</i>'
+            '.*<i>(?P<filchars>[a-zA-Z]*)</i>'
         )
         for line in self.header:
             if ':' in line:
