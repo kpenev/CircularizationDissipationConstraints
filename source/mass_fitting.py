@@ -4,6 +4,7 @@
 
 import scipy, scipy.integrate
 
+from planetary_system_io import read_cds_pipe_table
 from cmd_photometry_interpolator import CMDPhotometryInterpolator
 from cmd_usno_photometry_interpolator import CMDUSNOPhotometryInterpolator
 
@@ -165,6 +166,7 @@ def fit_binary_masses(photometry_interp,
                       photometry,
                       mass_function,
                       mass_function_error,
+                      distance_modulus,
                       min_mag_difference=dict(),
                       magnitude_template="%(filchar)cmag",
                       error_template="e_%(filchar)cmag"):
@@ -183,6 +185,9 @@ def fit_binary_masses(photometry_interp,
 
         mass_function_error(float):    An error estimate of the
             ``mass_function`` argument.
+
+        distance_modulus(float):    The distance modulus to assume for the
+            binary being fit.
 
         min_mag_difference(dict):    Minimal difference in magnitudes between
             primary and secondary to impose on the result. Keys should be
@@ -204,21 +209,26 @@ def fit_binary_masses(photometry_interp,
     def negative_log_likelihood(masses):
         """Return -log(likelihood) of the data given stellar masses."""
 
-        print('LL(m1=%s, m2=%s)' % (repr(masses[0]), repr(masses[1])))
-        predicted_photometry = photometry_interp.get_binary_magnitudes(*masses)
-        result = -mass_function_log_likelihood(*masses,
-                                               mass_function,
-                                               mass_function_error)
+        predicted_photometry = scipy.array(
+            photometry_interp.get_binary_magnitudes(*masses)
+            +
+            distance_modulus,
+            copy=False
+        )
+        result = scipy.array(
+            -mass_function_log_likelihood(*masses,
+                                          mass_function,
+                                          mass_function_error),
+            copy=False
+        )
         for filchar, predicted in zip(photometry_interp.filchars,
                                       predicted_photometry):
             try:
                 observed = photometry[magnitude_template
                                       %
                                       dict(filchar=filchar)]
-                stddev = photometry[error_template
-                                    %
-                                    dict(filchar=filchar)]
-            except KeyError:
+                stddev = photometry[error_template % dict(filchar=filchar)]
+            except ValueError:
                 continue
 
             try:
@@ -226,12 +236,19 @@ def fit_binary_masses(photometry_interp,
             except TypeError:
                 sigma = stddev[0 if predicted <= observed else 1]
 
-            result += (observed - predicted)**2 / (2.0 * sigma**2)
+            if (
+                    not scipy.isfinite(sigma)
+                    or
+                    not scipy.isfinite(observed)
+            ):
+                continue
 
-        print('LL(m1=%s, m2=%s)=%s (q=%s)' % (repr(masses[0]),
-                                              repr(masses[1]),
-                                              repr(-result),
-                                              repr(masses[1]/masses[0])))
+            update = scipy.isfinite(predicted)
+            result[update] += (
+                observed - predicted[update]
+            )**2 / (
+                2.0 * sigma**2
+            )
 
         return result
 
@@ -263,10 +280,8 @@ def fit_binary_masses(photometry_interp,
     )
     best_masses = photometry_interp.data[0]['Mini'][best_indices]
 
-    print('Best masses: ' + repr(best_masses))
-
     mass_bounds = scipy.optimize.Bounds(
-        lb = photometry_interp.data[0]['Mini'][0] + 0.01,
+        lb = 0.5,#photometry_interp.data[0]['Mini'][0] + 0.01,
         ub = photometry_interp.data[0]['Mini'][
             photometry_interp.data[0]['Mini'].size - 1,
         ] - 0.01,
@@ -278,27 +293,13 @@ def fit_binary_masses(photometry_interp,
 #        method='trust-constr',
         bounds=mass_bounds,
 #        options=dict(gtol=0.0, maxiter=1e6, initial_tr_radius=0.1, verbose=3)
-        options=dict(maxiter=1e6, disp=True)
+        options=dict(maxiter=1e6, disp=False)
     )
 
 if __name__ == '__main__':
-    print('LL: ' + repr(mass_function_log_likelihood(1.0, 0.5, 0.1, 0.1)))
     interpolator = CMDPhotometryInterpolator(
-        '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat'
+        '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.2_UBVRIJHK.dat'
     )
-
-    predicted_magnitudes = interpolator(0.7)
-    print('Predicted magnitudes: ' + repr(predicted_magnitudes))
-    mfit = fit_single_mass(
-        interpolator,
-        {
-            "g'mag": predicted_magnitudes[1],
-            "r'mag": predicted_magnitudes[2],
-            "e_g'mag": 0.01,
-            "e_r'mag": 0.01
-        }
-    )
-    print('Best fit mass = ' + repr(mfit))
 
     m1, m2 = scipy.pi/3, scipy.pi/20
     fmass = (m2**3 / 3.0)/((m1+m2)**2)
@@ -316,7 +317,48 @@ if __name__ == '__main__':
             fit_binary_masses(interpolator,
                               binary_mag,
                               fmass,
-                              0.1 * fmass)
+                              0.1 * fmass,
+                              0.0)
         )
     )
     print('Correct answer: m1=%s, m2=%s' % (repr(m1), repr(m2)))
+
+    ngc_188_photometry = read_cds_pipe_table(
+        '../data/Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
+    )
+    ngc_188_single_lined_binaries = read_cds_pipe_table(
+        '../data/Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
+    )
+    ngc_188_params = read_cds_pipe_table(
+        '../data/Geller_et_al_2009_WIYN_physical_parameters.tsv'
+    )
+
+
+    for binary in ngc_188_single_lined_binaries:
+        photometry = ngc_188_photometry[
+            ngc_188_photometry['PKM'] == binary['PKM']
+        ]
+
+        answer = ngc_188_params[
+            ngc_188_params['PKM'] == binary['PKM']
+        ]
+        if not answer:
+            continue
+
+        result = fit_binary_masses(interpolator,
+                                   photometry,
+                                   binary['f(m)'],
+                                   binary['e_f(m)'],
+                                   11.23)
+        m1, m2 = result.x
+
+        print(
+            '%c Binary %d best fit masses: m1=%s (%s), m2=%s (%s)' % (
+                ('v' if result.success else '*'),
+                binary['PKM'],
+                repr(m1),
+                answer['l_M1'][0].decode() + repr(answer['M1'][0]),
+                repr(m2),
+                answer['l_M2'][0].decode() + repr(answer['M2'][0])
+            )
+        )
