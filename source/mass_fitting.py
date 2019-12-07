@@ -191,8 +191,7 @@ def fit_binary_masses(photometry_interp,
 
         min_mag_difference(dict):    Minimal difference in magnitudes between
             primary and secondary to impose on the result. Keys should be
-            filter characters, i.e. one of: ``'u'``, ``'g'``, ``'r``, ``'i``,
-            ``'z``.
+            filter characters.
 
         magnitude_template:    See same name argument to
             :func:`fit_single_mass`.
@@ -252,15 +251,20 @@ def fit_binary_masses(photometry_interp,
 
         return result
 
-    def mag_differences(masses):
+    def mag_difference_constraints(masses):
         """Return the secondary - primary mags for min mag constraints."""
 
         magnitudes = photometry_interp(masses)
         mag_differences = magnitudes[:, 1] - magnitudes[:, 0]
-        return [
-            mag_differences[photometry_interp.filchars.index(filchar)]
-            for filchar in sorted(min_mag_difference.keys())
+        defficiencies = [
+            (
+                mag_differences[photometry_interp.filchars.index(filchar)]
+                -
+                min_diff
+            )
+            for filchar, min_diff in min_mag_difference.items()
         ]
+        return min(defficiencies)
 
     mass_grid = scipy.meshgrid(
         photometry_interp.data[0]['Mini'],
@@ -281,7 +285,7 @@ def fit_binary_masses(photometry_interp,
     best_masses = photometry_interp.data[0]['Mini'][best_indices]
 
     mass_bounds = scipy.optimize.Bounds(
-        lb = 0.5,#photometry_interp.data[0]['Mini'][0] + 0.01,
+        lb = photometry_interp.data[0]['Mini'][0] + 0.01,
         ub = photometry_interp.data[0]['Mini'][
             photometry_interp.data[0]['Mini'].size - 1,
         ] - 0.01,
@@ -293,6 +297,14 @@ def fit_binary_masses(photometry_interp,
 #        method='trust-constr',
         bounds=mass_bounds,
 #        options=dict(gtol=0.0, maxiter=1e6, initial_tr_radius=0.1, verbose=3)
+        constraints = (
+            dict(
+                type='ineq',
+                fun=mag_difference_constraints
+            )
+            if min_mag_difference else
+            ()
+        ),
         options=dict(maxiter=1e6, disp=False)
     )
 
@@ -333,7 +345,6 @@ if __name__ == '__main__':
         '../data/Geller_et_al_2009_WIYN_physical_parameters.tsv'
     )
 
-
     for binary in ngc_188_single_lined_binaries:
         photometry = ngc_188_photometry[
             ngc_188_photometry['PKM'] == binary['PKM']
@@ -349,16 +360,21 @@ if __name__ == '__main__':
                                    photometry,
                                    binary['f(m)'],
                                    binary['e_f(m)'],
-                                   11.23)
+                                   11.23,
+                                   min_mag_difference=dict(V=2.5))
         m1, m2 = result.x
+        dv = (interpolator(m2)[interpolator.filchars.index('V')]
+              -
+              interpolator(m1)[interpolator.filchars.index('V')])
 
         print(
-            '%c Binary %d best fit masses: m1=%s (%s), m2=%s (%s)' % (
+            '%c Binary %d best fit masses: m1=%s (%s), m2=%s (%s), dV=%s' % (
                 ('v' if result.success else '*'),
                 binary['PKM'],
                 repr(m1),
                 answer['l_M1'][0].decode() + repr(answer['M1'][0]),
                 repr(m2),
-                answer['l_M2'][0].decode() + repr(answer['M2'][0])
+                answer['l_M2'][0].decode() + repr(answer['M2'][0]),
+                dv
             )
         )
