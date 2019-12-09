@@ -106,7 +106,7 @@ if __name__ == '__main__':
                                   cluster_members["Imag"]))
 
     interpolator = CMDPhotometryInterpolator(
-        '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.2_UBVRIJHK.dat'
+        '../data/CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_UBVRIJHK.dat'
     )
 
     interp_masses = interpolator.data[0]['Mini']
@@ -131,5 +131,7 @@ if __name__ == '__main__':
                         -predicted_ubvrijhk[2] - 11.23, '-r', linewidth=3)
             pyplot.xlabel('%s - %s [mag]' % ('UBVRI'[left], 'UBVRI'[right]))
             pyplot.ylabel('-V [mag]')
+
+            pyplot.ylim(-23, None)
 
             pyplot.show()

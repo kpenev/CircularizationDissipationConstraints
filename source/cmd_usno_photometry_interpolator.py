@@ -22,6 +22,7 @@ class CMDUSNOPhotometryInterpolator(CMDPhotometryInterpolator):
 
         assert self.filchars == 'ugriz'
 
+        print('Initializing USNO interpolation.')
         self.grid_mag = sdss_to_usno(self.grid_mag)
 
     def __call__(self, interp_mass):

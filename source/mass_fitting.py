@@ -2,11 +2,8 @@
 
 """Functions to fit for single and binary star masses given photometry."""
 
-import scipy, scipy.integrate
-
-from planetary_system_io import read_cds_pipe_table
-from cmd_photometry_interpolator import CMDPhotometryInterpolator
-from cmd_usno_photometry_interpolator import CMDUSNOPhotometryInterpolator
+import scipy
+import scipy.integrate
 
 def fit_single_mass(photometry_interp,
                     photometry,
@@ -114,7 +111,7 @@ def mass_function_log_likelihood(primary_mass,
             function.
 
         observed_mass_function_err(float):    Error estimate of the observed
-            mass function, if a single value, the error is assumed to follow
+            mass function. If a single value, the error is assumed to follow
             symmetric Gaussian distribution. If a 2-tuple the first value
             specifies the positive standard deviation and the second value
             specifies the negative one.
@@ -162,14 +159,84 @@ def mass_function_log_likelihood(primary_mass,
         (2.0 * sigma**2)
     )
 
-def fit_binary_masses(photometry_interp,
+def double_lined_orbit_log_likelihood(primary_mass,
+                                      secondary_mass,
+                                      *,
+                                      observed_mass_ratio,
+                                      mass_ratio_error,
+                                      observed_projected_primary_mass,
+                                      projected_primary_mass_error):
+    r"""
+    Return unnormalized log-likelihood of observing SB2 RV params given masses.
+
+    Args:
+        primary_mass(float):    The mass of the primary star.
+
+        secondary_mass(float):    The mass of the secondary star.
+
+        observed_mass_ratio(float):    The nominal value of the mass ratio
+            derived from RV observations.
+
+        mass_ratio_error(float):    Estimate of the error in
+            ``observed_mass_ratio``. If a single value, the error is assumed to
+            follow symmetric Gaussian distribution. If a 2-tuple the first value
+            specifies the positive standard deviation and the second value
+            specifies the negative one.
+
+        observed_projected_primary_mass(float):    The nominal value of
+            :math:`M_1 \sin^3 i` derived from RV observations.
+
+        projected_primary_mass_error(float):    Error estimate of the
+            ``observed_projected_primary_mass``. See ``mass_ratio_error`` for
+            comments on two-sided errors.
+
+    Returns:
+        float:
+            The log-likelihood of observing the given value of the mass ratio
+            and projected primary mass (:math:`M_1 \sin^3 i`), assuming gaussian
+            error distribution, with possibly different standard deviations
+            below and above the peak.
+    """
+
+    predicted_mass_ratio = secondary_mass / primary_mass
+    try:
+        mass_ratio_stddev = float(mass_ratio_error)
+    except TypeError:
+        if predicted_mass_ratio < observed_mass_ratio:
+            mass_ratio_stddev = mass_ratio_error[1]
+        else:
+            mass_ratio_stddev = mass_ratio_error[0]
+
+    mass_ratio_log_likelihood = -(
+        (predicted_mass_ratio - observed_mass_ratio)**2
+        /
+        (2.0 * mass_ratio_stddev**2)
+    )
+
+    try:
+        primary_mass_stddev = float(projected_primary_mass_error)
+    except TypeError:
+        primary_mass_stddev = projected_primary_mass_error[0]
+
+    return (
+        mass_ratio_log_likelihood
+        -
+        scipy.minimum(
+            0,
+            (primary_mass - observed_projected_primary_mass)**2
+            /
+            (2.0 * primary_mass_stddev**2)
+        )
+    )
+
+def fit_binary_masses(*,
+                      photometry_interp,
                       photometry,
-                      mass_function,
-                      mass_function_error,
                       distance_modulus,
-                      min_mag_difference=dict(),
+                      min_mag_difference=None,
                       magnitude_template="%(filchar)cmag",
-                      error_template="e_%(filchar)cmag"):
+                      error_template="e_%(filchar)cmag",
+                      **rv_parameters):
     r"""
     Find the best fit masses for stars in a binary given RV and photometry.
 
@@ -178,13 +245,6 @@ def fit_binary_masses(photometry_interp,
             :func:`fit_single_mass`.
 
         photometry:    See same name argument to :func:`fit_single_mass`.
-
-        mass_function(float):    The value of the mass function
-            (:math:`\frac{M_2^2\sin^3i}{M_1+M_2)}`), presumably from RV
-            measurements].
-
-        mass_function_error(float):    An error estimate of the
-            ``mass_function`` argument.
 
         distance_modulus(float):    The distance modulus to assume for the
             binary being fit.
@@ -198,6 +258,14 @@ def fit_binary_masses(photometry_interp,
 
         error_template:    See same name argument to
             :func:`fit_single_mass`.
+
+        rv_parameters:    Either the ``observed_mass_function`` and
+            ``observed_mass_function_err`` arguments to
+            :func:`mass_function_log_likelihood` if the binary is SB1 or the
+            ``observed_mass_ratio``, ``mass_ratio_error``,
+            ``observed_projected_primary_mass`, and
+            ``projected_primary_mass_error`` arguments to
+            :func:`double_lined_orbit_log_likelihood` for SB2 binaries.
 
     Returns:
         (float, float):
@@ -214,12 +282,16 @@ def fit_binary_masses(photometry_interp,
             distance_modulus,
             copy=False
         )
-        result = scipy.array(
-            -mass_function_log_likelihood(*masses,
-                                          mass_function,
-                                          mass_function_error),
-            copy=False
-        )
+        if 'observed_projected_primary_mass' in rv_parameters:
+            result = scipy.array(
+                -double_lined_orbit_log_likelihood(*masses, **rv_parameters),
+                copy=False
+            )
+        else:
+            result = scipy.array(
+                -mass_function_log_likelihood(*masses, **rv_parameters),
+                copy=False
+            )
         for filchar, predicted in zip(photometry_interp.filchars,
                                       predicted_photometry):
             try:
@@ -267,13 +339,18 @@ def fit_binary_masses(photometry_interp,
         return min(defficiencies)
 
     mass_grid = scipy.meshgrid(
-        photometry_interp.data[0]['Mini'],
-        photometry_interp.data[0]['Mini']
+        photometry_interp.data[0]['Mini'][1:-1],
+        photometry_interp.data[0]['Mini'][1:-1]
     )
+
 
     log_likelihood_grid = negative_log_likelihood((
         mass_grid
     ))
+
+    if min_mag_difference:
+        grid_constraints = mag_difference_constraints(mass_grid)
+        log_likelihood_grid[grid_constraints < 0] = scipy.inf
     best_indices = scipy.stack(
         reversed(
             sorted(
@@ -282,22 +359,24 @@ def fit_binary_masses(photometry_interp,
             )
         )
     )
+#    print('Best diff: ' + repr(grid_constraints[best_indices[0],
+#                                                best_indices[1]]))
     best_masses = photometry_interp.data[0]['Mini'][best_indices]
 
+#    print('Best masses: ' + repr(best_masses))
+
     mass_bounds = scipy.optimize.Bounds(
-        lb = photometry_interp.data[0]['Mini'][0] + 0.01,
-        ub = photometry_interp.data[0]['Mini'][
+        lb=photometry_interp.data[0]['Mini'][0] + 0.01,
+        ub=photometry_interp.data[0]['Mini'][
             photometry_interp.data[0]['Mini'].size - 1,
         ] - 0.01,
-        keep_feasible = True
+        keep_feasible=True
     )
     return scipy.optimize.minimize(
         fun=negative_log_likelihood,
         x0=best_masses,
-#        method='trust-constr',
         bounds=mass_bounds,
-#        options=dict(gtol=0.0, maxiter=1e6, initial_tr_radius=0.1, verbose=3)
-        constraints = (
+        constraints=(
             dict(
                 type='ineq',
                 fun=mag_difference_constraints
@@ -307,74 +386,3 @@ def fit_binary_masses(photometry_interp,
         ),
         options=dict(maxiter=1e6, disp=False)
     )
-
-if __name__ == '__main__':
-    interpolator = CMDPhotometryInterpolator(
-        '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.2_UBVRIJHK.dat'
-    )
-
-    m1, m2 = scipy.pi/3, scipy.pi/20
-    fmass = (m2**3 / 3.0)/((m1+m2)**2)
-    binary_mag = {
-        fc + 'mag': mag for fc, mag in zip(
-            interpolator.filchars,
-            interpolator.get_binary_magnitudes(m1, m2)
-        )
-    }
-    for fc in interpolator.filchars:
-        binary_mag['e_%cmag' % fc] = 0.1
-    print('Binary mag: ' + repr(binary_mag))
-    print(
-        repr(
-            fit_binary_masses(interpolator,
-                              binary_mag,
-                              fmass,
-                              0.1 * fmass,
-                              0.0)
-        )
-    )
-    print('Correct answer: m1=%s, m2=%s' % (repr(m1), repr(m2)))
-
-    ngc_188_photometry = read_cds_pipe_table(
-        '../data/Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
-    )
-    ngc_188_single_lined_binaries = read_cds_pipe_table(
-        '../data/Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
-    )
-    ngc_188_params = read_cds_pipe_table(
-        '../data/Geller_et_al_2009_WIYN_physical_parameters.tsv'
-    )
-
-    for binary in ngc_188_single_lined_binaries:
-        photometry = ngc_188_photometry[
-            ngc_188_photometry['PKM'] == binary['PKM']
-        ]
-
-        answer = ngc_188_params[
-            ngc_188_params['PKM'] == binary['PKM']
-        ]
-        if not answer:
-            continue
-
-        result = fit_binary_masses(interpolator,
-                                   photometry,
-                                   binary['f(m)'],
-                                   binary['e_f(m)'],
-                                   11.23,
-                                   min_mag_difference=dict(V=2.5))
-        m1, m2 = result.x
-        dv = (interpolator(m2)[interpolator.filchars.index('V')]
-              -
-              interpolator(m1)[interpolator.filchars.index('V')])
-
-        print(
-            '%c Binary %d best fit masses: m1=%s (%s), m2=%s (%s), dV=%s' % (
-                ('v' if result.success else '*'),
-                binary['PKM'],
-                repr(m1),
-                answer['l_M1'][0].decode() + repr(answer['M1'][0]),
-                repr(m2),
-                answer['l_M2'][0].decode() + repr(answer['M2'][0]),
-                dv
-            )
-        )
