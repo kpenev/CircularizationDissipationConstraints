@@ -37,10 +37,7 @@ def fit_all_binaries(interpolator,
         print(80 * '=')
         for binary in orbital_parameters:
             photometry = ngc188_photometry[
-                scipy.logical_or(
-                    ngc188_photometry['PKM'] == binary['PKM'],
-                    ngc188_photometry['PKM_1'] == binary['PKM']
-                )
+                ngc188_photometry['PKM'] == binary['PKM']
             ]
             if photometry.size == 0:
                 print('No photometry for binary ' + repr(binary['PKM']))
@@ -116,7 +113,6 @@ def plot_bad_binaries(interpolator,
             cluster_members = ngc188_photometry[ngc188_photometry['Memb'] > 0.5]
         except ValueError:
             cluster_members = ngc188_photometry[ngc188_photometry['Mm'] > 0.5]
-        print('cluster_members: ' + repr(cluster_members))
         observed_photometry = scipy.array([
             cluster_members[observed_phot_template % dict(filchar=filchar)]
             for filchar in interpolator.filchars[:5]
@@ -126,16 +122,9 @@ def plot_bad_binaries(interpolator,
 
         literature_params = ngc188_params[ngc188_params['PKM'] == binary_id]
 
-        print('Phot PKM: ' + repr(ngc188_photometry['PKM']))
-        print('Looking for: ' + repr(binary_id))
-
         binary_photometry = ngc188_photometry[
-            scipy.logical_or(
-                ngc188_photometry['PKM'] == binary_id,
-                ngc188_photometry['PKM_1'] == binary_id,
-            )
+            ngc188_photometry['PKM'] == binary_id
         ]
-        print('Binary photometry: ' + repr(binary_photometry))
         binary_photometry = [
             binary_photometry[observed_phot_template % dict(filchar=filchar)]
             for filchar in interpolator.filchars
@@ -256,6 +245,36 @@ def plot_bad_binaries(interpolator,
                              float(parsed['m1']),
                              float(parsed['m2']))
 
+def get_ngc188_usno_photometry():
+    """Return a properly formatted field array with USNO filter photometry."""
+
+    match_data = scipy.genfromtxt(
+        '../data/Fornal_et_al_cross_Platais_et_al_NGC188_photometry.csv',
+        names=True,
+        dtype=None,
+        delimiter=',',
+        deletechars=''
+    )
+    photometry = read_cds_pipe_table(
+        '../data/Fornal_et_al_2006_NGC188_photometry.tsv'
+    )
+
+    result_dtype = [(name, (int if name == 'PKM' else dtype[0]))
+                    for name, dtype in photometry.dtype.fields.items()]
+
+    result = scipy.empty(photometry.shape, dtype=result_dtype)
+    for result_index, phot_entry in enumerate(photometry):
+        for colname in photometry.dtype.names:
+            if colname == 'PKM':
+                matched = (match_data['FTS'] == phot_entry['FTS'])
+                if matched.any():
+                    result[result_index][colname] = match_data['PKM_1'][
+                        matched
+                    ][0]
+            else:
+                result[result_index][colname] = phot_entry[colname]
+
+    return result
 
 def main():
     """Avoid polluting global scope."""
@@ -268,7 +287,7 @@ def main():
             '../data/CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_ugriz.dat'
         ),
         'usno': CMDUSNOPhotometryInterpolator(
-            '../data/CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_ugriz.dat'
+            '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.2.dat'
         )
     }
 
@@ -276,13 +295,7 @@ def main():
         'UBVRIJHK': read_cds_pipe_table(
             '../data/Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
         ),
-        'usno': scipy.genfromtxt(
-            '../data/Fornal_et_al_cross_Platais_et_al_NGC188_photometry.csv',
-            names=True,
-            dtype=None,
-            delimiter=',',
-            deletechars=''
-        )
+        'usno': get_ngc188_usno_photometry()
     }
     read_cds_pipe_table(
         '../data/Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
@@ -298,17 +311,22 @@ def main():
     )
 
     for filter_set in ['usno', 'UBVRIJHK', 'usno']:
+        observed_phot_template=(
+            "%(filchar)c'mag" if filter_set == 'usno'
+            else "%(filchar)cmag"
+        )
         fit_all_binaries(interpolator[filter_set],
                          ngc188_photometry[filter_set],
                          ngc188_single_lined_binaries,
                          ngc188_double_lined_binaries,
-                         ngc188_params)
+                         ngc188_params,
+                         observed_phot_template=observed_phot_template)
 
         plot_bad_binaries(interpolator[filter_set],
                           ngc188_photometry[filter_set],
                           ngc188_params,
                           bad_binaries_fname='all_binary_fits.txt',
-                          observed_phot_template="%(filchar)c'mag")
+                          observed_phot_template=observed_phot_template)
 
 if __name__ == '__main__':
     main()
