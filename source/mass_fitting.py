@@ -276,12 +276,21 @@ def fit_binary_masses(*,
     def negative_log_likelihood(masses):
         """Return -log(likelihood) of the data given stellar masses."""
 
+        print('Calculating -LL(%s)' % repr(masses))
+
         predicted_photometry = scipy.array(
             photometry_interp.get_binary_magnitudes(*masses)
             +
             distance_modulus,
             copy=False
         )
+        print('Predicted photometry: '
+              +
+              repr(predicted_photometry)
+              +
+              ', shape: '
+              +
+              repr(predicted_photometry.shape))
         if 'observed_projected_primary_mass' in rv_parameters:
             result = scipy.array(
                 -double_lined_orbit_log_likelihood(*masses, **rv_parameters),
@@ -292,8 +301,12 @@ def fit_binary_masses(*,
                 -mass_function_log_likelihood(*masses, **rv_parameters),
                 copy=False
             )
+
+        print('Mass based -LL: ' + repr(result))
+
         for filchar, predicted in zip(photometry_interp.filchars,
                                       predicted_photometry):
+            print('Filter character: ' + repr(filchar))
             try:
                 observed = photometry[magnitude_template
                                       %
@@ -320,7 +333,9 @@ def fit_binary_masses(*,
             )**2 / (
                 2.0 * sigma**2
             )
+            print('Result after %s filchar: %s' % (filchar, repr(result)))
 
+        print('-LL(%s) = %s' % (repr(masses), repr(result)))
         return result
 
     def mag_difference_constraints(masses):
@@ -359,11 +374,9 @@ def fit_binary_masses(*,
             )
         )
     )
-#    print('Best diff: ' + repr(grid_constraints[best_indices[0],
-#                                                best_indices[1]]))
     best_masses = photometry_interp.data[0]['Mini'][best_indices]
 
-#    print('Best masses: ' + repr(best_masses))
+    print('Best masses: ' + repr(best_masses))
 
     mass_bounds = scipy.optimize.Bounds(
         lb=photometry_interp.data[0]['Mini'][0] + 0.01,
@@ -384,5 +397,5 @@ def fit_binary_masses(*,
             if min_mag_difference else
             ()
         ),
-        options=dict(maxiter=1e6, disp=False)
+        options=dict(maxiter=1e6, disp=True)
     )
