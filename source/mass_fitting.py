@@ -362,6 +362,14 @@ def fit_binary_masses(*,
         )
     )
     best_masses = photometry_interp.data[0]['Mini'][best_indices]
+    print('Best masses: ' + repr(best_masses))
+    print('Mass box: '
+          +
+          repr(photometry_interp.data[0]['Mini'][best_indices - 1])
+          +
+          ' - '
+          +
+          repr(photometry_interp.data[0]['Mini'][best_indices + 1]))
 
     mass_bounds = scipy.optimize.Bounds(
         lb=photometry_interp.data[0]['Mini'][0] + 0.01,
@@ -382,5 +390,5 @@ def fit_binary_masses(*,
             if min_mag_difference else
             ()
         ),
-        options=dict(maxiter=1e6, disp=True)
+        options=dict(maxiter=1e6, disp=False)
     )

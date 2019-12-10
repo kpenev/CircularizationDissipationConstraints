@@ -84,16 +84,44 @@ def fit_all_binaries(interpolator,
                 ]
             )
 
+            if is_double_lined:
+                mass_comparison = (
+                    'q = %s (%s +- %s), min_m1 = %s +- %s'
+                    %
+                    (
+                        repr(secondary_m / primary_m),
+                        repr(binary['q']),
+                        repr(binary['e_q']),
+                        repr(binary['msin3i1']),
+                        repr(binary['e_msin3i1']),
+                    )
+                )
+            else:
+                mass_comparison = (
+                    'max(fm) = %s (%s +- %s)'
+                    %
+                    (
+                        repr(secondary_m**3 / (primary_m + secondary_m)**2),
+                        repr(binary['f(m)']),
+                        repr(binary['e_f(m)'])
+                    )
+                )
+
             print(
-                '%c Binary %d best fit masses: m1=%s (%s), m2=%s (%s), dV=%s' % (
+                (
+                    '%c Binary %d best fit masses: m1=%s (%s), m2=%s (%s), '
+                    'dV=%s '
+                ) % (
                     ('v' if result.success else '*'),
                     binary['PKM'],
                     repr(primary_m),
                     answer['l_M1'][0].decode() + repr(answer['M1'][0]),
                     repr(secondary_m),
                     answer['l_M2'][0].decode() + repr(answer['M2'][0]),
-                    mag_diff
+                    repr(mag_diff)
                 )
+                +
+                mass_comparison
             )
             min_mag_difference = None
 
@@ -127,7 +155,7 @@ def plot_bad_binaries(interpolator,
         ]
         binary_photometry = [
             binary_photometry[observed_phot_template % dict(filchar=filchar)]
-            for filchar in interpolator.filchars
+            for filchar in interpolator.filchars[:5]
         ]
 
         fit_photometry = (interpolator.get_binary_magnitudes(fit_m1, fit_m2)
@@ -287,7 +315,7 @@ def main():
             '../data/CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_ugriz.dat'
         ),
         'usno': CMDUSNOPhotometryInterpolator(
-            '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.2.dat'
+            '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat'
         )
     }
 
@@ -310,7 +338,10 @@ def main():
         '../data/Geller_et_al_2009_WIYN_physical_parameters.tsv'
     )
 
-    for filter_set in ['usno', 'UBVRIJHK', 'usno']:
+    distance_modulus = {'UBVRIJHK': 11.23,
+                        'usno': 11.3}
+
+    for filter_set in ['UBVRIJHK', 'usno']:
         observed_phot_template=(
             "%(filchar)c'mag" if filter_set == 'usno'
             else "%(filchar)cmag"
@@ -320,13 +351,15 @@ def main():
                          ngc188_single_lined_binaries,
                          ngc188_double_lined_binaries,
                          ngc188_params,
-                         observed_phot_template=observed_phot_template)
+                         observed_phot_template=observed_phot_template,
+                         distance_modulus=distance_modulus[filter_set])
 
         plot_bad_binaries(interpolator[filter_set],
                           ngc188_photometry[filter_set],
                           ngc188_params,
                           bad_binaries_fname='all_binary_fits.txt',
-                          observed_phot_template=observed_phot_template)
+                          observed_phot_template=observed_phot_template,
+                          distance_modulus=distance_modulus[filter_set])
 
 if __name__ == '__main__':
     main()

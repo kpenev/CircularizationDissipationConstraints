@@ -51,38 +51,47 @@ if __name__ == '__main__':
                                        cluster_members["r'mag"],
                                        cluster_members["i'mag"],
                                        cluster_members["z'mag"]))
-    pyplot.plot(observed_usno_ugriz[1] - observed_usno_ugriz[2],
-                -observed_usno_ugriz[1],
-                'ok')
-
-    interpolator = CMDSDSSPhotometryInterpolator(
+    interpolator = CMDUSNOPhotometryInterpolator(
         '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat'
     )
     interp_masses = interpolator.data[0]['Mini']
 
     predicted_sdss_ugriz = interpolator(interp_masses)
 
-    predicted_usno_ugriz = interpolator.get_usno_magnitudes(interp_masses)
+    predicted_usno_ugriz = interpolator(interp_masses)
     predicted_q1_binary_usno_ugriz = (
-        interpolator.get_binary_usno_magnitudes(
+        interpolator.get_binary_magnitudes(
             interp_masses,
             interp_masses
         )
     )
 
-    pyplot.plot(predicted_usno_ugriz[1] - predicted_usno_ugriz[2],
-                -predicted_usno_ugriz[1] - 11.3, 'or', markersize=10)
-    pyplot.plot(predicted_usno_ugriz[1] - predicted_usno_ugriz[2],
-                -predicted_usno_ugriz[1] - 11.3, '-r', linewidth=3)
-    pyplot.plot(
-        (
-            predicted_q1_binary_usno_ugriz[1]
-            -
-            predicted_q1_binary_usno_ugriz[2]
-        ),
-        -predicted_q1_binary_usno_ugriz[1] - 11.3,
-        '-g',
-        linewidth=3
-    )
+    for left in range(5):
+        for right in range(left + 1, 5):
+            pyplot.plot(observed_usno_ugriz[left] - observed_usno_ugriz[right],
+                        -observed_usno_ugriz[1],
+                        'ok')
+            pyplot.plot(
+                predicted_usno_ugriz[left] - predicted_usno_ugriz[right],
+                -predicted_usno_ugriz[1] - 11.3,
+                'or',
+                markersize=10
+            )
+            pyplot.plot(
+                predicted_usno_ugriz[left] - predicted_usno_ugriz[right],
+                -predicted_usno_ugriz[1] - 11.3,
+                '-r',
+                linewidth=3
+            )
+#    pyplot.plot(
+#        (
+#            predicted_q1_binary_usno_ugriz[1]
+#            -
+#            predicted_q1_binary_usno_ugriz[2]
+#        ),
+#        -predicted_q1_binary_usno_ugriz[1] - 11.3,
+#        '-g',
+#        linewidth=3
+#    )
 
-    pyplot.show()
+            pyplot.show()
