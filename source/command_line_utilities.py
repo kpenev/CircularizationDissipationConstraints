@@ -131,9 +131,10 @@ def add_path_cmdline_args(parser):
     )
     parser.add_argument(
         '--use-binary-stars',
-        action='store_true',
-        default=False,
-        help='Read binary stellar system data from a default set of files.'
+        action='store',
+        default=None,
+        help='Read binary stellar system data from a default set of files for a'
+        ' cluster.'
     )
     parser.add_argument(
         '--progress-pickle', '--progress',

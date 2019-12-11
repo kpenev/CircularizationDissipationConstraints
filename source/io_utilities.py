@@ -88,6 +88,69 @@ def get_nasa_system(system_id, nasa_systems):
     )
     return result
 
+def get_quantity(value, plus_error, minus_error, unit):
+    """Return a properly formatted Quantity instance with errors."""
+
+    result = units.Quantity(
+        value,
+        unit=unit
+    )
+    result.plus_error = units.Quantity(
+        plus_error,
+        unit=unit
+    )
+    result.minus_error = units.Quantity(
+        minus_error,
+        unit=unit
+    )
+    return result
+
+def read_milliman_et_al_2014_binaries(
+        single_lined_orbits_fname=(
+            '../data/Milliman_et_al_2014_WIYN_single_lined_orbits.tsv'
+        ),
+        double_lined_orbits_fname=(
+            '../data/Milliman_et_al_2014_WIYN_double_lined_orbits.tsv'
+        )
+):
+    """Read Geller et al 2009 NGC6819 binaries in format like that of exopl."""
+
+    def create_system(record):
+        """Return a properly created system from the given binary record."""
+
+        return SimpleNamespace(
+            hostname=record['WOCS'],
+            age=get_quantity(2.6, 0.25, 0.25, 'Gyr'),
+            eccentricity=get_quantity(record['e'],
+                                      record['e_e'],
+                                      record['e_e'],
+                                      ''),
+            eccentricity_limit=False,
+            feh=get_quantity(0.09, 0.03, 0.03, ''),
+            orbital_period=get_quantity(record['Per'],
+                                        record['e_Per'],
+                                        record['e_Per'],
+                                        'day'),
+            primary_mass=get_quantity(numpy.nan,
+                                      numpy.nan,
+                                      numpy.nan,
+                                      'M_sun'),
+            secondary_mass=get_quantity(numpy.nan,
+                                        numpy.nan,
+                                        numpy.nan,
+                                        'M_sun')
+        )
+
+    single_lined_data = read_cds_pipe_table(single_lined_orbits_fname)
+    double_lined_data = read_cds_pipe_table(single_lined_orbits_fname)
+    print('double_lined_data:' + repr(double_lined_data))
+
+    return (
+        [create_system(record) for record in double_lined_data]
+        +
+        [create_system(record) for record in single_lined_data]
+    )
+
 def read_geller_et_al_2009_binaries(
         single_lined_orbits_fname=(
             '../data/Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
@@ -99,24 +162,7 @@ def read_geller_et_al_2009_binaries(
             '../data/Geller_et_al_2009_WIYN_physical_parameters.tsv'
         )
 ):
-    """Read the Geller et al 2009 NGC 188 binaries to pandas data frame."""
-
-    def get_quantity(value, plus_error, minus_error, unit):
-        """Return a properly formatted Quantity instance with errors."""
-
-        result = units.Quantity(
-            value,
-            unit=unit
-        )
-        result.plus_error = units.Quantity(
-            plus_error,
-            unit=unit
-        )
-        result.minus_error = units.Quantity(
-            minus_error,
-            unit=unit
-        )
-        return result
+    """Read Geller et al 2009 NGC 188 binaries in format like that of exopl."""
 
     def create_system(record):
         """Return a properly created system from the given record."""

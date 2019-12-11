@@ -19,7 +19,8 @@ from planetary_system_io import read_nasa_planets
 from io_utilities import\
     load_progress_pickle,\
     get_nasa_system,\
-    read_geller_et_al_2009_binaries
+    read_geller_et_al_2009_binaries,\
+    read_milliman_et_al_2014_binaries
 from calculate_e_Q_grid import prepare_nasa_system, fix_semimajor
 from process_e_Q_grid import\
     format_eccentricity_vs_lgQ,\
@@ -238,8 +239,18 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, **kwargs):
                                      add_units=True,
                                      need_ages=False)
         if cmdline_args.use_binary_stars:
-            systems = read_geller_et_al_2009_binaries()
-
+            if (
+                    (
+                        isinstance(cmdline_args.use_binary_stars, bool)
+                        and
+                        cmdline_args.use_binary_stars
+                    )
+                    or
+                    cmdline_args.use_binary_stars.upper() == 'NGC188'
+            ):
+                systems = read_geller_et_al_2009_binaries()
+            elif cmdline_args.use_binary_stars.upper() == 'NGC6819':
+                systems = read_milliman_et_al_2014_binaries()
             field_names = ['pl_orbper',
                            'pl_orbeccen',
                            'pl_orbeccenlim',
@@ -334,7 +345,10 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, **kwargs):
                        fmt='vg',
                        markersize=15,
                        label='unknown')
-        pyplot.plot([3.0, 20.0], [0, 0.6], '-k')
+        if cmdline_args.use_binary_stars.upper() == 'NGC6819':
+            pyplot.plot([2.1, 18.0], [0, 0.6], '-k')
+        else:
+            pyplot.plot([3.0, 20.0], [0, 0.6], '-k')
         pyplot.xlim((2.0, 100))
 
 

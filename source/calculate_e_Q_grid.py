@@ -201,6 +201,8 @@ def main():
     orbital_evolution_library.read_eccentricity_expansion_coefficients(
         cmdline_args.eccentricity_expansion_coefficients.encode('ascii')
     )
+    if cmdline_args.use_binary_stars.upper() == 'NGC6819':
+        return
 
     evolution_systems = []
     if cmdline_args.nasa_data:
@@ -231,8 +233,14 @@ def main():
                 pass
     if cmdline_args.use_binary_stars:
         evolution_systems.extend(
-            filter(lambda s: s.orbital_period < 50.0 * units.day,
-                   read_geller_et_al_2009_binaries())
+            filter(
+                lambda s: s.orbital_period < 50.0 * units.day,
+                (
+                    read_geller_et_al_2009_binaries()
+                    if cmdline_args.use_binary_stars.upper() == 'NGC188' else
+                    read_milliman_et_al_2014_binaries()
+                )
+            )
         )
 
     if cmdline_args.orbital_period is not None:

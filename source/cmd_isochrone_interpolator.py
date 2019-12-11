@@ -51,7 +51,7 @@ class IsochroneFileIterator:
 
             yield self._line
             self._line = self._isochrone.readline()
-            while self._line[0] != '#':
+            while self._line == '' or self._line[0] != '#':
                 if self._line == '':
                     return
                 yield self._line
