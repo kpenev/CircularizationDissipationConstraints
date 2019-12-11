@@ -7,8 +7,11 @@ import scipy.integrate
 
 def fit_single_mass(photometry_interp,
                     photometry,
+                    *,
                     magnitude_template="%(filchar)c'mag",
-                    error_template="e_%(filchar)c'mag"):
+                    magnitude_error_template="e_%(filchar)c'mag",
+                    color_template=None,
+                    color_error_template=None):
     """
     Find single star best fit mass for a subset of USNO u', g', r', i', z' mags.
 
@@ -25,24 +28,52 @@ def fit_single_mass(photometry_interp,
             should expand to the key giving a particular magnitude measured
             nominal value.
 
-        error_template(str):    A %(filchar)c-substitution template that
-            should expand to the key giving a particular magnitude error.
+        magnitude_error_template(str):    A %(filchar)c-substitution template
+            that should expand to the key giving a particular magnitude error.
 
+        color_template(None or str):    If None, individual colors are fit. If
+            not None, it is assumed that ``photometry`` contains color
+            information (not just magnitudes), so masses are derived by fitting
+            color--magnitude digramse. In the latter case, this argument should
+            be contain a %(filchar1)c and %(filchar2)c substitutions, expanding
+            to the key in ``photometry`` giving a particular measured color
+            nominal value. Colors are always assumed to be magnitude in the
+            bluer band minus the magnitude in the redder band.
+
+        color_error_template(None or str):    The error estimate of
+            ``color_template``.
 
     Returns:
         The stellar mass which best reproduces the given measurements,
         assuming gaussian errors.
     """
 
-    def get_magnitude(filchar):
-        """Return the nominal measured magnitude in the given filter."""
+    def get_magnitude_term(theoretical_value, filchar):
+        """Return the negative log-likelihood for the given filter."""
 
-        return photometry[magnitude_template % dict(filchar=filchar)]
+        return (
+            (
+                theoretical_value
+                -
+                photometry[magnitude_template % dict(filchar=filchar)]
+            )
+            /
+            photometry[magnitude_error_template % dict(filchar=filchar)]
+        )**2
 
-    def get_error(filchar):
-        """Return the measurement error estimate in the given filter."""
+    def get_color_term(theoretical_value, filchar1, filchar2):
+        """Return the nominal measured color for the two given filters."""
 
-        return photometry[error_template % dict(filchar=filchar)]
+        substitution = dict(filchar1=filchar1, filchar2=filchar2)
+        return (
+            (
+                theoretical_value
+                -
+                photometry[color_template % substitution]
+            )
+            /
+            photometry[color_error_template % substitution]
+        )**2
 
     def check_magnitude(filchar):
         """Return True iff the given magnitude has a measurement & error."""
@@ -50,7 +81,18 @@ def fit_single_mass(photometry_interp,
         return (
             magnitude_template % dict(filchar=filchar) in photometry
             and
-            error_template % dict(filchar=filchar) in photometry
+            magnitude_error_template % dict(filchar=filchar) in photometry
+        )
+
+    def check_color(filchar1, filchar2):
+        """Return True iff the given color has a measurement & error."""
+
+        return (
+            color_template % dict(filchar1=filchar1,
+                                  filchar2=filchar2) in photometry
+            and
+            color_error_template % dict(filchar1=filchar1,
+                                        filchar2=filchar2) in photometry
         )
 
     def get_square_diff(theoretical_magnitudes):
@@ -64,15 +106,29 @@ def fit_single_mass(photometry_interp,
                 photometry_interp.filchars
         ):
             if check_magnitude(filter_character):
-                grid_square_diff += (
-                    (
-                        theoretical_magnitudes[filter_index]
-                        -
-                        get_magnitude(filter_character)
-                    )
-                    /
-                    get_error(filter_character)
-                )**2
+                grid_square_diff += get_magnitude_term(
+                    theoretical_magnitudes[filter_index],
+                    filter_character
+                )
+
+        if color_template:
+            assert color_error_template
+            for index1, filchar1 in enumerate(
+                    photometry_interp.filchars
+            ):
+                for index2 in range(index1 + 1,
+                                    len(photometry_interp.filchars)):
+                    filchar2 = photometry_interp.filchars[index2]
+                    if check_color(filchar1, filchar2):
+                        grid_square_diff += get_color_term(
+                            (
+                                theoretical_magnitudes[index1]
+                                -
+                                theoretical_magnitudes[index2]
+                            ),
+                            filchar1,
+                            filchar2
+                        )
         return grid_square_diff
 
     best_grid_index = get_square_diff(
@@ -229,13 +285,15 @@ def double_lined_orbit_log_likelihood(primary_mass,
         )
     )
 
-def fit_binary_masses(*,
-                      photometry_interp,
+def fit_binary_masses(photometry_interp,
                       photometry,
                       distance_modulus,
+                      *,
                       min_mag_difference=None,
                       magnitude_template="%(filchar)cmag",
                       error_template="e_%(filchar)cmag",
+                      color_template=None,
+                      color_error_template=None,
                       **rv_parameters):
     r"""
     Find the best fit masses for stars in a binary given RV and photometry.
@@ -256,7 +314,11 @@ def fit_binary_masses(*,
         magnitude_template:    See same name argument to
             :func:`fit_single_mass`.
 
-        error_template:    See same name argument to
+        error_template:    See same name argument to :func:`fit_single_mass`.
+
+        color_template:     See same name argument to :func:`fit_single_mass`.
+
+        color_error_template:     See same name argument to
             :func:`fit_single_mass`.
 
         rv_parameters:    Either the ``observed_mass_function`` and
