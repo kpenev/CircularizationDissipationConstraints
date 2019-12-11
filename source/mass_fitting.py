@@ -291,7 +291,7 @@ def fit_binary_masses(photometry_interp,
                       *,
                       min_mag_difference=None,
                       magnitude_template="%(filchar)cmag",
-                      error_template="e_%(filchar)cmag",
+                      magnitude_error_template="e_%(filchar)cmag",
                       color_template=None,
                       color_error_template=None,
                       **rv_parameters):
@@ -335,6 +335,71 @@ def fit_binary_masses(photometry_interp,
             are Gaussian.
     """
 
+    def update_negative_log_likelihood(*,
+                                       filchar,
+                                       predicted,
+                                       result,
+                                       rh_filchar=None):
+        """
+        Add to result the negative log-likelihood for a single magnitude/color.
+
+        Args:
+            filchar(1-char string):    The filter to add the negative
+                log-likelihood for (if ``lh_filchar`` is ``None``), or the LH
+                filter of the color difference being added.
+
+            predicted(array):    The predicted value(s) for the magnitude or
+                color.
+
+            result(array):    The array to add the negative log-likelihood to.
+
+            rh_filchar(1-char string or None):    If None the log-likelihood for
+                a single magnitude is added, if not None, this is the RH filter
+                defining the color to add the log-likelihood for.
+        """
+
+        try:
+            if rh_filchar is None:
+                observed = photometry[magnitude_template
+                                      %
+                                      dict(filchar=filchar)]
+                stddev = photometry[magnitude_error_template
+                                    %
+                                    dict(filchar=filchar)]
+            else:
+                observed = photometry[color_template
+                                      %
+                                      dict(filchar1=filchar,
+                                           filchar2=rh_filchar)]
+                stddev = photometry[color_error_template
+                                    %
+                                    dict(filchar1=filchar,
+                                         filchar2=rh_filchar)]
+        except KeyError:
+            return
+
+        try:
+            sigma = float(stddev)
+        except TypeError:
+            sigma = stddev[0 if predicted <= observed else 1]
+
+        if (
+                not scipy.isfinite(sigma)
+                or
+                not scipy.isfinite(observed)
+        ):
+            return
+
+        #False positive
+        #pylint: disable=assignment-from-no-return
+        update = scipy.isfinite(predicted)
+        #pylint: enable=assignment-from-no-return
+        result[update] += (
+            observed - predicted[update]
+        )**2 / (
+            2.0 * sigma**2
+        )
+
     def negative_log_likelihood(masses):
         """Return -log(likelihood) of the data given stellar masses."""
 
@@ -356,35 +421,25 @@ def fit_binary_masses(photometry_interp,
         )
 
 
-        for filchar, predicted in zip(photometry_interp.filchars,
-                                      predicted_photometry):
-            try:
-                observed = photometry[magnitude_template
-                                      %
-                                      dict(filchar=filchar)]
-                stddev = photometry[error_template % dict(filchar=filchar)]
-            except ValueError:
-                continue
+        for filchar_index, (filchar, predicted) in enumerate(
+                zip(photometry_interp.filchars, predicted_photometry)
+        ):
+            update_negative_log_likelihood(filchar=filchar,
+                                           predicted=predicted,
+                                           result=result)
+            if color_template is not None:
+                assert color_error_template is not None
 
-            try:
-                sigma = float(stddev)
-            except TypeError:
-                sigma = stddev[0 if predicted <= observed else 1]
-
-            if (
-                    not scipy.isfinite(sigma)
-                    or
-                    not scipy.isfinite(observed)
-            ):
-                continue
-
-            update = scipy.isfinite(predicted)
-            result[update] += (
-                observed - predicted[update]
-            )**2 / (
-                2.0 * sigma**2
-            )
-
+                for rh_filchar, rh_predicted in zip(
+                        photometry_interp.filchars[filchar_index + 1:],
+                        predicted_photometry[filchar_index + 1:]
+                ):
+                    update_negative_log_likelihood(
+                        filchar=filchar,
+                        rh_filchar=rh_filchar,
+                        predicted=(predicted - rh_predicted),
+                        result=result
+                    )
         return result
 
     def mag_difference_constraints(masses):
@@ -402,48 +457,47 @@ def fit_binary_masses(photometry_interp,
         ]
         return min(defficiencies)
 
-    mass_grid = scipy.meshgrid(
-        photometry_interp.data[0]['Mini'][1:-1],
-        photometry_interp.data[0]['Mini'][1:-1]
-    )
+    def choose_starting_point():
+        """Return a good starting point for the minimization."""
 
-
-    log_likelihood_grid = negative_log_likelihood((
-        mass_grid
-    ))
-
-    if min_mag_difference:
-        grid_constraints = mag_difference_constraints(mass_grid)
-        log_likelihood_grid[grid_constraints < 0] = scipy.inf
-    best_indices = scipy.stack(
-        reversed(
-            sorted(
-                scipy.unravel_index(scipy.argmin(log_likelihood_grid),
-                                    log_likelihood_grid.shape)
-            )
+        mass_grid = scipy.meshgrid(
+            photometry_interp.data[0]['Mini'][1:-1],
+            photometry_interp.data[0]['Mini'][1:-1]
         )
-    )
-    best_masses = photometry_interp.data[0]['Mini'][best_indices]
-    print('Best masses: ' + repr(best_masses))
-    print('Mass box: '
-          +
-          repr(photometry_interp.data[0]['Mini'][best_indices - 1])
-          +
-          ' - '
-          +
-          repr(photometry_interp.data[0]['Mini'][best_indices + 1]))
 
-    mass_bounds = scipy.optimize.Bounds(
-        lb=photometry_interp.data[0]['Mini'][0] + 0.01,
-        ub=photometry_interp.data[0]['Mini'][
-            photometry_interp.data[0]['Mini'].size - 1,
-        ] - 0.01,
-        keep_feasible=True
-    )
+
+        log_likelihood_grid = negative_log_likelihood((
+            mass_grid
+        ))
+
+        if min_mag_difference:
+            grid_constraints = mag_difference_constraints(mass_grid)
+            log_likelihood_grid[grid_constraints < 0] = scipy.inf
+
+        best_masses = photometry_interp.data[0]['Mini'][
+            scipy.stack(
+                reversed(
+                    sorted(
+                        scipy.unravel_index(scipy.argmin(log_likelihood_grid),
+                                            log_likelihood_grid.shape)
+                    )
+                )
+            )
+        ]
+        print('Best masses: ' + repr(best_masses))
+
+        return best_masses
+
     return scipy.optimize.minimize(
         fun=negative_log_likelihood,
-        x0=best_masses,
-        bounds=mass_bounds,
+        x0=choose_starting_point(),
+        bounds=scipy.optimize.Bounds(
+            lb=photometry_interp.data[0]['Mini'][0] + 0.01,
+            ub=photometry_interp.data[0]['Mini'][
+                photometry_interp.data[0]['Mini'].size - 1,
+            ] - 0.01,
+            keep_feasible=True
+        ),
         constraints=(
             dict(
                 type='ineq',

@@ -70,7 +70,7 @@ def fit_all_binaries(interpolator,
                 min_mag_difference=(None if is_double_lined
                                     else {min_mag_difference_filchar: 2.5}),
                 magnitude_template=observed_phot_template,
-                error_template=('e_' + observed_phot_template),
+                magnitude_error_template=('e_' + observed_phot_template),
                 **rv_params
             )
             primary_m, secondary_m = result.x
