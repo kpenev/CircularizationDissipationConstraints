@@ -34,7 +34,11 @@ def plot_bostanci_cmd(interpolator, photometry, distance_modulus):
     pyplot.ylim(-20, -13)
     pyplot.show()
 
-def plot_miliman_cmd(interpolator, photometry, distance_modulus):
+def plot_miliman_cmd(interpolator,
+                     photometry,
+                     distance_modulus,
+                     single_lined_binaries,
+                     double_lined_binaries):
     """Create a color-magnitude diagram of NGC 6819."""
 
     single_member_phot = photometry[photometry['Mm'] == b'SM ']
@@ -42,19 +46,70 @@ def plot_miliman_cmd(interpolator, photometry, distance_modulus):
     interp_masses = interpolator.data[0]['Mini']
     predicted_photometry = interpolator(interp_masses) + distance_modulus
 
-    pyplot.plot(predicted_photometry[2] - predicted_photometry[4],
-                -predicted_photometry[2],
-                '-y',
-                linewidth=5,
-                zorder=10)
-
-    pyplot.plot(single_member_phot['V-I'],
-                -single_member_phot['Vmag'],
-                'ok',
-                zorder=0)
-    pyplot.xlim(0, 2)
-    pyplot.ylim(-20, -13)
-    pyplot.show()
+    for is_double_lined, binary_data in [(False, single_lined_binaries),
+                                         (True, double_lined_binaries)]:
+        for _, binary in binary_data.iterrows():
+            binary_individual_photometry = interpolator(
+                [binary['m1_fit'], binary['m2_fit']]
+            ) + distance_modulus
+            binary_combined_photometry = interpolator.get_binary_magnitudes(
+                binary['m1_fit'],
+                binary['m2_fit']
+            ) + distance_modulus
+            pyplot.plot(predicted_photometry[2] - predicted_photometry[4],
+                        -predicted_photometry[2],
+                        '-y',
+                        linewidth=5,
+                        zorder=10)
+            pyplot.plot(single_member_phot['V-I'],
+                        -single_member_phot['Vmag'],
+                        'ok',
+                        zorder=0)
+            pyplot.plot(single_lined_binaries['V-I'].values,
+                        -single_lined_binaries['Vmag'].values,
+                        'or',
+                        zorder=20,
+                        markerfacecolor='none',
+                        markeredgewidth=3)
+            pyplot.plot(double_lined_binaries['V-I'].values,
+                        -double_lined_binaries['Vmag'].values,
+                        'og',
+                        zorder=30,
+                        markerfacecolor='none',
+                        markeredgewidth=3)
+            pyplot.plot(binary['V-I'],
+                        -binary['Vmag'],
+                        'x' + ('g' if is_double_lined else 'r'),
+                        markersize=20,
+                        markeredgewidth=5,
+                        zorder=40)
+            pyplot.plot(
+                (
+                    binary_individual_photometry[2]
+                    -
+                    binary_individual_photometry[4]
+                ),
+                -binary_individual_photometry[2],
+                '+b',
+                markersize=20,
+                markeredgewidth=5,
+                zorder=40
+            )
+            pyplot.plot(
+                (
+                    binary_combined_photometry[2]
+                    -
+                    binary_combined_photometry[4]
+                ),
+                -binary_combined_photometry[2],
+                '+c',
+                markersize=20,
+                markeredgewidth=5,
+                zorder=40
+            )
+            pyplot.xlim(0, 2)
+            pyplot.ylim(-17, -11)
+            pyplot.show()
 
 def plot_hole_cmd(interpolator, photometry, distance_modulus):
     """Create a color-magnitude diagram of NGC 6819."""
@@ -107,7 +162,10 @@ def fit_milliman(single_lined_data,
 
     for is_double_lined, binary_data in [(False, single_lined_data),
                                          (True, double_lined_data)]:
-        for _, binary in binary_data.iterrows():
+        m1_series = pandas.Series(index=binary_data.index)
+        m2_series = pandas.Series(index=binary_data.index)
+
+        for binary_ind, binary in binary_data.iterrows():
             if is_double_lined:
                 rv_params = dict(
                     observed_mass_ratio=binary['q'],
@@ -121,7 +179,7 @@ def fit_milliman(single_lined_data,
                     observed_mass_function_err=binary['e_f(m)']
                 )
 
-            result = fit_binary_masses(
+            (m1_series[binary_ind], m2_series[binary_ind]) = fit_binary_masses(
                 photometry_interp=interpolator,
                 photometry=binary,
                 distance_modulus=distance_modulus,
@@ -132,7 +190,9 @@ def fit_milliman(single_lined_data,
                 color_template='%(filchar1)c-%(filchar2)c',
                 color_error_template='e_%(filchar1)c-%(filchar2)c',
                 **rv_params
-            )
+            ).x
+        binary_data['m1_fit'] = m1_series
+        binary_data['m2_fit'] = m2_series
 
 def main():
     """Avoid polluting global namespace."""
@@ -141,7 +201,7 @@ def main():
         '../data/CMD_2.5Gyr_isochrone_Av0.35_FeH0.09_UBVRIJHK.dat'
     )
     milliman_interpolator = CMDPhotometryInterpolator(
-        '../data/CMD_2.5Gyr_isochrone_Av0.5_FeH0.09_UBVRIJHK.dat'
+        '../data/CMD_2.5Gyr_isochrone_Av0.45_FeH0.09_UBVRIJHK.dat'
     )
     milliman_photometry = read_cds_pipe_table(
         '../data/Milliman_et_al_14_NGC6819_RV_summary_with_VIphotometry.tsv'
@@ -178,9 +238,17 @@ def main():
         '../data/Bostanci_et_al_16_NGC6819_UBV_photometry.tsv'
     )
 #    plot_hole_cmd(milliman_interpolator, hole_photometry, 11.85)
-#    plot_miliman_cmd(milliman_interpolator, milliman_photometry, 11.85)
 #    plot_bostanci_cmd(bostanci_interpolator, bostanci_photometry, 12.0)
     fit_milliman(single_lined_data, double_lined_data, milliman_interpolator)
+    print(80*'=' + '\nSingle line binaries\n' + 80 * '=')
+    print(repr(single_lined_data))
+    print(80*'=' + '\nDouble line binaries\n' + 80 * '=')
+    print(repr(double_lined_data))
+    plot_miliman_cmd(milliman_interpolator,
+                     milliman_photometry,
+                     11.85,
+                     single_lined_data,
+                     double_lined_data)
 
 if __name__ == '__main__':
     main()
