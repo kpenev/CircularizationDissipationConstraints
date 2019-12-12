@@ -282,10 +282,10 @@ def read_geller_et_al_2009_binaries(
     ngc188_age = get_quantity(6.3, 0.2, 0.2, 'Gyr')
     ngc188_feh = get_quantity(0.21, 0.03, 0.03, '')
 
-    create_binary_star_systems(single_lined_data,
-                               double_lined_data,
-                               ngc188_age,
-                               ngc188_feh)
+    return create_binary_star_systems(single_lined_data,
+                                      double_lined_data,
+                                      ngc188_age,
+                                      ngc188_feh)
 
 def init_progress_pickle(cmdline_args):
     """

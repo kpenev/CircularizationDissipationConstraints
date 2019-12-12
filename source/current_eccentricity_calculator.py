@@ -100,6 +100,10 @@ class CurrentEccentricityCalculator:
         system, lgQ = job
         #pylint: enable=invalid-name
 
+        if system.primary_mass > 1.2 * units.M_sun:
+            print('Skipping %s, lgQ = %g' % (system.hostname, lgQ))
+            return None
+
         print('Trying %s, lgQ = %g' % (system.hostname, lgQ))
 
         default_dissipation = dict(

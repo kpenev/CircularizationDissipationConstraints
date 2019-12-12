@@ -523,7 +523,13 @@ def get_system_list(cmdline_args, interpolator=None):
     #pylint: enable=no-member
 
     if getattr(cmdline_args, 'use_binary_stars', None):
-        systems.extend(read_geller_et_al_2009_binaries())
+        systems.extend(
+            (
+                read_geller_et_al_2009_binaries()
+                if cmdline_args.use_binary_stars.upper() == 'NGC188' else
+                read_milliman_et_al_2014_binaries()
+            )
+        )
 
     if cmdline_args.pickle_systems:
         with open(cmdline_args.pickle_systems, 'ab') as system_pickle:
