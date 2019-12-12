@@ -130,7 +130,7 @@ class CurrentEccentricityCalculator:
                 default_dissipation,
                 reference_phase_lag=phase_lag(lgQ)
             )
-            if system.secondary_mass > 1.2:
+            if system.secondary_mass > 1.2 * units.M_sun:
                 secondary_dissipation = None
         else:
             primary_dissipation = None
@@ -152,7 +152,7 @@ class CurrentEccentricityCalculator:
                 max_age=system.age,
                 secondary_is_star=(check_if_secondary_is_star(system)
                                    and
-                                   system.secondary_mass <= 1.2),
+                                   system.secondary_mass <= 1.2 * units.M_sun),
             )
         except AssertionError:
             print('Failed %s, lgQ = %g, e0 = %g' % (system.hostname,

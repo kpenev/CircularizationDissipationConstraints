@@ -19,6 +19,7 @@ from binary_utils import calculate_secondary_mass
 from io_utilities import\
     get_nasa_system,\
     read_geller_et_al_2009_binaries,\
+    read_milliman_et_al_2014_binaries,\
     init_progress_pickle
 from command_line_utilities import\
     fix_system_units,\
@@ -201,8 +202,6 @@ def main():
     orbital_evolution_library.read_eccentricity_expansion_coefficients(
         cmdline_args.eccentricity_expansion_coefficients.encode('ascii')
     )
-    if cmdline_args.use_binary_stars.upper() == 'NGC6819':
-        return
 
     evolution_systems = []
     if cmdline_args.nasa_data:
@@ -249,6 +248,10 @@ def main():
                                 interpolator,
                                 cmdline_args.small_planet_density)
         )
+
+    print('Evolution systems (%d): ' % len(evolution_systems)
+          +
+          repr(evolution_systems))
 
     grid_jobs = [
         (system, lgQ)

@@ -115,7 +115,7 @@ def create_binary_star_systems(single_lined_data, double_lined_data, age, feh):
 
         m1_plus_error = m1_minus_error = 0.1
         m2_plus_error = m2_minus_error = 0.15
-        if record['l_M1']:
+        if 'l_M1' in record and record['l_M1']:
             m1_minus_error = record['M1']
             m2_minus_error = record['M2']
 
@@ -144,7 +144,7 @@ def create_binary_star_systems(single_lined_data, double_lined_data, age, feh):
             )
 
         return SimpleNamespace(
-            hostname=record['PKM'],
+            hostname=(record['PKM'] if 'PKM' in record else record['WOCS']),
             age=age,
             eccentricity=get_quantity(record['e'],
                                       record['e_e'],
@@ -175,9 +175,9 @@ def create_binary_star_systems(single_lined_data, double_lined_data, age, feh):
 
 
     return [
-        create_single_system(record)
+        create_single_system(record[1])
         for record in itertools.chain(double_lined_data.iterrows(),
-                                      single_lined_data.iterrow())
+                                      single_lined_data.iterrows())
     ]
 
 def read_milliman_data(
@@ -237,9 +237,7 @@ def read_milliman_et_al_2014_binaries(
         double_lined_orbits_fname,
         photometry_fname
     )[1:]
-    fit_milliman(single_lined_data,
-                 double_lined_data,
-                 plot_photometry=None)
+    fit_milliman(single_lined_data, double_lined_data)
     return create_binary_star_systems(
         single_lined_data,
         double_lined_data,
