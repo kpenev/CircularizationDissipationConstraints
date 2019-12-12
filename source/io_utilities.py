@@ -2,6 +2,7 @@
 
 import os.path
 import pickle
+import itertools
 from types import SimpleNamespace
 
 from astropy import units
@@ -9,6 +10,7 @@ import numpy
 import pandas
 
 from planetary_system_io import read_cds_pipe_table
+from fit_ngc6819_masses import fit_milliman
 
 def get_nasa_system(system_id, nasa_systems):
     """
@@ -26,7 +28,7 @@ def get_nasa_system(system_id, nasa_systems):
             the evolution of the system.
     """
 
-    def get_quantity(system_index, column_name):
+    def get_system_quantity(system_index, column_name):
         """Return a properly formatted Quantity instance with errors."""
 
         print('Getting '
@@ -66,25 +68,25 @@ def get_nasa_system(system_id, nasa_systems):
 
     result = SimpleNamespace(
         hostname=nasa_systems.pl_hostname[system_index],
-        star_density=get_quantity(system_index, 'st_dens'),
-        db_star_mass=get_quantity(system_index, 'st_mass'),
-        db_star_age=get_quantity(system_index, 'st_age'),
-        db_star_radius=get_quantity(system_index, 'st_rad'),
-        db_planet_mass=get_quantity(system_index, 'pl_bmassj'),
-        db_planet_radius=get_quantity(system_index, 'pl_radj'),
-        planet_to_star_radius_ratio=get_quantity(system_index,
-                                                 'pl_ratror'),
-        teff=get_quantity(system_index, 'st_teff'),
-        feh=get_quantity(system_index, 'st_metfe'),
-        logg=get_quantity(system_index, 'st_logg'),
-        rv_semi_amplitude=get_quantity(system_index, 'pl_rvamp'),
-        eccentricity=get_quantity(system_index, 'pl_orbeccen'),
+        star_density=get_system_quantity(system_index, 'st_dens'),
+        db_star_mass=get_system_quantity(system_index, 'st_mass'),
+        db_star_age=get_system_quantity(system_index, 'st_age'),
+        db_star_radius=get_system_quantity(system_index, 'st_rad'),
+        db_planet_mass=get_system_quantity(system_index, 'pl_bmassj'),
+        db_planet_radius=get_system_quantity(system_index, 'pl_radj'),
+        planet_to_star_radius_ratio=get_system_quantity(system_index,
+                                                        'pl_ratror'),
+        teff=get_system_quantity(system_index, 'st_teff'),
+        feh=get_system_quantity(system_index, 'st_metfe'),
+        logg=get_system_quantity(system_index, 'st_logg'),
+        rv_semi_amplitude=get_system_quantity(system_index, 'pl_rvamp'),
+        eccentricity=get_system_quantity(system_index, 'pl_orbeccen'),
         eccentricity_limit=(nasa_systems.pl_orbeccenlim[system_index] > 0.5),
-        semimajor_to_rstar_ratio=get_quantity(system_index, 'pl_ratdor'),
-        orbital_period=get_quantity(system_index, 'pl_orbper'),
-        semimajor=get_quantity(system_index, 'pl_orbsmax'),
-        impact_parameter=get_quantity(system_index, 'pl_imppar'),
-        transit_duration=get_quantity(system_index, 'pl_trandur')
+        semimajor_to_rstar_ratio=get_system_quantity(system_index, 'pl_ratdor'),
+        orbital_period=get_system_quantity(system_index, 'pl_orbper'),
+        semimajor=get_system_quantity(system_index, 'pl_orbsmax'),
+        impact_parameter=get_system_quantity(system_index, 'pl_imppar'),
+        transit_duration=get_system_quantity(system_index, 'pl_trandur')
     )
     return result
 
@@ -105,67 +107,11 @@ def get_quantity(value, plus_error, minus_error, unit):
     )
     return result
 
-def read_milliman_et_al_2014_binaries(
-        single_lined_orbits_fname=(
-            '../data/Milliman_et_al_2014_WIYN_single_lined_orbits.tsv'
-        ),
-        double_lined_orbits_fname=(
-            '../data/Milliman_et_al_2014_WIYN_double_lined_orbits.tsv'
-        )
-):
-    """Read Geller et al 2009 NGC6819 binaries in format like that of exopl."""
+def create_binary_star_systems(single_lined_data, double_lined_data, age, feh):
+    """Return a properly created system from the given record."""
 
-    def create_system(record):
-        """Return a properly created system from the given binary record."""
-
-        return SimpleNamespace(
-            hostname=record['WOCS'],
-            age=get_quantity(2.6, 0.25, 0.25, 'Gyr'),
-            eccentricity=get_quantity(record['e'],
-                                      record['e_e'],
-                                      record['e_e'],
-                                      ''),
-            eccentricity_limit=False,
-            feh=get_quantity(0.09, 0.03, 0.03, ''),
-            orbital_period=get_quantity(record['Per'],
-                                        record['e_Per'],
-                                        record['e_Per'],
-                                        'day'),
-            primary_mass=get_quantity(numpy.nan,
-                                      numpy.nan,
-                                      numpy.nan,
-                                      'M_sun'),
-            secondary_mass=get_quantity(numpy.nan,
-                                        numpy.nan,
-                                        numpy.nan,
-                                        'M_sun')
-        )
-
-    single_lined_data = read_cds_pipe_table(single_lined_orbits_fname)
-    double_lined_data = read_cds_pipe_table(single_lined_orbits_fname)
-    print('double_lined_data:' + repr(double_lined_data))
-
-    return (
-        [create_system(record) for record in double_lined_data]
-        +
-        [create_system(record) for record in single_lined_data]
-    )
-
-def read_geller_et_al_2009_binaries(
-        single_lined_orbits_fname=(
-            '../data/Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
-        ),
-        double_lined_orbits_fname=(
-            '../data/Geller_et_al_2009_WIYN_double_lined_orbits.tsv'
-        ),
-        physical_parameters_fname=(
-            '../data/Geller_et_al_2009_WIYN_physical_parameters.tsv'
-        )
-):
-    """Read Geller et al 2009 NGC 188 binaries in format like that of exopl."""
-
-    def create_system(record):
-        """Return a properly created system from the given record."""
+    def create_single_system(record):
+        """Create a single system from the given record."""
 
         m1_plus_error = m1_minus_error = 0.1
         m2_plus_error = m2_minus_error = 0.15
@@ -173,27 +119,44 @@ def read_geller_et_al_2009_binaries(
             m1_minus_error = record['M1']
             m2_minus_error = record['M2']
 
+        if record['M1'] > 1.2:
+            masses = dict(
+                primary_mass=get_quantity(record['M2'],
+                                          m2_plus_error,
+                                          m2_minus_error,
+                                          'M_sun'),
+                secondary_mass=get_quantity(record['M1'],
+                                            m1_plus_error,
+                                            m1_minus_error,
+                                            'M_sun'),
+                secondary_radius=get_quantity(1.0, 0.1, 0.1, 'R_sun')
+            )
+        else:
+            masses = dict(
+                primary_mass=get_quantity(record['M1'],
+                                          m1_plus_error,
+                                          m1_minus_error,
+                                          'M_sun'),
+                secondary_mass=get_quantity(record['M2'],
+                                            m2_plus_error,
+                                            m2_minus_error,
+                                            'M_sun')
+            )
+
         return SimpleNamespace(
             hostname=record['PKM'],
-            age=get_quantity(6.3, 0.2, 0.2, 'Gyr'),
+            age=age,
             eccentricity=get_quantity(record['e'],
                                       record['e_e'],
                                       record['e_e'],
                                       ''),
             eccentricity_limit=False,
-            feh=get_quantity(0.21, 0.03, 0.03, ''),
+            feh=feh,
             orbital_period=get_quantity(record['Per'],
                                         record['e_Per'],
                                         record['e_Per'],
                                         'day'),
-            primary_mass=get_quantity(record['M1'],
-                                      m1_plus_error,
-                                      m1_minus_error,
-                                      'M_sun'),
-            secondary_mass=get_quantity(record['M2'],
-                                        m2_plus_error,
-                                        m2_minus_error,
-                                        'M_sun')
+            **masses
         )
 
         #Parameters defined for planetary systems but not here.
@@ -208,6 +171,94 @@ def read_geller_et_al_2009_binaries(
         #star_density=<Quantity nan g / cm3>,
         #teff=<Quantity 4128. K>,
         #transit_duration=<Quantity 0.0804 d>
+
+
+
+    return [
+        create_single_system(record)
+        for record in itertools.chain(double_lined_data.iterrows(),
+                                      single_lined_data.iterrow())
+    ]
+
+def read_milliman_data(
+        single_lined_orbits_fname=(
+            '../data/Milliman_et_al_14_NGC6819_RV_single_lined_orbits.tsv'
+        ),
+        double_lined_orbits_fname=(
+            '../data/Milliman_et_al_14_NGC6819_RV_double_lined_orbits.tsv'
+        ),
+        photometry_fname=(
+            '../data/Milliman_et_al_14_NGC6819_RV_summary_with_VIphotometry.tsv'
+        )
+):
+    """Read the data from the Milliman et al (2014) tables as pandas frames."""
+
+    photometry = pandas.DataFrame(read_cds_pipe_table(photometry_fname))
+
+    single_lined_data = pandas.merge(
+        pandas.DataFrame(
+            read_cds_pipe_table(single_lined_orbits_fname)
+        ),
+        photometry,
+        on='WOCS'
+    )
+    double_lined_data = pandas.merge(
+        pandas.DataFrame(
+            read_cds_pipe_table(double_lined_orbits_fname)
+        ),
+        photometry,
+        on='WOCS'
+    )
+    single_lined_data['e_Vmag'] = pandas.Series(0.02, single_lined_data.index)
+    single_lined_data['e_V-I'] = pandas.Series(0.03, single_lined_data.index)
+
+    double_lined_data['e_Vmag'] = pandas.Series(0.02, double_lined_data.index)
+    double_lined_data['e_V-I'] = pandas.Series(0.03, double_lined_data.index)
+
+    return photometry, single_lined_data, double_lined_data
+
+def read_milliman_et_al_2014_binaries(
+        single_lined_orbits_fname=(
+            '../data/Milliman_et_al_2014_WIYN_single_lined_orbits.tsv'
+        ),
+        double_lined_orbits_fname=(
+            '../data/Milliman_et_al_2014_WIYN_double_lined_orbits.tsv'
+        ),
+        photometry_fname=(
+            '../data/Milliman_et_al_14_NGC6819_RV_summary_with_VIphotometry.tsv'
+        )
+):
+    """Read Milliman et al 2014 NGC6819 binaries in format like that of exopl."""
+
+    ngc6819_age = get_quantity(2.6, 0.25, 0.25, 'Gyr')
+    ngc6819_feh = get_quantity(0.09, 0.03, 0.03, '')
+    single_lined_data, double_lined_data = read_milliman_data(
+        single_lined_orbits_fname,
+        double_lined_orbits_fname,
+        photometry_fname
+    )[1:]
+    fit_milliman(single_lined_data,
+                 double_lined_data,
+                 plot_photometry=None)
+    return create_binary_star_systems(
+        single_lined_data,
+        double_lined_data,
+        ngc6819_age,
+        ngc6819_feh
+    )
+
+def read_geller_et_al_2009_binaries(
+        single_lined_orbits_fname=(
+            '../data/Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
+        ),
+        double_lined_orbits_fname=(
+            '../data/Geller_et_al_2009_WIYN_double_lined_orbits.tsv'
+        ),
+        physical_parameters_fname=(
+            '../data/Geller_et_al_2009_WIYN_physical_parameters.tsv'
+        )
+):
+    """Read Geller et al 2009 NGC 188 binaries in format like that of exopl."""
 
     physical_parameters = pandas.DataFrame(
         read_cds_pipe_table(physical_parameters_fname)
@@ -230,11 +281,13 @@ def read_geller_et_al_2009_binaries(
     print('single lined data: ' + repr(single_lined_data))
     print('double lined data: ' + repr(double_lined_data))
 
-    return (
-        [create_system(record[1]) for record in double_lined_data.iterrows()]
-        +
-        [create_system(record[1]) for record in single_lined_data.iterrows()]
-    )
+    ngc188_age = get_quantity(6.3, 0.2, 0.2, 'Gyr')
+    ngc188_feh = get_quantity(0.21, 0.03, 0.03, '')
+
+    create_binary_star_systems(single_lined_data,
+                               double_lined_data,
+                               ngc188_age,
+                               ngc188_feh)
 
 def init_progress_pickle(cmdline_args):
     """

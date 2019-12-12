@@ -4,7 +4,7 @@ import numpy
 from astropy import units
 
 from orbital_evolution.transformations import phase_lag
-from reproduce_system import find_evolution, secondary_is_star
+from reproduce_system import find_evolution, check_if_secondary_is_star
 
 from io_utilities import pickle_new_result
 
@@ -97,10 +97,10 @@ class CurrentEccentricityCalculator:
 
         #lgQ is more readable than alternatives
         #pylint: disable=invalid-name
-        system, lgQ_star = job
+        system, lgQ = job
         #pylint: enable=invalid-name
 
-        print('Trying %s, lgQ = %g' % (system.hostname, lgQ_star))
+        print('Trying %s, lgQ = %g' % (system.hostname, lgQ))
 
         default_dissipation = dict(
             tidal_frequency_breaks=None,
@@ -111,21 +111,27 @@ class CurrentEccentricityCalculator:
 
         if system.hostname in self.progress:
             progress_entry = self.progress[system.hostname]
-            if lgQ_star in progress_entry:
-                progress_entry = progress_entry[lgQ_star]
+            if lgQ in progress_entry:
+                progress_entry = progress_entry[lgQ]
                 assert self.initial_eccentricity == progress_entry[0]
                 return progress_entry[1]
 
+        secondary_dissipation = dict(
+            default_dissipation,
+            reference_phase_lag=phase_lag(lgQ)
+        )
         if numpy.isfinite(self.primary_lgQ):
             primary_dissipation = dict(
                 default_dissipation,
                 reference_phase_lag=phase_lag(self.primary_lgQ)
             )
-        elif secondary_is_star(system):
+        elif check_if_secondary_is_star(system):
             primary_dissipation = dict(
                 default_dissipation,
-                reference_phase_lag=phase_lag(lgQ_star)
+                reference_phase_lag=phase_lag(lgQ)
             )
+            if system.secondary_mass > 1.2:
+                secondary_dissipation = None
         else:
             primary_dissipation = None
 
@@ -135,8 +141,7 @@ class CurrentEccentricityCalculator:
                 interpolator=self.interpolator,
                 dissipation=dict(
                     primary=primary_dissipation,
-                    secondary=dict(default_dissipation,
-                                   reference_phase_lag=phase_lag(lgQ_star))
+                    secondary=secondary_dissipation
                 ),
                 initial_eccentricity=self.initial_eccentricity,
                 #False positive.
@@ -144,11 +149,14 @@ class CurrentEccentricityCalculator:
                 disk_period=(4.0 * units.day),
                 disk_dissipation_age=(5e-3 * units.Gyr),
                 #pylint: enable=no-member
-                max_age=system.age
+                max_age=system.age,
+                secondary_is_star=(check_if_secondary_is_star(system)
+                                   and
+                                   system.secondary_mass <= 1.2),
             )
         except AssertionError:
             print('Failed %s, lgQ = %g, e0 = %g' % (system.hostname,
-                                                    lgQ_star,
+                                                    lgQ,
                                                     self.initial_eccentricity))
             return None
 
@@ -168,7 +176,7 @@ class CurrentEccentricityCalculator:
                 %
                 (
                     system.hostname,
-                    lgQ_star,
+                    lgQ,
                     self.initial_eccentricity,
                     final_eccentricity
                 )
@@ -176,7 +184,7 @@ class CurrentEccentricityCalculator:
 
             self._progress_lock.acquire()
             pickle_new_result(system.hostname,
-                              lgQ_star,
+                              lgQ,
                               self.initial_eccentricity,
                               final_eccentricity,
                               self.progress_pickle_fname)
