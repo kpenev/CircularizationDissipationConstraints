@@ -7,6 +7,15 @@ import numpy
 
 from planetary_system_io import QuantityWithErrors
 
+data_dir = os.path.join(
+    os.path.dirname(
+        os.path.dirname(
+            __file__
+        )
+    ),
+    'data',
+)
+
 def add_info_cmdline_args(parser):
     """Add arguments to a parser to parse required parameters from info file."""
 

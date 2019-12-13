@@ -2,15 +2,21 @@
 
 """Find max likelinhood masses in NGC6819 from photometry and RVs."""
 
+import os.path
+
 import pandas
 
 from cmd_photometry_interpolator import CMDPhotometryInterpolator
 from mass_fitting import fit_binary_masses
+from command_line_utilities import data_dir
 
 def fit_milliman(single_lined_data,
                  double_lined_data,
                  interpolator=CMDPhotometryInterpolator(
-                     '../data/CMD_2.5Gyr_isochrone_Av0.45_FeH0.09_UBVRIJHK.dat'
+                     os.path.join(
+                         data_dir,
+                         'CMD_2.5Gyr_isochrone_Av0.45_FeH0.09_UBVRIJHK.dat'
+                     )
                  ),
                  distance_modulus=11.85):
     """

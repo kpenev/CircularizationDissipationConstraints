@@ -11,6 +11,7 @@ from astropy import units
 import scipy
 
 from planetary_system_io import read_cds_pipe_table
+from command_line_utilities import data_dir
 
 from cmd_isochrone_interpolator import CMDInterpolator
 
@@ -96,7 +97,10 @@ class CMDPhotometryInterpolator(CMDInterpolator):
 
 if __name__ == '__main__':
     ngc_188_photometry = read_cds_pipe_table(
-        '../data/Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
+        os.path.join(
+            data_dir,
+            'Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
+        )
     )
     cluster_members = ngc_188_photometry[ngc_188_photometry['Memb'] > 0.5]
     observed_ubvri = scipy.array((cluster_members["Umag"],
@@ -106,7 +110,10 @@ if __name__ == '__main__':
                                   cluster_members["Imag"]))
 
     interpolator = CMDPhotometryInterpolator(
-        '../data/CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_UBVRIJHK.dat'
+        os.path.join(
+            data_dir,
+            'CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_UBVRIJHK.dat'
+        )
     )
 
     interp_masses = interpolator.data[0]['Mini']

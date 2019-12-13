@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Diagnostic plots for binary mas fitting for NGC6819."""
 
+import os.path
+
 from matplotlib import pyplot
 
 #from planetary_system_io import read_cds_pipe_table
 from cmd_photometry_interpolator import CMDPhotometryInterpolator
 from fit_ngc6819_masses import fit_milliman
-from io_utilities import read_milliman_data
+from io_utilities import read_milliman_data, data_dir
 
 def plot_bostanci_cmd(interpolator, photometry, distance_modulus):
     """Create a color-magnitude diagram of NGC 6819."""
@@ -140,10 +142,16 @@ def main():
     """Avoid polluting global namespace."""
 
 #    bostanci_interpolator = CMDPhotometryInterpolator(
-#        '../data/CMD_2.5Gyr_isochrone_Av0.35_FeH0.09_UBVRIJHK.dat'
+#        os.path.join(
+#            data_dir,
+#            'CMD_2.5Gyr_isochrone_Av0.35_FeH0.09_UBVRIJHK.dat'
+#        )
 #    )
 #    hole_photometry = read_cds_pipe_table(
-#        '../data/Hole_et_al_2009_NGC6819_photometry.tsv'
+#        os.path.join(
+#            data_dir,
+#            'Hole_et_al_2009_NGC6819_photometry.tsv'
+#        )
 #    )
 #    (
 #        milliman_photometry,
@@ -152,7 +160,10 @@ def main():
 #    ) = read_milliman_data()
 
 #    bostanci_photometry = read_cds_pipe_table(
-#        '../data/Bostanci_et_al_16_NGC6819_UBV_photometry.tsv'
+#        os.path.join(
+#            data_dir,
+#            'Bostanci_et_al_16_NGC6819_UBV_photometry.tsv'
+#        )
 #    )
 
     (
@@ -174,7 +185,10 @@ def main():
 
     plot_miliman_cmd(
         CMDPhotometryInterpolator(
-            '../data/CMD_2.5Gyr_isochrone_Av0.45_FeH0.09_UBVRIJHK.dat'
+            os.path.join(
+                data_dir,
+                'CMD_2.5Gyr_isochrone_Av0.45_FeH0.09_UBVRIJHK.dat'
+            )
         ),
         milliman_photometry,
         11.85,

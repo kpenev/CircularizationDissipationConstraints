@@ -3,6 +3,7 @@
 """A test of binary stellar mass fitting using NGC188 from literature."""
 
 import re
+import os.path
 
 from matplotlib import pyplot
 import scipy
@@ -11,6 +12,7 @@ from planetary_system_io import read_cds_pipe_table
 from cmd_photometry_interpolator import CMDPhotometryInterpolator
 from cmd_usno_photometry_interpolator import CMDUSNOPhotometryInterpolator
 from mass_fitting import fit_binary_masses
+from command_line_utilities import data_dir
 
 def fit_all_binaries(interpolator,
                      ngc188_photometry,
@@ -277,14 +279,20 @@ def get_ngc188_usno_photometry():
     """Return a properly formatted field array with USNO filter photometry."""
 
     match_data = scipy.genfromtxt(
-        '../data/Fornal_et_al_cross_Platais_et_al_NGC188_photometry.csv',
+        os.path.join(
+            data_dir,
+            'Fornal_et_al_cross_Platais_et_al_NGC188_photometry.csv'
+        ),
         names=True,
         dtype=None,
         delimiter=',',
         deletechars=''
     )
     photometry = read_cds_pipe_table(
-        '../data/Fornal_et_al_2006_NGC188_photometry.tsv'
+        os.path.join(
+            data_dir,
+            'Fornal_et_al_2006_NGC188_photometry.tsv'
+        )
     )
 
     result_dtype = [(name, (int if name == 'PKM' else dtype[0]))
@@ -309,40 +317,64 @@ def main():
 
     interpolator = {
         'UBVRIJHK': CMDPhotometryInterpolator(
-            '../data/CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_UBVRIJHK.dat'
+            os.path.join(
+                data_dir,
+                'CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_UBVRIJHK.dat'
+            )
         ),
         'sdss': CMDPhotometryInterpolator(
-            '../data/CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_ugriz.dat'
+            os.path.join(
+                data_dir,
+                'CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_ugriz.dat'
+            )
         ),
         'usno': CMDUSNOPhotometryInterpolator(
-            '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat'
+            os.path.join(
+                data_dir,
+                'CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat'
+            )
         )
     }
 
     ngc188_photometry = {
         'UBVRIJHK': read_cds_pipe_table(
-            '../data/Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
+            os.path.join(
+                data_dir,
+                'Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
+            )
         ),
         'usno': get_ngc188_usno_photometry()
     }
     read_cds_pipe_table(
-        '../data/Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
+        os.path.join(
+            data_dir,
+            'Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
+        )
     )
     ngc188_single_lined_binaries = read_cds_pipe_table(
-        '../data/Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
+        os.path.join(
+            data_dir,
+            'Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
+        )
     )
     ngc188_double_lined_binaries = read_cds_pipe_table(
-        '../data/Geller_et_al_2009_WIYN_double_lined_orbits.tsv'
+        os.path.join(
+            data_dir,
+            'Geller_et_al_2009_WIYN_double_lined_orbits.tsv'
+        )
     )
     ngc188_params = read_cds_pipe_table(
-        '../data/Geller_et_al_2009_WIYN_physical_parameters.tsv'
+        os.path.join(
+            data_dir,
+            'Geller_et_al_2009_WIYN_physical_parameters.tsv'
+        )
     )
 
     distance_modulus = {'UBVRIJHK': 11.23,
                         'usno': 11.3}
 
     for filter_set in ['UBVRIJHK', 'usno']:
-        observed_phot_template=(
+        observed_phot_template = (
             "%(filchar)c'mag" if filter_set == 'usno'
             else "%(filchar)cmag"
         )

@@ -11,6 +11,7 @@ import pandas
 
 from planetary_system_io import read_cds_pipe_table
 from fit_ngc6819_masses import fit_milliman
+from command_line_utilities import data_dir
 
 def get_nasa_system(system_id, nasa_systems):
     """
@@ -182,13 +183,22 @@ def create_binary_star_systems(single_lined_data, double_lined_data, age, feh):
 
 def read_milliman_data(
         single_lined_orbits_fname=(
-            '../data/Milliman_et_al_14_NGC6819_RV_single_lined_orbits.tsv'
+            os.path.join(
+                data_dir,
+                'Milliman_et_al_14_NGC6819_RV_single_lined_orbits.tsv'
+            )
         ),
         double_lined_orbits_fname=(
-            '../data/Milliman_et_al_14_NGC6819_RV_double_lined_orbits.tsv'
+            os.path.join(
+                data_dir,
+                'Milliman_et_al_14_NGC6819_RV_double_lined_orbits.tsv'
+            )
         ),
         photometry_fname=(
-            '../data/Milliman_et_al_14_NGC6819_RV_summary_with_VIphotometry.tsv'
+            os.path.join(
+                data_dir,
+                'Milliman_et_al_14_NGC6819_RV_summary_with_VIphotometry.tsv'
+            )
         )
 ):
     """Read the data from the Milliman et al (2014) tables as pandas frames."""
@@ -219,13 +229,22 @@ def read_milliman_data(
 
 def read_milliman_et_al_2014_binaries(
         single_lined_orbits_fname=(
-            '../data/Milliman_et_al_2014_WIYN_single_lined_orbits.tsv'
+            os.path.join(
+                data_dir,
+                'Milliman_et_al_2014_WIYN_single_lined_orbits.tsv'
+            )
         ),
         double_lined_orbits_fname=(
-            '../data/Milliman_et_al_2014_WIYN_double_lined_orbits.tsv'
+            os.path.join(
+                data_dir,
+                'Milliman_et_al_2014_WIYN_double_lined_orbits.tsv'
+            )
         ),
         photometry_fname=(
-            '../data/Milliman_et_al_14_NGC6819_RV_summary_with_VIphotometry.tsv'
+            os.path.join(
+                data_dir,
+                'Milliman_et_al_14_NGC6819_RV_summary_with_VIphotometry.tsv'
+            )
         )
 ):
     """Read Milliman et al 2014 NGC6819 binaries in format like that of exopl."""
@@ -247,13 +266,22 @@ def read_milliman_et_al_2014_binaries(
 
 def read_geller_et_al_2009_binaries(
         single_lined_orbits_fname=(
-            '../data/Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
+            os.path.join(
+                data_dir,
+                'Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
+            )
         ),
         double_lined_orbits_fname=(
-            '../data/Geller_et_al_2009_WIYN_double_lined_orbits.tsv'
+            os.path.join(
+                data_dir,
+                'Geller_et_al_2009_WIYN_double_lined_orbits.tsv'
+            )
         ),
         physical_parameters_fname=(
-            '../data/Geller_et_al_2009_WIYN_physical_parameters.tsv'
+            os.path.join(
+                data_dir,
+                'Geller_et_al_2009_WIYN_physical_parameters.tsv'
+            )
         )
 ):
     """Read Geller et al 2009 NGC 188 binaries in format like that of exopl."""

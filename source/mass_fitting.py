@@ -375,7 +375,7 @@ def fit_binary_masses(photometry_interp,
                                     %
                                     dict(filchar1=filchar,
                                          filchar2=rh_filchar)]
-        except KeyError:
+        except (KeyError, ValueError):
             return
 
         try:

@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Define a class that interpolates within a CMD isochrone grid."""
 
+import os.path
+
 from matplotlib import pyplot
 import scipy
 import scipy.interpolate
+
+from command_line_utilities import data_dir
 
 class IsochroneFileIterator:
     """
@@ -147,7 +151,12 @@ class CMDInterpolator:
 def plot_isochrone():
     """Plot an isochrone read from the CMD interface."""
 
-    interpolator = CMDInterpolator('../data/CMD_2.5Gyr_isochrone.dat')
+    interpolator = CMDInterpolator(
+        os.path.join(
+            data_dir,
+            'CMD_2.5Gyr_isochrone.dat'
+        )
+    )
     print('2.5Gyr Sun Teff = '
           +
           repr(10.0**interpolator.get_interpolated('logTe',

@@ -4,6 +4,8 @@
 Define a class that works with interpolated SDSS photometry from CMD isochrones.
 """
 
+import os.path
+
 from matplotlib import pyplot
 import scipy
 
@@ -11,6 +13,7 @@ from planetary_system_io import read_cds_pipe_table
 from magnitude_transformations import sdss_to_usno
 
 from cmd_photometry_interpolator import CMDPhotometryInterpolator
+from command_line_utilities import data_dir
 
 class CMDUSNOPhotometryInterpolator(CMDPhotometryInterpolator):
     """Interpolate SDSS photometry from CMD isochrones for a single cluster."""
@@ -43,7 +46,7 @@ class CMDUSNOPhotometryInterpolator(CMDPhotometryInterpolator):
 
 if __name__ == '__main__':
     ngc_188_photometry = read_cds_pipe_table(
-        '../data/Fornal_et_al_2006_NGC188_photometry.tsv'
+        os.path.join(data_dir, 'Fornal_et_al_2006_NGC188_photometry.tsv')
     )
     cluster_members = ngc_188_photometry[ngc_188_photometry['Mm'] > 0.5]
     observed_usno_ugriz = scipy.array((cluster_members["u'mag"],
@@ -52,7 +55,7 @@ if __name__ == '__main__':
                                        cluster_members["i'mag"],
                                        cluster_members["z'mag"]))
     interpolator = CMDUSNOPhotometryInterpolator(
-        '../data/CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat'
+        os.path.join(data_dir, 'CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat')
     )
     interp_masses = interpolator.data[0]['Mini']
 
