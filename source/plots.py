@@ -345,10 +345,17 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, **kwargs):
                        fmt='vg',
                        markersize=15,
                        label='unknown')
-        if cmdline_args.use_binary_stars.upper() == 'NGC6819':
-            pyplot.plot([2.1, 18.0], [0, 0.6], '-k')
-        else:
+        if (
+                isinstance(cmdline_args.use_binary_stars, bool)
+                and
+                cmdline_args.use_binary_stars
+        ):
             pyplot.plot([3.0, 20.0], [0, 0.6], '-k')
+            pyplot.ylim((0, 0.6))
+        else:
+            assert cmdline_args.use_binary_stars.upper() == 'NGC6819'
+            pyplot.plot([2.1, 18.0], [0, 0.6], '-k')
+            pyplot.ylim((0, 0.8))
         pyplot.xlim((2.0, 100))
 
 
@@ -359,8 +366,22 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, **kwargs):
         plot_exoplanets(systems)
     else:
         plot_binaries(systems)
-    pyplot.ylim((0, 0.6))
     pyplot.legend()
+    pyplot.xlabel('$P_{orb}$ [days]')
+    pyplot.ylabel('eccentricity')
+    pyplot.title(
+        'NGC 188' if (
+            isinstance(cmdline_args.use_binary_stars, bool)
+            and
+            cmdline_args.use_binary_stars
+        ) else (
+            cmdline_args.use_binary_stars.upper()[:3]
+            +
+            ' '
+            +
+            cmdline_args.use_binary_stars.upper()[3:]
+        )
+    )
     if plot_fname is None:
         pyplot.show()
     else:
