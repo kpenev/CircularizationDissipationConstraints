@@ -12,6 +12,8 @@ from astropy import units
 from configargparse import ArgumentParser, DefaultsFormatter
 import asteval
 
+from kelly_colors import kelly_colors
+
 from stellar_evolution.change_variables import QuantityEvaluator
 from stellar_evolution.manager import StellarEvolutionManager
 from planetary_system_io import read_nasa_planets
@@ -53,12 +55,7 @@ def parse_command_line():
         '--lgQ-x-axis',
         action='append',
         nargs=2,
-        default=[
-            (
-                '(secondary_radius/semimajor)**5*primary_mass/secondary_mass',
-                ''
-            )
-        ],
+        default=[],
         help="Add plots of lg(Q*') vs different quantities. Two entries must be"
         " specified: expression and units. The expression can be any "
         "expression involving system properties that can be converted to the "
@@ -68,7 +65,8 @@ def parse_command_line():
     )
     parser.add_argument(
         '--progress-pickle', '--progress',
-        default='progress.pickle',
+        default=[],
+        action='append',
         help='The filename where the calculated eccentricities were saved, or '
         'one of these files for plot type lgQ_change_vs. Default: %(default)s.'
     )
@@ -208,7 +206,7 @@ def get_axis_label(axis_quantity, axis_units, planet):
 #pylint: disable=invalid-name
 #kwargs only accepted to homogenize call signatures across plotters
 #pylint: disable=unused-argument
-def plot_e_vs_P(cmdline_args, plot_fname=None, **kwargs):
+def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
     """Create a plot of eccentricity vs period."""
 
     def plot_selection(systems, selected, **kwargs):
@@ -384,13 +382,16 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, **kwargs):
     )
     if plot_fname is None:
         pyplot.show()
-    else:
+    elif save_plot:
         pyplot.savefig(plot_fname)
         pyplot.cla()
 #pylint: enable=invalid-name
 #pylint: enable=unused-argument
 
-def plot_star_solving(interpolator, system, plot_fname=None):
+def plot_star_solving(interpolator,
+                      system,
+                      plot_fname=None,
+                      save_plot=True):
     """Make a plot showing the attempt to solve for stellar mass/age."""
 
     plot_ages = 10.0**numpy.linspace(-3, 1, 1000)
@@ -418,7 +419,7 @@ def plot_star_solving(interpolator, system, plot_fname=None):
     pyplot.plot([2.839], [5314], '+')
     if plot_fname is None:
         pyplot.show()
-    else:
+    elif save_plot:
         pyplot.savefig(plot_fname)
         pyplot.cla()
 
@@ -443,7 +444,8 @@ def solve_lgQ_limits(lgQ_vs_period,
 def plot_single_lgQ_vs_e(system,
                          progress,
                          eccentricity_envelope,
-                         plot_fname=None):
+                         plot_fname=None,
+                         save_plot=True):
     """Show a plot of the final eccentricity vs lgQ for a system."""
 
 
@@ -495,7 +497,7 @@ def plot_single_lgQ_vs_e(system,
     pyplot.ylabel(get_axis_label('eccentricity', '', True))
     if plot_fname is None:
         pyplot.show()
-    else:
+    elif save_plot:
         pyplot.savefig(plot_fname)
         pyplot.cla()
 #pylint: enable=invalid-name
@@ -547,7 +549,15 @@ def get_system_list(cmdline_args, interpolator=None):
         systems.extend(
             (
                 read_geller_et_al_2009_binaries()
-                if cmdline_args.use_binary_stars.upper() == 'NGC188' else
+                if (
+                        (
+                            isinstance(cmdline_args.use_binary_stars, bool)
+                            and
+                            cmdline_args.use_binary_stars
+                        )
+                        or
+                        cmdline_args.use_binary_stars.upper() == 'NGC188'
+                ) else
                 read_milliman_et_al_2014_binaries()
             )
         )
@@ -751,8 +761,13 @@ def plot_lgQ_vs(lgQ_x_axes,
                 progress,
                 cmdline_args,
                 interpolator,
-                plot_fname=None):
+                plot_fname=None,
+                save_plot=True,
+                label=''):
     """Make a plot of the log10(Q*') constraints vs orbital period."""
+
+    if not hasattr(plot_lgQ_vs, "color_index"):
+        plot_lgQ_vs.color_index = 2
 
     def add_points(*,
                    plot_x,
@@ -769,28 +784,30 @@ def plot_lgQ_vs(lgQ_x_axes,
         )
         if limit == 'upper':
             plot_style['fmt'] = 'v'
-            colors = ['red', 'orange']
             plot_style['zorder'] = 0
         elif limit == 'lower':
             plot_style['fmt'] = '^'
-            colors = ['blue', 'cyan']
             plot_style['zorder'] = 1
         else:
             assert not limit
             plot_style['fmt'] = 'o'
-            colors = ['green', 'orange']
             plot_style['linewidth'] = 2
             plot_style['zorder'] = 2
+            plot_style['label'] = label
 
-        for color_index, include in enumerate(
-                [
-                    numpy.logical_not(assumed_default_density),
-                    assumed_default_density
-                ]
-        ):
-            plot_style['markeredgecolor'] = colors[color_index]
-            plot_style['ecolor'] = colors[color_index]
-            plot_style['markerfacecolor'] = colors[color_index]
+        for include in [
+                numpy.logical_not(assumed_default_density),
+                assumed_default_density
+        ]:
+            plot_style['markeredgecolor'] = kelly_colors[
+                plot_lgQ_vs.color_index
+            ]
+            plot_style['ecolor'] = kelly_colors[
+                plot_lgQ_vs.color_index
+            ]
+            plot_style['markerfacecolor'] = kelly_colors[
+                plot_lgQ_vs.color_index
+            ]
 
             if distinguish is None:
                 sub_include_list = [include]
@@ -809,6 +826,8 @@ def plot_lgQ_vs(lgQ_x_axes,
                 )
                 plot_style['markerfacecolor'] = 'none'
                 plot_style['zorder'] -= 10
+                if 'label' in plot_style:
+                    del plot_style['label']
 
     (
         plot_x,
@@ -893,13 +912,24 @@ def plot_lgQ_vs(lgQ_x_axes,
 
         if plot_fname is None:
             pyplot.show()
-        else:
+            plot_lgQ_vs.color_index = 2
+        elif save_plot:
+            print('Saving and clearing: '
+                  +
+                  plot_fname
+                  %
+                  dict(x_label=lgQ_x_axes[x_index][0].replace('/', ':')))
+            pyplot.legend()
             pyplot.savefig(
                 plot_fname
                 %
                 dict(x_label=lgQ_x_axes[x_index][0].replace('/', ':'))
             )
             pyplot.cla()
+            plot_lgQ_vs.color_index = 2
+        else:
+            plot_lgQ_vs.color_index += 1
+            print('Awaiting more points')
 
 def plot_lgQ_change_vs(*,
                        lgQ_x_axes,
@@ -907,7 +937,8 @@ def plot_lgQ_change_vs(*,
                        second_progress,
                        cmdline_args,
                        interpolator,
-                       plot_fname=None):
+                       plot_fname=None,
+                       save_plot=True):
     """Create a plot of how the lg(Q') constraints change between two runs."""
 
     def get_matched_constraints():
@@ -1111,7 +1142,7 @@ def plot_lgQ_change_vs(*,
 
         if plot_fname is None:
             pyplot.show()
-        else:
+        elif save_plot:
             pyplot.savefig(
                 plot_fname
                 %
@@ -1128,6 +1159,29 @@ def load_progress(progress_pickle):
         progress = load_progress_pickle(progress_file)
     return pickled_cmdline_args, progress
 
+def dataset_label(cmdline_args):
+    """Return a label to use for the dataset from a progress pickle."""
+
+    if cmdline_args.nasa_data is not None:
+        assert not cmdline_args.use_binary_stars
+        return 'Exoplanets'
+    else:
+        if (
+                (
+                    isinstance(cmdline_args.use_binary_stars, bool)
+                    and
+                    cmdline_args.use_binary_stars
+                )
+                or
+                cmdline_args.use_binary_stars.upper() == 'NGC188'
+        ):
+            return 'NGC 188'
+        elif cmdline_args.use_binary_stars.upper() == 'NGC6819':
+            return 'NGC 6819'
+        else:
+            assert False
+
+
 def main():
     """Avoid adding things to global namespace."""
 
@@ -1143,11 +1197,7 @@ def main():
                             cmdline_args.axes_vspan - cmdline_args.axes_vshift])
     #pylint: enable=unused-variable
 
-    pickled_cmdline_args, progress = load_progress(cmdline_args.progress_pickle)
-    pickled_cmdline_args.pickle_systems = cmdline_args.pickle_systems
-    pickled_cmdline_args.pretend_min_eccentricity = (
-        cmdline_args.pretend_min_eccentricity
-    )
+    pickled_cmdline_args = load_progress(cmdline_args.progress_pickle[0])[0]
 
     if getattr(cmdline_args, 'second_progress_pickle', None):
         second_progress = load_progress(cmdline_args.second_progress_pickle)[1]
@@ -1160,6 +1210,8 @@ def main():
         'default'
     )
 
+    print('Processing progress pickles: ' + repr(cmdline_args.progress_pickle))
+
     for plot_type in cmdline_args.plot:
         if cmdline_args.plot_fname is None:
             plot_fname = None
@@ -1168,16 +1220,32 @@ def main():
                 plot_type=plot_type,
                 x_label=('%(x_label)s' if plot_type == 'lgQ_vs' else '')
             )
-        arguments = dict(progress=progress,
-                         lgQ_x_axes=cmdline_args.lgQ_x_axis,
-                         cmdline_args=pickled_cmdline_args,
-                         interpolator=interpolator,
-                         plot_fname=plot_fname)
-        if plot_type == 'lgQ_change_vs':
-            arguments['second_progress'] = second_progress
+        for plot_pickle in cmdline_args.progress_pickle:
+            print('Plotting pickle: ' + repr(plot_pickle))
+            plot_cmdline_args, progress = load_progress(plot_pickle)
+            plot_cmdline_args.pickle_systems = cmdline_args.pickle_systems
+            plot_cmdline_args.pretend_min_eccentricity = (
+                cmdline_args.pretend_min_eccentricity
+            )
 
-        globals()['plot_' + plot_type](**arguments)
 
+            arguments = dict(progress=progress,
+                             lgQ_x_axes=cmdline_args.lgQ_x_axis,
+                             cmdline_args=plot_cmdline_args,
+                             interpolator=interpolator,
+                             plot_fname=plot_fname,
+                             label=dataset_label(plot_cmdline_args))
+            if plot_type == 'lgQ_change_vs':
+                arguments['second_progress'] = second_progress
+
+            globals()['plot_' + plot_type](
+                save_plot=(
+                    plot_pickle
+                    ==
+                    cmdline_args.progress_pickle[-1]
+                ),
+                **arguments
+            )
 
 if __name__ == '__main__':
     main()
