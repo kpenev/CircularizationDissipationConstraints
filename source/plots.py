@@ -302,21 +302,25 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
         plot_selection(systems,
                        fluffy,
                        fmt='or',
-                       markersize=10,
-                       label='fluffy')
+                       markersize=5,
+                       label='fluffy',
+                       zorder=10)
         plot_selection(systems,
                        dense,
                        fmt='sb',
-                       markersize=15,
-                       label='dense')
+                       markersize=5,
+                       label='dense',
+                       zorder=20)
         plot_selection(systems,
                        unknown,
                        fmt='vg',
-                       markersize=15,
-                       label='unknown')
+                       markersize=5,
+                       label='unknown',
+                       zorder=30)
 
         pyplot.plot([0.8, 5.0], [0, 0.6], '-k')
         pyplot.xlim((0.7, 20))
+        pyplot.ylim((0, 0.8))
 
     def plot_binaries(systems):
         """Create e(p) plot for binary stars, i.e. marking primary mass."""
@@ -348,7 +352,7 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
                 and
                 cmdline_args.use_binary_stars
         ):
-            pyplot.plot([3.0, 20.0], [0, 0.6], '-k')
+            pyplot.plot([3.0, 20.0], [0, 0.6], '-k', zorder=100)
             pyplot.ylim((0, 0.6))
         else:
             assert cmdline_args.use_binary_stars.upper() == 'NGC6819'
@@ -367,19 +371,22 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
     pyplot.legend()
     pyplot.xlabel('$P_{orb}$ [days]')
     pyplot.ylabel('eccentricity')
-    pyplot.title(
-        'NGC 188' if (
-            isinstance(cmdline_args.use_binary_stars, bool)
-            and
-            cmdline_args.use_binary_stars
-        ) else (
-            cmdline_args.use_binary_stars.upper()[:3]
-            +
-            ' '
-            +
-            cmdline_args.use_binary_stars.upper()[3:]
+    if hasattr(cmdline_args, 'use_binary_stars'):
+        pyplot.title(
+            'NGC 188' if (
+                isinstance(cmdline_args.use_binary_stars, bool)
+                and
+                cmdline_args.use_binary_stars
+            ) else (
+                cmdline_args.use_binary_stars.upper()[:3]
+                +
+                ' '
+                +
+                cmdline_args.use_binary_stars.upper()[3:]
+            )
         )
-    )
+    else:
+        pyplot.title('Exoplanets')
     if plot_fname is None:
         pyplot.show()
     elif save_plot:
