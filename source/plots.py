@@ -332,21 +332,25 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
         #pylint: enable=no-member
         unknown = numpy.logical_and(numpy.logical_not(cool),
                                     numpy.logical_not(hot))
+#        plot_selection(systems,
+#                       cool,
+#                       fmt='or',
+#                       markersize=10,
+#                       label='cool')
+#        plot_selection(systems,
+#                       hot,
+#                       fmt='sb',
+#                       markersize=15,
+#                       label='hot')
+#        plot_selection(systems,
+#                       unknown,
+#                       fmt='vg',
+#                       markersize=15,
+#                       label='unknown')
         plot_selection(systems,
-                       cool,
-                       fmt='or',
-                       markersize=10,
-                       label='cool')
-        plot_selection(systems,
-                       hot,
-                       fmt='sb',
-                       markersize=15,
-                       label='hot')
-        plot_selection(systems,
-                       unknown,
-                       fmt='vg',
-                       markersize=15,
-                       label='unknown')
+                       None,
+                       fmt='og',
+                       markersize=15)
         if (
                 isinstance(cmdline_args.use_binary_stars, bool)
                 and
@@ -774,7 +778,7 @@ def plot_lgQ_vs(lgQ_x_axes,
                 markersize=5,
                 linewidth=2,
                 fill_limit_markers=True,
-                limit_line_width=2):
+                limit_line_width=0.3):
     """Make a plot of the log10(Q*') constraints vs orbital period."""
 
     if not hasattr(plot_lgQ_vs, "color_index"):
