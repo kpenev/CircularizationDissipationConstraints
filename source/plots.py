@@ -18,13 +18,13 @@ from stellar_evolution.change_variables import QuantityEvaluator
 from stellar_evolution.manager import StellarEvolutionManager
 from planetary_system_io import read_nasa_planets
 
-from io_utilities import\
+from .io_utilities import\
     load_progress_pickle,\
     get_nasa_system,\
     read_geller_et_al_2009_binaries,\
     read_milliman_et_al_2014_binaries
-from calculate_e_Q_grid import prepare_nasa_system, fix_semimajor
-from process_e_Q_grid import\
+from .calculate_e_Q_grid import prepare_nasa_system, fix_semimajor
+from .process_e_Q_grid import\
     format_eccentricity_vs_lgQ,\
     invert_eccentricity_vs_lgQ,\
     EccentricityEnvelope
@@ -770,7 +770,11 @@ def plot_lgQ_vs(lgQ_x_axes,
                 interpolator,
                 plot_fname=None,
                 save_plot=True,
-                label=''):
+                label='',
+                markersize=5,
+                linewidth=2,
+                fill_limit_markers=True,
+                limit_line_width=2):
     """Make a plot of the log10(Q*') constraints vs orbital period."""
 
     if not hasattr(plot_lgQ_vs, "color_index"):
@@ -786,8 +790,9 @@ def plot_lgQ_vs(lgQ_x_axes,
         """Add a set of points to the plot color-coding for default density."""
 
         plot_style = dict(
-            markersize=5,
-            linewidth=0.3
+            markersize=markersize,
+            linewidth=limit_line_width,
+            markeredgewidth=limit_line_width
         )
         if limit == 'upper':
             plot_style['fmt'] = 'v'
@@ -798,7 +803,7 @@ def plot_lgQ_vs(lgQ_x_axes,
         else:
             assert not limit
             plot_style['fmt'] = 'o'
-            plot_style['linewidth'] = 2
+            plot_style['linewidth'] = linewidth
             plot_style['zorder'] = 2
             plot_style['label'] = label
 
@@ -814,7 +819,7 @@ def plot_lgQ_vs(lgQ_x_axes,
             ]
             plot_style['markerfacecolor'] = kelly_colors[
                 plot_lgQ_vs.color_index
-            ]
+            ] if fill_limit_markers or (not limit) else 'none'
 
             if distinguish is None:
                 sub_include_list = [include]

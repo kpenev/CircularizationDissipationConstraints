@@ -10,8 +10,8 @@ import numpy
 import pandas
 
 from planetary_system_io import read_cds_pipe_table
-from fit_ngc6819_masses import fit_milliman
-from command_line_utilities import data_dir
+from .fit_ngc6819_masses import fit_milliman
+from .command_line_utilities import data_dir
 
 def get_nasa_system(system_id, nasa_systems):
     """

@@ -11,9 +11,9 @@ from astropy import units
 import scipy
 
 from planetary_system_io import read_cds_pipe_table
-from command_line_utilities import data_dir
+from .command_line_utilities import data_dir
 
-from cmd_isochrone_interpolator import CMDInterpolator
+from .cmd_isochrone_interpolator import CMDInterpolator
 
 class CMDPhotometryInterpolator(CMDInterpolator):
     """

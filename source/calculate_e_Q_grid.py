@@ -16,17 +16,17 @@ from orbital_evolution.evolve_interface import library as\
 from planetary_system_io import read_nasa_planets
 from binary_utils import calculate_secondary_mass
 
-from io_utilities import\
+from .io_utilities import\
     get_nasa_system,\
     read_geller_et_al_2009_binaries,\
     read_milliman_et_al_2014_binaries,\
     init_progress_pickle
-from command_line_utilities import\
+from .command_line_utilities import\
     fix_system_units,\
     add_info_cmdline_args,\
     add_assumptions_cmdline_args,\
     add_path_cmdline_args
-from current_eccentricity_calculator import CurrentEccentricityCalculator
+from .current_eccentricity_calculator import CurrentEccentricityCalculator
 
 def parse_command_line():
     """Return the parsed command line as attributes of an object."""
