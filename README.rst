@@ -30,3 +30,5 @@ Relevant articles:
       * NGC 5288
       * NGC 2323
   * `WIYN Open Cluster Study. XXXVI. Spectroscopic Binary Orbits in NGC 188 <https://ui.adsabs.harvard.edu/abs/2009AJ....137.3743G/abstract>`_
+  
+For planets, `Barnes (2015) <https://ui.adsabs.harvard.edu/abs/2015IJAsB..14..321B>`_ show a method for constraining eccentricyt from transit duration.
