@@ -11,9 +11,14 @@ from matplotlib import pyplot
 from astropy import units as u
 
 reference_urls = [
-    'https://ui.adsabs.harvard.edu/abs/1985AJ.....90..609G/abstract',
-    'https://ui.adsabs.harvard.edu/abs/2012JApA...33...29G/abstract',
+    'https://ui.adsabs.harvard.edu/abs/1985AJ.....90..609G/abstract', #0
+    'https://ui.adsabs.harvard.edu/abs/2012JApA...33...29G/abstract', #1
+    'https://ui.adsabs.harvard.edu/abs/1978AJ.....83.1114G/abstract', #2
+    'https://ui.adsabs.harvard.edu/abs/2007Obs...127..165T/abstract', #3
+    'https://ui.adsabs.harvard.edu/abs/2003Obs...123....1T/abstract' #4
 ]
+
+_kps = u.km / u.s
 
 
 #False positive
@@ -1427,24 +1432,111 @@ systems = [
         errMassFunc=0.00022 * u.M_sun,
         member='maybe',
         ref=1
+    ),
+    dict(
+        ID='vB62',
+        type='Single Lined',
+        Porb=8.55089 * u.day,
+        errPorb=0.00007 * u.day,
+        Gamma=38.77 * u.km / u.s,
+        errGamma=0.14 * u.km / u.s,
+        K=16.46 * u.km / u.s,
+        errK=0.16 * u.km / u.s,
+        Ecc=0.233,
+        errECC=0.012,
+        Omega=38.0 * u.deg,
+        errOmega=2.8 * u.deg,
+        ProjSemimajor1=1.88 * u.Gm,
+        errProjSemimajor1=0.02 * u.Gm,
+        MassFunc=0.0036 * u.M_sun,
+        errMassFunc=0.0001 * u.M_sun,
+        member=True,
+        ref=2
+    ),
+    dict(
+        ID='vB121',
+        type='Single Lined',
+        Porb=5.75096 * u.day,
+        errPorb=0.00003 * u.day,
+        Gamma=42.74 * u.km / u.s,
+        errGamma=0.17 * u.km / u.s,
+        K=19.70 * u.km / u.s,
+        errK=0.23 * u.km / u.s,
+        Ecc=0.254,
+        errEcc=0.01,
+        Omega=54.9 * u.deg,
+        errOmega=2.4 * u.deg,
+        ProjSemimajor1=1.46 * u.Gm,
+        errProjSemimajor1=0.02 * u.Gm,
+        MassFunc=0.0037 * u.M_sun,
+        errMassFunc=0.00001 * u.M_sun,
+        member=True,
+        ref=2
+    ),
+    dict(
+        ID='vB182',
+        type='Double Lined',
+        Porb=358.484 * u.day,
+        errPorb=0.013 * u.day,
+        Gamma=40.233 * u.km / u.s,
+        errGamma=0.016 * u.km / u.s,
+        K1=14.03 * u.km / u.s,
+        errK1=0.02 * u.km / u.s,
+        K2=19.85 * u.km / u.s,
+        errK2=0.05 * u.km / u.s,
+        Ecc=0.3703,
+        errEcc=0.0013,
+        MassRatio=1.415,
+        errMassRatio=0.004,
+        M1sin3i=0.679 * u.M_sun,
+        errM1sin3i=0.004 * u.M_sun,
+        M2sin3i=0.480 * u.M_sun,
+        errM2sin3i=0.002 * u.M_sun,
+        ProjSemimajor1=64.24 * u.Gm,
+        errProjSemimajor1=0.11 * u.Gm,
+        ProjSemimajor2=90.87 * u.Gm,
+        errProjSemimajor2=0.25 * u.Gm,
+        modelM1=0.84 * u.M_sun,
+        modelM2=0.59 * u.M_sun,
+        member=True,
+        ref=3
+    ),
+    dict(
+        ID='vB23',
+        type='Double Lined',
+        Porb=75.6587 * u.day,
+        errPorb=0.0008 * u.day,
+        Gamma=38.461 * u.km / u.s,
+        errGamma=0.014 * u.km / u.s,
+        K1=32.054 * _kps,
+        errK1=0.019 * _kps,
+        K2=34.767 * _kps,
+        errK2=0.04 * _kps,
+        Ecc=0.2628,
+        errEcc=0.0006,
+        MassRatio=1.085,
+        errMassRatio=0.001,
+        M1sin3i=1.096 * u.M_sun,
+        errM1sin3i=0.002 * u.M_sun,
+        M2sin3i=1.01 * u.M_sun,
+        errM2sin3i=0.002 * u.M_sun,
+        ProjSemimajor1=32.176 * u.Gm,
+        errProjSemimajor1=0.02 * u.Gm,
+        ProjSemimajor2=34.899 * u.Gm,
+        errProjSemimajor2=0.04 * u.Gm,
+        member=True,
+        ref=4
     )
 ]
 #pylint: disable=no-member
 
 if __name__ == '__main__':
     print('Record contains %d systems' % len(systems))
-    for s in systems:
-        print(
-            '%s: Porb = %s, e = %s'
-            %
-            (
-                s['ID'],
-                repr(s.get('Porb', float('nan') * u.day)),
-                repr(s.get('Ecc', float('nan') * u.day)),
-            )
-        )
-    porb=[s.get('Porb', float('nan') * u.day).to_value('day') for s in systems]
-    eccentricity=[s.get('Ecc', float('nan')) for s in systems]
+    member_systems = list(filter(lambda s: s['member'], systems))
+    porb=[s.get('Porb', float('nan') * u.day).to_value('day')
+          for s in member_systems]
+    eccentricity=[s.get('Ecc', float('nan')) for s in member_systems]
     pyplot.semilogx(porb, eccentricity, 'ok')
-    pyplot.ylim(0, 0.7)
+#    pyplot.ylim(0, 0.7)
+#    pyplot.xlim(0, 100)
     pyplot.show()
