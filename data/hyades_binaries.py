@@ -1,3 +1,4 @@
+#pylint: disable=too-many-lines
 """
 Data for Hyades binaries from Griffin et. al. 1985.
 
@@ -6,6 +7,7 @@ Article URL: https://ui.adsabs.harvard.edu/abs/1985AJ.....90..609G/abstract
 
 #Single lined:
 
+from matplotlib import pyplot
 from astropy import units as u
 
 reference_urls = [
@@ -39,7 +41,7 @@ systems = [
     dict(
         ID='vB22',
         type='Double Lined',
-        Porb=5.608486,
+        Porb=5.608486 * u.day,
         errPorb=(0.000006 * u.day, 0.000006 * u.day),
         Gamma=38.09 * u.km / u.s,
         errGamma=(0.13 * u.km / u.s, 0.13 * u.km / u.s),
@@ -59,6 +61,7 @@ systems = [
         errM1=(0.03 * u.M_sun, 0.03 * u.M_sun),
         M2=0.75 * u.M_sun,
         errM2=(0.01 * u.M_sun, 0.01 * u.M_sun),
+        member=True,
         ref=0
     ),
     dict(
@@ -371,6 +374,7 @@ systems = [
         errProjSemimajor1=(36.0 * u.Gm, 36.0 * u.Gm),
         MassFunc=0.036 * u.M_sun,
         errMassFunc=(0.004 * u.M_sun, 0.004 * u.M_sun),
+        member=False,
         ref=1
     ),
     dict(
@@ -389,6 +393,7 @@ systems = [
         errProjSemimajor1=22.0 * u.Gm,
         MassFunc=0.033 * u.M_sun,
         errMassFunc=0.004 * u.M_sun,
+        member=False,
         ref=1
     ),
     dict(
@@ -408,6 +413,7 @@ systems = [
         errProjSemimajor1=(0.23 * u.Gm, 0.23 * u.Gm),
         MassFunc=0.01048 * u.M_sun,
         errMassFunc=(0.00024 * u.M_sun, 0.00024 * u.M_sun),
+        member=False,
         ref=1
     ),
     dict(
@@ -427,6 +433,7 @@ systems = [
         errProjSemimajor1=25.0 * u.Gm,
         MassFunc=0.0070 * u.M_sun,
         errMassFunc=0.0010 * u.M_sun,
+        member=False,
         ref=1
     ),
     dict(
@@ -446,6 +453,7 @@ systems = [
         errProjSemimajor1=7.0 * u.Gm,
         MassFunc=0.0086 * u.M_sun,
         errMassFunc=0.0008 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -465,6 +473,7 @@ systems = [
         errProjSemimajor1=5.0 * u.Gm,
         MassFunc=0.0090 * u.M_sun,
         errMassFunc=0.0016 * u.M_sun,
+        member=False,
         ref=1
     ),
     dict(
@@ -483,6 +492,7 @@ systems = [
         ProjSemimajor1=37.5 * u.Gm,
         errProjSemimajor1=0.9 * u.Gm,
         MassFunc=0.0137,
+        member=False,
         ref=1
     ),
     dict(
@@ -508,6 +518,7 @@ systems = [
         errM1sin3i=0.006 * u.M_sun,
         M2sin3i=0.474 * u.M_sun,
         errM2sin3i=0.005 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -527,6 +538,7 @@ systems = [
         errProjSemimajor1=0.006 * u.Gm,
         MassFunc=0.00475 * u.M_sun,
         errMassFunc=0.00010 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -552,6 +564,7 @@ systems = [
         errM1sin3i=0.012 * u.M_sun,
         M2sin3i=0.152 * u.M_sun,
         errM2sin3i=0.008 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -571,6 +584,7 @@ systems = [
         errProjSemimajor1=4.0 * u.Gm,
         MassFunc=0.0408 * u.M_sun,
         errMassFunc=0.0017 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -592,6 +606,7 @@ systems = [
         errMassFunc=0.00016 * u.M_sun,
         MassRatio=0.46,
         errMassRatio=0.02,
+        member=True,
         ref=1
     ),
     dict(
@@ -611,6 +626,7 @@ systems = [
         errProjSemimajor1=0.24 * u.Gm,
         MassFunc=0.00081 * u.M_sun,
         errMassFunc=0.00003 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -630,6 +646,7 @@ systems = [
         errProjSemimajor1=0.008 * u.Gm,
         MassFunc=0.0440 * u.M_sun,
         errMassFunc=0.0003 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -655,6 +672,7 @@ systems = [
         errM1sin3i=0.013 * u.M_sun,
         M2sin3i=0.286 * u.M_sun,
         errM2sin3i=0.01 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -674,6 +692,7 @@ systems = [
         errProjSemimajor1=1000.0 * u.Gm,
         MassFunc=0.18 * u.M_sun,
         errMassFunc=0.25 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -699,6 +718,7 @@ systems = [
         errM1sin3i=0.03 * u.M_sun,
         M2sin3i=0.54 * u.M_sun,
         errM2sin3i=0.03 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -706,6 +726,7 @@ systems = [
         type='Mixed Lined',
         Porb=15650.0 * u.day,
         errPorb=608.0 * u.day,
+        member=True,
         ref=1
     ),
     dict(
@@ -725,6 +746,7 @@ systems = [
         errProjSemimajor1=0.010 * u.Gm,
         MassFunc=0.00742 * u.M_sun,
         errMassFunc=0.00012 * u.M_sun,
+        member=False,
         ref=1
     ),
     dict(
@@ -744,6 +766,7 @@ systems = [
         errProjSemimajor1=18.0 * u.Gm,
         MassFunc=0.0104 * u.M_sun,
         errMassFunc=0.0027 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -763,6 +786,7 @@ systems = [
         errProjSemimajor1=2.4 * u.Gm,
         MassFunc=0.0535 * u.M_sun,
         errMassFunc=0.0018 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -778,6 +802,7 @@ systems = [
         ProjSemimajor2=700.0 * u.Gm,
         M1sin3i=0.8 * u.M_sun,
         M2sin3i=0.57 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -797,6 +822,7 @@ systems = [
         errProjSemimajor1=0.5 * u.Gm,
         MassFunc=0.00361 * u.M_sun,
         errMassFunc=0.00022 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -816,6 +842,7 @@ systems = [
         errProjSemimajor1=26.0 * u.Gm,
         MassFunc=0.0062 * u.M_sun,
         errMassFunc=0.0022 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -835,6 +862,7 @@ systems = [
         errProjSemimajor1=2.9 * u.Gm,
         MassFunc=0.1166 * u.M_sun,
         errMassFunc=0.0021 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -854,6 +882,7 @@ systems = [
         errProjSemimajor1=11.0 * u.Gm,
         MassFunc=0.0448 * u.M_sun,
         errMassFunc=0.0035 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -889,6 +918,7 @@ systems = [
         errM2sin3iOuter=0.08 * u.M_sun,
         ModelM1Inner=1.25 * u.M_sun,
         ModelM2Inner=0.75 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -908,6 +938,7 @@ systems = [
         errProjSemimajor1=10.0 * u.Gm,
         MassFunc=0.0057 * u.M_sun,
         errMassFunc=0.0013 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -927,6 +958,7 @@ systems = [
         errProjSemimajor1=2.9 * u.Gm,
         MassFunc=0.00020 * u.M_sun,
         errMassFunc=0.00005 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -946,6 +978,7 @@ systems = [
         errProjSemimajor1=0.08 * u.Gm,
         MassFunc=0.000243 * u.M_sun,
         errMassFunc=0.000024 * u.M_sun,
+        member=False,
         ref=1
     ),
     dict(
@@ -965,6 +998,7 @@ systems = [
         errProjSemimajor1=0.004 * u.Gm,
         MassFunc=0.0517 * u.M_sun,
         errMassFunc=0.0004 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -984,6 +1018,7 @@ systems = [
         errProjSemimajor1=8.0 * u.Gm,
         MassFunc=0.0797 * u.M_sun,
         errMassFunc=0.0030 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1009,6 +1044,7 @@ systems = [
         errM1sin3i=0.022 * u.M_sun,
         M2sin3i=0.333 * u.M_sun,
         errM2sin3i=0.014 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1028,6 +1064,7 @@ systems = [
         errProjSemimajor1=8.0 * u.Gm,
         MassFunc=0.0084 * u.M_sun,
         errMassFunc=0.0014 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1047,6 +1084,7 @@ systems = [
         errProjSemimajor1=22.0 * u.Gm,
         MassFunc=0.017 * u.M_sun,
         errMassFunc=0.005 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1066,6 +1104,7 @@ systems = [
         errProjSemimajor1=3.6 * u.Gm,
         MassFunc=0.0461 * u.M_sun,
         errMassFunc=0.0030 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1085,6 +1124,7 @@ systems = [
         errProjSemimajor1=0.4 * u.Gm,
         MassFunc=0.00327 * u.M_sun,
         errMassFunc=0.00011 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1104,6 +1144,7 @@ systems = [
         errProjSemimajor1=2.1 * u.Gm,
         MassFunc=0.00052 * u.M_sun,
         errMassFunc=0.00006 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1129,6 +1170,7 @@ systems = [
         errM1sin3i=0.05 * u.M_sun,
         M2sin3i=0.51 * u.M_sun,
         errM2sin3i=0.05 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1148,6 +1190,7 @@ systems = [
         errProjSemimajor1=0.3 * u.Gm,
         MassFunc=0.1517 * u.M_sun,
         errMassFunc=0.0017 * u.M_sun,
+        member=False,
         ref=1
     ),
     dict(
@@ -1167,6 +1210,7 @@ systems = [
         errProjSemimajor1=0.6 * u.Gm,
         MassFunc=0.000095 * u.M_sun,
         errMassFunc=0.000013 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1186,6 +1230,7 @@ systems = [
         errProjSemimajor1=1.9 * u.Gm,
         MassFunc=0.0085 * u.M_sun,
         errMassFunc=0.0004 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1205,6 +1250,7 @@ systems = [
         errProjSemimajor1=4.0 * u.Gm,
         MassFunc=0.0140 * u.M_sun,
         errMassFunc=0.0009 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1224,6 +1270,7 @@ systems = [
         errProjSemimajor1=0.9 * u.Gm,
         MassFunc=0.0145 * u.M_sun,
         errMassFunc=0.0005 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1249,6 +1296,7 @@ systems = [
         errM1sin3i=0.011 * u.M_sun,
         M2sin3i=0.750 * u.M_sun,
         errM2sin3i=0.015 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1276,6 +1324,7 @@ systems = [
         errM2sin3i=0.009 * u.M_sun,
         ModelM1=1.17 * u.M_sun,
         ModelM2=0.73 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1301,6 +1350,7 @@ systems = [
         errM1sin3i=0.016 * u.M_sun,
         M2sin3i=0.779 * u.M_sun,
         errM2sin3i=0.015 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1320,6 +1370,7 @@ systems = [
         errProjSemimajor1=6.0 * u.Gm,
         MassFunc=0.039 * u.M_sun,
         errMassFunc=0.005 * u.M_sun,
+        member=True,
         ref=1
     ),
     dict(
@@ -1339,6 +1390,7 @@ systems = [
         errProjSemimajor1=0.8 * u.Gm,
         MassFunc=0.0068 * u.M_sun,
         errMassFunc=0.0004 * u.M_sun,
+        member='maybe',
         ref=1
     ),
     dict(
@@ -1358,6 +1410,7 @@ systems = [
         errProjSemimajor1=0.13 * u.Gm,
         MassFunc=0.00492 * u.M_sun,
         errMassFunc=0.00022 * u.M_sun,
+        member='maybe',
         ref=1
     )
 ]
@@ -1365,3 +1418,18 @@ systems = [
 
 if __name__ == '__main__':
     print('Record contains %d systems' % len(systems))
+    for s in systems:
+        print(
+            '%s: Porb = %s, e = %s'
+            %
+            (
+                s['ID'],
+                repr(s.get('Porb', float('nan') * u.day)),
+                repr(s.get('Ecc', float('nan') * u.day)),
+            )
+        )
+    porb=[s.get('Porb', float('nan') * u.day).to_value('day') for s in systems]
+    eccentricity=[s.get('Ecc', float('nan')) for s in systems]
+    pyplot.semilogx(porb, eccentricity, 'ok')
+    pyplot.ylim(0, 0.7)
+    pyplot.show()
