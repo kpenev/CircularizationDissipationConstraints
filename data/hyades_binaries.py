@@ -1,9 +1,5 @@
 #pylint: disable=too-many-lines
-"""
-Data for Hyades binaries from Griffin et. al. 1985.
-
-Article URL: https://ui.adsabs.harvard.edu/abs/1985AJ.....90..609G/abstract
-"""
+"""Data for binary stars in/near the Hyades open cluster."""
 
 #Single lined:
 
