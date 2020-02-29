@@ -10,7 +10,9 @@ from planetary_system_io import QuantityWithErrors
 data_dir = os.path.join(
     os.path.dirname(
         os.path.dirname(
-            __file__
+            os.path.abspath(
+                __file__
+            )
         )
     ),
     'data',

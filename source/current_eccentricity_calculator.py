@@ -6,7 +6,7 @@ from astropy import units
 from orbital_evolution.transformations import phase_lag
 from reproduce_system import find_evolution, check_if_secondary_is_star
 
-from .io_utilities import pickle_new_result
+from io_utilities import pickle_new_result
 
 #This is intended to serve as the callable for multiprocessing pool.
 #pylint: disable=too-few-public-methods

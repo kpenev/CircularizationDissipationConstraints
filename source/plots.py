@@ -1,11 +1,28 @@
 #!/usr/bin/env python3
 
+#TODO: split long file.
+#pylint: disable=too-many-lines
+
 """A collection of useful plotting functions."""
 
+import sys
 import pickle
 import collections
 import os.path
 
+sys.path.append(
+    os.path.join(
+        os.path.dirname(
+            os.path.dirname(
+                os.path.abspath(__file__)
+            )
+        ),
+        'data'
+    )
+)
+
+#Need to update sys.path before imports
+#pylint:disable=wrong-import-position
 from matplotlib import pyplot, rcParams
 import numpy
 from astropy import units
@@ -17,17 +34,22 @@ from kelly_colors import kelly_colors
 from stellar_evolution.change_variables import QuantityEvaluator
 from stellar_evolution.manager import StellarEvolutionManager
 from planetary_system_io import read_nasa_planets
-
-from .io_utilities import\
+#False positive
+#pylint: disable=import-error
+import praesepe_binaries
+#pylint: enable=import-error
+from io_utilities import\
     load_progress_pickle,\
     get_nasa_system,\
     read_geller_et_al_2009_binaries,\
-    read_milliman_et_al_2014_binaries
-from .calculate_e_Q_grid import prepare_nasa_system, fix_semimajor
-from .process_e_Q_grid import\
+    read_milliman_et_al_2014_binaries,\
+    format_hyades_praesepe_binaries
+from calculate_e_Q_grid import prepare_nasa_system, fix_semimajor
+from process_e_Q_grid import\
     format_eccentricity_vs_lgQ,\
     invert_eccentricity_vs_lgQ,\
     EccentricityEnvelope
+#pylint:enable=wrong-import-position
 
 def parse_command_line():
     """Parse the command line defining the plots to create."""
@@ -202,6 +224,8 @@ def get_axis_label(axis_quantity, axis_units, planet):
         get_unit_label(axis_units)
     )
 
+#TODO: look into simplifying
+#pylint: disable=too-many-statements
 #Simplifies command line arguments.
 #pylint: disable=invalid-name
 #kwargs only accepted to homogenize call signatures across plotters
@@ -249,6 +273,15 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
                 systems = read_geller_et_al_2009_binaries()
             elif cmdline_args.use_binary_stars.upper() == 'NGC6819':
                 systems = read_milliman_et_al_2014_binaries()
+            elif cmdline_args.use_binary_stars.upper() == 'HyadesPreasepe':
+                systems = format_hyades_praesepe_binaries(
+                    praesepe_binaries.read_systems(),
+                    #False positive
+                    #pylint: disable=no-member
+                    age=630.0 * units.Myr,
+                    #pylint: enable=no-member
+                    feh=0.21
+                )
             field_names = ['pl_orbper',
                            'pl_orbeccen',
                            'pl_orbeccenlim',
@@ -296,9 +329,11 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
         threshold_density = 2.0 * units.Unit('g/cm3')
         dense = systems.pl_dens > threshold_density
         fluffy = systems.pl_dens < threshold_density
+        #False positive
+        #pylint: disable=assignment-from-no-return
         unknown = numpy.logical_and(numpy.logical_not(dense),
                                     numpy.logical_not(fluffy))
-
+        #pylint: enable=assignment-from-no-return
         plot_selection(systems,
                        fluffy,
                        fmt='or',
@@ -330,8 +365,11 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
         hot = systems.primary_mass > 1.4 * units.M_sun
         cool = systems.primary_mass < 1.2 * units.M_sun
         #pylint: enable=no-member
+        #False positive
+        #pylint: disable=assignment-from-no-return
         unknown = numpy.logical_and(numpy.logical_not(cool),
                                     numpy.logical_not(hot))
+        #pylint: enable=assignment-from-no-return
 #        plot_selection(systems,
 #                       cool,
 #                       fmt='or',
@@ -398,6 +436,7 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
         pyplot.cla()
 #pylint: enable=invalid-name
 #pylint: enable=unused-argument
+#pylint: enable=too-many-statements
 
 def plot_star_solving(interpolator,
                       system,
@@ -561,13 +600,13 @@ def get_system_list(cmdline_args, interpolator=None):
             (
                 read_geller_et_al_2009_binaries()
                 if (
-                        (
-                            isinstance(cmdline_args.use_binary_stars, bool)
-                            and
-                            cmdline_args.use_binary_stars
-                        )
-                        or
-                        cmdline_args.use_binary_stars.upper() == 'NGC188'
+                    (
+                        isinstance(cmdline_args.use_binary_stars, bool)
+                        and
+                        cmdline_args.use_binary_stars
+                    )
+                    or
+                    cmdline_args.use_binary_stars.upper() == 'NGC188'
                 ) else
                 read_milliman_et_al_2014_binaries()
             )
@@ -600,6 +639,8 @@ def plot_lgQ_vs_e(progress, cmdline_args, plot_fname=None, **_):
                 plot_fname
             )
 
+#TODO: look into simplyfying
+#pylint: disable=too-many-locals
 def get_lgQ_constraints(lgQ_x_axes,
                         progress,
                         cmdline_args,
@@ -753,6 +794,7 @@ def get_lgQ_constraints(lgQ_x_axes,
     if get_hostnames:
         return result + (numpy.array(hostnames),)
     return result
+#pylint: enable=too-many-locals
 
 def set_x_axis(quantity, planets):
     """Set the x axis appropriately for the givne quantity."""
@@ -768,10 +810,14 @@ def set_x_axis(quantity, planets):
         pyplot.xscale('log')
         pyplot.autoscale()
 
+#TODO: look into simplifying
+#pylint: disable=too-many-statements
+#pylint: disable=too-many-locals
 def plot_lgQ_vs(lgQ_x_axes,
                 progress,
                 cmdline_args,
                 interpolator,
+                *,
                 plot_fname=None,
                 save_plot=True,
                 label='',
@@ -896,8 +942,11 @@ def plot_lgQ_vs(lgQ_x_axes,
             distinguish=is_giant[limit_flags['lower']]
         )
 
+        #False positive
+        #pylint: disable=assignment-from-no-return
         selected = numpy.logical_and(plot_lgQ['nominal'] > 3.5,
                                      limit_flags['two_sided'])
+        #pylint: enable=assignment-from-no-return
         add_points(
             plot_x=plot_x[x_index, selected],
             plot_y=plot_lgQ['nominal'][selected],
@@ -946,7 +995,12 @@ def plot_lgQ_vs(lgQ_x_axes,
         else:
             plot_lgQ_vs.color_index += 1
             print('Awaiting more points')
+#pylint: enable=too-many-statements
+#pylint: enable=too-many-locals
 
+#TODO: look into simplifying
+#pylint: disable=too-many-statements
+#pylint: disable=too-many-locals
 def plot_lgQ_change_vs(*,
                        lgQ_x_axes,
                        progress,
@@ -996,6 +1050,8 @@ def plot_lgQ_change_vs(*,
         assumed_default_density = first_assumed_default_density[first_in_second]
         is_giant = first_is_giant[first_in_second]
 
+        #False positives
+        #pylint: disable=assignment-from-no-return
         limit_flags['two_sided'] = numpy.logical_and(
             limit_flags['two_sided'],
             second_limit_flags['two_sided']
@@ -1026,6 +1082,7 @@ def plot_lgQ_change_vs(*,
             ),
             numpy.logical_not(limit_flags['two_sided'])
         )
+        #pylint: enable=assignment-from-no-return
 
         assert (second_plot_x[:, second_in_first] == plot_x).all()
         assert (second_assumed_default_density[second_in_first]
@@ -1089,10 +1146,13 @@ def plot_lgQ_change_vs(*,
                 ]
 
             for sub_include in sub_include_list:
+                #False positive
+                #pylint: disable=assignment-from-no-return
                 plot_include = numpy.logical_and(
                     sub_include,
                     numpy.abs(plot_y2 - plot_y1) < 1
                 )
+                #pylint: enable=assignment-from-no-return
                 pyplot.errorbar(
                     x=plot_x[plot_include],
                     y=plot_y1[plot_include],
@@ -1140,8 +1200,11 @@ def plot_lgQ_change_vs(*,
             distinguish=is_giant[limit_flags['lower']]
         )
 
+        #False positive
+        #pylint: disable=assignment-from-no-return
         selected = numpy.logical_and(first_lgQ['nominal'] > 3.5,
                                      limit_flags['two_sided'])
+        #pylint: enable=assignment-from-no-return
 
         add_points(
             plot_x=plot_x[x_index, selected],
@@ -1165,6 +1228,8 @@ def plot_lgQ_change_vs(*,
                 dict(x_label=lgQ_x_axes[x_index][0].replace('/', ':'))
             )
             pyplot.cla()
+#pylint: enable=too-many-statements
+#pylint: enable=too-many-locals
 #pylint: enable=invalid-name
 
 def load_progress(progress_pickle):
@@ -1181,22 +1246,22 @@ def dataset_label(cmdline_args):
     if cmdline_args.nasa_data is not None:
         assert not cmdline_args.use_binary_stars
         return 'Exoplanets'
-    else:
-        if (
-                (
-                    isinstance(cmdline_args.use_binary_stars, bool)
-                    and
-                    cmdline_args.use_binary_stars
-                )
-                or
-                cmdline_args.use_binary_stars.upper() == 'NGC188'
-        ):
-            return 'NGC 188'
-        elif cmdline_args.use_binary_stars.upper() == 'NGC6819':
-            return 'NGC 6819'
-        else:
-            assert False
+    if (
+            (
+                isinstance(cmdline_args.use_binary_stars, bool)
+                and
+                cmdline_args.use_binary_stars
+            )
+            or
+            cmdline_args.use_binary_stars.upper() == 'NGC188'
+    ):
+        return 'NGC 188'
+    if cmdline_args.use_binary_stars.upper() == 'NGC6819':
+        return 'NGC 6819'
 
+    raise RuntimeError('Unrecognized input dataset: '
+                       +
+                       repr(cmdline_args.use_binary_stars))
 
 def main():
     """Avoid adding things to global namespace."""
@@ -1243,7 +1308,6 @@ def main():
             plot_cmdline_args.pretend_min_eccentricity = (
                 cmdline_args.pretend_min_eccentricity
             )
-
 
             arguments = dict(progress=progress,
                              lgQ_x_axes=cmdline_args.lgQ_x_axis,

@@ -10,8 +10,8 @@ import numpy
 import pandas
 
 from planetary_system_io import read_cds_pipe_table
-from .fit_ngc6819_masses import fit_milliman
-from .command_line_utilities import data_dir
+from fit_ngc6819_masses import fit_milliman
+from command_line_utilities import data_dir
 
 def get_nasa_system(system_id, nasa_systems):
     """
@@ -109,7 +109,7 @@ def get_quantity(value, plus_error, minus_error, unit):
     return result
 
 def create_binary_star_systems(single_lined_data, double_lined_data, age, feh):
-    """Return a properly created system from the given record."""
+    """Return properly formatted systems from NGC6819 and NGC188 orbit fits."""
 
     def create_single_system(record):
         """Create a single system from the given record."""
@@ -314,6 +314,66 @@ def read_geller_et_al_2009_binaries(
                                       double_lined_data,
                                       ngc188_age,
                                       ngc188_feh)
+
+def format_hyades_praesepe_binaries(systems, age, feh):
+    """Format the given systems from Hyades or Praesepe format."""
+
+    def format_system(input_sys):
+        """Re-format the given system to attributes with proper names."""
+
+        def get_parameter(param_name):
+            """Add error attributes to the given quantity."""
+
+            quantity = input_sys[param_name]
+            if param_name.startswith('ModelM'):
+                #False positive
+                #pylint: disable=no-member
+                error = 0.0 * units.M_sun
+                #pylint: enable=no-member
+            else:
+                error = input_sys['err' + param_name]
+
+            if isinstance(error, tuple):
+                plus_error, minus_error = error
+            else:
+                plus_error = minus_error = error
+
+            if isinstance(quantity, float):
+                result = units.Quantity(quantity, unit='')
+                result.plus_error = units.Quantity(plus_error, unit='')
+                result.minus_error = units.Quantity(minus_error, unit='')
+            else:
+                result = units.Quantity(quantity)
+                result.plus_error = plus_error
+                result.minus_error = minus_error
+            return result
+
+        if input_sys['ModelM1'] > 1.2:
+            masses = dict(
+                primary_mass=get_parameter('ModelM2'),
+                secondary_mass=get_parameter('ModelM1'),
+                secondary_radius=get_quantity(1.0, 0.1, 0.1, 'R_sun')
+            )
+        else:
+            masses = dict(
+                primary_mass=get_parameter('ModelM1'),
+                secondary_mass=get_parameter('ModelM2')
+            )
+
+        return SimpleNamespace(
+            hostname=input_sys['ID'],
+            age=age,
+            feh=feh,
+            eccentricity=get_parameter('Ecc'),
+            eccentricity_limit=False,
+            orbital_period=get_parameter('Porb'),
+            **masses
+        )
+
+    return [
+        format_system(input_sys)
+        for input_sys in filter(lambda s: s['member'], systems)
+    ]
 
 def init_progress_pickle(cmdline_args):
     """

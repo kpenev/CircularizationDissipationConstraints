@@ -3,7 +3,6 @@
 
 #Single lined:
 
-from matplotlib import pyplot
 from astropy import units as u
 
 reference_urls = [

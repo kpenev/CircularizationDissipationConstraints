@@ -7,7 +7,7 @@ from matplotlib import pyplot
 import scipy
 import scipy.interpolate
 
-from .command_line_utilities import data_dir
+from command_line_utilities import data_dir
 
 class IsochroneFileIterator:
     """

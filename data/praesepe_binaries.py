@@ -87,9 +87,8 @@ def read_systems(
         #pylint: enable=no-member
     return result
 
-systems = read_systems()
-
 if __name__ == '__main__':
+    systems = read_systems()
     keys = list(systems[0].keys())
     keys.remove('ID')
     for sys in systems:
