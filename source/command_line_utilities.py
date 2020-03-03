@@ -107,7 +107,7 @@ def add_assumptions_cmdline_args(parser):
         type=float,
         default=2.0,
         help='A default density in g/cm^3 to assume for small planets for which'
-        ' mass is unknown'
+        ' mass is unknown. Default: %(default)s'
     )
     parser.add_argument(
         '--stellar-lgQ',
@@ -120,6 +120,13 @@ def add_assumptions_cmdline_args(parser):
         type=float,
         default=0.55,
         help='The initial eccentrcicity to assume.'
+    )
+    parser.add_argument(
+        '--resolve-secondary-mass-range',
+        choices=['amin', 'amax', 'mean'],
+        default='mean',
+        help='How to handle a two-sided range of possible secondary masses. '
+        'Only used for Hyades/Preasepe data. Default: %(default)s'
     )
 
 def add_path_cmdline_args(parser):
