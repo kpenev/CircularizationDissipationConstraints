@@ -315,7 +315,10 @@ def read_geller_et_al_2009_binaries(
                                       ngc188_age,
                                       ngc188_feh)
 
-def format_hyades_praesepe_binaries(systems, age, feh):
+def format_hyades_praesepe_binaries(systems,
+                                    age,
+                                    feh,
+                                    resolve_secondary_mass_range):
     """Format the given systems from Hyades or Praesepe format."""
 
     def format_system(input_sys):
@@ -330,6 +333,13 @@ def format_hyades_praesepe_binaries(systems, age, feh):
                 #pylint: disable=no-member
                 error = 0.0 * units.M_sun
                 #pylint: enable=no-member
+                if param_name == 'ModelM2' and quantity.size == 2:
+                    quantity = getattr(
+                        numpy,
+                        resolve_secondary_mass_range
+                    )(
+                        quantity
+                    )
             else:
                 error = input_sys['err' + param_name]
 
@@ -337,6 +347,9 @@ def format_hyades_praesepe_binaries(systems, age, feh):
                 plus_error, minus_error = error
             else:
                 plus_error = minus_error = error
+
+            plus_error = plus_error or 0.0
+            minus_error = minus_error or 0.0
 
             if isinstance(quantity, float):
                 result = units.Quantity(quantity, unit='')
@@ -348,7 +361,13 @@ def format_hyades_praesepe_binaries(systems, age, feh):
                 result.minus_error = minus_error
             return result
 
-        if input_sys['ModelM1'] > 1.2:
+        if 'ModelM1' not in input_sys:
+            nan_mass = get_quantity(numpy.nan, numpy.nan, numpy.nan, 'M_sun')
+            masses = dict(
+                primary_mass=nan_mass,
+                secondary_mass=nan_mass,
+            )
+        elif input_sys['ModelM1'] > 1.2 * units.M_sun:
             masses = dict(
                 primary_mass=get_parameter('ModelM2'),
                 secondary_mass=get_parameter('ModelM1'),
@@ -372,7 +391,14 @@ def format_hyades_praesepe_binaries(systems, age, feh):
 
     return [
         format_system(input_sys)
-        for input_sys in filter(lambda s: s['member'], systems)
+        for input_sys in filter(
+                lambda s: (
+                    s['member']
+                    and
+                    s['ID'] not in ['J271', 'vB75', 'vB176']
+                ),
+                systems
+        )
     ]
 
 def init_progress_pickle(cmdline_args):
