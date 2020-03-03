@@ -27,8 +27,8 @@ def _solve_line(x0, y0, x1, y1, target_y):
     result = (target_y - y0) * (x0 - x1) / (y0 - y1) + x0
     return result if x0 <= result <= x1 else None
 
-class EccentricityEnvelope:
-    """Class for working with the eccentricity envelovpe."""
+class LinearEccentricityEnvelope:
+    """Piecewise-linear model for the eccentricity envelovpe."""
 
     def _eccentricity_envelope_line(self, orbital_period):
         """Evaluate the straight line portion of the eccentricity envelope."""
@@ -82,6 +82,44 @@ class EccentricityEnvelope:
             self.max_eccentricity
             +
             self.min_period
+        )
+
+class MeibomEccentricityEnvelope:
+    """Model for the eccentricity envelope after Meibom & Mathieu 2004."""
+
+    def __init__(self, min_period, alpha, beta, gamma):
+        """Set the parameters defining the envelope."""
+
+        self.min_period = min_period
+        self.alpha = alpha
+        self.beta = beta
+        self.gamma = gamma
+
+    def __call__(self, orbital_period):
+        """Return the envelope at the given orbital period."""
+
+        return self.alpha * (
+            1.0
+            -
+            numpy.exp(
+                self.beta
+                *
+                numpy.minimum(
+                    (self.min_period - orbital_period),
+                    0.0
+                )
+            )
+        )**self.gamma
+
+    def get_period(self, eccentricity):
+        """Return the period where the e-envelope has the given value."""
+
+        return (
+            self.min_period
+            -
+            1.0 / self.beta
+            *
+            numpy.log(1.0 - (eccentricity / self.alpha)**(1.0 / self.gamma))
         )
 
 def invert_eccentricity_vs_lgQ(eccentricity_vs_lgQ,

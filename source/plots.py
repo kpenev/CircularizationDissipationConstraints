@@ -37,6 +37,7 @@ from planetary_system_io import read_nasa_planets
 #False positive
 #pylint: disable=import-error
 import praesepe_binaries
+import hyades_binaries
 #pylint: enable=import-error
 from io_utilities import\
     load_progress_pickle,\
@@ -48,7 +49,11 @@ from calculate_e_Q_grid import prepare_nasa_system, fix_semimajor
 from process_e_Q_grid import\
     format_eccentricity_vs_lgQ,\
     invert_eccentricity_vs_lgQ,\
-    EccentricityEnvelope
+    LinearEccentricityEnvelope,\
+    MeibomEccentricityEnvelope
+from command_line_utilities import\
+    add_path_cmdline_args,\
+    add_assumptions_cmdline_args
 #pylint:enable=wrong-import-position
 
 def parse_command_line():
@@ -86,7 +91,7 @@ def parse_command_line():
         "included (see --plot)."
     )
     parser.add_argument(
-        '--progress-pickle', '--progress',
+        '--first-progress-pickle',
         default=[],
         action='append',
         help='The filename where the calculated eccentricities were saved, or '
@@ -159,6 +164,8 @@ def parse_command_line():
         help='If passed plots are generated assuming all systems minimum '
         'eccentricity has the given value.'
     )
+    add_path_cmdline_args(parser)
+    add_assumptions_cmdline_args(parser)
     result = parser.parse_args()
     return result
 
@@ -273,14 +280,21 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
                 systems = read_geller_et_al_2009_binaries()
             elif cmdline_args.use_binary_stars.upper() == 'NGC6819':
                 systems = read_milliman_et_al_2014_binaries()
-            elif cmdline_args.use_binary_stars.upper() == 'HyadesPreasepe':
+            elif cmdline_args.use_binary_stars.upper().startswith('PRAESEPE'):
                 systems = format_hyades_praesepe_binaries(
-                    praesepe_binaries.read_systems(),
+                    (
+                        praesepe_binaries.read_systems()
+                        +
+                        hyades_binaries.systems
+                    ),
                     #False positive
                     #pylint: disable=no-member
                     age=630.0 * units.Myr,
                     #pylint: enable=no-member
-                    feh=0.21
+                    feh=0.21,
+                    resolve_secondary_mass_range=(
+                        cmdline_args.resolve_secondary_mass_range
+                    )
                 )
             field_names = ['pl_orbper',
                            'pl_orbeccen',
@@ -306,6 +320,7 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
             result = PlotSystem(*(numpy.empty(num_systems, dtype=float) * unit
                                   for unit in field_units))
             for sys_index, system in enumerate(systems):
+                print('Adding system: ' + repr(system))
                 result.pl_orbper[sys_index] = system.orbital_period
                 result.pl_orbeccen[sys_index] = system.eccentricity
                 result.pl_orbeccenlim[sys_index] = False
@@ -396,10 +411,14 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
         ):
             pyplot.plot([3.0, 20.0], [0, 0.6], '-k', zorder=100)
             pyplot.ylim((0, 0.6))
-        else:
-            assert cmdline_args.use_binary_stars.upper() == 'NGC6819'
+        elif cmdline_args.use_binary_stars.upper() == 'NGC6819':
             pyplot.plot([2.1, 18.0], [0, 0.6], '-k')
             pyplot.ylim((0, 0.8))
+        elif cmdline_args.use_binary_stars.upper().startswith('PRAESEPE'):
+            envelope = MeibomEccentricityEnvelope(5.7, 0.65, 10.0, 1.0)
+            plot_x = numpy.logspace(0.0, 2.0, 1000)
+            pyplot.plot(plot_x, envelope(plot_x), '-k')
+            pyplot.ylim((0, 1.0))
         pyplot.xlim((2.0, 100))
 
 
@@ -414,19 +433,7 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
     pyplot.xlabel('$P_{orb}$ [days]')
     pyplot.ylabel('eccentricity')
     if hasattr(cmdline_args, 'use_binary_stars'):
-        pyplot.title(
-            'NGC 188' if (
-                isinstance(cmdline_args.use_binary_stars, bool)
-                and
-                cmdline_args.use_binary_stars
-            ) else (
-                cmdline_args.use_binary_stars.upper()[:3]
-                +
-                ' '
-                +
-                cmdline_args.use_binary_stars.upper()[3:]
-            )
-        )
+        pyplot.title(get_dataset_label(cmdline_args))
     else:
         pyplot.title('Exoplanets')
     if plot_fname is None:
@@ -1240,7 +1247,7 @@ def load_progress(progress_pickle):
         progress = load_progress_pickle(progress_file)
     return pickled_cmdline_args, progress
 
-def dataset_label(cmdline_args):
+def get_dataset_label(cmdline_args):
     """Return a label to use for the dataset from a progress pickle."""
 
     if cmdline_args.nasa_data is not None:
@@ -1256,12 +1263,10 @@ def dataset_label(cmdline_args):
             cmdline_args.use_binary_stars.upper() == 'NGC188'
     ):
         return 'NGC 188'
-    if cmdline_args.use_binary_stars.upper() == 'NGC6819':
-        return 'NGC 6819'
+    if cmdline_args.use_binary_stars.upper().startswith('NGC'):
+        return 'NGC ' + cmdline_args.use_binary_stars.upper()[3:]
 
-    raise RuntimeError('Unrecognized input dataset: '
-                       +
-                       repr(cmdline_args.use_binary_stars))
+    return cmdline_args.use_binary_stars.upper()
 
 def main():
     """Avoid adding things to global namespace."""
@@ -1278,20 +1283,27 @@ def main():
                             cmdline_args.axes_vspan - cmdline_args.axes_vshift])
     #pylint: enable=unused-variable
 
-    pickled_cmdline_args = load_progress(cmdline_args.progress_pickle[0])[0]
+    pickled_cmdline_args = (
+        load_progress(cmdline_args.first_progress_pickle[0])[0]
+        if cmdline_args.first_progress_pickle else
+        None
+    )
 
     if getattr(cmdline_args, 'second_progress_pickle', None):
         second_progress = load_progress(cmdline_args.second_progress_pickle)[1]
 
-    interpolator = StellarEvolutionManager(
-        pickled_cmdline_args.stellar_evolution_interpolator_dir
-        if cmdline_args.overwrite_interpolator is None else
-        cmdline_args.overwrite_interpolator
-    ).get_interpolator_by_name(
-        'default'
-    )
+    if pickled_cmdline_args is not None:
+        interpolator = StellarEvolutionManager(
+            pickled_cmdline_args.stellar_evolution_interpolator_dir
+            if cmdline_args.overwrite_interpolator is None else
+            cmdline_args.overwrite_interpolator
+        ).get_interpolator_by_name(
+            'default'
+        )
 
-    print('Processing progress pickles: ' + repr(cmdline_args.progress_pickle))
+    print('Processing progress pickles: '
+          +
+          repr(cmdline_args.first_progress_pickle))
 
     for plot_type in cmdline_args.plot:
         if cmdline_args.plot_fname is None:
@@ -1301,28 +1313,33 @@ def main():
                 plot_type=plot_type,
                 x_label=('%(x_label)s' if plot_type == 'lgQ_vs' else '')
             )
-        for plot_pickle in cmdline_args.progress_pickle:
+        for plot_pickle in (cmdline_args.first_progress_pickle or [None]):
             print('Plotting pickle: ' + repr(plot_pickle))
-            plot_cmdline_args, progress = load_progress(plot_pickle)
-            plot_cmdline_args.pickle_systems = cmdline_args.pickle_systems
-            plot_cmdline_args.pretend_min_eccentricity = (
-                cmdline_args.pretend_min_eccentricity
-            )
-
+            if plot_pickle is None:
+                plot_cmdline_args = cmdline_args
+                progress = interpolator = None
+            else:
+                plot_cmdline_args, progress = load_progress(plot_pickle)
+                plot_cmdline_args.pickle_systems = cmdline_args.pickle_systems
+                plot_cmdline_args.pretend_min_eccentricity = (
+                    cmdline_args.pretend_min_eccentricity
+                )
             arguments = dict(progress=progress,
                              lgQ_x_axes=cmdline_args.lgQ_x_axis,
                              cmdline_args=plot_cmdline_args,
                              interpolator=interpolator,
                              plot_fname=plot_fname,
-                             label=dataset_label(plot_cmdline_args))
+                             label=get_dataset_label(plot_cmdline_args))
             if plot_type == 'lgQ_change_vs':
                 arguments['second_progress'] = second_progress
 
             globals()['plot_' + plot_type](
                 save_plot=(
+                    not cmdline_args.first_progress_pickle
+                    or
                     plot_pickle
                     ==
-                    cmdline_args.progress_pickle[-1]
+                    cmdline_args.first_progress_pickle[-1]
                 ),
                 **arguments
             )
