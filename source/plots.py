@@ -277,16 +277,11 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
                     or
                     cmdline_args.use_binary_stars.upper() == 'NGC188'
             ):
-                systems = read_geller_et_al_2009_binaries()
+                systems = [read_geller_et_al_2009_binaries()]
             elif cmdline_args.use_binary_stars.upper() == 'NGC6819':
-                systems = read_milliman_et_al_2014_binaries()
+                systems = [read_milliman_et_al_2014_binaries()]
             elif cmdline_args.use_binary_stars.upper().startswith('PRAESEPE'):
-                systems = format_hyades_praesepe_binaries(
-                    (
-                        praesepe_binaries.read_systems()
-                        +
-                        hyades_binaries.systems
-                    ),
+                format_kwargs = dict(
                     #False positive
                     #pylint: disable=no-member
                     age=630.0 * units.Myr,
@@ -296,6 +291,17 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
                         cmdline_args.resolve_secondary_mass_range
                     )
                 )
+                systems = [
+                    format_hyades_praesepe_binaries(
+                        praesepe_binaries.read_systems(),
+                        **format_kwargs
+                    ),
+                    format_hyades_praesepe_binaries(
+                        hyades_binaries.systems,
+                        **format_kwargs
+                    )
+                ]
+
             field_names = ['pl_orbper',
                            'pl_orbeccen',
                            'pl_orbeccenlim',
@@ -315,23 +321,27 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
                            #pylint: enable=no-member
             PlotSystem = collections.namedtuple('PlotSystem',
                                                 field_names)
-            num_systems = len(systems)
 
-            result = PlotSystem(*(numpy.empty(num_systems, dtype=float) * unit
-                                  for unit in field_units))
-            for sys_index, system in enumerate(systems):
-                print('Adding system: ' + repr(system))
-                result.pl_orbper[sys_index] = system.orbital_period
-                result.pl_orbeccen[sys_index] = system.eccentricity
-                result.pl_orbeccenlim[sys_index] = False
-                result.pl_orbeccenerr1[sys_index] = (
-                    system.eccentricity.plus_error
+            result = []
+            for system_collection in systems:
+                num_systems = len(system_collection)
+                result.append(
+                    PlotSystem(*(numpy.empty(num_systems, dtype=float) * unit
+                                 for unit in field_units))
                 )
-                result.pl_orbeccenerr2[sys_index] = (
-                    system.eccentricity.minus_error
-                )
-                result.primary_mass[sys_index] = system.primary_mass
-                result.secondary_mass[sys_index] = system.secondary_mass
+                for sys_index, system in enumerate(system_collection):
+                    print('Adding system: ' + repr(system))
+                    result[-1].pl_orbper[sys_index] = system.orbital_period
+                    result[-1].pl_orbeccen[sys_index] = system.eccentricity
+                    result[-1].pl_orbeccenlim[sys_index] = False
+                    result[-1].pl_orbeccenerr1[sys_index] = (
+                        system.eccentricity.plus_error
+                    )
+                    result[-1].pl_orbeccenerr2[sys_index] = (
+                        system.eccentricity.minus_error
+                    )
+                    result[-1].primary_mass[sys_index] = system.primary_mass
+                    result[-1].secondary_mass[sys_index] = system.secondary_mass
 
             return result
 
@@ -375,35 +385,38 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
     def plot_binaries(systems):
         """Create e(p) plot for binary stars, i.e. marking primary mass."""
 
-        #False positive
-        #pylint: disable=no-member
-        hot = systems.primary_mass > 1.4 * units.M_sun
-        cool = systems.primary_mass < 1.2 * units.M_sun
-        #pylint: enable=no-member
-        #False positive
-        #pylint: disable=assignment-from-no-return
-        unknown = numpy.logical_and(numpy.logical_not(cool),
-                                    numpy.logical_not(hot))
-        #pylint: enable=assignment-from-no-return
-#        plot_selection(systems,
-#                       cool,
-#                       fmt='or',
-#                       markersize=10,
-#                       label='cool')
-#        plot_selection(systems,
-#                       hot,
-#                       fmt='sb',
-#                       markersize=15,
-#                       label='hot')
-#        plot_selection(systems,
-#                       unknown,
-#                       fmt='vg',
-#                       markersize=15,
-#                       label='unknown')
-        plot_selection(systems,
-                       None,
-                       fmt='og',
-                       markersize=15)
+
+        for plot_systems in systems:
+            #False positive
+            #pylint: disable=no-member
+            hot = plot_systems.primary_mass > 1.4 * units.M_sun
+            cool = plot_systems.primary_mass < 1.2 * units.M_sun
+            #pylint: enable=no-member
+            #False positive
+            #pylint: disable=assignment-from-no-return
+            unknown = numpy.logical_and(numpy.logical_not(cool),
+                                        numpy.logical_not(hot))
+            #pylint: enable=assignment-from-no-return
+    #        plot_selection(plot_systems,
+    #                       cool,
+    #                       fmt='or',
+    #                       markersize=10,
+    #                       label='cool')
+    #        plot_selection(plot_systems,
+    #                       hot,
+    #                       fmt='sb',
+    #                       markersize=15,
+    #                       label='hot')
+    #        plot_selection(plot_systems,
+    #                       unknown,
+    #                       fmt='vg',
+    #                       markersize=15,
+    #                       label='unknown')
+
+            plot_selection(plot_systems,
+                           None,
+                           fmt='o',
+                           markersize=15)
         if (
                 isinstance(cmdline_args.use_binary_stars, bool)
                 and
