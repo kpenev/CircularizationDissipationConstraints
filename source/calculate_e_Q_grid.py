@@ -4,6 +4,8 @@
 """Calculate final eccentricity vs Q on a grid of Q values for a system."""
 
 from multiprocessing import Pool, Manager
+import sys
+import os.path
 
 import numpy
 from astropy import units, constants
@@ -16,17 +18,38 @@ from orbital_evolution.evolve_interface import library as\
 from planetary_system_io import read_nasa_planets
 from binary_utils import calculate_secondary_mass
 
+sys.path.append(
+    os.path.join(
+        os.path.dirname(
+            os.path.dirname(
+                os.path.abspath(__file__)
+            )
+        ),
+        'data'
+    )
+)
+
+#Need to update module search paths before importing
+#pylint: disable=wrong-import-position
+
+#False positive
+#pylint: disable=import-error
+import praesepe_binaries
+import hyades_binaries
+#pylint: enable=import-error
 from io_utilities import\
     get_nasa_system,\
     read_geller_et_al_2009_binaries,\
     read_milliman_et_al_2014_binaries,\
-    init_progress_pickle
+    init_progress_pickle,\
+    format_hyades_praesepe_binaries
 from command_line_utilities import\
     fix_system_units,\
     add_info_cmdline_args,\
     add_assumptions_cmdline_args,\
     add_path_cmdline_args
 from current_eccentricity_calculator import CurrentEccentricityCalculator
+#pylint: enable=wrong-import-position
 
 def parse_command_line():
     """Return the parsed command line as attributes of an object."""
@@ -55,6 +78,8 @@ def fix_semimajor(system):
     """Calculate the semimajor axis if not already in the system."""
 
     if not numpy.isfinite(getattr(system, 'semimajor', numpy.nan)):
+        #False positive
+        #pylint: disable=no-member
         system.semimajor = (
             constants.G * (system.primary_mass + system.secondary_mass)
             *
@@ -62,6 +87,7 @@ def fix_semimajor(system):
             /
             (4.0 * numpy.pi**2)
         )**(1.0 / 3.0)
+        #pylint: enable=no-member
 
 def prepare_nasa_system(system,
                         interpolator,
@@ -128,16 +154,18 @@ def prepare_nasa_system(system,
                     eccentricity=system.eccentricity
                 )
             else:
-                #False positive
-                #pylint: disable=no-member
-                assert system.secondary_radius < 5.0 * units.earthRad
+                assert (
+                    #False positive
+                    #pylint: disable=no-member
+                    system.secondary_radius < 5.0 * units.earthRad
+                    #pylint: enable=no-member
+                )
                 system.secondary_mass = (
                     small_planet_density
                     *
                     4.0 / 3.0 * numpy.pi * system.secondary_radius**3
                 )
                 system.assumed_default_density = True
-                #pylint: enable=no-member
 
     def fix_eccentricity():
         """Use backup methods for calculating eccentricity if unknown."""
@@ -231,16 +259,52 @@ def main():
             except AssertionError:
                 pass
     if cmdline_args.use_binary_stars:
-        evolution_systems.extend(
-            filter(
-                lambda s: s.orbital_period < 50.0 * units.day,
-                (
-                    read_geller_et_al_2009_binaries()
-                    if cmdline_args.use_binary_stars.upper() == 'NGC188' else
-                    read_milliman_et_al_2014_binaries()
+        if cmdline_args.use_binary_stars.upper() == 'NGC188':
+            candidate_systems = read_geller_et_al_2009_binaries()
+        elif cmdline_args.use_binary_stars.upper() == 'NGC6819':
+            candidate_systems = read_milliman_et_al_2014_binaries()
+        else:
+            assert cmdline_args.use_binary_stars.upper() == 'PRAESEPE/HYADES'
+            candidate_systems = (
+                format_hyades_praesepe_binaries(
+                    praesepe_binaries.read_systems(),
+                    #False positive
+                    #pylint: disable=no-member
+                    age=670.0 * units.Myr,
+                    #pylint: enable=no-member
+                    feh=0.156,
+                    resolve_secondary_mass_range=(
+                        cmdline_args.resolve_secondary_mass_range
+                    )
+                )
+                +
+                format_hyades_praesepe_binaries(
+                    hyades_binaries.systems,
+                    #False positive
+                    #pylint: disable=no-member
+                    age=635.0 * units.Myr,
+                    #pylint: enable=no-member
+                    feh=0.146,
+                    resolve_secondary_mass_range=(
+                        cmdline_args.resolve_secondary_mass_range
+                    )
                 )
             )
+        #False positive
+        #pylint: disable=no-member
+        evolution_systems.extend(
+            filter(
+                lambda s: (
+                    s.orbital_period < 50.0 * units.day
+                    and
+                    numpy.isfinite(s.primary_mass)
+                    and
+                    numpy.isfinite(s.secondary_mass)
+                ),
+                candidate_systems
+            )
         )
+        #pylint: enable=no-member
 
     if cmdline_args.orbital_period is not None:
         evolution_systems.append(
