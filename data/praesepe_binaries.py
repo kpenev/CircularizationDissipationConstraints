@@ -22,10 +22,12 @@ def read_systems(
     orbits = scipy.genfromtxt(orbits_fname,
                               dtype=None,
                               names=True,
+                              comments='#',
                               delimiter=',')
     orbit_errors = scipy.genfromtxt(orbit_errors_fname,
                                     dtype=None,
                                     names=True,
+                                    comments='#',
                                     delimiter=',')
     mass_fits = scipy.genfromtxt(mass_fits_fname,
                                  dtype=None,
