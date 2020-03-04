@@ -164,6 +164,13 @@ def parse_command_line():
         help='If passed plots are generated assuming all systems minimum '
         'eccentricity has the given value.'
     )
+    parser.add_argument(
+        '--split-by-temperature',
+        action='store_true',
+        default=False,
+        help='Should the eccentricity vs orbital period plot distinguish '
+        'between systems with hot vs cold primary/host stars.'
+    )
     add_path_cmdline_args(parser)
     add_assumptions_cmdline_args(parser)
     result = parser.parse_args()
@@ -172,12 +179,29 @@ def parse_command_line():
 def get_eccentricity_envelope(cmdline_args):
     """Return an EccentricityEnvelope instance set-up per the command line."""
 
-    return LinearEccentricityEnvelope(
-        min_period=(3.0 if cmdline_args.nasa_data is None else 0.8),
-        max_period=(20.0 if cmdline_args.nasa_data is None else 5.0),
-        max_eccentricity=0.6
-    )
+    if cmdline_args.nasa_data is None:
+        if (
+                (
+                    isinstance(cmdline_args.use_binary_stars, bool)
+                    and
+                    cmdline_args.use_binary_stars
+                )
+                or
+                cmdline_args.use_binary_stars.upper() == 'NGC188'
+        ):
+            return LinearEccentricityEnvelope(min_period=3.0,
+                                              max_period=20.0,
+                                              max_eccentricity=0.6)
+        if cmdline_args.use_binary_stars.upper() == 'NGC6819':
+            return LinearEccentricityEnvelope(min_period=2.1,
+                                              max_period=18.0,
+                                              max_eccentricity=0.6)
+        if cmdline_args.use_binary_stars.upper().startswith('PRAESEPE'):
+            return MeibomEccentricityEnvelope(5.7, 0.65, 10.0, 1.0)
 
+    return LinearEccentricityEnvelope(min_period=0.8,
+                                      max_period=5.0,
+                                      max_eccentricity=0.6)
 #Handling the multiple cases is the whole point
 #pylint: disable=too-many-return-statements
 #False positive with astropy
@@ -378,62 +402,53 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
                        label='unknown',
                        zorder=30)
 
-        pyplot.plot([0.8, 5.0], [0, 0.6], '-k')
         pyplot.xlim((0.7, 20))
-        pyplot.ylim((0, 0.8))
 
     def plot_binaries(systems):
         """Create e(p) plot for binary stars, i.e. marking primary mass."""
 
 
         for plot_systems in systems:
-            #False positive
-            #pylint: disable=no-member
-            hot = plot_systems.primary_mass > 1.4 * units.M_sun
-            cool = plot_systems.primary_mass < 1.2 * units.M_sun
-            #pylint: enable=no-member
-            #False positive
-            #pylint: disable=assignment-from-no-return
-            unknown = numpy.logical_and(numpy.logical_not(cool),
-                                        numpy.logical_not(hot))
-            #pylint: enable=assignment-from-no-return
-    #        plot_selection(plot_systems,
-    #                       cool,
-    #                       fmt='or',
-    #                       markersize=10,
-    #                       label='cool')
-    #        plot_selection(plot_systems,
-    #                       hot,
-    #                       fmt='sb',
-    #                       markersize=15,
-    #                       label='hot')
-    #        plot_selection(plot_systems,
-    #                       unknown,
-    #                       fmt='vg',
-    #                       markersize=15,
-    #                       label='unknown')
-
-            plot_selection(plot_systems,
-                           None,
-                           fmt='o',
-                           markersize=15)
-        if (
-                isinstance(cmdline_args.use_binary_stars, bool)
-                and
-                cmdline_args.use_binary_stars
-        ):
-            pyplot.plot([3.0, 20.0], [0, 0.6], '-k', zorder=100)
-            pyplot.ylim((0, 0.6))
-        elif cmdline_args.use_binary_stars.upper() == 'NGC6819':
-            pyplot.plot([2.1, 18.0], [0, 0.6], '-k')
-            pyplot.ylim((0, 0.8))
-        elif cmdline_args.use_binary_stars.upper().startswith('PRAESEPE'):
-            envelope = MeibomEccentricityEnvelope(5.7, 0.65, 10.0, 1.0)
-            plot_x = numpy.logspace(0.0, 2.0, 1000)
-            pyplot.plot(plot_x, envelope(plot_x), '-k')
-            pyplot.ylim((0, 1.0))
+            if cmdline_args.split_by_temperature:
+                #False positive
+                #pylint: disable=no-member
+                hot = plot_systems.primary_mass > 1.4 * units.M_sun
+                cool = plot_systems.primary_mass < 1.2 * units.M_sun
+                #pylint: enable=no-member
+                #False positive
+                #pylint: disable=assignment-from-no-return
+                unknown = numpy.logical_and(numpy.logical_not(cool),
+                                            numpy.logical_not(hot))
+                #pylint: enable=assignment-from-no-return
+                plot_selection(plot_systems,
+                               cool,
+                               fmt='o',
+                               markersize=10,
+                               label='cool')
+                plot_selection(plot_systems,
+                               hot,
+                               fmt='s',
+                               markersize=15,
+                               label='hot')
+                plot_selection(plot_systems,
+                               unknown,
+                               fmt='v',
+                               markersize=15,
+                               label='unknown')
+            else:
+                plot_selection(plot_systems,
+                               None,
+                               fmt='o',
+                               markersize=15)
         pyplot.xlim((2.0, 100))
 
+    def plot_envelope():
+        """Add a line showing the eccentricity envelope to the plot."""
+
+        envelope = get_eccentricity_envelope(cmdline_args)
+        plot_x = numpy.logspace(*numpy.log10(pyplot.xlim()), 1000)
+        pyplot.plot(plot_x, envelope(plot_x), '-k')
+        pyplot.ylim((0, 1.0))
 
     systems = read_systems()
 
@@ -442,6 +457,7 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
         plot_exoplanets(systems)
     else:
         plot_binaries(systems)
+    plot_envelope()
     pyplot.legend()
     pyplot.xlabel('$P_{orb}$ [days]')
     pyplot.ylabel('eccentricity')
@@ -519,7 +535,6 @@ def plot_single_lgQ_vs_e(system,
     """Show a plot of the final eccentricity vs lgQ for a system."""
 
 
-    print('System: ' + repr(system))
     plot_data = format_eccentricity_vs_lgQ(progress[system.hostname])
     pyplot.plot(plot_data[:, 0], plot_data[:, 1], '-k')
     pyplot.plot(plot_data[:, 0], plot_data[:, 1], 'ok')
@@ -529,6 +544,9 @@ def plot_single_lgQ_vs_e(system,
     envelope_eccentricity = eccentricity_envelope(
         system.orbital_period.to_value('day')
     )
+
+    print('System: ' + repr(system) + ', e_env = ' + repr(envelope_eccentricity))
+
     pyplot.axhline(y=nominal_eccentricity, color='r')
     pyplot.axhline(y=low_eccentricity, color='r')
     pyplot.axhline(envelope_eccentricity, color='b')
@@ -572,6 +590,8 @@ def plot_single_lgQ_vs_e(system,
         pyplot.cla()
 #pylint: enable=invalid-name
 
+#No reasonable way to simplify
+#pylint: disable=too-many-branches
 def get_system_list(cmdline_args, interpolator=None):
     """Return a list of systems for plotting."""
 
@@ -662,6 +682,7 @@ def get_system_list(cmdline_args, interpolator=None):
             pickle.dump(systems, system_pickle)
 
     return systems
+#pylint: enable=too-many-branches
 
 #Simplifies command line arguments.
 #pylint: disable=invalid-name
