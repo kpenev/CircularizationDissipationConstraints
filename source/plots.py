@@ -172,7 +172,7 @@ def parse_command_line():
 def get_eccentricity_envelope(cmdline_args):
     """Return an EccentricityEnvelope instance set-up per the command line."""
 
-    return EccentricityEnvelope(
+    return LinearEccentricityEnvelope(
         min_period=(3.0 if cmdline_args.nasa_data is None else 0.8),
         max_period=(20.0 if cmdline_args.nasa_data is None else 5.0),
         max_eccentricity=0.6
@@ -616,21 +616,45 @@ def get_system_list(cmdline_args, interpolator=None):
     #pylint: enable=no-member
 
     if getattr(cmdline_args, 'use_binary_stars', None):
-        systems.extend(
-            (
-                read_geller_et_al_2009_binaries()
-                if (
-                    (
-                        isinstance(cmdline_args.use_binary_stars, bool)
-                        and
-                        cmdline_args.use_binary_stars
+        if(
+                (
+                    isinstance(cmdline_args.use_binary_stars, bool)
+                    and
+                    cmdline_args.use_binary_stars
+                )
+                or
+                cmdline_args.use_binary_stars.upper() == 'NGC188'
+        ):
+            systems.extend(read_geller_et_al_2009_binaries())
+        elif cmdline_args.use_binary_stars.upper() == 'NGC6819':
+            systems.extend(read_milliman_et_al_2014_binaries())
+        else:
+            assert cmdline_args.use_binary_stars.upper() == 'PRAESEPE/HYADES'
+            systems.extend(
+                format_hyades_praesepe_binaries(
+                    praesepe_binaries.read_systems(),
+                    #False positive
+                    #pylint: disable=no-member
+                    age=670.0 * units.Myr,
+                    #pylint: enable=no-member
+                    feh=0.156,
+                    resolve_secondary_mass_range=(
+                        cmdline_args.resolve_secondary_mass_range
                     )
-                    or
-                    cmdline_args.use_binary_stars.upper() == 'NGC188'
-                ) else
-                read_milliman_et_al_2014_binaries()
+                )
+                +
+                format_hyades_praesepe_binaries(
+                    hyades_binaries.systems,
+                    #False positive
+                    #pylint: disable=no-member
+                    age=635.0 * units.Myr,
+                    #pylint: enable=no-member
+                    feh=0.146,
+                    resolve_secondary_mass_range=(
+                        cmdline_args.resolve_secondary_mass_range
+                    )
+                )
             )
-        )
 
     if cmdline_args.pickle_systems:
         with open(cmdline_args.pickle_systems, 'ab') as system_pickle:
