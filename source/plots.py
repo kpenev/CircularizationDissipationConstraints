@@ -523,7 +523,7 @@ def solve_lgQ_limits(lgQ_vs_period,
         invert_eccentricity_vs_lgQ(lgQ_vs_period,
                                    low_eccentricity),
         invert_eccentricity_vs_lgQ(lgQ_vs_period,
-                                   envelope_eccentricity,
+                                   max(envelope_eccentricity, 0.005),
                                    default_min=min(lgQ_vs_period.keys()))
     )
 
