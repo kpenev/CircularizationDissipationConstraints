@@ -382,7 +382,7 @@ def format_hyades_praesepe_binaries(systems,
         return SimpleNamespace(
             hostname=input_sys['ID'],
             age=age,
-            feh=feh,
+            feh=get_quantity(feh, 0.004, 0.004, ''),
             eccentricity=get_parameter('Ecc'),
             eccentricity_limit=False,
             orbital_period=get_parameter('Porb'),
