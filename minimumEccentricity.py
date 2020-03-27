@@ -7,7 +7,7 @@ class TransitingExoplanet:
     #actual transit period (T), transit period if its
     #orbit were circular (T_c)
 
-    KOI = 1
+    KOI = 'a'
     a = 1
     p = 1
     T = 1
@@ -100,7 +100,7 @@ for i in range(1, 10):
 
 #_______________________________________________________________________________________________________________________________________________________________________________
 
-#Data from Nasa Exoplanet archive
+#Data from planets_2019.09.18_13.19.49.csv found in the Data folder
 
 import planetary_system_io
 readPlanet = planetary_system_io.read_nasa_planets('C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2019.09.18_13.19.49.csv',
@@ -132,17 +132,37 @@ for i in range(0, (len(KOI)-1)):
         planet[j].printAttributes()
         planet = planet + [TransitingExoplanet()]
         
-    
-
+#____________________________________________________________________________________________________________________________________________________________________________    
+#Data from q1_q8_koi_2020.03.16_21.25.09.csv found in the Data folder
+print('Now Printing results from new_q1_q8_koi_2020.03.16_21.25.09.csv')
+import planetary_system_io
+readPlanet = planetary_system_io.read_nasa_planets('C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/new_q1_q8_koi_2020.03.16_21.25.09.csv',
+                     eliminate=('SWEEPS-11',
+                                'HD 41004 B',
+                                'PSR J1719-1438',
+                                'K2-22'),
+                     need_ages=False,
+                     )
 
 
 #Now we are taking data on planets from the file
-#KOI = readPlanet.kepoi_name
-#Kepler = readPlanet.kepler_name
-#a = readPlanet.koi_sma
-#P = readPlanet.koi_period
-#T = readPlanet.koi_duration
-#Rp = readPlanet.koi_prad
-#Rs = readPlanet.koi_srad
-#b = readPlanet.koi_impact
+KOI = readPlanet.kepoi_name
+Kepler = readPlanet.kepler_name
+a = readPlanet.koi_sma
+P = readPlanet.koi_period
+T = readPlanet.koi_duration
+Rp = readPlanet.koi_prad
+Rs = readPlanet.koi_srad
+b = readPlanet.koi_impact
 
+#Following command is to print the attributes of the table
+print('Planet Name', '    ', '  a', '    ', '    P', '    ', '    T', '    ', '    Rp', '   ', ' Rs', ' ', '    b', '    ', '         Tc', '    ','             delta','   ','              emin')
+
+planet = [TransitingExoplanet()]
+j = -1
+for i in range(0, (len(KOI)-1)):
+    if not(math.isnan(a[i]) or math.isnan(P[i])or math.isnan(T[i])or math.isnan(Rp[i]) or math.isnan(Rs[i]) or math.isnan(b[i])):
+        j = j + 1
+        planet[j]._init_(KOI[i], a[i], P[i], T[i], Rp[i], Rs[i], b[i])
+        planet[j].printAttributes()
+        planet = planet + [TransitingExoplanet()]
