@@ -146,7 +146,7 @@ readPlanet = planetary_system_io.read_nasa_planets('C:/Users/moham/OneDrive/Docu
 
 
 #Now we are taking data on planets from the file
-KOI = readPlanet.kepoi_name
+KOI = readPlanet.kepid
 a = readPlanet.koi_sma
 P = readPlanet.koi_period
 T = readPlanet.koi_duration
