@@ -136,7 +136,7 @@ for i in range(0, (len(KOI)-1)):
 #Data from q1_q8_koi_2020.03.16_21.25.09.csv found in the Data folder
 print('Now Printing results from q1_q8_koi_2020.03.16_21.25.09.csv')
 import planetary_system_io
-readPlanet = planetary_system_io.read_nasa_planets('C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/new_q1_q8_koi_2020.03.16_21.25.09.csv',
+readPlanet = planetary_system_io.read_nasa_planets('C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/q1_q8_koi_2020.03.16_21.25.09.csv',
                      eliminate=('SWEEPS-11',
                                 'HD 41004 B',
                                 'PSR J1719-1438',
