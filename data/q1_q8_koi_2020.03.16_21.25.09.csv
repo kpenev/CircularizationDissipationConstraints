@@ -7,7 +7,6 @@
 #,,,,,,,
 # COLUMN kepid:          KepID,,,,,,,
 # COLUMN kepoi_name:     KOI Name,,,,,,,
-# COLUMN kepler_name:    Kepler Name,,,,,,,
 # COLUMN koi_period:     Orbital Period [days],,,,,,,
 # COLUMN koi_impact:     Impact Parameter,,,,,,,
 # COLUMN koi_duration:   Transit Duration [hrs],,,,,,,
