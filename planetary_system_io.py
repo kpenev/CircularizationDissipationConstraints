@@ -365,6 +365,7 @@ def read_nasa_planets(csv_filename,
             column_name = entries[2].strip(':')
             column_index = data_columns.index(column_name)
             column_values = data[:, column_index][1:]
+            column_units = 1
             if add_units:
                 if entries[-1][-1] == ']':
                     column_units = convert_nasa_unit_to_astropy(
