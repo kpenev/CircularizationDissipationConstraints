@@ -128,7 +128,7 @@ j = -1
 for i in range(0, (len(KOI)-1)):
     if not(math.isnan(a[i]) or math.isnan(P[i])or math.isnan(T[i])or math.isnan(Rp[i]) or math.isnan(Rs[i]) or math.isnan(b[i])):
         j = j + 1
-        planet[j]._init_(KOI[i], a[i], P[i], T[i], Rp[i], Rs[i], b[i])
+        planet[j]._init_(KOI[i], a[i], P[i], T[i]*24, Rp[i], Rs[i], b[i])
         planet[j].printAttributes()
         planet = planet + [TransitingExoplanet()]
         
@@ -164,5 +164,39 @@ for i in range(0, (len(KOI)-1)):
     if not(math.isnan(a[i]) or math.isnan(P[i])or math.isnan(T[i])or math.isnan(Rp[i]) or math.isnan(Rs[i]) or math.isnan(b[i])):
         j = j + 1
         planet[j]._init_(KOI[i], a[i], P[i], T[i], Rp[i], Rs[i], b[i])
+        planet[j].printAttributes()
+        planet = planet + [TransitingExoplanet()]
+
+#_______________________________________________________________________________________________________________________________________________________________________________
+
+#Data from planets_2020.04.10_14.52.24.csv found in the Data folder
+
+import planetary_system_io
+readPlanet = planetary_system_io.read_nasa_planets('C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv',
+                     eliminate=('SWEEPS-11',
+                                'HD 41004 B',
+                                'PSR J1719-1438',
+                                'K2-22'),
+                     need_ages=False,
+                     )
+
+#Now we are taking data on planets from the file
+KOI = readPlanet.pl_name
+a = readPlanet.pl_orbsmax
+P = readPlanet.pl_orbper
+T = readPlanet.pl_trandur
+Rp = readPlanet.pl_rade
+Rs = readPlanet.st_rad
+b = readPlanet.pl_imppar
+
+#Following command is to print the attributes of the table
+print('Planet Name', '    ', '  a', '    ', '    P', '    ', '    T', '    ', '    Rp', '   ', ' Rs', ' ', '    b', '    ', '         Tc', '    ','             delta','   ','              emin')
+
+planet = [TransitingExoplanet()]
+j = -1
+for i in range(0, (len(KOI)-1)):
+    if not(math.isnan(a[i]) or math.isnan(P[i])or math.isnan(T[i])or math.isnan(Rp[i]) or math.isnan(Rs[i]) or math.isnan(b[i])):
+        j = j + 1
+        planet[j]._init_(KOI[i], a[i], P[i], T[i]*24, Rp[i], Rs[i], b[i])
         planet[j].printAttributes()
         planet = planet + [TransitingExoplanet()]
