@@ -143,7 +143,7 @@ readPlanet = planetary_system_io.read_nasa_planets('C:/Users/moham/OneDrive/Docu
                                 'K2-22'),
                      need_ages=False,
                      )
-s
+
 
 #Now we are taking data on planets from the file
 
