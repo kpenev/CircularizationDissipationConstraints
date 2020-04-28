@@ -41,6 +41,7 @@ systems = [
     ),
     dict(
         ID='vB22',
+        OtherIDs=dict(HD=27130),
         type='Double Lined',
         PInner=5.6084828 * u.day,
         errPInner=0.0000018 * u.day,
@@ -137,6 +138,7 @@ systems = [
     ),
     dict(
         ID='vB69',
+        OtherIDs=dict(HD=29291),
         type='Single Line',
         Porb=41.6570 * u.day,
         errPorb=(0.0023 * u.day, 0.0023 * u.day),
@@ -198,6 +200,7 @@ systems = [
     ),
     dict(
         ID='J301',
+        OtherIDs=dict(HD=283750),
         type='Single Lined',
         Porb=1.787797 * u.day,
         errPorb=(0.000005 * u.day, 0.000005 * u.day),
@@ -295,6 +298,7 @@ systems = [
     ),
     dict(
         ID='J331',
+        OtherIDs=dict(),
         type='Double Lined',
         Porb=8.49356 * u.day,
         errPorb=(0.00007 * u.day, 0.00007 * u.day),
@@ -513,6 +517,7 @@ systems = [
     ),
     dict(
         ID='vB34',
+        OtherIDs=dict(HR=1358, HD=27483),
         type='Double Lined',
         Porb=3.0587287 * u.day,
         errPorb=0.0000016 * u.day,
@@ -543,6 +548,7 @@ systems = [
     ),
     dict(
         ID='vB38',
+        OtherIDs=dict(HR=1368, HD=27628),
         type='Single Lined',
         Porb=2.143302 * u.day,
         errPorb=0.0000013 * u.day,
@@ -609,6 +615,7 @@ systems = [
     ),
     dict(
         ID='vB40',
+        OtherIDs=dict(HD=27691, ADS=3169),
         type='Single Lined',
         Porb=3.9996682 * u.day,
         errPorb=0.0000018 * u.day,
@@ -651,6 +658,7 @@ systems = [
     ),
     dict(
         ID='vB45',
+        OtherIDs=dict(HR=1376, HD=27749),
         type='Single Lined',
         Porb=8.416632 * u.day,
         errPorb=0.000005 * u.day,
@@ -911,6 +919,7 @@ systems = [
     ),
     dict(
         ID='vB75',
+        OtherIDs=dict(HD=28363, Hu=1080, ADS=3248),
         type='Double Lined Triple',
         PInner=21.251391 * u.day,
         errPInner=0.000033 * u.day,
@@ -1007,6 +1016,7 @@ systems = [
     ),
     dict(
         ID='J288',
+        OtherIDs=dict(HDE=286839, G7=256),
         type='Single Lined',
         Porb=1.4844952 * u.day,
         errPorb=0.0000007 * u.day,
@@ -1303,6 +1313,7 @@ systems = [
     ),
     dict(
         ID='vB117',
+        OtherIDs=dict(HDE=283882),
         type='Double Lined',
         Porb=11.927046 * u.day,
         errPorb=0.000011 * u.day,
@@ -1445,6 +1456,7 @@ systems = [
     ),
     dict(
         ID='vB62',
+        OtherIDs=dict(HD=28033),
         type='Single Lined',
         Porb=8.55089 * u.day,
         errPorb=0.00007 * u.day,
@@ -1465,6 +1477,7 @@ systems = [
     ),
     dict(
         ID='vB121',
+        OtherIDs=dict(HD=30738),
         type='Single Lined',
         Porb=5.75096 * u.day,
         errPorb=0.00003 * u.day,
@@ -1536,20 +1549,27 @@ systems = [
         errProjSemimajor2=0.04 * u.Gm,
         modelM1=1.096 * u.M_sun,#Minimum masses match spectral class
         modelM2=1.01 * u.M_sun,#Minimum masses match spectral class
-        errM2sin3i=0.002 * u.M_sun,
         member=True,
         ref=4
     )
 ]
 #pylint: disable=no-member
 
+def select_short_period_members(max_period=50 * u.day):
+    """Return a list containing only short-period member systems."""
+
+    return filter(lambda s: (s.get('Porb', s.get('PInner')) < max_period and bool(s['member'])),
+                  systems)
+
 if __name__ == '__main__':
+    for s in select_short_period_members():
+        print(s['ID'])
     print('Record contains %d systems' % len(systems))
     member_systems = list(filter(lambda s: s['member'], systems))
     porb=[s.get('Porb', float('nan') * u.day).to_value('day')
           for s in member_systems]
     eccentricity=[s.get('Ecc', float('nan')) for s in member_systems]
-    pyplot.semilogx(porb, eccentricity, 'ok')
+#    pyplot.semilogx(porb, eccentricity, 'ok')
 #    pyplot.ylim(0, 0.7)
 #    pyplot.xlim(0, 100)
-    pyplot.show()
+#    pyplot.show()
