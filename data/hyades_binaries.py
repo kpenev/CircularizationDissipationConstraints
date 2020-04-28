@@ -152,6 +152,7 @@ systems = [
         errProjSemimajor1=(0.09 * u.Gm, 0.09 * u.Gm),
         MassFunc=0.00070 * u.M_sun,
         errMassFunc=(0.00006 * u.M_sun, 0.00006 * u.M_sun),
+        modelM1=0.931,
         member=True,
         ref=0
     ),
@@ -1533,6 +1534,9 @@ systems = [
         errProjSemimajor1=0.02 * u.Gm,
         ProjSemimajor2=34.899 * u.Gm,
         errProjSemimajor2=0.04 * u.Gm,
+        modelM1=1.096 * u.M_sun,#Minimum masses match spectral class
+        modelM2=1.01 * u.M_sun,#Minimum masses match spectral class
+        errM2sin3i=0.002 * u.M_sun,
         member=True,
         ref=4
     )
