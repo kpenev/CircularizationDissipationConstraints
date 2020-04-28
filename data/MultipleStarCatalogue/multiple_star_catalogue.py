@@ -67,7 +67,6 @@ class MultipleStarCatalogue:
         assert len(identifier) == 1
         id_type, id_value = next(iter(identifier.items()))
         ids = self.index[self.index[id_type] == id_value]['IDS']
-        print('Index result: ' + repr(ids))
         if ids.empty:
             return None
         else:
