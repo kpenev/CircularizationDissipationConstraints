@@ -1,0 +1,230 @@
+#
+#   VizieR Astronomical Server vizier.u-strasbg.fr
+#    Date: 2020-04-27T21:19:09 [V1.99+ (14-Oct-2013)]
+#   In case of problem, please report to:	cds-question@unistra.fr
+#
+#
+#Coosys	J2000:	eq_FK5 J2000
+#INFO	votable-version=1.99+ (14-Oct-2013)	
+#INFO	-ref=VIZ5ea74b415fc5	
+#INFO	-out.max=unlimited	
+#INFO	queryParameters=9	
+#-oc.form=dec
+#-out.max=unlimited
+#-out.all=2
+#-nav=cat:J/A+AS/124/75&tab:{J/A+AS/124/75/remarks}&key:source=J/A+AS/124/75/remarks&HTTPPRM:&
+#-source=J/A+AS/124/75/remarks
+#-order=I
+#-out=IDS
+#-out=Rem
+#-out.all=2
+#
+
+#RESOURCE=yCat_41240075
+#Name: J/A+AS/124/75
+#Title: Multiple star catalogue (MSC) (Tokovinin 1997-1999)
+#Table	J_A_AS_124_75_remarks:
+#Name: J/A+AS/124/75/remarks
+#Title: Remarks
+#Column	IDS	(a10)	IDS(1900)	[ucd=meta.id;meta.main]
+#Column	Rem	(a80)	Remark text	[ucd=meta.note]
+IDS|Rem
+ |
+----------|--------------------------------------------------------------------------------
+00120+0819|C has RV dip of low contrast, must be binary or triple.
+00197-2743|Leinert A&A 291 L47 1994. mag.K=9.27A, 10.47B, 10.82C.  trig. par. in PASP 98 65
+00263+6642|CPM Gl 48 at 310', 10.04 dM3.5. Too wide to be physical, P=83 Myr.
+00272+0624|Second occultation companion never seen in speckle, very doubtful or >1.5"
+00275+2743|Enigma: Ba,Bb can not be less massive than 0.87 M_sun, but they are too faint!
+00307+2927|Arcturus group, 10 Gyr old, [m/H]=-0.6.
+00315+3310|Lindroos A&AS 60 183 1985; A&A 156 223 1986: age 56 My, dist. 163 pc.
+00508+5949|Comm. Astroph. 18 167 1995 Hubrig, Mathys: HgMn star.
+00508+5949|Photometry: Schoeller et al. PAZh 1998 24 283: dV(Aa-B)=0.06, dV(AP)=0.71.
+01357+2514|A: must have tertiray: K12 var, e>0! (A&A 171 157 1987)
+01537+7025|ApJS 47 247 1981 Heintz: RV period of 4y not excluded.
+01587-0049|Stephenson AJ 65 60 1965: A=G5II-III, B=G5V. Ptm(B): Eggen AJ 68 483 1963.
+01587-0049|Griffin: Aab resolvable by speckle, probably eclipsing, i~90 deg.
+02059+4412|BAAS 23 881 1991 Walker R.L.: B,C physical, D - optical.
+02066+2950|Aab: twin PMS contact binary?
+02208+6657|AJ 111 408 1996 Heintz: discussion. Companion of McAlister (CHARA 6) NOT Ab?
+02338+6007| Oh+Kim, ASP 130 269 1997: P3=18.7y, K3=0.0019d, w3=20d.
+02437+1702|Lindroos A&A 156 223 1986: age 62 My, dist. 157 pc, Av=0.21m.
+03017+4034|Masses: Gatewood AJ 109 434 1995. MkIII AB: ApJ 413 L129 1993.
+03017+4034|Lestrade et al., ApJ 410 808 1993: orbits are inclined by 100d mutually.
+03086+8433|Griffin Obs. 109 180 1989: V0(Aa) var. -0.3 km/(s.y). Hipparcos: G-solution.
+03198-1600|Dyn. parallax of AB disagrees with Hipparcos: wrong AB orbit?
+03205+2822|HIPARCOS: A is a periodic variable!
+03217+0923|A=SB2: Fekel ApJ 246 879 1981. Mentioned in Mazeh, MNRAS 263 775 1993. UR n=5.
+03380+3158|Observ. 118 138 1998 Stickland et al: SB orbit from IUE, e=0. Ab=B2V.
+03440+2333|Pleiades. Just cluster members?
+03551+1212|Masses from Fekel & Tomkin ApJ 263 289 1982. Chambliss PASP 104 663 1992.
+03577+2751|BC: Ghez AJ 106 2005 1993, B:C= 1:41 in K; A:BC=1:8 in K. Aa orbit is in fact ci
+03590+6203|NGC 1502. Mayer, A&A 288 L13 1994: O-C orbit of Bc, K1=0.0863d, mass(Bc)=18.6?
+04012-3543|AJ 111 936 1996: AC = CHARA 224, it's NOT I 152, both are seen!
+04165+2523|Lindroos A&A 156 223 1986: age 123 My, dist. 79 pc, Av=0. B: G2V, strong Li.
+04171+1449|Hyades, vB 40. C(17.8m, 62", LDS 1166) is just a cluster member?
+04207+2553|Simon et al, ApJ 443 625 1995. Leinert et al. A&A 278 129 1993.
+04220+1059|Orbit computed by Tokovinin from data of Wolff & Preston, ApJS 37 371 1978
+04233+1556|Hyades, vB 75. M.Smekhov PAZh 21 445 1995.  Also A&A 283 515 1994.
+04241+2357|Ghez et al. AJ 106 2005 1993: flux ratio of AB in K 2.69.
+04244+1525|Hyades. Combined mass 2.82 solar. Aa=SB1 - ApJS 1981 46 247; UR n=2.
+04267+1919|Leinert A&A 250 407 1991. Ghez AJ 106 2005 1993. AB inside the disk.
+04267+1919|AJ 109 2138 1995 Koerner D.W., Sargent A.I.: resolved CO emission.
+04302+0957|A was claimed to be SB5 (A&A 200 175 1988), but is likely to be SB3 or SB4.
+04307+0801|Disagreement between dynamical and HIPPARCOS parallaxes.
+04318+1457|AJ 105 220 1993: speckle, CHARA 153.  AJ 96 172 1988: SB, no orbit.
+04347+1620|Hyades. Mermillod et al A&A 283 515 1994. Mason AJ 105 220 1993.
+05014+3016|Ghez AJ 106 2005 1993. (cf. speckle catalog). IRAS 05046+3020.
+05018-0447|B is above Main Sequence, T Tau? RV(B)=+23 (T98).
+05024+0822|PQ = ADS 9712 = HD 33055, 2000: 05.0755 +08.2411, not in HIPPARCOS!
+05066+0024|Orbit computed by Tokovinin from data of Wolff & Preston, ApJS 37 371 1978.
+05066+0024|MNRAS 220 559 1986 Guthrie: orbit P=25.01d, e=0.50. HgMn star.
+05081+4618|Mayer P. 1990  Bull A.I. Czech. 41 No4. HIP-.
+05083+0151|Disagreement between Hipparcos, dynamical and photometric parallax.
+05089+3234|A is 2 mag. above MS, but it's a close binary!
+05097-0819|A consid. as SB by PLaskett (ApJ 30 26 1909), K1=3.8, contested (ApJ 105 222)
+05164-0030|Lindroos A&A 156 223 1986: age 23 My, dist. 236 pc, Av=0.16m. C is contracting
+05212+3442|Mayer P., Drechel H. A&A 183 61 1987. i(Aab) changes rapidly.
+05304-0527|E(11.1m, AH=4.1"), F(11.5m, CF=4.0"), G(16.7m, CG=7.6"), H(15.8m, AH=7.9")
+05304-0527|This "system" is the Trapezium cluster and contains more stars.
+05304-0527|IR imaging: AJ 108 1382 1994 McCaughrean M., Stauffer J.
+05334+6630|DE(10.42V, 0.62B-V, 0.3") = HIP 27000 at 38" from ABC optical?
+05335+2550|AJ 92 1210 1986 Evans et al.: AB not detected at occultation.
+05337-0239|ApJS 75 965 1991: E is not SB. A is controversial SB.
+05427-1034|SB3: A&AS 61 53 1985, dRV(Aa-C)=+1.9. i(Aa)=85.6.
+05496+1253|Kreiner et al. (ASP 130 273 1997): orbits, masses. K3=0.0056d.
+05580+2316|Must be dwarfs: period too short for giants!
+06198+8221|Kim, ASP Conf. 130 261 1997. Ac: A&A 144 315 1985.
+06198+8221|V0 var: Reinger et al. MN 248 168 1991.
+06230+2016|Orbit of Mason (AJ 114 808 1996) suspect: wrong dyn. parallax!
+06240-0658|AJ 81 541 1976 Abt et al: DEF non-members, C=CD-46 3848 member, also HD 68157,
+06240-0658|... and HD 68234. D=SB, P>7d, Am. D,F above main sequence?
+06355+0959|Other comp. DEF... Cluster NGC 2264.
+06466-3135|Binary, ellipsoidal var: A&A 291 473 1994 Sterken et al. P=28.601d, Ab=K0III?
+06466-3135|Secondary fills Roche lobe, accretes via disk on Aa -> fast rotation and Be
+07142+2210|A is not SB (ApJ 188 291 1974), but the SB 442 orbit is used by Hipparcos.
+07146-2446|Obs. 118 7 1998 Stickland et al.: quadruple, Ab is eclipsing, RV(P) const
+07146-2446|Cluster NGC 2362: m-M=9.77, Eb-v=0.12. Ampl. of eclipses 0.05m, P=1.282122d.
+07218+2139|Aristidi et al. 1998: dV(Aab-Ac)=1.0 +- 0.2.
+07248-1447|C must be a white dwarf. PM(C)-141-250.
+07569-0819|Dynamic and ptm parallax in disagreement with Hipparcos!
+08371-5242|Lindroos A&A 156 223 1986: age 10 My, dist. 130 pc, Av=0.03m. B is contracting
+08555-0758|UMa group. B is also binary? (discordant RV, too bright)
+09027+5454|AAS 127 257: a3ini=1.487 AU, m3=0.22..0.48 for i3=90..30; e3=0.41, w3=53.
+09358+1020|Aristidi et al. 1998: dV(Aab-Ac)=1.6 +- 0.2. 1997.07: 0.59" 267.9d.
+09562+1754|Hrvinak B.J. ApJ 290 696 1985;  Barden S.C. ApJ 317 333 1987. HIP: susp. non-sin
+10030+1227|Lindroos A&A 156 223 1986: age 135 My, dist. 28 pc, Av=0. B: K0Ve, weak Li.
+10160-5654|Marked disagreement of magnitudes with WDS!
+10331-4742|Disagreement between Hipparcos and dynamical parallax.
+10405-5928|In the cluster Collinder 228. Visual components at 7.3" and 8.8".
+10405-5928|HIPPARCOS: vis. comp. at 1.4", dm=3.5.
+10576+6217|C may have tertiary (MM87).
+11128+3205|AJ 109 332 1995 Mason et al: speckle component to B discovered.
+11128+3205|Griffin: Obs. 118 273 1998: orbits, K12 for AB: 4.84 & 4.33 km/s, V0=-15. No Bc
+11137+3844|ApJ 485 350: HD 98423 has same PM, pi(HIP)=17.5mas. Aab are Am stars.
+11171-2414|ApJ 452 870 1995: Disc., young with large IR excess. Tentative orbit for AB.
+11171-2414|Analysis, ptm: ApJ 498 385 1998 Soderblom et al.; age 10 Myr; dm(Bab)=1.5
+11171-2414|Ghez-96: Evol. proc. in bin. stars. Proc. NATO ASI, Cambridge, 1995. ASI V.477
+11254+4150|ApJ 452 863 1995 Zucker,Torres,Mazeh: New orbit for Aab, dV(B-Aab)=-5.3.
+12021+6938|ADS 8248B = HIP 59095 (9.91V, 0.98B-V, 19.8") is optical, RV=-47.4.
+12210-6233|Eggen AJ 110 1749 1995: Pleiades supercluster, PMS stars.
+12210-6233|Comp. P discovered by Tokovinin et al. in JK-bands (A&A 346, 1999).
+12257+6945|Abc: cataclismic binary. Reimers D. et al. 1988 A&A 193 180. HIP: G-solution.
+12545-0316|AJ 106 352 1993: P(Aab)=15.7y, low e. 1991.39: 6.5d 0.105".
+13017-6446|AB: discordant RV and ptm. parallax, optical?
+13065+3122|B must be K1V. Member of a group of another 5 G-F stars within 1 degree.
+13067-5917|AJ 116 2975 1998 Mason et al.: AP confirmed, 0.2".
+13085-6721|Lindroos A&A 156 223 1986: age <20 My, dist 90 pc, Av=0.04. B: contracting
+13149+3540|Aa resolved by Balega et al. at 6m telescope.
+13568-5953|Resolved at Narrabri (MNRAS 167 121 1974).
+13568-5953|MN 172 639 1975 Lomb N.: RV var, pulsations: P=0.157d, K1=7.2 km/s
+14058+2534|AB not resolved by Hipparcos and not confirmed by speckle, suspect.
+14185+0854|Eggen AJ 102 2028 1991: IC 2391 supercluster. PAR(cl)=0.0164.
+14509+4543|A&A 171 157 1987: V0(Aa) var. HIPPARCOS: G-solution.
+15021-4454|ApJ 246 879 1981 Fekel: eclipsing.
+15059+6330|A&A 171 157 1987: K1 var. due to tertiary? HIPPARCOS: X-solution, susp. non-sin
+15099+6213|Hardie R.H., Hall D.S. J.Ap.Astron. 11 265 1990. AB fix 138y. B = HIP 74368.
+15140+2712|L'Astronomie 97 277 1983: invisible comp. not detected, ampl.<0.021".
+15140+2712|Total 14 speckle measurements of AB, but only 1 of Aa, so it rests doubtful.
+15207+3742|A&A 341 121 1999: ptm mass ratio of Aab=0.94. Revised HIP. parallax = 27.7 mas.
+15333-0827|T99: P(Aab)>1300 days.
+15344+3633|CE=Wak 1 not confirmed by speckle, spurious.
+15453+2526|RV(Ac)=-35.0+-0.3, const.; RV(B)=-31.4 (Griffin). P(Aac) guessed. B=HIP 77503.
+15492-1905|ApJS 74 551 1990: Period 25.27 or 25.25 days, very eccentric orbit.
+15535-3807|Lindroos A&A 156 223 1986: age 3 My, dist. 157 pc, Av=0.02. B: contracting
+15544-2220|Multiple: Narrabri, MN 167 121 1974 R. Handbury Brown et al. dV=1.9 +- 0.5.
+15544-2220|Cote & van Kerkwijk A&A 1993: Be spectrum during periastron passage.
+15596-1932|RV(B) var: ApJS 64 487 1987; n21: ApJS 74 551 1990.
+15596-1932|Eggen AJ 110 1749 1995: PMS stars in Pleiades supercluster.
+15596-1932|Lindroos A&A 156 223 1986: age 10 My, dist. 174 pc, Av 0.53m.
+16019-3849|A&A 296 463 1995 Stecklum: CD, 1994.24 1.456" 111.0d, dJ=2.99, dH=3.09, dK=3.60
+16019-3849|A&AS 104 315 1994 The et al. : accretion disk, variability of CD. Dist.=160pc.
+16086+1348|Aa: false discovery? (no confirmation, no RV changes).
+16206+3716|Primary and sec. are evolved. Analogue: HD 158209 (Obs. 117 82 1997).
+16224-0809|MSC15589-1105 = ADS 9909/9910 are CPM!   B: variable absorption?
+16252-2421|Ghez AJ 106 2005 1993: f=4.7 in K. Mathiew AJ 98 987 1989. A&A 287 145 1994.
+16314-5648|A is Algol-type variable R Ara, SB(Observ. 97 242 1977).
+16363+0042|ApJ 504 978 1998: tertiary is detected spectroscopically.
+16463+4609|Quintuple: A&A 112 299 1982; RV: AN 311 41 1990, n186.
+16470-4138|NGC 6231, Sco OB1: ApJS 90 195 1991 Perry C. et al. Not IRAS.
+16470-4138|ApJS 68 319 1988 Levato et al.: P=27.25d, K1=55, e=0.6 (preliminary).
+16471-4140|NGC 6231, Sco OB1.
+16483-4030|NGC 6231, Sco OB1. Ref. to SB orbit in AJ 115 821 1998.
+16501-0809|Delfosse et al. A&A 344 897 1999 => Gl 644 is observed as SB3 with ELODIE.
+16565+3104|AB rests doubtful, not confirmed by HIPPARCOS.
+17033+5436|C component(13.2m, 13") is likely optical, rel. pos. changes due to PM of A.
+17072-6650|AJ 110 1749 1995 Eggen: Pleiades supercluster, PMS stars.
+17072-6650|A&A 248 72 1991: PMS binary? RV(B)=3.5, const. Age =10^7 y?
+17282-3231|Cluster NGC 6383.
+17282-3231|V0 changes by 16 km/s. Aab is ellipsoidal var., 0.04m. i=46.
+17282-3231|Lindroos A&A 156 223 1986: age ?, dist. 1297 pc, Av=0.99. Comp. B,C,X.
+17419+0536|Cluster IC 4665. Chemicaly peculiar (Comm. Aph. 18 167 1995).
+17473-3443|Cluster NGC 6475.
+17503-3444|AJ 117 541 1999 Lacy: i(Aab)=67..76d, precession. E(B-V)=0.22, AV=0.71.
+17503-3444|Lacy: was eclipsing <1899, 1963-1986, will eclipse after 2030.
+18016+2126|ApJ 304 688 1986 Abt: Comp. DEG are projected and form phys. triple at 150pc.
+18110-3408|Lindroos A&A 156 223 1986: age 39 My, dist. 339 pc, Av=0.23m. B: A1V.
+18214+5135|C (85.6", 119d, V=10.26, B-V=0.62): optical Xrp; C=SB2, RV=-19.
+18251+0359|Lindroos A&A 156 223 1986: age 30 My, dist. 431 pc, Av=0.86m. B: A7Vp, diff. sp
+18294+1739|CD system doubtful, not confirmed by speckle.
+18316+5140|ApJ 234 958 1979 Vogt+Fekel: lum. ratio Aa/Ab=1.93, masses & temper. equal.
+18316+5140|Vsini(Aa)=8.5 km/s, Prot=3.827d, R(Aa)=0.9 R_sun, above MS, still contracting.
+18464+3314|ApJ 304 688 1986: C,D,E are optical, B,F physical.
+18481-2252|ApJS 53 553 1983: Period of A 145.96 or 368 days.
+18549-3702|A&A 320 478 1997 Beust+: dynamics of triple system. P=126..270 days!
+18549-3702|AJ 115 1617 1998 Casey+: model and parameters.
+19240-0714|Cepheid U Aql.
+19426+3329|PQ = ADS 12889 = HD 186858 = BD+33 3582 = Gl 765.4
+19445+1853|ApJS 46 247 1981: evidence for SB sub-system. Lines poor. A above MS, SB2?
+19516+4136|Must be slightly evolved according to HIPPARCOS parallax.
+19597+3545|Cluster NGC 6871. MN 197 949 1981: several IR sources.
+19597+3545|Also ADS 13374 = HD 190918 in the same cluster.
+20055+3511|Must be reddened! Colors of A,B are similar (Shatsky, 1997)
+20146+4025|Mason AJ 115 821 1998: Cyg OB39, 1.2 kpc. Orbit Aa in prep. by McKibben.
+20370+3157|AP not confirmed by further speckle observations.
+20388+7514|CPM  GJ 1255D=HD 199476=BD+74 889=Wo 9710. PM+405+565, 7.77V, 8.48B G8V
+20388+7514|Associated with IRAS 20381+7525: A&AS 117 205 1996.
+20388+7514|Discrepancy between dynamical and HIPPARCOS parallaxes!
+20402+1157|AP not seen by speckle interferometry in 1976-1981 and by HIPPARCOS.
+20490-7048|Walker W., Budding E. Observ. 116 149 1996: ptm. orbit of Aa.
+20541+0355|Discrep. between dyn. and HIPPARCOS parallaxes!
+20564+4707|Cluster around a B star.
+20597+0308|AP = SEE 3 (0.5") doubtful, not conf. by HIPPARCOS.
+21175+1922|PAZh 21 523 1995: Comp. AP?(5.3", 9.5V, PA=150d).
+21194+5708|Discrepancy between dynamic and Hipparcos parallax.
+21359+5702|Mason AJ 115 821 1998: Cep OB2, 0.91 kpc.
+21384+4037|P =  ADS 15251 = HD 206656, CPM. Orbits of AB and PQ are nearly coplanar.
+22096+3914|Aa: cf. AJ 93 688 1987; Not measured in 1988.65 (AJ 99 965 1990).
+22237-0032|Bab resolved? (ESO Messenger 18 24 1979).
+22314+3907|E = HD 214112 =HIP 111505=BD+38 4808, PM+015+007, 7.24V, 0.27B-V, F0, optical.
+22399-0311|Negative Hipparcos parallax.
+22473+4047|Young cluster?
+22475+6109|ApJS 317 787 1987 Young et al.: A - SB? RV=-4.0..+1.3.
+22482-1209|Component magnitudes uncertain.
+23047+7451|Ab may be collapsed star or a binary, min. mass 2.8 M_sun.
+23075+0209|Nearby SZ Psc, K1IV-V+F8V, associated with IRAS 23108+0224: A&AS 117 205 1996.
+23119-1422|WDS: ambiguous orbit, P= 105 or 260y.
+23254+5800|ApJ 285 190 1984: Aa has apsidal period 1600y.
+23254+5800|Young cluster?
+23268+1923|Delfosse et al. A&A 344 897 1999: periods of Aa,Ab few years, UR with Adapt.Opt
+
