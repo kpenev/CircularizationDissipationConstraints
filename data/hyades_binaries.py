@@ -154,7 +154,7 @@ systems = [
         errProjSemimajor1=(0.09 * u.Gm, 0.09 * u.Gm),
         MassFunc=0.00070 * u.M_sun,
         errMassFunc=(0.00006 * u.M_sun, 0.00006 * u.M_sun),
-        modelM1=0.931,
+        ModelM1=0.931,
         member=True,
         ref=0
     ),
@@ -1335,8 +1335,8 @@ systems = [
         errM1sin3i=0.011 * u.M_sun,
         M2sin3i=0.750 * u.M_sun,
         errM2sin3i=0.015 * u.M_sun,
-        modelM1=0.81,#Use min masses since they strain spectral type already
-        modelM2=0.77,#Use min masses since they strain spectral type already
+        ModelM1=0.81,#Use min masses since they strain spectral type already
+        ModelM2=0.77,#Use min masses since they strain spectral type already
         member=True,
         ref=1
     ),
@@ -1519,8 +1519,8 @@ systems = [
         errProjSemimajor1=0.11 * u.Gm,
         ProjSemimajor2=90.87 * u.Gm,
         errProjSemimajor2=0.25 * u.Gm,
-        modelM1=0.84 * u.M_sun,
-        modelM2=0.59 * u.M_sun,
+        ModelM1=0.84 * u.M_sun,
+        ModelM2=0.59 * u.M_sun,
         member=True,
         ref=3
     ),
@@ -1547,8 +1547,8 @@ systems = [
         errProjSemimajor1=0.02 * u.Gm,
         ProjSemimajor2=34.899 * u.Gm,
         errProjSemimajor2=0.04 * u.Gm,
-        modelM1=1.096 * u.M_sun,#Minimum masses match spectral class
-        modelM2=1.01 * u.M_sun,#Minimum masses match spectral class
+        ModelM1=1.096 * u.M_sun,#Minimum masses match spectral class
+        ModelM2=1.01 * u.M_sun,#Minimum masses match spectral class
         member=True,
         ref=4
     )
@@ -1562,8 +1562,48 @@ def select_short_period_members(max_period=50 * u.day):
                   systems)
 
 if __name__ == '__main__':
-    for s in select_short_period_members():
-        print(s['ID'])
+    from MultipleStarCatalogue.multiple_star_catalogue import\
+        MultipleStarCatalogue
+    import numpy
+
+    msc = MultipleStarCatalogue()
+    for system in select_short_period_members():
+        M1 = system.get('M1', system.get('ModelM1', system.get('ModelM1Inner')))
+        M2 = system.get('M2', system.get('ModelM2', system.get('ModelM2Inner')))
+        orbital_period = system.get(
+            'Porb',
+            system.get('PInner')
+        ).to_value('day')
+        if M1 is None or M2 is None:
+            msc_info = msc(
+                HD=str(system['OtherIDs'].get('HD', system.get('HDE')))
+            )
+            print(msc_info)
+            if msc_info is not None:
+                best_match = numpy.inf
+                for index, msc_period in enumerate(
+                        numpy.power(10.0, msc_info['logP'].array)
+                ):
+                    if abs(msc_period - orbital_period) < best_match:
+                        best_match = abs(msc_period - orbital_period)
+                        best_index = index
+                print('Period discrepancy: ' + repr(best_match))
+                if M1 is None:
+                    M1 = msc_info['Mass1'].array[best_index] * u.M_sun
+                if M2 is None:
+                    M2 = msc_info['Mass1'].array[best_index] * u.M_sun
+        print(
+            '%s: P=%f, M1=%s, M2=%s'
+            %
+            (
+                system['ID'],
+                orbital_period,
+                M1,
+                M2,
+            )
+        )
+        print('\t' + ', '.join(system.keys()))
+        print(100*'=')
     print('Record contains %d systems' % len(systems))
     member_systems = list(filter(lambda s: s['member'], systems))
     porb=[s.get('Porb', float('nan') * u.day).to_value('day')
