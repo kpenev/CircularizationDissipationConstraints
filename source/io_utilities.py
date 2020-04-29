@@ -12,6 +12,10 @@ import pandas
 from planetary_system_io import read_cds_pipe_table
 from fit_ngc6819_masses import fit_milliman
 from command_line_utilities import data_dir
+from ..data.multiple_star_catalogue.multiple_star_catalogue import\
+    MultipleStarCatalogue
+from ..data.sophie_catalogue.sophie_catalogue import SophieCatalogue
+
 
 def get_nasa_system(system_id, nasa_systems):
     """
@@ -247,7 +251,7 @@ def read_milliman_et_al_2014_binaries(
             )
         )
 ):
-    """Read Milliman et al 2014 NGC6819 binaries in format like that of exopl."""
+    """Read Milliman et al 2014 NGC6819 binaries in format like that of exop."""
 
     ngc6819_age = get_quantity(2.6, 0.25, 0.25, 'Gyr')
     ngc6819_feh = get_quantity(0.09, 0.03, 0.03, '')
@@ -315,13 +319,14 @@ def read_geller_et_al_2009_binaries(
                                       ngc188_age,
                                       ngc188_feh)
 
+#pylint: disable=too-many-statements
 def format_hyades_praesepe_binaries(systems,
                                     age,
                                     feh,
                                     resolve_secondary_mass_range):
     """Format the given systems from Hyades or Praesepe format."""
 
-    def format_system(input_sys):
+    def format_system(input_sys, msc, sophie):
         """Re-format the given system to attributes with proper names."""
 
         def get_parameter(param_name):
@@ -361,23 +366,109 @@ def format_hyades_praesepe_binaries(systems,
                 result.minus_error = minus_error
             return result
 
-        if 'ModelM1' not in input_sys:
-            nan_mass = get_quantity(numpy.nan, numpy.nan, numpy.nan, 'M_sun')
-            masses = dict(
-                primary_mass=nan_mass,
-                secondary_mass=nan_mass,
+        #pylint: disable=too-many-branches
+        def get_masses():
+            """Return the two component masses, combining everything avaible."""
+
+            #False positive
+            #pylint: disable=no-member
+            primary_mass = input_sys.get(
+                'M1',
+                input_sys.get(
+                    'ModelM1',
+                    input_sys.get('ModelM1Inner')
+                )
             )
-        elif input_sys['ModelM1'] > 1.2 * units.M_sun:
-            masses = dict(
-                primary_mass=get_parameter('ModelM2'),
-                secondary_mass=get_parameter('ModelM1'),
-                secondary_radius=get_quantity(1.0, 0.1, 0.1, 'R_sun')
+            secondary_mass = input_sys.get(
+                'M2',
+                input_sys.get(
+                    'ModelM2',
+                    input_sys.get('ModelM2Inner')
+                )
             )
-        else:
-            masses = dict(
-                primary_mass=get_parameter('ModelM1'),
-                secondary_mass=get_parameter('ModelM2')
+            if secondary_mass is not None and secondary_mass.size == 2:
+                secondary_mass = getattr(
+                    numpy,
+                    resolve_secondary_mass_range
+                )(
+                    secondary_mass
+                )
+
+            if primary_mass is None or secondary_mass is None:
+                hdid = str(
+                    input_sys['OtherIDs'].get('HD', input_sys.get('HDE'))
+                )
+                sophie_info = sophie(HD=hdid)
+                if sophie_info is not None:
+                    print('In SOPHIE catalogue')
+                    if primary_mass is None:
+                        primary_mass = sophie_info.get(
+                            'Mass',
+                            sophie_info.get('Mprimary')
+                        )[0] * units.M_sun
+                        if not numpy.isfinite(primary_mass):
+                            primary_mass = None
+
+                    if secondary_mass is None:
+                        secondary_mass = sophie_info['M2sini'][0] * units.M_jup
+                        if not numpy.isfinite(secondary_mass):
+                            secondary_mass = None
+
+            if primary_mass is None or secondary_mass is None:
+                msc_info = msc(HD=hdid)
+
+                orbital_period = input_sys.get(
+                    'Porb',
+                    input_sys.get('PInner')
+                ).to_value('day')
+
+                if msc_info is not None:
+                    print('In MSC catalogue')
+                    best_match = numpy.inf
+                    for index, msc_period in enumerate(
+                            numpy.power(10.0, msc_info['logP'].array)
+                    ):
+                        if abs(msc_period - orbital_period) < best_match:
+                            best_match = abs(msc_period - orbital_period)
+                            best_index = index
+                    print('Period discrepancy: ' + repr(best_match))
+                    if primary_mass is None:
+                        primary_mass = (msc_info['Mass1'].array[best_index]
+                                        *
+                                        units.M_sun)
+                    if secondary_mass is None:
+                        secondary_mass = (msc_info['Mass1'].array[best_index]
+                                          *
+                                          units.M_sun)
+            if primary_mass is None:
+                nan_mass = get_quantity(numpy.nan,
+                                        numpy.nan,
+                                        numpy.nan,
+                                        'M_sun')
+                return dict(
+                    primary_mass=nan_mass,
+                    secondary_mass=nan_mass,
+                )
+            primary_mass.plus_error = primary_mass.minus_error = (
+                0.0 * units.M_sun
             )
+            if secondary_mass is not None:
+                secondary_mass.plus_error = secondary_mass.minus_error = (
+                    0.0 * units.M_sun
+                )
+
+            if primary_mass > 1.2 * units.M_sun:
+                return dict(
+                    primary_mass=secondary_mass,
+                    secondary_mass=primary_mass,
+                    secondary_radius=get_quantity(1.0, 0.1, 0.1, 'R_sun')
+                )
+            return dict(
+                primary_mass=primary_mass,
+                secondary_mass=secondary_mass
+            )
+            #pylint: disable=no-member
+        #pylint: enable=too-many-branches
 
         return SimpleNamespace(
             hostname=input_sys['ID'],
@@ -386,20 +477,23 @@ def format_hyades_praesepe_binaries(systems,
             eccentricity=get_parameter('Ecc'),
             eccentricity_limit=False,
             orbital_period=get_parameter('Porb'),
-            **masses
+            **get_masses()
         )
 
+    msc = MultipleStarCatalogue()
+    sophie = SophieCatalogue()
     return [
-        format_system(input_sys)
+        format_system(input_sys, msc, sophie)
         for input_sys in filter(
-                lambda s: (
-                    s['member']
-                    and
-                    s['ID'] not in ['J271', 'vB75', 'vB176']
-                ),
-                systems
+            lambda s: (
+                s['member']
+                and
+                s['ID'] not in ['J271', 'vB176']
+            ),
+            systems
         )
     ]
+#pylint: enable=too-many-statements
 
 def init_progress_pickle(cmdline_args):
     """
