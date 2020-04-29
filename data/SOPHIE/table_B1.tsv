@@ -1,0 +1,120 @@
+#
+#   VizieR Astronomical Server vizier.u-strasbg.fr
+#    Date: 2020-04-29T03:31:35 [V1.99+ (14-Oct-2013)]
+#   In case of problem, please report to:	cds-question@unistra.fr
+#
+#
+#Coosys	J2000:	eq_FK5 J2000
+#INFO	votable-version=1.99+ (14-Oct-2013)	
+#INFO	-ref=VIZ5ea8f4f13eb2	
+#INFO	-out.max=unlimited	
+#INFO	queryParameters=28	
+#-oc.form=dec
+#-out.max=unlimited
+#-out.all=2
+#-nav=cat:J/A+A/631/A125&tab:{J/A+A/631/A125/tableb1}&key:source=J/A+A/631/A125/tableb1&HTTPPRM:&
+#-c.eq=J2000
+#-c.r=  2
+#-c.u=arcmin
+#-c.geom=r
+#-source=J/A+A/631/A125/tableb1
+#-order=I
+#-out=Name
+#-out=RAJ2000
+#-out=DEJ2000
+#-out=Vmag
+#-out=B-V
+#-out=Plx
+#-out=e_Plx
+#-out=SpType
+#-out=TimeSpan
+#-out=VC
+#VC=VC
+#-out=Ntot
+#-out=NSoph-
+#-out=NSoph+
+#-out=NElod
+#-out=Simbad
+#Simbad=Simbad
+#-out.all=2
+#
+
+#RESOURCE=yCat_36310125
+#Name: J/A+A/631/A125
+#Title: 54 massive companions detected with SOPHIE (Kiefer+, 2019)
+#Table	J_A_A_631_A125_tableb1:
+#Name: J/A+A/631/A125/tableb1
+#Title: Table of the 54 observed targets
+#Column	Name	(A9)	Star name	[ucd=meta.id;meta.main]
+#Column	RAJ2000	(A13)	Right ascension (J2000) from Simbad	[ucd=pos.eq.ra;meta.main]
+#Column	DEJ2000	(A13)	Declination (J2000) from Simbad	[ucd=pos.eq.dec;meta.main]
+#Column	Vmag	(F5.2)	V magnitude from Simbad	[ucd=phot.mag;em.opt.V]
+#Column	B-V	(F5.2)	B-V colour index from Simbad	[ucd=phot.color;em.opt.B;em.opt.V]
+#Column	Plx	(F6.3)	Absolute parallax from Gaia DR2 (Cat. I/345)	[ucd=pos.parallax]
+#Column	e_Plx	(F6.3)	rms uncertainty on Plx	[ucd=stat.error;pos.parallax]
+#Column	SpType	(a13)	Spectral type (from Simbad)	[ucd=src.spType]
+#Column	TimeSpan	(F8.2)	Time span	[ucd=time.interval]
+#Column	VC	(A2)	Show the Radial Velocity curves	[ucd=meta.ref.url]
+#Column	Ntot	(I3)	Total number of SOPHIE radial velocity measurements	[ucd=meta.number]
+#Column	NSoph-	(I2)	Number of radial velocity measurements with SOPHIE- (in sophiem.dat file ) (G1)	[ucd=meta.number]
+#Column	NSoph+	(I2)	Number of radial velocity measurements with SOPHIE+ (in sophiep.dat file ) (G1)	[ucd=meta.number]
+#Column	NElod	(I2)	Total number of radial velocity measurements with Elodie (in elodie.dat file)	[ucd=meta.number]
+#Column	Simbad	(a6)	Simbad column added by the CDS	[ucd=meta.ref.url]
+Name|RAJ2000|DEJ2000|Vmag|B-V|Plx|e_Plx|SpType|TimeSpan|VC|Ntot|NSoph-|NSoph+|NElod|Simbad
+ |"h:m:s"|"d:m:s"|mag|mag|mas|mas| |d| | | | | |
+---------|-------------|-------------|-----|-----|------|------|-------------|--------|--|---|--|--|--|------
+HD225239 |00 04 53.7604|+34 39 35.259| 6.11| 0.63|28.280| 0.230|G2V          | 1324.26|VC| 45| 0|45| 0|Simbad
+BD+210055|00 30 31.0151|+22 46 08.282| 9.24| 0.94|26.375| 0.097|K5           | 2303.79|VC| 20| 0|20| 0|Simbad
+HD5470   |00 56 40.2179|+17 57 35.427| 8.33| 0.64|14.853| 0.097|G0           | 5812.53|VC| 24| 1| 3| 0|Simbad
+HD13014  |02 08 26.0644|+43 11 27.653| 7.59| 0.62|15.075| 0.076|F5           | 1354.27|VC| 16| 0|16| 0|Simbad
+HD15292  |02 33 40.2378|+77 40 02.217| 7.66| 0.69|27.063| 0.028|G5           |  761.78|VC| 12| 0|12| 0|Simbad
+HD18450  |02 58 52.4290|+26 46 26.675| 8.22| 0.90|34.022| 0.066|K2V          | 2263.87|VC| 11| 0|11| 0|Simbad
+HD23965  |03 50 03.4617|+22 35 29.896| 7.27| 0.54|23.183| 0.054|F7           | 3779.79|VC| 84|19|65| 0|Simbad
+HD24505  |03 54 59.8438|+28 11 17.160| 8.03| 0.70|13.650| 0.100|G5III        | 5135.40|VC| 29| 0| 8| 1|Simbad
+HD28635  |04 31 29.3459|+13 54 12.510| 7.75| 0.55|20.384| 0.084|F9V          | 7703.28|VC| 29| 0|13| 3|Simbad
+HD40647  |06 06 05.7202|+69 28 34.069| 8.26| 0.80|31.860| 0.160|G5V          | 4462.55|VC| 34|18| 7| 0|Simbad
+HD48679  |06 58 18.0025|+80 55 42.319| 8.85| 0.75|14.964| 0.078|G0           | 1288.64|VC| 26| 0|26| 0|Simbad
+BD+291539|07 30 22.3337|+29 22 50.355| 9.34| 0.79|16.016| 0.040|G5           | 1317.21|VC| 17| 0|17| 0|Simbad
+HD60846  |07 38 17.9491|+42 27 35.051| 7.92| 0.62|13.736| 0.067|F8           | 2194.99|VC| 10| 0|10| 0|Simbad
+HD62923  |07 48 31.8080|+47 45 53.769| 8.03| 0.75|17.220| 0.740|G5           | 1837.98|VC| 18| 3| 0|15|Simbad
+HD71827  |08 37 14.4992|+77 02 48.470| 7.29| 0.53|22.703| 0.024|F8           | 4837.82|VC| 46| 0|44| 2|Simbad
+HD73636  |08 41 14.5774|+47 28 50.118| 7.57| 0.57|17.500| 0.120|G0           | 4167.73|VC| 22| 0| 0| 0|Simbad
+HD77712  |09 04 15.0684|+03 01 34.932| 8.93| 0.85|19.570| 0.120|K1/2(V)      | 1508.85|VC| 19| 0|19| 0|Simbad
+HD78536  |09 08 53.9250|+03 57 33.093| 8.30| 0.65|12.257| 0.054|G3V          | 4068.99|VC|  8| 3| 5| 0|Simbad
+HD82460  |09 33 28.7365|+46 13 43.274| 8.37| 0.66|19.826| 0.091|G0           | 1819.03|VC| 17| 0|17| 0|Simbad
+BD+281779|09 36 50.0041|+27 58 22.406| 9.17| 0.82|23.415| 0.053|G5V          | 2419.36|VC| 15| 4|11| 0|Simbad
+HD85533  |09 55 46.9216|+70 02 28.078| 8.46| 0.68|18.765| 0.037|G5           | 3141.28|VC| 11| 5| 6| 0|Simbad
+HD87899  |10 09 14.2011|+46 17 02.355| 8.88| 0.65|19.150| 0.140|G5           | 1168.96|VC| 20|20| 0| 0|Simbad
+HD101305 |11 39 28.4419|+02 50 47.630| 8.33| 0.54|14.187| 0.072|F6V          | 1524.87|VC| 19| 0|19| 0|Simbad
+HD103913 |11 58 04.3185|+25 08 16.182| 8.28| 0.52|11.371| 0.063|F8           | 4089.76|VC| 21|13| 8| 0|Simbad
+HD104289 |12 00 41.2765|+59 21 11.190| 8.07| 0.52|14.182| 0.043|F8           | 5136.81|VC| 16| 0| 9| 7|Simbad
+BD+192536|12 10 04.4512|+18 58 36.151|10.08| 1.22|21.860| 0.150|K5           | 4105.73|VC| 11| 4| 7| 0|Simbad
+HD106888 |12 17 36.1848|+14 26 34.187| 8.18| 0.54|14.890| 0.130|F8           | 4304.19|VC| 20|14| 4| 2|Simbad
+HD108436 |12 26 53.7835|+69 43 46.205| 8.46| 0.63|18.392| 0.082|G0           | 2043.26|VC|  8| 0| 8| 0|Simbad
+HD109157 |12 32 27.4354|+28 05 04.636| 9.16| 0.82|22.840| 0.100|G7IV         | 1935.93|VC| 11| 0|11| 0|Simbad
+BD+132550|12 34 52.7685|+12 27 33.399| 8.94| 0.75|15.660| 0.120|G5           | 1281.74|VC| 10| 0|10| 0|Simbad
+HD110376 |12 41 37.0772|+19 51 04.687| 8.99| 0.95|30.950| 0.110|K3V          |17201.33|VC|103| 0| 8| 0|Simbad
+HD130396 |14 47 31.8899|+19 03 00.114| 7.45| 0.50|22.127| 0.076|F8V          | 2155.90|VC| 30| 0|30| 0|Simbad
+HD133621 |15 00 26.9508|+71 45 55.645| 6.66| 0.61|28.730| 0.260|G0           |10222.62|VC| 38| 0|12| 0|Simbad
+BD+362641|15 45 00.2842|+35 57 40.797|10.11| 1.15|18.499| 0.032|K4/5V        |  979.22|VC|  9| 9| 0| 0|Simbad
+BD+212816|15 45 30.0338|+21 10 43.015| 9.21| 0.85|19.490| 0.210|K0           | 4003.96|VC| 17|12| 5| 0|Simbad
+HD144286 |16 03 55.0314|+31 02 34.943| 9.42| 0.75|14.912| 0.080|K0           | 2317.76|VC| 15| 0|15| 0|Simbad
+HD146735 |16 14 44.6766|+57 01 34.537| 8.38| 0.60|11.912| 0.032|G0           | 2295.82|VC| 12| 0|12| 0|Simbad
+HD147487 |16 21 15.5930|+27 22 32.054| 8.56| 0.57|14.930| 0.310|G0V          | 1087.97|VC| 11| 0|11| 0|Simbad
+HD153376 |16 58 37.9267|+15 27 15.681| 6.90| 0.63|18.526| 0.027|F8V          | 4059.90|VC| 20| 0| 2| 0|Simbad
+HD155228 |17 09 27.2020|+22 05 30.558| 7.04| 0.49|14.750| 0.180|F6V          |  928.59|VC| 13| 0|13| 0|Simbad
+HD156111 |17 14 57.1366|+19 40 57.353| 7.22| 0.81|22.576| 0.054|G8V          |  475.75|VC| 21| 0|21| 0|Simbad
+HD156728 |17 16 39.1391|+50 36 23.329| 8.03| 0.64|23.630| 0.120|G5           | 2264.84|VC| 12| 0|12| 0|Simbad
+HD161479 |17 45 02.9275|+19 17 25.650| 8.11| 0.78|20.353| 0.039|K0           | 5080.98|VC| 19| 4| 8| 4|Simbad
+BD+680971|18 00 36.1034|+68 33 24.238| 9.75| 0.81|16.405| 0.068|K2           | 2476.15|VC| 16| 0|16| 0|Simbad
+HD167215 |18 12 59.4025|+28 15 27.357| 8.10| 0.52|12.201| 0.032|F8           |14262.80|VC| 54|14| 5| 0|Simbad
+HD193554 |20 20 03.6455|+23 38 17.172| 8.26| 0.63|26.600| 0.300|G5           | 5752.59|VC| 62| 6| 4| 0|Simbad
+HD204613 |21 27 42.9669|+57 19 18.864| 8.22| 0.65|15.910| 0.290|G1IIIa:CH1.5 |14876.74|VC| 43|11| 5| 0|Simbad
+HD207992 |21 52 19.6628|+39 48 06.213| 8.28| 0.72|26.069| 0.066|G5           | 5218.37|VC| 19|12| 2| 0|Simbad
+HD211681 |22 06 49.0856|+85 24 33.746| 8.09| 0.74|13.822| 0.030|G5           | 5942.22|VC| 56|23| 7|12|Simbad
+HD210631 |22 11 39.3642|+06 11 36.405| 8.51| 0.60|14.040| 0.150|G0           |12929.42|VC| 93| 0| 8| 0|Simbad
+HD212029 |22 20 23.8494|+46 25 05.719| 8.51| 0.50|16.120| 0.140|G0           | 1796.08|VC| 21| 0|21| 0|Simbad
+HD212733 |22 25 55.0226|+35 21 53.473| 8.30| 0.91|32.956| 0.061|K2           | 5306.19|VC| 38| 2|22| 8|Simbad
+HD212735 |22 26 21.5485|+10 45 27.260| 8.25| 0.75|18.174| 0.072|G5           | 3416.71|VC| 11| 6| 5| 0|Simbad
+HD217850 |23 02 36.6571|+58 52 33.315| 8.50| 0.80|15.170| 0.200|G8V          | 4480.33|VC| 64| 9|32| 0|Simbad
+

@@ -1,0 +1,92 @@
+#
+#   VizieR Astronomical Server vizier.u-strasbg.fr
+#    Date: 2020-04-29T03:36:36 [V1.99+ (14-Oct-2013)]
+#   In case of problem, please report to:	cds-question@unistra.fr
+#
+#
+#Coosys	J2000:	eq_FK5 J2000
+#INFO	votable-version=1.99+ (14-Oct-2013)	
+#INFO	-ref=VIZ5ea8f62e4118	
+#INFO	-out.max=unlimited	
+#INFO	queryParameters=33	
+#-oc.form=dec
+#-out.max=unlimited
+#-out.all=2
+#-nav=cat:J/A+A/631/A125&tab:{J/A+A/631/A125/tableb5}&key:source=J/A+A/631/A125/tableb5&HTTPPRM:&
+#-source=J/A+A/631/A125/tableb5
+#-order=I
+#-out=Name
+#-out=Per
+#-out=e_Per
+#-out=K
+#-out=e_K
+#-out=e
+#-out=e_e
+#-out=omega
+#-out=e_omega
+#-out=Tp
+#-out.all=2
+#-out=n_Tp
+#-out=e_Tp
+#-out=GammaS+
+#-out=e_GammaS+
+#-out=GammaS-
+#-out=e_GammaS-
+#-out=n_GammaS-
+#-out=sO-CS+
+#-out=sO-CS-
+#-out=f(m)
+#-out=e_f(m)
+#-out=M2sini
+#-out=e_M2sini
+#-out=a2
+#-out=e_a2
+#-out.all=2
+#
+
+#RESOURCE=yCat_36310125
+#Name: J/A+A/631/A125
+#Title: 54 massive companions detected with SOPHIE (Kiefer+, 2019)
+#Table	J_A_A_631_A125_tableb5:
+#Name: J/A+A/631/A125/tableb5
+#Title: *Table of orbital fits for the 11 single companions with Msini within 20-90M_Jup_, ordered by values of M2sini
+#Column	Name	(A9)	Star name	[ucd=meta.id;meta.main]
+#Column	Per	(F13.7)	Period	[ucd=time.period]
+#Column	e_Per	(F13.7)	rms uncertainty on Per	[ucd=stat.error]
+#Column	K	(F8.2)	Semi-amplitude velocity, K	[ucd=phys.veloc;src.orbital]
+#Column	e_K	(F7.2)	rms uncertainty on Velocity semi-amplitude	[ucd=stat.error]
+#Column	e	(F9.6)	Eccentricity	[ucd=src.orbital.eccentricity]
+#Column	e_e	(F8.5)	? rms uncertainty on Eccentricity	[ucd=stat.error]
+#Column	omega	(F8.3)	? Periastron angle {omega}	[ucd=src.orbital.periastron]
+#Column	e_omega	(F6.3)	? rms uncertainty on omega	[ucd=stat.error]
+#Column	Tp	(F10.4)	Time of passage at periastron, for objects with e=0, time of primary transit (Tp-2400000)	[ucd=src.orbital.periastron]
+#Column	n_Tp	(A1)	[*] * when Tp is the time of primary transit (1)	[ucd=meta.note]
+#Column	e_Tp	(F9.4)	rms uncertainty on Tp	[ucd=stat.error]
+#Column	GammaS+	(F9.4)	Center-of-mass velocity gamma from SOPHIE+ measurements (G1)	[ucd=phys.veloc;pos.barycenter]
+#Column	e_GammaS+	(F7.4)	rms uncertainty on GammaS+	[ucd=stat.error]
+#Column	GammaS-	(F8.4)	? Center-of-mass velocity gamma from SOPHIE- measurements (G1)	[ucd=phys.veloc;pos.barycenter]
+#Column	e_GammaS-	(F7.4)	? rms uncertainty on GammaS-	[ucd=stat.error]
+#Column	n_GammaS-	(A1)	[f] f for fixed (2)	[ucd=meta.note]
+#Column	sO-CS+	(F5.2)	Residual O-C for SOPHIE+ measurements (G1)(3)	[ucd=stat.fit.residual]
+#Column	sO-CS-	(F5.2)	? Residual O-C for SOPHIE- measurements (G1)(3)	[ucd=stat.fit.residual]
+#Column	f(m)	(F8.2)	Mass function	[ucd=phys.mass]
+#Column	e_f(m)	(F8.2)	rms uncertainty on Mass function	[ucd=stat.error]
+#Column	M2sini	(F6.2)	Mass of companion, in Jupiter mass unit	[ucd=phys.mass]
+#Column	e_M2sini	(F5.2)	rms uncertainty on M2sini	[ucd=stat.error]
+#Column	a2	(F7.4)	Semi-major axis of companion	[ucd=phys.size.smajAxis]
+#Column	e_a2	(F7.4)	rms uncertainty on a2	[ucd=stat.error]
+Name|Per|e_Per|K|e_K|e|e_e|omega|e_omega|Tp|n_Tp|e_Tp|GammaS+|e_GammaS+|GammaS-|e_GammaS-|n_GammaS-|sO-CS+|sO-CS-|f(m)|e_f(m)|M2sini|e_M2sini|a2|e_a2
+ |d|d|m/s|m/s| | |deg|deg|d| |d|km/s|km/s|km/s|km/s| |m/s|m/s|10-6Msun|10-6Msun|Mjup|Mjup|AU|AU
+---------|-------------|-------------|--------|-------|---------|--------|--------|------|----------|-|---------|---------|-------|--------|-------|-|-----|-----|--------|--------|------|-----|-------|-------
+HD217850 | 3508.1000000|    2.7000000|  433.40|   2.70| 0.758400| 0.00160| 165.680| 0.260|57552.0000| |   1.1000|   7.3610| 0.0034|  7.3465| 0.0058| | 5.87| 7.61|    8.20|    0.13| 22.16| 0.73| 4.6560| 0.0750
+HD48679  | 1111.6100000|    0.3000000| 1224.20|   4.30| 0.824730| 0.00046| 155.710| 0.160|58167.0800| |   0.2900|  19.3806| 0.0053|        |       | | 4.60|     |   38.22|    0.39| 36.00| 1.30| 2.1450| 0.0370
+HD23965  | 3974.0000000|  121.0000000|  781.00|  52.00| 0.792000| 0.01200| -37.900| 2.100|58474.0000| | 124.0000|   7.4340| 0.0650|  7.4460| 0.0620| |21.70|28.40|   45.10|    7.70| 40.20| 2.60| 5.1600| 0.1400
+HD77712  | 1311.7000000|    2.1000000| 1129.00|  84.00| 0.674000| 0.02000|  51.100| 1.700|57950.4000| |   3.8000|   5.1680| 0.0910|        |       | | 5.33|     |   79.00|   12.00| 42.10| 2.50| 2.3060| 0.0390
+HD130396 | 2060.6000000|    7.3000000|  837.30|   3.90| 0.427500| 0.00370| 163.020| 0.730|57385.7000| |   3.6000|   8.1361| 0.0054|        |       | | 8.67|     |   92.60|    1.20| 50.90| 1.70| 3.3280| 0.0550
+BD+291539|  175.8700000|    0.0098000| 2401.00|   2.20| 0.274900| 0.00120| -49.600| 0.170|57358.3250| |   0.0680|  21.4215| 0.0032|        |       | | 4.65|     |  224.18|    0.58| 59.70| 2.00| 0.6070| 0.0100
+HD82460  |  590.9000000|    0.2400000| 3366.00| 182.00| 0.839000| 0.01100| -81.300| 4.200|57438.0000| |   3.0000|  10.9500| 0.2900|        |       | | 7.34|     |  376.00|   32.00| 73.20| 3.00| 1.3870| 0.0230
+HD28635  | 2636.8000000|    2.2000000| 1181.60|   8.20| 0.501800| 0.00490| 142.310| 0.960|57405.8000| |   3.4000|  40.2570| 0.0170|        |       | | 7.42|     |  291.80|    7.10| 77.10| 2.70| 4.0140| 0.0680
+HD211681 | 7612.0000000|  131.0000000|  789.40|   3.60| 0.465000| 0.00530| -51.950| 0.700|60751.0000| | 136.0000| -40.9817| 0.0082|-40.9731| 0.0061| | 3.79|13.00|  269.10|    6.00| 77.80| 2.60| 8.2800| 0.1600
+HD210631 | 4030.0000000|   40.0000000| 1349.00| 115.00| 0.569000| 0.04200|-100.200| 4.600|61353.0000| |  48.0000| -12.5900| 0.1200|        |       | | 4.62|     |  575.00|  135.00| 83.40| 6.90| 4.9760| 0.0850
+BD+210055| 1322.6300000|    0.6500000| 2101.60|   2.50| 0.445700| 0.00120| -65.520| 0.180|56921.4900| |   0.5000|  22.7199| 0.0030|        |       | | 4.25|     |  912.40|    3.00| 85.30| 2.90| 2.2350| 0.0370
+
