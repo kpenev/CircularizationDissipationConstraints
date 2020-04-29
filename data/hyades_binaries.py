@@ -1562,11 +1562,13 @@ def select_short_period_members(max_period=50 * u.day):
                   systems)
 
 if __name__ == '__main__':
-    from MultipleStarCatalogue.multiple_star_catalogue import\
-        MultipleStarCatalogue
     import numpy
+    from multiple_star_catalogue.multiple_star_catalogue import\
+        MultipleStarCatalogue
+    from sophie_catalogue.sophie_catalogue import SophieCatalogue
 
     msc = MultipleStarCatalogue()
+    sophie = SophieCatalogue()
     for system in select_short_period_members():
         M1 = system.get('M1', system.get('ModelM1', system.get('ModelM1Inner')))
         M2 = system.get('M2', system.get('ModelM2', system.get('ModelM2Inner')))
@@ -1575,11 +1577,27 @@ if __name__ == '__main__':
             system.get('PInner')
         ).to_value('day')
         if M1 is None or M2 is None:
-            msc_info = msc(
-                HD=str(system['OtherIDs'].get('HD', system.get('HDE')))
-            )
-            print(msc_info)
+            hdid = str(system['OtherIDs'].get('HD', system.get('HDE')))
+            sophie_info = sophie(HD=hdid)
+            if sophie_info is not None:
+                print('In SOPHIE catalogue')
+                if M1 is None:
+                    M1 = sophie_info.get(
+                        'Mass',
+                        sophie_info.get('Mprimary')
+                    )[0] * u.M_sun
+                    if not numpy.isfinite(M1):
+                        M1 = None
+
+                if M2 is None:
+                    M2 = sophie_info['M2sini'][0] * u.M_sun
+                    if not numpy.isfinite(M2):
+                        M2 = None
+
+        if M1 is None or M2 is None:
+            msc_info = msc(HD=hdid)
             if msc_info is not None:
+                print('In MSC catalogue')
                 best_match = numpy.inf
                 for index, msc_period in enumerate(
                         numpy.power(10.0, msc_info['logP'].array)
@@ -1602,7 +1620,6 @@ if __name__ == '__main__':
                 M2,
             )
         )
-        print('\t' + ', '.join(system.keys()))
         print(100*'=')
     print('Record contains %d systems' % len(systems))
     member_systems = list(filter(lambda s: s['member'], systems))

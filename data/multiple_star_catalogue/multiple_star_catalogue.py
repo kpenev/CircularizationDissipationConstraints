@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
+"""Define a class for working wit the "Multiple Star Catalogue."""
 
 import os.path
 from csv import QUOTE_NONE
 
-from pandas import read_csv, merge
+import pandas
 
+#The other option is using module with glodals which seems worse
+#pylint: disable=too-few-public-methods
 class MultipleStarCatalogue:
     """Interface to the multiple star catalogue."""
 
@@ -14,12 +17,12 @@ class MultipleStarCatalogue:
         def read_file(fname, names_row):
             """Read the given file assuming column names at the given line."""
 
-            dtype=dict()
+            dtype = dict()
             if fname in ['subsystems', 'orbits']:
                 dtype['Level'] = int
             elif fname == 'index':
-                dtype=str
-            return read_csv(
+                dtype = str
+            return pandas.read_csv(
                 os.path.join(data_dir, fname + '.tsv'),
                 header=0,
                 sep='|',
@@ -48,20 +51,25 @@ class MultipleStarCatalogue:
         self.index = tables['index']
         print(self.index['HD'].array)
 
-        self.data = merge(tables['subsystems'],
-                          tables['orbits'],
-                          how='outer',
-                          on=('IDS', 'Level'))
+        self.data = pandas.merge(tables['subsystems'],
+                                 tables['orbits'],
+                                 how='outer',
+                                 on=('IDS', 'Level'))
 
         print('Data:')
         print(self.data)
 
     def __call__(self, **identifier):
         """
-        Retrun all available data for a star with a given identifier.
+        Return all available data for a star with a given identifier.
 
         Args:
             identifier:    Should be one of the columns from the index table
+
+        Returns:
+            pandas dataframe:
+                All available information on the system with the given
+                identifier in the MSC.
         """
 
         assert len(identifier) == 1
@@ -69,8 +77,8 @@ class MultipleStarCatalogue:
         ids = self.index[self.index[id_type] == id_value]['IDS']
         if ids.empty:
             return None
-        else:
-            return self.data[self.data['IDS'] == ids.array[0]]
+        return self.data[self.data['IDS'] == ids.array[0]]
+#pylint: enable=too-few-public-methods
 
 if __name__ == '__main__':
     msc = MultipleStarCatalogue()
