@@ -1,4 +1,10 @@
-"""Data for binary stars in/near the Praesepe open cluster."""
+"""
+Data for binary stars in/near the Praesepe open cluster.
+
+Sources:
+    * https://ui.adsabs.harvard.edu/abs/1999A%26A...352..479M/abstract
+    * https://ui.adsabs.harvard.edu/abs/1990A%26A...235..114M/abstract
+"""
 
 import os.path
 
