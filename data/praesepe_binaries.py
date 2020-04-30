@@ -99,7 +99,14 @@ if __name__ == '__main__':
     systems = read_systems()
     keys = list(systems[0].keys())
     keys.remove('ID')
-    for sys in systems:
-        print(sys['ID'] + ':')
-        for k in keys:
-            print('\t%s: %s' % (repr(k), repr(sys[k])))
+    for sys in filter(lambda s: s['Porb'] < 50.0 * u.day, systems):
+        print(
+            sys['ID'] + ': P = %s, e = %s, M1 = %s, M2 = %s'
+            %
+            (
+                repr(sys['Porb'].to_value('day')),
+                repr(sys['Ecc']),
+                repr(sys['ModelM1'].to_value('M_sun')),
+                repr(sys['ModelM2'].to_value('M_sun')),
+            )
+        )

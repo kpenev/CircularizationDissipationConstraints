@@ -1611,13 +1611,14 @@ if __name__ == '__main__':
                 if M2 is None:
                     M2 = msc_info['Mass1'].array[best_index] * u.M_sun
         print(
-            '%s: P=%f, M1=%s, M2=%s'
+            '%s: P = %s, e = %s, M1 = %s, M2 = %s'
             %
             (
                 system['ID'],
-                orbital_period,
-                M1,
-                M2,
+                repr(orbital_period),
+                repr(system.get('Ecc', float('nan'))),
+                repr(M1),
+                repr(M2),
             )
         )
         print(100*'=')
