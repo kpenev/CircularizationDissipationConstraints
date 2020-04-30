@@ -12,13 +12,18 @@ import pandas
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'data'))
 
+#Need to update search path
+#pylint: disable=wrong-import-position
 from planetary_system_io import read_cds_pipe_table
 from fit_ngc6819_masses import fit_milliman
 from command_line_utilities import data_dir
+#False positive
+#pylint: disable=import-error
 from multiple_star_catalogue.multiple_star_catalogue import\
     MultipleStarCatalogue
 from sophie_catalogue.sophie_catalogue import SophieCatalogue
-
+#pylint: enable=import-error
+#pylint: enable=wrong-import-position
 
 def get_nasa_system(system_id, nasa_systems):
     """
@@ -332,42 +337,46 @@ def format_hyades_praesepe_binaries(systems,
     def format_system(input_sys, msc, sophie):
         """Re-format the given system to attributes with proper names."""
 
-        def get_parameter(param_name):
+        def get_parameter(*alias_param_names):
             """Add error attributes to the given quantity."""
 
-            quantity = input_sys[param_name]
-            if param_name.startswith('ModelM'):
-                #False positive
-                #pylint: disable=no-member
-                error = 0.0 * units.M_sun
-                #pylint: enable=no-member
-                if param_name == 'ModelM2' and quantity.size == 2:
-                    quantity = getattr(
-                        numpy,
-                        resolve_secondary_mass_range
-                    )(
-                        quantity
-                    )
-            else:
-                error = input_sys['err' + param_name]
+            for param_name in alias_param_names:
+                quantity = input_sys.get(param_name)
+                if quantity is None:
+                    continue
+                if param_name.startswith('ModelM'):
+                    #False positive
+                    #pylint: disable=no-member
+                    error = 0.0 * units.M_sun
+                    #pylint: enable=no-member
+                    if param_name == 'ModelM2' and quantity.size == 2:
+                        quantity = getattr(
+                            numpy,
+                            resolve_secondary_mass_range
+                        )(
+                            quantity
+                        )
+                else:
+                    error = input_sys['err' + param_name]
 
-            if isinstance(error, tuple):
-                plus_error, minus_error = error
-            else:
-                plus_error = minus_error = error
+                if isinstance(error, tuple):
+                    plus_error, minus_error = error
+                else:
+                    plus_error = minus_error = error
 
-            plus_error = plus_error or 0.0
-            minus_error = minus_error or 0.0
+                plus_error = plus_error or 0.0
+                minus_error = minus_error or 0.0
 
-            if isinstance(quantity, float):
-                result = units.Quantity(quantity, unit='')
-                result.plus_error = units.Quantity(plus_error, unit='')
-                result.minus_error = units.Quantity(minus_error, unit='')
-            else:
-                result = units.Quantity(quantity)
-                result.plus_error = plus_error
-                result.minus_error = minus_error
-            return result
+                if isinstance(quantity, float):
+                    result = units.Quantity(quantity, unit='')
+                    result.plus_error = units.Quantity(plus_error, unit='')
+                    result.minus_error = units.Quantity(minus_error, unit='')
+                else:
+                    result = units.Quantity(quantity)
+                    result.plus_error = plus_error
+                    result.minus_error = minus_error
+                return result
+            raise KeyError("'" + "' | '".join(alias_param_names) + "'")
 
         #pylint: disable=too-many-branches
         def get_masses():
@@ -397,57 +406,63 @@ def format_hyades_praesepe_binaries(systems,
                     secondary_mass
                 )
 
-            if primary_mass is None or secondary_mass is None:
-                hdid = str(
-                    input_sys['OtherIDs'].get('HD', input_sys.get('HDE'))
-                )
-                sophie_info = sophie(HD=hdid)
-                if sophie_info is not None:
-                    print('In SOPHIE catalogue')
-                    if primary_mass is None:
-                        primary_mass = sophie_info.get(
-                            'Mass',
-                            sophie_info.get('Mprimary')
-                        )[0] * units.M_sun
-                        if not numpy.isfinite(primary_mass):
-                            primary_mass = None
+            if hasattr(input_sys, 'OtherIDs'):
+                if primary_mass is None or secondary_mass is None:
+                    hdid = str(
+                        input_sys['OtherIDs'].get('HD', input_sys.get('HDE'))
+                    )
+                    sophie_info = sophie(HD=hdid)
+                    if sophie_info is not None:
+                        print('In SOPHIE catalogue')
+                        if primary_mass is None:
+                            primary_mass = sophie_info.get(
+                                'Mass',
+                                sophie_info.get('Mprimary')
+                            )[0] * units.M_sun
+                            if not numpy.isfinite(primary_mass):
+                                primary_mass = None
 
-                    if secondary_mass is None:
-                        secondary_mass = sophie_info['M2sini'][0] * units.M_jup
-                        if not numpy.isfinite(secondary_mass):
-                            secondary_mass = None
+                        if secondary_mass is None:
+                            secondary_mass = (sophie_info['M2sini'][0]
+                                              *
+                                              units.M_jup)
+                            if not numpy.isfinite(secondary_mass):
+                                secondary_mass = None
 
-            if primary_mass is None or secondary_mass is None:
-                msc_info = msc(HD=hdid)
+                if primary_mass is None or secondary_mass is None:
+                    msc_info = msc(HD=hdid)
 
-                orbital_period = input_sys.get(
-                    'Porb',
-                    input_sys.get('PInner')
-                ).to_value('day')
+                    orbital_period = input_sys.get(
+                        'Porb',
+                        input_sys.get('PInner')
+                    ).to_value('day')
 
-                if msc_info is not None:
-                    print('In MSC catalogue')
-                    best_match = numpy.inf
-                    for index, msc_period in enumerate(
-                            numpy.power(10.0, msc_info['logP'].array)
-                    ):
-                        if abs(msc_period - orbital_period) < best_match:
-                            best_match = abs(msc_period - orbital_period)
-                            best_index = index
-                    print('Period discrepancy: ' + repr(best_match))
-                    if primary_mass is None:
-                        primary_mass = (msc_info['Mass1'].array[best_index]
-                                        *
-                                        units.M_sun)
-                    if secondary_mass is None:
-                        secondary_mass = (msc_info['Mass1'].array[best_index]
-                                          *
-                                          units.M_sun)
+                    if msc_info is not None:
+                        print('In MSC catalogue')
+                        best_match = numpy.inf
+                        for index, msc_period in enumerate(
+                                numpy.power(10.0, msc_info['logP'].array)
+                        ):
+                            if abs(msc_period - orbital_period) < best_match:
+                                best_match = abs(msc_period - orbital_period)
+                                best_index = index
+                        print('Period discrepancy: ' + repr(best_match))
+                        if primary_mass is None:
+                            primary_mass = (msc_info['Mass1'].array[best_index]
+                                            *
+                                            units.M_sun)
+                        if secondary_mass is None:
+                            secondary_mass = (
+                                msc_info['Mass1'].array[best_index]
+                                *
+                                units.M_sun
+                            )
+
+            nan_mass = get_quantity(numpy.nan,
+                                    numpy.nan,
+                                    numpy.nan,
+                                    'M_sun')
             if primary_mass is None:
-                nan_mass = get_quantity(numpy.nan,
-                                        numpy.nan,
-                                        numpy.nan,
-                                        'M_sun')
                 return dict(
                     primary_mass=nan_mass,
                     secondary_mass=nan_mass,
@@ -455,7 +470,9 @@ def format_hyades_praesepe_binaries(systems,
             primary_mass.plus_error = primary_mass.minus_error = (
                 0.0 * units.M_sun
             )
-            if secondary_mass is not None:
+            if secondary_mass is None:
+                secondary_mass = nan_mass
+            else:
                 secondary_mass.plus_error = secondary_mass.minus_error = (
                     0.0 * units.M_sun
                 )
@@ -473,13 +490,14 @@ def format_hyades_praesepe_binaries(systems,
             #pylint: disable=no-member
         #pylint: enable=too-many-branches
 
+        print('Formatting system: ' + repr(input_sys))
         return SimpleNamespace(
             hostname=input_sys['ID'],
             age=age,
             feh=get_quantity(feh, 0.004, 0.004, ''),
-            eccentricity=get_parameter('Ecc'),
+            eccentricity=get_parameter('Ecc', 'EccInner'),
             eccentricity_limit=False,
-            orbital_period=get_parameter('Porb'),
+            orbital_period=get_parameter('Porb', 'PInner'),
             **get_masses()
         )
 
