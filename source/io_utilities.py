@@ -1,5 +1,6 @@
 """Utilities for input and output of exoplanet data."""
 
+import sys
 import os.path
 import pickle
 import itertools
@@ -9,12 +10,14 @@ from astropy import units
 import numpy
 import pandas
 
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'data'))
+
 from planetary_system_io import read_cds_pipe_table
 from fit_ngc6819_masses import fit_milliman
 from command_line_utilities import data_dir
-from ..data.multiple_star_catalogue.multiple_star_catalogue import\
+from multiple_star_catalogue.multiple_star_catalogue import\
     MultipleStarCatalogue
-from ..data.sophie_catalogue.sophie_catalogue import SophieCatalogue
+from sophie_catalogue.sophie_catalogue import SophieCatalogue
 
 
 def get_nasa_system(system_id, nasa_systems):
