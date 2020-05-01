@@ -1,4 +1,5 @@
 import math
+import planetary_system_io
 class TransitingExoplanet:
     """ 
     This is a class for calculating the minimum eccentricity
@@ -57,7 +58,7 @@ class TransitingExoplanet:
 
     
     
-    def _init_(self, planet_id, semi_major_axis, orbital_period, transit_time, planet_radius, star_radius, impact_parameter):
+    def __init__(self, planet_id, semi_major_axis, orbital_period, transit_time, planet_radius, star_radius, impact_parameter):
 
         """ 
         The constructor for MinimumEccentricityOfTheOrbitOfTheTransitingExoplanet class.
@@ -174,23 +175,20 @@ print('planet_id', '    ', '  semi_major_axis', '    ', '    orbital_period', ' 
 #11 instances of class TransitingExoplanet
 #The first element of this array is initialized in the following
 #way:
-planet = [TransitingExoplanet()]
-planet[0]._init_(planet_id[0], semi_major_axis[0], orbital_period[0], transit_duration[0], planet_radius[0], star_radius[0], impact_parameter[0])
-planet[0].print_attributes()
+planet = []
 
 #Now we are running a loop to insert records of rest of the planets
 #in the table:
 
-for i in range(1, 10):
-   planet = planet + [TransitingExoplanet()]
-   planet[i]._init_(planet_id[i], semi_major_axis[i], orbital_period[i], transit_duration[i], planet_radius[i], star_radius[i], impact_parameter[i])
+for i in range(0, (len(planet_id)-1)):
+   planet = planet + [TransitingExoplanet(planet_id[i], semi_major_axis[i], orbital_period[i], transit_duration[i], planet_radius[i], star_radius[i], impact_parameter[i])]
    planet[i].print_attributes()
 
 #_______________________________________________________________________________________________________________________________________________________________________________
 
 #Data from planets_2019.09.18_13.19.49.csv found in the Data folder
 
-import planetary_system_io
+
 readPlanet = planetary_system_io.read_nasa_planets('C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2019.09.18_13.19.49.csv',
                      eliminate=('SWEEPS-11',
                                 'HD 41004 B',
@@ -211,19 +209,18 @@ impact_parameter = readPlanet.pl_imppar
 #Following command is to print the attributes of the table
 print('Planet Name', '    ', '  semi_major_axis', '    ', '    orbital_period', '    ', '    transit_duration', '    ', '    planet_radius', '   ', ' star_radius', ' ', '    impact_parameter', '    ', '         transit_duration_if_circular_orbit', '    ','             delta','   ','              emin')
 
-planet = [TransitingExoplanet()]
+planet = []
 j = -1
 for i in range(0, (len(planet_id)-1)):
     if not(math.isnan(semi_major_axis[i]) or math.isnan(orbital_period[i])or math.isnan(transit_duration[i])or math.isnan(planet_radius[i]) or math.isnan(star_radius[i]) or math.isnan(impact_parameter[i])):
         j = j + 1
-        planet[j]._init_(planet_id[i], semi_major_axis[i], orbital_period[i], transit_duration[i]*24, planet_radius[i], star_radius[i], impact_parameter[i])
+        planet = planet + [TransitingExoplanet(planet_id[i], semi_major_axis[i], orbital_period[i], transit_duration[i]*24, planet_radius[i], star_radius[i], impact_parameter[i])]
         planet[j].print_attributes()
-        planet = planet + [TransitingExoplanet()]
         
 #____________________________________________________________________________________________________________________________________________________________________________    
 #Data from updated_planets_koi_2020.03.16_21.25.09.csv found in the Data folder
 print('Now Printing results from updated_planets_koi_2020.03.16_21.25.09.csv')
-import planetary_system_io
+
 readPlanet = planetary_system_io.read_nasa_planets('C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/updated_planets_koi_2020.03.16_21.25.09.csv',
                      eliminate=('SWEEPS-11',
                                 'HD 41004 B',
@@ -246,20 +243,20 @@ impact_parameter = readPlanet.pl_imppar
 #Following command is to print the attributes of the table
 print('Planet Name', '    ', '  semi_major_axis', '    ', '    orbital_period', '    ', '    transit_duration', '    ', '    planet_radius', '   ', ' star_radius', ' ', '    impact_parameter', '    ', '         transit_duration_if_circular_orbit', '    ','             delta','   ','              emin')
 
-planet = [TransitingExoplanet()]
+
+planet = []
 j = -1
 for i in range(0, (len(planet_id)-1)):
     if not(math.isnan(semi_major_axis[i]) or math.isnan(orbital_period[i])or math.isnan(transit_duration[i])or math.isnan(planet_radius[i]) or math.isnan(star_radius[i]) or math.isnan(impact_parameter[i])):
         j = j + 1
-        planet[j]._init_(planet_id[i], semi_major_axis[i], orbital_period[i], transit_duration[i], planet_radius[i], star_radius[i], impact_parameter[i])
+        planet = planet + [TransitingExoplanet(planet_id[i], semi_major_axis[i], orbital_period[i], transit_duration[i], planet_radius[i], star_radius[i], impact_parameter[i])]
         planet[j].print_attributes()
-        planet = planet + [TransitingExoplanet()]
 
 #_______________________________________________________________________________________________________________________________________________________________________________
 
 #Data from planets_2020.04.10_14.52.24.csv found in the Data folder
 
-import planetary_system_io
+
 readPlanet = planetary_system_io.read_nasa_planets('C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv',
                      eliminate=('SWEEPS-11',
                                 'HD 41004 B',
@@ -280,11 +277,11 @@ impact_parameter = readPlanet.pl_imppar
 #Following command is to print the attributes of the table
 print('Planet Name', '    ', '  semi_major_axis', '    ', '    orbital_period', '    ', '    transit_duration', '    ', '    planet_radius', '   ', ' star_radius', ' ', '    impact_parameter', '    ', '         transit_duration_if_circular_orbit', '    ','             delta','   ','              emin')
 
-planet = [TransitingExoplanet()]
+
+planet = []
 j = -1
 for i in range(0, (len(planet_id)-1)):
     if not(math.isnan(semi_major_axis[i]) or math.isnan(orbital_period[i])or math.isnan(transit_duration[i])or math.isnan(planet_radius[i]) or math.isnan(star_radius[i]) or math.isnan(impact_parameter[i])):
         j = j + 1
-        planet[j]._init_(planet_id[i], semi_major_axis[i], orbital_period[i], transit_duration[i]*24, planet_radius[i], star_radius[i], impact_parameter[i])
+        planet = planet + [TransitingExoplanet(planet_id[i], semi_major_axis[i], orbital_period[i], transit_duration[i]*24, planet_radius[i], star_radius[i], impact_parameter[i])]
         planet[j].print_attributes()
-        planet = planet + [TransitingExoplanet()]
