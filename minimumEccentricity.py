@@ -37,19 +37,7 @@ class TransitingExoplanet:
         
     """
     
-
-    
-
-    planet_id = 'a'
-    semi_major_axis = 1
-    orbital_period = 1
-    transit_duration = 1
-    planet_radius = 1
-    star_radius = 1
-    impact_parameter = 1    
-    transit_duration_if_circular_orbit = 1
-    minimum_eccentricity = 0
-    delta = 1
+      
     SOLAR_RADIUS = 6.96 * pow(10,8)
     EARTH_RADIUS = 6378*1000
     AU = 1.496* pow(10,11)
