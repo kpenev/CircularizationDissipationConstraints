@@ -44,11 +44,16 @@ def read_table(fname,
         sep='\t',
         header=0,
         skiprows=[1],
-        index_col=((0, 1) if has_references else [0]),
+        dtype={'No': str, 'Ref': int},
+        index_col=False,
         skip_blank_lines=False,
         encoding='ascii',
         low_memory=False
     )
+    if has_references:
+        data = data.set_index(['No', 'Ref'])
+    else:
+        data = data.set_index('No')
     if drop_stars:
         if has_references:
             data = data.drop(index=drop_stars, level=0, errors='ignore')
@@ -92,12 +97,16 @@ def read_table(fname,
     return data
 
 if __name__ == '__main__':
-    print(read_file('hyades/SB', False))
-    print(read_file('hyades/adel.coo', True))
-    orb_elem, orb_elem_err = read_file('hyades/elem.orb',
-                                       True,
-                                       True,
-                                       drop_stars=['0169'])
+    sb = read_table('webda/melotte_25/SB', has_errors=False)
+    adel_coo = read_table('webda/melotte_25/adel.coo', has_errors=True)
+    orb_elem, orb_elem_err = read_table('webda/melotte_25/elem.orb',
+                                        has_errors=True,
+                                        force_unique_index=True,
+                                        drop_stars=['0169'])
+
+    print(80*'=')
+    print(sb)
+    print(adel_coo)
     print(orb_elem)
     print(orb_elem_err)
     print(orb_elem.loc['0141'])
