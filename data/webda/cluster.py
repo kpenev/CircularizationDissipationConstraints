@@ -201,10 +201,16 @@ class Cluster:
         return result
 
 if __name__ == '__main__':
+    from matplotlib import pyplot
     import warnings
     warnings.simplefilter('error')
 
     hyades = Cluster('Melotte 25')
+    cmd_data_singles = hyades.get_color_magnitude()
+    cmd_data_binaries = hyades.get_color_magnitude(binaries='only')
     print('Age: ' + repr(hyades.age.to_value('Gyr')))
     print('[Fe/H]: ' + repr(hyades.feh))
-    print(hyades.get_color_magnitude())
+
+    pyplot.plot(cmd_data_singles['BV'], -cmd_data_singles['V'], 'ok')
+    pyplot.plot(cmd_data_binaries['BV'], -cmd_data_binaries['V'], 'xr')
+    pyplot.show()
