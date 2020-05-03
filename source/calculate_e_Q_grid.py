@@ -216,7 +216,7 @@ def prepare_nasa_system(system,
     fix_eccentricity()
     fix_semimajor(system)
 
-def get_evolution_systems(cmdline_args):
+def get_evolution_systems(cmdline_args, interpolator):
     """Return a list of the systems to process."""
 
     evolution_systems = []
@@ -307,7 +307,7 @@ def get_evolution_systems(cmdline_args):
 
     return evolution_systems
 
-def get_jobs(cmdline_args):
+def get_jobs(cmdline_args, evolution_systems):
     """Return list of the jobs to process with CurrentEccentricityCalculator."""
 
     def parse_known_to_fail(line):
@@ -315,8 +315,6 @@ def get_jobs(cmdline_args):
 
         system, lgQ, initial_eccentricity = line.split()
         return system, float(lgQ), float(initial_eccentricity)
-
-    evolution_systems = get_evolution_systems(cmdline_args)
 
     grid_jobs = [
         (system, lgQ, cmdline_args.initial_eccentricity)
@@ -330,13 +328,14 @@ def get_jobs(cmdline_args):
 
     to_delete = []
     for index, job in enumerate(grid_jobs):
-        if job in known_to_fail:
+        replacement_job = (job[0].hostname,) + job[1:]
+        if replacement_job in known_to_fail:
             replaced = False
             for initial_eccentricity in\
                     cmdline_args.fallback_initial_eccentricity:
-                replacement_job = job[:2] + (initial_eccentricity,)
+                replacement_job = replacement_job[:2] + (initial_eccentricity,)
                 if replacement_job not in known_to_fail:
-                    grid_jobs[index] = replacement_job
+                    grid_jobs[index] = (job[0],) + replacement_job[1:]
                     break
             if not replaced:
                 to_delete.append(index)
@@ -372,7 +371,8 @@ def main():
         progress_lock=pool_manager.Lock()
         #pylint: enable=no-member
     )
-    job_list = get_jobs
+    job_list = get_jobs(cmdline_args,
+                        get_evolution_systems(cmdline_args, interpolator))
     if cmdline_args.num_parallel_processes == 1:
         final_eccentricities = [calculate_current_eccentricity(job)
                                 for job in job_list]
