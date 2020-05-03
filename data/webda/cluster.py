@@ -200,6 +200,32 @@ class Cluster:
         result.index = result.index.droplevel(1)
         return result
 
+    def get_binaries(self,
+                     orbital_element_reference_ranking,
+                     membership_threshold=0.5,
+                     **color_magnitude_kwargs):
+        """
+        Return available information for binaries.
+
+        Args:
+            select_orbital_elements(callable):    Should be a callable which
+                takes all available orbital elements entries for a system and
+                returns the best. This is passed directly to groupby().apply of
+                the pandas DataFrame of orbital elements.
+
+            membership_threshold(float):    The minimum membership probability
+                which will still count the star as a member.
+
+            color_magnitude_kwargs:    Any arguments to pass directly to
+                self.get_color_magnitude(), when collecting photometry to
+                include for the binaries.
+
+        Returns:
+            pandas.DataFrame:
+                Indexed by star number and columns containing a selected "best"
+                values for all relevant binary information.
+        """
+
 if __name__ == '__main__':
     from matplotlib import pyplot
     import warnings
