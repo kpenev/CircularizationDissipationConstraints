@@ -100,10 +100,14 @@ class CurrentEccentricityCalculator:
         #pylint: disable=no-member
         if system.primary_mass > 1.2 * units.M_sun:
         #pylint: enable=no-member
-            print('Skipping %s, lgQ = %g' % (system.hostname, lgQ))
+            print('Skipping %s, lgQ = %g, e0 = %g' % (system.hostname,
+                                                       lgQ,
+                                                       initial_eccentricity))
             return None
 
-        print('Trying %s, lgQ = %g' % (system.hostname, lgQ))
+        print('Trying %s, lgQ = %g, e0 = %g' % (system.hostname,
+                                                 lgQ,
+                                                 initial_eccentricity))
 
         default_dissipation = dict(
             tidal_frequency_breaks=None,

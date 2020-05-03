@@ -337,6 +337,7 @@ def get_jobs(cmdline_args):
                 replacement_job = job[:2] + (initial_eccentricity,)
                 if replacement_job not in known_to_fail:
                     grid_jobs[index] = replacement_job
+                    replaced = True
                     break
             if not replaced:
                 to_delete.append(index)
