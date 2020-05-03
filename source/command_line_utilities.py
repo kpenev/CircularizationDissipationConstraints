@@ -122,11 +122,31 @@ def add_assumptions_cmdline_args(parser):
         help='The initial eccentrcicity to assume.'
     )
     parser.add_argument(
+        '--fallback-initial-eccentricity',
+        type=float,
+        default=[],
+        action='append',
+        help='Initial eccentrcicity to assume if the main assumption fails. If '
+        'multiple values are given, they are tried in the order supplied. For '
+        'example if --initial-eccentricity is 0.5, and 0.51, and 0.49 are '
+        'passed here, all Q values for all systems are first attempted with '
+        'e0=0.5. Only those that fail are attempted with e0=0.51. Finally, only'
+        ' those that fail even this second attempt will be tried with e0=0.49.'
+    )
+    parser.add_argument(
         '--resolve-secondary-mass-range',
         choices=['amin', 'amax', 'mean'],
         default='mean',
         help='How to handle a two-sided range of possible secondary masses. '
         'Only used for Hyades/Preasepe data. Default: %(default)s'
+    )
+    parser.add_argument(
+        '--known-to-fail',
+        default='known_to_fail.txt',
+        help='A filename to read a list of (system name, initial eccentricity, '
+        'log10(Q)) combinations which are known to fail. Those will not be '
+        'attempted again. This file will be automatically uptade with any other'
+        ' failures encountered. Default: %(default)s'
     )
 
 def add_path_cmdline_args(parser):

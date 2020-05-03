@@ -18,8 +18,6 @@ class CurrentEccentricityCalculator:
     interruption.
 
     Attributes:
-        initial_eccentricity:    See same name argument to __init__().
-
         interpolator:    See same name argument to __init__().
 
         primary_lgQ:    See same name argument to __init__().
@@ -36,7 +34,6 @@ class CurrentEccentricityCalculator:
     #pylint: disable=invalid-name
     def __init__(self,
                  *,
-                 initial_eccentricity,
                  primary_lgQ,
                  interpolator,
                  progress,
@@ -46,9 +43,6 @@ class CurrentEccentricityCalculator:
         Set-up the object to calculate present day eccentricities for systems.
 
         Args:
-            initial_eccentricity(float):     The eccentricity to start system
-                evolution with.
-
             interpolator:     A stellar evolution interpolator instance used to
                 create the star in the system.
 
@@ -68,7 +62,6 @@ class CurrentEccentricityCalculator:
             None
         """
 
-        self.initial_eccentricity = initial_eccentricity
         self.interpolator = interpolator
         self.primary_lgQ = primary_lgQ
         self.progress_pickle_fname = progress_pickle_fname
@@ -86,7 +79,10 @@ class CurrentEccentricityCalculator:
                 * system(SimpleNamespace): containing the system to evolve.
 
                 * lgQ(float): log10(Q*') to assume for calculating the
-                evolution.
+                  evolution.
+
+                * initial_eccentricity:    The eccentricity to start system
+                  evolution with.
 
         Returns:
             float:
@@ -97,10 +93,13 @@ class CurrentEccentricityCalculator:
 
         #lgQ is more readable than alternatives
         #pylint: disable=invalid-name
-        system, lgQ = job
+        system, lgQ, initial_eccentricity = job
         #pylint: enable=invalid-name
 
+        #False positive
+        #pylint: disable=no-member
         if system.primary_mass > 1.2 * units.M_sun:
+        #pylint: enable=no-member
             print('Skipping %s, lgQ = %g' % (system.hostname, lgQ))
             return None
 
@@ -115,10 +114,9 @@ class CurrentEccentricityCalculator:
 
         if system.hostname in self.progress:
             progress_entry = self.progress[system.hostname]
-            if lgQ in progress_entry:
-                progress_entry = progress_entry[lgQ]
-                assert self.initial_eccentricity == progress_entry[0]
-                return progress_entry[1]
+            attempt_id = (lgQ, initial_eccentricity)
+            if attempt_id in progress_entry:
+                return progress_entry[attempt_id]
 
         secondary_dissipation = dict(
             default_dissipation,
@@ -147,21 +145,21 @@ class CurrentEccentricityCalculator:
                     primary=primary_dissipation,
                     secondary=secondary_dissipation
                 ),
-                initial_eccentricity=self.initial_eccentricity,
+                initial_eccentricity=initial_eccentricity,
                 #False positive.
                 #pylint: disable=no-member
                 disk_period=(4.0 * units.day),
                 disk_dissipation_age=(5e-3 * units.Gyr),
-                #pylint: enable=no-member
                 max_age=system.age,
                 secondary_is_star=(check_if_secondary_is_star(system)
                                    and
                                    system.secondary_mass <= 1.2 * units.M_sun),
+                #pylint: enable=no-member
             )
         except AssertionError:
             print('Failed %s, lgQ = %g, e0 = %g' % (system.hostname,
                                                     lgQ,
-                                                    self.initial_eccentricity))
+                                                    initial_eccentricity))
             return None
 
         print(evolution.format())
@@ -181,7 +179,7 @@ class CurrentEccentricityCalculator:
                 (
                     system.hostname,
                     lgQ,
-                    self.initial_eccentricity,
+                    initial_eccentricity,
                     final_eccentricity
                 )
             )
@@ -189,10 +187,12 @@ class CurrentEccentricityCalculator:
             self._progress_lock.acquire()
             pickle_new_result(system.hostname,
                               lgQ,
-                              self.initial_eccentricity,
+                              initial_eccentricity,
                               final_eccentricity,
                               self.progress_pickle_fname)
             self._progress_lock.release()
 
             return final_eccentricity
+
+        return None
 #pylint: disable=too-few-public-methods

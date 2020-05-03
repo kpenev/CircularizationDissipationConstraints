@@ -216,20 +216,8 @@ def prepare_nasa_system(system,
     fix_eccentricity()
     fix_semimajor(system)
 
-def main():
-    """Calculate the grid specified on the command line."""
-
-    cmdline_args = parse_command_line()
-    progress = init_progress_pickle(cmdline_args)
-
-    interpolator = StellarEvolutionManager(
-        cmdline_args.stellar_evolution_interpolator_dir
-    ).get_interpolator_by_name(
-        'default'
-    )
-    orbital_evolution_library.read_eccentricity_expansion_coefficients(
-        cmdline_args.eccentricity_expansion_coefficients.encode('ascii')
-    )
+def get_evolution_systems(cmdline_args):
+    """Return a list of the systems to process."""
 
     evolution_systems = []
     if cmdline_args.nasa_data:
@@ -317,15 +305,64 @@ def main():
           +
           repr(evolution_systems))
 
+    return evolution_systems
+
+def get_jobs(cmdline_args):
+    """Return list of the jobs to process with CurrentEccentricityCalculator."""
+
+    def parse_known_to_fail(line):
+        """Parse a single line from the file of evolutions known to fail."""
+
+        system, lgQ, initial_eccentricity = line.split()
+        return system, float(lgQ), float(initial_eccentricity)
+
+    evolution_systems = get_evolution_systems(cmdline_args)
+
     grid_jobs = [
-        (system, lgQ)
+        (system, lgQ, cmdline_args.initial_eccentricity)
         for system in evolution_systems
         for lgQ in numpy.arange(3.0, 10.0, 1.0)
     ]
 
+    with open(cmdline_args.known_to_fail, 'r') as known_to_fail_file:
+        known_to_fail = {parse_known_to_fail(line)
+                         for line in known_to_fail_file}
+
+    to_delete = []
+    for index, job in enumerate(grid_jobs):
+        if job in known_to_fail:
+            replaced = False
+            for initial_eccentricity in\
+                    cmdline_args.fallback_initial_eccentricity:
+                replacement_job = job[:2] + (initial_eccentricity,)
+                if replacement_job not in known_to_fail:
+                    grid_jobs[index] = replacement_job
+                    break
+            if not replaced:
+                to_delete.append(index)
+
+    for i in reversed(to_delete):
+        del grid_jobs[i]
+
+    return grid_jobs
+
+def main():
+    """Calculate the grid specified on the command line."""
+
+    cmdline_args = parse_command_line()
+    progress = init_progress_pickle(cmdline_args)
+
+    interpolator = StellarEvolutionManager(
+        cmdline_args.stellar_evolution_interpolator_dir
+    ).get_interpolator_by_name(
+        'default'
+    )
+    orbital_evolution_library.read_eccentricity_expansion_coefficients(
+        cmdline_args.eccentricity_expansion_coefficients.encode('ascii')
+    )
+
     pool_manager = Manager()
     calculate_current_eccentricity = CurrentEccentricityCalculator(
-        initial_eccentricity=cmdline_args.initial_eccentricity,
         primary_lgQ=cmdline_args.stellar_lgQ,
         interpolator=interpolator,
         progress=progress,
@@ -335,15 +372,23 @@ def main():
         progress_lock=pool_manager.Lock()
         #pylint: enable=no-member
     )
+    job_list = get_jobs
     if cmdline_args.num_parallel_processes == 1:
-        for job in grid_jobs:
-            calculate_current_eccentricity(job)
+        final_eccentricities = [calculate_current_eccentricity(job)
+                                for job in job_list]
     else:
         with Pool(cmdline_args.num_parallel_processes) as process_pool:
-            process_pool.map(
+            final_eccentricities = process_pool.map(
                 calculate_current_eccentricity,
-                grid_jobs
+                job_list
             )
+
+    with open(cmdline_args.known_to_fail, 'a') as known_to_fail_file:
+        for ef, job in zip(final_eccentricities, job_list):
+            if ef is None:
+                known_to_fail_file.write('%s %s %s\n'
+                                         %
+                                         (job[0], repr(job[1]), repr(job[2])))
 
 if __name__ == '__main__':
     main()

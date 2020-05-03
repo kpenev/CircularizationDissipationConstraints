@@ -540,7 +540,8 @@ def init_progress_pickle(cmdline_args):
                 pickled_cfg['stellar_lgQ'] = numpy.inf
             for ignore_arg in ['progress_pickle',
                                'num_parallel_processes',
-                               'use_binary_stars']:
+                               'use_binary_stars',
+                               'fallback_initial_eccentricity']:
                 if ignore_arg in pickled_cfg:
                     del pickled_cfg[ignore_arg]
                 if ignore_arg in cmdline_cfg:
@@ -591,9 +592,9 @@ def load_progress_pickle(progress_file):
             assert isinstance(final_eccentricity, float)
             if hostname not in result:
                 result[hostname] = dict()
-            assert lgQ not in result[hostname]
-            result[hostname][lgQ] = (initial_eccentricity,
-                                     final_eccentricity)
+            attempt_id = (lgQ, initial_eccentricity)
+            assert attempt_id not in result[hostname]
+            result[hostname][attempt_id] = final_eccentricity
     except EOFError:
         pass
 
