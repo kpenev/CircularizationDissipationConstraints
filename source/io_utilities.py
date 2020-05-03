@@ -541,7 +541,8 @@ def init_progress_pickle(cmdline_args):
             for ignore_arg in ['progress_pickle',
                                'num_parallel_processes',
                                'use_binary_stars',
-                               'fallback_initial_eccentricity']:
+                               'fallback_initial_eccentricity',
+                               'known_to_fail']:
                 if ignore_arg in pickled_cfg:
                     del pickled_cfg[ignore_arg]
                 if ignore_arg in cmdline_cfg:
