@@ -28,11 +28,11 @@ def read_table(fname,
             unique index.
 
     Returns:
-        pandas.DataFrame or (pandas.DataFrame, pandas.DataFrame):
+        pandas.DataFrame:
             The data in the file indexed by star number (and by
-            reference number if multiref). Two DataFrame objects are returned
-            for files with error estimates, the first containing the values and
-            the second cantaining the errors.
+            reference number if multiref). For files with error estimates, the
+            data frame has twice as many columns as the file, with the second
+            set of columns prefixed by `'err_'` containing the error estimates.
     """
 
 
@@ -83,7 +83,13 @@ def read_table(fname,
             errors = errors.copy()
             errors[no_error[error_mask]] = None
 
-        return data[value_mask], errors
+        return pandas.concat(
+            [
+                data[value_mask],
+                errors.rename(columns=lambda colname: 'err_' + colname)
+            ],
+            axis=1
+        )
 
     if force_unique_index and not data.index.is_unique:
         to_drop = data.index.duplicated(keep='last')
@@ -97,28 +103,20 @@ def read_table(fname,
     return data
 
 if __name__ == '__main__':
-    sb = read_table('webda/melotte_25/SB', has_errors=False)
+    spectroscopic_binaries = read_table('webda/melotte_25/SB', has_errors=False)
     adel_coo = read_table('webda/melotte_25/adel.coo', has_errors=True)
-    orb_elem, orb_elem_err = read_table('webda/melotte_25/elem.orb',
-                                        has_errors=True,
-                                        force_unique_index=True,
-                                        drop_stars=['0169'])
+    orb_elem = read_table('webda/melotte_25/elem.orb',
+                          has_errors=True,
+                          force_unique_index=True,
+                          drop_stars=['0169'])
 
     print(80*'=')
-    print(sb)
+    print(spectroscopic_binaries)
     print(adel_coo)
     print(orb_elem)
-    print(orb_elem_err)
     print(orb_elem.loc['0141'])
-    print(orb_elem_err.loc['0141'])
     print(orb_elem.loc['0095'])
-    print(orb_elem_err.loc['0095'])
     try:
         print(orb_elem.loc['0169'])
     except KeyError:
-        assert(True)
-    try:
-        print(orb_elem_err.loc['0169'])
-        assert False
-    except KeyError:
-        assert(True)
+        assert True
