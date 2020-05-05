@@ -13,14 +13,14 @@ def fit_single_mass(photometry_interp,
                     color_template=None,
                     color_error_template=None):
     """
-    Find single star best fit mass for a subset of USNO u', g', r', i', z' mags.
+    Fit single star mass for mags/colors with both observed & predicted values.
 
     Args:
         photometry_interp(CMDPhotometryInterpolator):    Object able to
             predict relevant magnitudes for a given stellar mass or binary.
 
-        photometry(dict):    A subset of u', g', r', i', z' magnitudes and
-            errors measured for the star to fit. The key <-> magnitude or
+        photometry(dict):    Magnitudes, colors and their errors measured for
+        the star to fit. The key <-> magnitude, key <-> color, and
             key <-> error correspondence is specified by the template
             arguments.
 
@@ -31,10 +31,10 @@ def fit_single_mass(photometry_interp,
         magnitude_error_template(str):    A %(filchar)c-substitution template
             that should expand to the key giving a particular magnitude error.
 
-        color_template(None or str):    If None, individual colors are fit. If
+        color_template(None or str):    If None, individual magnitudes are fit. If
             not None, it is assumed that ``photometry`` contains color
             information (not just magnitudes), so masses are derived by fitting
-            color--magnitude digramse. In the latter case, this argument should
+            color--magnitude digrams. In the latter case, this argument should
             be contain a %(filchar1)c and %(filchar2)c substitutions, expanding
             to the key in ``photometry`` giving a particular measured color
             nominal value. Colors are always assumed to be magnitude in the
