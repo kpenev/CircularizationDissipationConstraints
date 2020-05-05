@@ -3,7 +3,7 @@
 
 """Calculate final eccentricity vs Q on a grid of Q values for a system."""
 
-from multiprocessing import Pool, Manager
+from multiprocessing import Pool, Manager, TimeoutError as MPTimeoutError
 import sys
 import os.path
 
@@ -377,19 +377,34 @@ def main():
     if cmdline_args.num_parallel_processes == 1:
         final_eccentricities = [calculate_current_eccentricity(job)
                                 for job in job_list]
+        with open(cmdline_args.known_to_fail, 'a') as known_to_fail_file:
+            for ef, job in zip(final_eccentricities, job_list):
+                if ef is None:
+                    known_to_fail_file.write(
+                        '%s %s %s\n'
+                        %
+                        (job[0], repr(job[1]), repr(job[2]))
+                    )
     else:
         with Pool(cmdline_args.num_parallel_processes) as process_pool:
-            final_eccentricities = process_pool.map(
+            final_eccentricity_iter = process_pool.imap(
                 calculate_current_eccentricity,
-                job_list
+                job_list,
             )
 
-    with open(cmdline_args.known_to_fail, 'a') as known_to_fail_file:
-        for ef, job in zip(final_eccentricities, job_list):
-            if ef is None:
-                known_to_fail_file.write('%s %s %s\n'
-                                         %
-                                         (job[0], repr(job[1]), repr(job[2])))
+            for job in job_list:
+                try:
+                    ef = final_eccentricity_iter.next(timeout=3.6e4)
+                except MPTimeoutError:
+                    ef = None
+                if ef is None:
+                    with open(cmdline_args.known_to_fail, 'a') as \
+                            known_to_fail_file:
+                        known_to_fail_file.write(
+                            '%s %s %s\n'
+                            %
+                            (job[0], repr(job[1]), repr(job[2]))
+                        )
 
 if __name__ == '__main__':
     main()
