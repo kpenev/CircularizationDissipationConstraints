@@ -44,11 +44,12 @@ def read_table(fname,
         sep='\t',
         header=0,
         skiprows=[1],
-        dtype={'No': str, 'Ref': int},
+        dtype={'No': str, 'Ref': int, 'Vo': float},
         index_col=False,
         skip_blank_lines=False,
         encoding='ascii',
-        low_memory=False
+        low_memory=False,
+        na_values=['(fixed)', 'fixed', '.', 'var']
     )
     if has_references:
         data = data.set_index(['No', 'Ref'])
@@ -109,13 +110,13 @@ if __name__ == '__main__':
                           has_errors=True,
                           force_unique_index=True,
                           drop_stars=['0169'])
-
+    print(orb_elem.dtypes)
     print(80*'=')
     print(spectroscopic_binaries)
     print(adel_coo)
     print(orb_elem)
     print(orb_elem.loc['0141'])
-    print(orb_elem.loc['0095'])
+    print(orb_elem.loc['0072'])
     try:
         print(orb_elem.loc['0169'])
     except KeyError:
