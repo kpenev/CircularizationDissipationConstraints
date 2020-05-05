@@ -383,7 +383,7 @@ def main():
                     known_to_fail_file.write(
                         '%s %s %s\n'
                         %
-                        (job[0], repr(job[1]), repr(job[2]))
+                        (job[0].hostname, repr(job[1]), repr(job[2]))
                     )
     else:
         with Pool(cmdline_args.num_parallel_processes) as process_pool:
@@ -403,7 +403,7 @@ def main():
                         known_to_fail_file.write(
                             '%s %s %s\n'
                             %
-                            (job[0], repr(job[1]), repr(job[2]))
+                            (job[0].hostname, repr(job[1]), repr(job[2]))
                         )
 
 if __name__ == '__main__':
