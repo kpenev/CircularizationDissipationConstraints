@@ -44,8 +44,34 @@ class Cluster:
         index_col='Cluster_name'
     )[0]
 
-    _tables_with_errors = ['melotte_25/elem.orb']
+    _tables_with_errors = ['elem.orb']
     _drop_stars = {'Melotte 25': ['0169']}
+
+    @staticmethod
+    def _unique_combine_star_lists(index1, index2):
+        """
+        Combine two pandas indices excl. duplicates, handling special cases
+
+        Args:
+            index1(None or pandas index):    The first list of indices, or
+                None if no stars have been identified so far.
+
+            inedx2(pandas index):    The part of the index of a WEBDA
+                table to join with the first. Could be either just star
+                numbers or star numbers and references, in which case the
+                references are ignored.
+
+        Returns:
+            pandas index:
+                The star numbers contained in either input index.
+        """
+
+        new_stars = (
+            index2.get_level_values(0).drop_duplicates()
+        )
+        if index1 is None:
+            return new_stars
+        return index1.union(new_stars)
 
     def _read_data(self, data_dir):
         """Read the cluster data into pandas.DataFrame objects."""
@@ -65,6 +91,68 @@ class Cluster:
             )
         return result
 
+    @staticmethod
+    def _select_orbital_elements(orbit):
+        """
+        Select which of the two orbits is "better".
+
+        Args:
+            orbit(pandas.DataFrame):    The values and errors of the orbital
+                elements from all references for a single star.
+
+        Returns:
+            pandas.DataFrame:
+                The selected entry from the input.
+        """
+
+        print('Selectnig best orbit among: ')
+        print(orbit)
+        porb_best = orbit['err_Po'].idxmin()
+        k1_best = orbit['err_K1'].idxmin()
+
+        print('Po best: ' + repr(porb_best))
+        print('K1 best: ' + repr(k1_best))
+        if not isinstance(porb_best, float):
+            print('best err_Po: ' + repr(orbit['err_Po'][porb_best]))
+        if not isinstance(k1_best, float):
+            print('best err_K1: ' + repr(orbit['err_K1'][k1_best]))
+
+
+        if isinstance(porb_best, float):
+            assert numpy.isnan(porb_best)
+            best = k1_best
+        else:
+            if isinstance(k1_best, float):
+                assert numpy.isnan(k1_best)
+                best = porb_best
+            else:
+                if (
+                        numpy.isnan(orbit['err_Po'][porb_best])
+                        or
+                        numpy.isnan(orbit['err_K1'][porb_best])
+                ):
+                    best = k1_best
+                elif (
+                        numpy.isnan(orbit['err_K1'][k1_best])
+                        or
+                        numpy.isnan(orbit['err_Po'][k1_best])
+                ):
+                    best = porb_best
+                elif k1_best == porb_best:
+                    best = porb_best
+                else:
+                    if (
+                            orbit['err_K1'][porb_best]/orbit['err_K1'][k1_best]
+                            >
+                            orbit['err_Po'][k1_best]/orbit['err_Po'][porb_best]
+                    ):
+                        best = k1_best
+                    else:
+                        best = porb_best
+
+        result = orbit.loc[[best]].reset_index(level=0, drop=True)
+        return result
+
     def __init__(self, cluster_name):
         """Read and organize the data for the given cluster for use."""
 
@@ -81,6 +169,23 @@ class Cluster:
                 cluster_name.lower().replace(' ', '_')
             )
         )
+
+    def get_nonmembers(self, membership_threshold=0.5):
+        """Return a list of the IDs of all non-stars present in cluster data."""
+
+        if 'NM' in self._star_data:
+            non_members = self._star_data['NM'].index
+        if 'prob.mu' in self._star_data:
+            non_members = self._unique_combine_star_lists(
+                non_members,
+                self._star_data['prob.mu'].index[
+                    self._star_data['prob.mu']['Prob']
+                    <
+                    membership_threshold
+                ]
+            )
+        return non_members
+
 
     def get_color_magnitude(self,
                             binaries='exclude',
@@ -115,32 +220,6 @@ class Cluster:
                 weighted with the given `N` is used.
         """
 
-        def combine_to_drop(current_to_drop, extra_to_drop):
-            """
-            Combine two lists of indices to drop.
-
-            Args:
-                current_to_drop(None or pandas index):    The current list of
-                    stars marked for exclusion from the result, or None if no
-                    stars have been identified so far.
-
-                extra_to_drop(pandas index):    The part of the index of a WEBDA
-                    table identifying stars to drop. Could be either just star
-                    numbers or star numbers and references, in which case the
-                    references are ignored.
-
-            Returns:
-                pandas index:
-                    The star numbers contained in either input index.
-            """
-
-            new_stars = (
-                extra_to_drop.get_level_values(0).drop_duplicates()
-            )
-            if current_to_drop is None:
-                return new_stars
-            return current_to_drop.union(new_stars)
-
         def get_raw_data():
             """
             Return all color information for the stars to include in result.
@@ -149,20 +228,9 @@ class Cluster:
             exist.
             """
 
-            to_drop = None
-            if 'NM' in self._star_data:
-                to_drop = self._star_data['NM'].index
-            if 'prob.mu' in self._star_data:
-                to_drop = combine_to_drop(
-                    to_drop,
-                    self._star_data['prob.mu'].index[
-                        self._star_data['prob.mu']['Prob']
-                        <
-                        membership_threshold
-                    ]
-                )
+            to_drop = self.get_nonmembers(membership_threshold)
             if binaries == 'exclude' and 'SB' in self._star_data:
-                to_drop = combine_to_drop(
+                to_drop = self._unique_combine_star_lists(
                     to_drop,
                     self._star_data['SB'].index
                 )
@@ -200,9 +268,24 @@ class Cluster:
         result.index = result.index.droplevel(1)
         return result
 
+    def get_binary_orbits(self, membership_threshold=0.5):
+        """Return the orbital elements of all member binaries."""
+
+        return self._star_data[
+            'elem.orb'
+        ].groupby(
+            level=0
+        ).apply(
+            self._select_orbital_elements
+        ).drop(
+            index=self.get_nonmembers(membership_threshold),
+            level=0
+        )
+
     def get_binaries(self,
-                     orbital_element_reference_ranking,
                      membership_threshold=0.5,
+                     require_orbit=False,
+                     require_photometry=False,
                      **color_magnitude_kwargs):
         """
         Return available information for binaries.
@@ -216,6 +299,12 @@ class Cluster:
             membership_threshold(float):    The minimum membership probability
                 which will still count the star as a member.
 
+            require_orbit(bool):    Should the result include only binaries for
+                which orbital elements are available?
+
+            require_photometry(bool):    Should the result include only binaries
+                for which photometry is available?
+
             color_magnitude_kwargs:    Any arguments to pass directly to
                 self.get_color_magnitude(), when collecting photometry to
                 include for the binaries.
@@ -226,12 +315,43 @@ class Cluster:
                 values for all relevant binary information.
         """
 
-if __name__ == '__main__':
-    from matplotlib import pyplot
-    import warnings
-    warnings.simplefilter('error')
+        if require_orbit:
+            if require_photometry:
+                merge_type = 'inner'
+            else:
+                merge_type = 'left'
+        else:
+            if require_photometry:
+                merge_type = 'right'
+            else:
+                merge_type = 'outer'
+
+        return pandas.merge(
+            self.get_binary_orbits(
+                membership_threshold
+            ).reset_index(
+                level='Ref'
+            ),
+            self.get_color_magnitude(
+                binaries='only',
+                membership_threshold=membership_threshold,
+                **color_magnitude_kwargs
+            ),
+            how=merge_type,
+            left_index=True,
+            right_index=True,
+            suffixes=['orb', 'cm']
+        )
+
+def examples():
+    """Run examples without polluting global scope."""
 
     hyades = Cluster('Melotte 25')
+
+    binaries = hyades.get_binaries(require_orbit=True)
+    print(binaries)
+
+
     cmd_data_singles = hyades.get_color_magnitude()
     cmd_data_binaries = hyades.get_color_magnitude(binaries='only')
     print('Age: ' + repr(hyades.age.to_value('Gyr')))
@@ -239,4 +359,11 @@ if __name__ == '__main__':
 
     pyplot.plot(cmd_data_singles['BV'], -cmd_data_singles['V'], 'ok')
     pyplot.plot(cmd_data_binaries['BV'], -cmd_data_binaries['V'], 'xr')
+    pyplot.plot(binaries['BV'], -binaries['V'], '+g')
     pyplot.show()
+
+if __name__ == '__main__':
+    from matplotlib import pyplot
+#    import warnings
+#    warnings.simplefilter('error')
+    examples()
