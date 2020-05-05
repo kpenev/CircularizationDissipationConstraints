@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 ulimit -S -m $((2 * 1024 * 1024))
 
