@@ -1,0 +1,13 @@
+Parameter	Ref	Value	Error
+---------	---	-----	-----
+Name	0	ngc2632 NGC 2632 Praesepe M44 M044	
+Right ascension J2000	1000000	08 40 24	
+Declination J2000	1000000	+19 40 00	
+Diameter [arcmin]	1000000	   70.0	
+Distance [pc]	1000000	  187	
+E(B-V)	1000000	0.009	
+log(age)	1000000	 8.863	
+Proper motion RA	1000000	-35.58	0.19
+Proper motion Dec	1000000	-12.90	0.19
+Radial velocity	1000000	+034.76	00.07
+Fe/H	1000000	+0.27 	0.05
