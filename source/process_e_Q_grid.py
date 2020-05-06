@@ -18,7 +18,7 @@ def format_eccentricity_vs_lgQ(eccentricity_vs_lgQ):
             See doc line.
     """
 
-    data = [(item[0], item[1][1]) for item in eccentricity_vs_lgQ.items()]
+    data = [(item[0][0], item[1]) for item in eccentricity_vs_lgQ.items()]
     return numpy.array(sorted(data, key=lambda item: item[0]))
 
 def _solve_line(x0, y0, x1, y1, target_y):

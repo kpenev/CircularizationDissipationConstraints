@@ -760,7 +760,11 @@ def get_lgQ_constraints(lgQ_x_axes,
     index = 0
     hostnames = []
     for system in systems:
-        if system.hostname not in progress:
+        if (
+                system.hostname not in progress
+                or
+                not numpy.isfinite(system.primary_mass.to_value('M_sun'))
+        ):
             continue
         hostnames.append(system.hostname)
         add_stellar_properties(system)
@@ -869,8 +873,8 @@ def set_x_axis(quantity, planets):
             pyplot.xscale('linear')
             pyplot.xlim(1, 4.5)
         else:
-            pyplot.xscale('linear')
-            pyplot.xlim(3, 50)
+            pyplot.xscale('log')
+            pyplot.xlim(1, 50)
     else:
         pyplot.xscale('log')
         pyplot.autoscale()
