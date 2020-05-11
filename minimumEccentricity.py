@@ -75,18 +75,42 @@ class TransitingExoplanet:
     SOLAR_RADIUS_LOWER_UNCERTAINTY = 65000
     
     EARTH_RADIUS = 6378000
-    EARTH_RADIUS_UPPER_UNCERTAINTY = EARTH
+    EARTH_RADIUS_UPPER_UNCERTAINTY = 0
+    EARTH_RADIUS_LOWER_UNCERTAINTY = 0
 
 
     
     AU = 149600000000
-    SOLAR_RADIUS_OVER_AU = 0.00465 #is the Sun's radius divided by 1AU
-    EARTH_RADIUS_OVER_SOLAR_RADIUS = 0.00916 #is the Earth's radius divided by the Sun's radius
+    SOLAR_RADIUS_OVER_AU = SOLAR_RADIUS / AU #is the Sun's radius divided by 1AU
+    SOLAR_RADIUS_OVER_AU_UPPER_UNCERTAINTY = SOLAR_RADIUS_UPPER_UNCERTAINTY / AU
+    SOLAR_RADIUS_LOWER_AU_UPPER_UNCERTAINTY = SOLAR_RADIUS_LOWER_UNCERTAINTY / AU
+    
+    EARTH_RADIUS_OVER_SOLAR_RADIUS = EARTH_RADIUS / SOLAR_RADIUS #is the Earth's radius divided by the Sun's radius
+    EARTH_RADIUS_OVER_SOLAR_RADIUS_UPPER_UNCERTAINTY = (EARTH_RADIUS + EARTH_RADIUS_UPPER_UNCERTAINTY)/(SOLAR_RADIUS - SOLAR_RADIUS_LOWER_AU_UPPER_UNCERTAINTY)-EARTH_RADIUS_OVER_SOLAR_RADIUS
+    EARTH_RADIUS_OVER_SOLAR_RADIUS_LOWER_UNCERTAINTY = EARTH_RADIUS_OVER_SOLAR_RADIUS - (EARTH_RADIUS - EARTH_RADIUS_LOWER_UNCERTAINTY)/(SOLAR_RADIUS + SOLAR_RADIUS_UPPER_AU_UPPER_UNCERTAINTY)
 
     
     
-    def __init__(self, planet_id, semi_major_axis, orbital_period, transit_time,
-                 planet_radius, star_radius, impact_parameter):
+    def __init__(self,
+                 planet_id,
+                 semi_major_axis,
+                 semi_major_axis_upper_uncertainty,
+                 semi_major_axis_lower_uncertainty,
+                 orbital_period,
+                 orbital_period_upper_uncertainty,
+                 orbital_period_lower_uncertainty,
+                 transit_duration,
+                 transit_duration_upper_uncertainty,
+                 transit_duration_lower_uncertainty,
+                 planet_radius,
+                 planet_radius_upper_uncertainty,
+                 planet_radius_lower_uncertainty                 
+                 star_radius,
+                 star_radius_upper_uncertainty,
+                 star_radius_lower_uncertainty,
+                 impact_parameter,
+                 impact_parameter_upper_uncertainty,
+                 impact_parameter_lower_uncertainty):
 
         """ 
         The constructor for TransitingExoplanet class.
@@ -100,7 +124,7 @@ class TransitingExoplanet:
            planet_id           (string): The identification label of the exoplanet 
            semi_major_axis     (float): Semi-major axis of the orbit of the exoplanet in Astronomical Unit (AU)
            orbital_period      (float): Orbital period of the exoplanet in days
-           transit_time        (float): Transit time of the exoplanet in hours
+           transit_duration    (float): Transit duration of the exoplanet in hours
            planet_radius       (float): Radius of the exoplanet in the Earth's radius, EARTH_RADIUS
            star_radius         (float): Radius of the parent star in the Sun's radius, SOLAR_RADIUS
            impact_parameter    (float): Impact parameter in the unit of the parent star's radius
@@ -110,7 +134,7 @@ class TransitingExoplanet:
         self.planet_id = planet_id
         self.semi_major_axis = semi_major_axis 
         self.orbital_period = orbital_period 
-        self.transit_duration =  transit_time   
+        self.transit_duration =  transit_duration   
         self.planet_radius = planet_radius 
         self.star_radius = star_radius 
         self.impact_parameter = impact_parameter 
