@@ -189,8 +189,9 @@ class TransitingExoplanet:
         self.minimum_eccentricity = self.find_emin(self.delta)
         self.minimum_eccentricity_upper_uncertainty = self.find_emin_upper_limit(self.delta, self.delta_upper_uncertainty, self.delta_lower_uncertainty) - self.minimum_eccentricity
         self.minimum_eccentricity_lower_uncertainty = self.find_emin_lower_limit(self.delta, self.delta_upper_uncertainty, self.delta_lower_uncertainty) - self.minimum_eccentricity
-        if self.minimum_eccentricity + self.minimum_eccentricity_lower_uncertainty <0:
-            self.minimum_eccentricity_lower_uncertainty = self.minimum_eccentricity
+
+        #if self.minimum_eccentricity + self.minimum_eccentricity_lower_uncertainty <0:
+        #    self.minimum_eccentricity_lower_uncertainty = self.minimum_eccentricity
             
     
 
@@ -266,11 +267,6 @@ class TransitingExoplanet:
         """
 
         tc = (1+(planet_radius + planet_radius_upper_uncertainty)/(star_radius + star_radius_lower_uncertainty) * (self.EARTH_RADIUS_OVER_SOLAR_RADIUS + self.EARTH_RADIUS_OVER_SOLAR_RADIUS_UPPER_UNCERTAINTY))        
-        print(tc)
-        print(impact_parameter)
-        print(impact_parameter_lower_uncertainty)
-        print(tc*tc)
-        print((impact_parameter + impact_parameter_lower_uncertainty)*(impact_parameter + impact_parameter_lower_uncertainty))
         tc = tc*tc - (impact_parameter + impact_parameter_lower_uncertainty)*(impact_parameter + impact_parameter_lower_uncertainty)
         
         tc = math.sqrt(tc)        
@@ -419,8 +415,15 @@ class TransitingExoplanet:
         The function to print attributes of exoplanet
           
         """
-        print(self.planet_id, '   ', self.semi_major_axis, '    ', self.orbital_period, '    ',
-              self.transit_duration, '    ', self.planet_radius, '  ', self.star_radius, '  ',
-              self.impact_parameter, '    ', self.transit_duration_if_circular_orbit, '  ',
-              self.delta, '    ', self.minimum_eccentricity)
+        print('Planet ID: ',self.planet_id,
+              '\n Transit duration if the orbit were circular: ', self.transit_duration_if_circular_orbit,
+              '\n Upper uncertainty of transit duration if the orbit were circular: ', self.transit_duration_upper_uncertainty_if_circular_orbit,
+              '\n Lower uncertainty of transit duration if the orbit were circular: ', self.transit_duration_lower_uncertainty_if_circular_orbit, 
+              '\n Delta: ', self.delta,
+              '\n Upper uncertainty of Delta: ', self.delta_upper_uncertainty,
+              '\n Lower uncertainty of Delta: ', self.delta_lower_uncertainty,
+              '\n Minimum Eccentricity: ', self.minimum_eccentricity,
+              '\n Upper uncertainty of minimum eccentricity: ', self.minimum_eccentricity_upper_uncertainty,
+              '\n Lower uncertainty of minimum eccentricity: ', self.minimum_eccentricity_lower_uncertainty,'\n\n')
 
+             
