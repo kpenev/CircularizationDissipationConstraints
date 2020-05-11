@@ -303,9 +303,7 @@ class TransitingExoplanet:
             
             semi_major_axis                       (float): The length of the semi-major axis of the exoplanet in AU
             semi_major_axis_upper_uncertainty     (float): The upper uncertainty associated with the length of the semi-major axis of the exoplanet in AU
-            semi_major_axis_lower_uncertainty     (float): The lower uncertainty associated with the length of the semi-major axis of the exoplanet in AU
             orbital_period                        (float): Orbital period in days
-            orbital_period_upper_uncertainty      (float): The upper uncertainty associated with the orbital period in days
             orbital_period_lower_uncertainty      (float): The lower uncertainty associated with the orbital period in days 
           
         Returns: 
@@ -389,12 +387,12 @@ class TransitingExoplanet:
   
         Parameters: 
             delta (float): Delta factor, i.e. the ratio of the transit time to the transit time for circular orbit.
-                      
+            delta_lower_uncertainty (float): The lower uncertainty of the delta factor          
         Returns: 
             minimum eccentricity of the exoplanet's orbit (float)
         """
         
-        return abs(((delta + delta_upper_uncertainty) * (delta + delta_upper_uncertainty) - 1)/((delta + delta_lower_uncertainty) * (delta + delta_lower_uncertainty)+1))
+        return abs(max((delta + delta_lower_uncertainty) * (delta + delta_lower_uncertainty) - 1, (delta + delta_upper_uncertainty) * (delta + delta_upper_uncertainty) - 1)/((delta + delta_lower_uncertainty) * (delta + delta_lower_uncertainty)+1))
 
     def find_emin_lower_limit(self, delta, delta_upper_uncertainty, delta_lower_uncertainty):
         """ 
@@ -402,12 +400,12 @@ class TransitingExoplanet:
   
         Parameters: 
             delta (float): Delta factor, i.e. the ratio of the transit time to the transit time for circular orbit.
-                      
+            delta_upper_uncertainty (float): The upper uncertainty of the delta factor          
         Returns: 
             minimum eccentricity of the exoplanet's orbit (float)
         """
         
-        return abs(((delta + delta_lower_uncertainty) * (delta + delta_lower_uncertainty) - 1)/((delta + delta_upper_uncertainty) * (delta + delta_upper_uncertainty)+1))
+        return abs(min((delta + delta_upper_uncertainty) * (delta + delta_upper_uncertainty) - 1, (delta + delta_lower_uncertainty) * (delta + delta_lower_uncertainty) - 1)/((delta + delta_upper_uncertainty) * (delta + delta_upper_uncertainty)+1))
 
     
     def print_attributes(self):
