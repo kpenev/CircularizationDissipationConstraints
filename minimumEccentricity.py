@@ -86,8 +86,8 @@ class TransitingExoplanet:
     SOLAR_RADIUS_LOWER_AU_UPPER_UNCERTAINTY = SOLAR_RADIUS_LOWER_UNCERTAINTY / AU
     
     EARTH_RADIUS_OVER_SOLAR_RADIUS = EARTH_RADIUS / SOLAR_RADIUS #is the Earth's radius divided by the Sun's radius
-    EARTH_RADIUS_OVER_SOLAR_RADIUS_UPPER_UNCERTAINTY = (EARTH_RADIUS + EARTH_RADIUS_UPPER_UNCERTAINTY)/(SOLAR_RADIUS - SOLAR_RADIUS_LOWER_AU_UPPER_UNCERTAINTY)-EARTH_RADIUS_OVER_SOLAR_RADIUS
-    EARTH_RADIUS_OVER_SOLAR_RADIUS_LOWER_UNCERTAINTY = EARTH_RADIUS_OVER_SOLAR_RADIUS - (EARTH_RADIUS - EARTH_RADIUS_LOWER_UNCERTAINTY)/(SOLAR_RADIUS + SOLAR_RADIUS_UPPER_AU_UPPER_UNCERTAINTY)
+    EARTH_RADIUS_OVER_SOLAR_RADIUS_UPPER_UNCERTAINTY = (EARTH_RADIUS + EARTH_RADIUS_UPPER_UNCERTAINTY)/(SOLAR_RADIUS - SOLAR_RADIUS_LOWER_UNCERTAINTY)-EARTH_RADIUS_OVER_SOLAR_RADIUS
+    EARTH_RADIUS_OVER_SOLAR_RADIUS_LOWER_UNCERTAINTY = EARTH_RADIUS_OVER_SOLAR_RADIUS - (EARTH_RADIUS - EARTH_RADIUS_LOWER_UNCERTAINTY)/(SOLAR_RADIUS + SOLAR_RADIUS_UPPER_UNCERTAINTY)
 
     
     
@@ -104,7 +104,7 @@ class TransitingExoplanet:
                  transit_duration_lower_uncertainty,
                  planet_radius,
                  planet_radius_upper_uncertainty,
-                 planet_radius_lower_uncertainty                 
+                 planet_radius_lower_uncertainty,                 
                  star_radius,
                  star_radius_upper_uncertainty,
                  star_radius_lower_uncertainty,

@@ -54,5 +54,23 @@ j = -1
 for i in range(0, (len(planet_id)-1)):
     if not(math.isnan(semi_major_axis[i]) or math.isnan(orbital_period[i])or math.isnan(transit_duration[i])or math.isnan(planet_radius[i]) or math.isnan(star_radius[i]) or math.isnan(impact_parameter[i])):
         j = j + 1
-        planet = planet + [TransitingExoplanet(planet_id[i], semi_major_axis[i], orbital_period[i], transit_duration[i]*24, planet_radius[i], star_radius[i], impact_parameter[i])]
+        planet = planet + [TransitingExoplanet(planet_id[i],
+                                               semi_major_axis[i],
+                                               semi_major_axis_upper_uncertainty[i],
+                                               semi_major_axis_lower_uncertainty[i],
+                                               orbital_period[i],
+                                               orbital_period_upper_uncertainty[i],
+                                               orbital_period_lower_uncertainty[i],
+                                               transit_duration[i]*24,
+                                               transit_duration_upper_uncertainty[i]*24,
+                                               transit_duration_lower_uncertainty[i]*24,
+                                               planet_radius[i],
+                                               planet_radius_upper_uncertainty[i],
+                                               planet_radius_lower_uncertainty[i],
+                                               star_radius[i],
+                                               star_radius_upper_uncertainty[i],
+                                               star_radius_lower_uncertainty[i],
+                                               impact_parameter[i],
+                                               impact_parameter_upper_uncertainty[i],
+                                               impact_parameter_lower_uncertainty[i])]
         planet[j].print_attributes()
