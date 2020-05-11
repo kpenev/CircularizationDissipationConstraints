@@ -14,13 +14,38 @@ class TransitingExoplanet:
       
     Attributes: 
         planet_id                            (string): The identification label of the exoplanet 
-        semi_major_axis                       (float): The length of the semi-major axis of the exoplanet
+        semi_major_axis                       (float): The length of the semi-major axis of the exoplanet in AU
+        semi_major_axis_upper_uncertainty     (float): The upper uncertainty associated with the length of the semi-major axis of the exoplanet in AU
+        semi_major_axis_lower_uncertainty     (float): The lower uncertainty associated with the length of the semi-major axis of the exoplanet in AU
         orbital_period                        (float): Orbital period in days
-        transit_duration                      (float): Transit time in hours
+        orbital_period_upper_uncertainty      (float): The upper uncertainty associated with the orbital period in days
+        orbital_period_lower_uncertainty      (float): The lower uncertainty associated with the orbital period in days
+        
+        transit_duration                      (float): Transit duration in hours
+        transit_duration_upper_uncertainty    (float): The upper uncertainty associated with the transit duration in hours
+        transit_duration_lower_uncertainty    (float): The lower uncertainty associated with the transit duration in hours
+
+
         planet_radius                         (float): Radius of the planet in the unit of the Earth's radius, EARTH_RADIUS
+        planet_radius_upper_uncertainty       (float): The upper uncertainty associated with the radius of the planet in the unit of the Earth's radius, EARTH_RADIUS
+        planet_radius_lower_uncertainty       (float): The lower uncertainty associated with the radius of the planet in the unit of the Earth's radius, EARTH_RADIUS
+        
         star_radius                           (float): Radius of the star in the unit of the Sun's radius, SOLAR_RADIUS
+        star_radius_upper_uncertainty         (float): The upper uncertainty associated with the radius of the star in the unit of the Sun's radius, SOLAR_RADIUS
+        star_radius_lower_uncertainty         (float): The lower uncertainty associated with the radius of the star in the unit of the Sun's radius, SOLAR_RADIUS
+
+
+        
         impact_parameter                      (float): Impact parameter in the unit of the parent star's radius
-        transit_duration_if_circular_orbit    (float): Duration for circular orbit in hours
+        impact_parameter_upper_uncertainty    (float): The upper uncertainty associated with the impact parameter in the unit of the parent star's radius
+        impact_parameter_lower_uncertainty    (float): The lower uncertainty associated with the impact parameter in the unit of the parent star's radius
+
+        
+        transit_duration_if_circular_orbit                      (float): Duration for circular orbit in hours
+        transit_duration_if_circular_orbit_upper_uncertainty    (float): Duration for circular orbit in hours
+        transit_duration_if_circular_orbit_lower_uncertainty    (float): Duration for circular orbit in hours
+
+        
         minimum_eccentricity                  (float): Minimum eccentricity of the exoplanet
         delta                                 (float): Delta factor
         SOLAR_RADIUS                          (float): The radius of the Sun in meters. This is a constant quantity
