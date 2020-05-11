@@ -41,13 +41,20 @@ class TransitingExoplanet:
         impact_parameter_lower_uncertainty    (float): The lower uncertainty associated with the impact parameter in the unit of the parent star's radius
 
         
-        transit_duration_if_circular_orbit                      (float): Duration for circular orbit in hours
-        transit_duration_if_circular_orbit_upper_uncertainty    (float): Duration for circular orbit in hours
-        transit_duration_if_circular_orbit_lower_uncertainty    (float): Duration for circular orbit in hours
+        transit_duration_if_circular_orbit                      (float): Transit duration in hours if the orbit is circular 
+        transit_duration_if_circular_orbit_upper_uncertainty    (float): The upper uncertainty associated with the transit duration in hours if the orbit is circular
+        transit_duration_if_circular_orbit_lower_uncertainty    (float): The lower uncertainty associated with the transit duration in hours if the orbit is circular
 
         
-        minimum_eccentricity                  (float): Minimum eccentricity of the exoplanet
+        minimum_eccentricity                        (float): Minimum eccentricity of the exoplanet
+        minimum_eccentricity_upper_uncertainty      (float): The upper uncertainty associated with the minimum eccentricity of the exoplanet
+        minimum_eccentricity_lower_uncertainty      (float): The lower uncertainty associated with the minimum eccentricity of the exoplanet
+
+        
         delta                                 (float): Delta factor
+        delta_upper_uncertainty               (float): The upper uncertainty associated with the delta factor
+        delta_lower_uncertainty               (float): The lower uncertainty associated with the delta factor
+        
         SOLAR_RADIUS                          (float): The radius of the Sun in meters. This is a constant quantity
         EARTH_RADIUS                          (float): The radius of the Earth in meters. This is a constant quantity
         AU                                    (float): Astronomical Unit in meters
@@ -63,9 +70,16 @@ class TransitingExoplanet:
     """
     
       
-    SOLAR_RADIUS = 6.96 * pow(10,8)
-    EARTH_RADIUS = 6378*1000
-    AU = 1.496* pow(10,11)
+    SOLAR_RADIUS = 696342000
+    SOLAR_RADIUS_UPPER_UNCERTAINTY = 65000
+    SOLAR_RADIUS_LOWER_UNCERTAINTY = 65000
+    
+    EARTH_RADIUS = 6378000
+    EARTH_RADIUS_UPPER_UNCERTAINTY = EARTH
+
+
+    
+    AU = 149600000000
     SOLAR_RADIUS_OVER_AU = 0.00465 #is the Sun's radius divided by 1AU
     EARTH_RADIUS_OVER_SOLAR_RADIUS = 0.00916 #is the Earth's radius divided by the Sun's radius
 
