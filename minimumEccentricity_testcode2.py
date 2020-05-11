@@ -42,6 +42,8 @@ star_radius_upper_uncertainty = readPlanet.st_raderr1
 star_radius_lower_uncertainty = readPlanet.st_raderr2
 
 impact_parameter = readPlanet.pl_imppar
+impact_parameter_upper_uncertainty = readPlanet.pl_impparerr1
+impact_parameter_lower_uncertainty = readPlanet.pl_impparerr2
 
 #Following command is to print the attributes of the table
 print('Planet Name', '    ', '  semi_major_axis', '    ', '    orbital_period', '    ', '    transit_duration', '    ', '    planet_radius', '   ', ' star_radius', ' ', '    impact_parameter', '    ', '         transit_duration_if_circular_orbit', '    ','             delta','   ','              emin')
