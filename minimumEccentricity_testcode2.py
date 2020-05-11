@@ -15,12 +15,32 @@ readPlanet = planetary_system_io.read_nasa_planets('C:/Users/moham/OneDrive/Docu
                      )
 
 #Now we are taking data on planets from the file
+
+
+
 planet_id = readPlanet.pl_name
+
 semi_major_axis = readPlanet.pl_orbsmax
+semi_major_axis_upper_uncertainty = readPlanet.pl_orbsmaxerr1
+semi_major_axis_lower_uncertainty = readPlanet.pl_orbsmaxerr2
+
 orbital_period = readPlanet.pl_orbper
+orbital_period_upper_uncertainty = readPlanet.pl_orbpererr1
+orbital_period_lower_uncertainty = readPlanet.pl_orbpererr2
+
 transit_duration = readPlanet.pl_trandur
+transit_duration_upper_uncertainty = readPlanet.pl_trandurerr1
+transit_duration_lower_uncertainty = readPlanet.pl_trandurerr2
+
+
 planet_radius = readPlanet.pl_rade
+planet_radius_upper_uncertainty = readPlanet.pl_radeerr1
+planet_radius_lower_uncertainty = readPlanet.pl_radeerr2
+
 star_radius = readPlanet.st_rad
+star_radius_upper_uncertainty = readPlanet.st_raderr1
+star_radius_lower_uncertainty = readPlanet.st_raderr2
+
 impact_parameter = readPlanet.pl_imppar
 
 #Following command is to print the attributes of the table
