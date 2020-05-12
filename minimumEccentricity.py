@@ -155,8 +155,7 @@ class TransitingExoplanet:
                                                                                                self.orbital_period)
         self.transit_duration_upper_uncertainty_if_circular_orbit = -self.transit_duration_if_circular_orbit + self.find_transit_duration_upper_limit_if_circular_orbit(
                                                             self.star_radius,
-                                                            self.star_radius_upper_uncertainty,
-                                                            self.star_radius_lower_uncertainty,
+                                                            self.star_radius_upper_uncertainty,                                                            
                                                             self.planet_radius,
                                                             self.planet_radius_upper_uncertainty,                                                            
                                                             self.impact_parameter,
@@ -166,8 +165,7 @@ class TransitingExoplanet:
                                                             self.orbital_period,
                                                             self.orbital_period_upper_uncertainty)
         self.transit_duration_lower_uncertainty_if_circular_orbit = -self.transit_duration_if_circular_orbit + self.find_transit_duration_lower_limit_if_circular_orbit(
-                                                            self.star_radius,
-                                                            self.star_radius_upper_uncertainty,
+                                                            self.star_radius,                                                            
                                                             self.star_radius_lower_uncertainty,
                                                             self.planet_radius,                                                            
                                                             self.planet_radius_lower_uncertainty,
@@ -222,6 +220,7 @@ class TransitingExoplanet:
         
         tc = (1+planet_radius/star_radius * self.EARTH_RADIUS_OVER_SOLAR_RADIUS)        
         tc = tc*tc - impact_parameter*impact_parameter
+        
         tc = math.sqrt(tc)        
         tc = tc * star_radius/3.1416/semi_major_axis * orbital_period * self.SOLAR_RADIUS_OVER_AU * 24
         #last 24 is for converting 1 day to 24 hours
@@ -230,8 +229,7 @@ class TransitingExoplanet:
 
     def find_transit_duration_upper_limit_if_circular_orbit(self,
                                                             star_radius,
-                                                            star_radius_upper_uncertainty,
-                                                            star_radius_lower_uncertainty,
+                                                            star_radius_upper_uncertainty,                                                           
                                                             planet_radius,
                                                             planet_radius_upper_uncertainty,                                                            
                                                             impact_parameter,
@@ -247,7 +245,7 @@ class TransitingExoplanet:
         Parameters: 
             star_radius                           (float): Radius of the star in the unit of the Sun's radius, SOLAR_RADIUS
             star_radius_upper_uncertainty         (float): The upper uncertainty associated with the radius of the star in the unit of the Sun's radius, SOLAR_RADIUS
-            star_radius_lower_uncertainty         (float): The lower uncertainty associated with the radius of the star in the unit of the Sun's radius, SOLAR_RADIUS  
+              
             planet_radius                         (float): Radius of the planet in the unit of the Earth's radius, EARTH_RADIUS
             planet_radius_upper_uncertainty       (float): The upper uncertainty associated with the radius of the planet in the unit of the Earth's radius, EARTH_RADIUS
             
@@ -266,9 +264,10 @@ class TransitingExoplanet:
             
         """
 
-        tc = (1+(planet_radius + planet_radius_upper_uncertainty)/(star_radius + star_radius_lower_uncertainty) * (self.EARTH_RADIUS_OVER_SOLAR_RADIUS + self.EARTH_RADIUS_OVER_SOLAR_RADIUS_UPPER_UNCERTAINTY))        
+        tc = (1+(planet_radius + planet_radius_upper_uncertainty)/(star_radius + star_radius_upper_uncertainty) * (self.EARTH_RADIUS_OVER_SOLAR_RADIUS + self.EARTH_RADIUS_OVER_SOLAR_RADIUS_UPPER_UNCERTAINTY))        
         tc = tc*tc - (impact_parameter + impact_parameter_lower_uncertainty)*(impact_parameter + impact_parameter_lower_uncertainty)
-        
+        print('rp over rs = ', (planet_radius + planet_radius_upper_uncertainty)/(star_radius + star_radius_upper_uncertainty) * (self.EARTH_RADIUS_OVER_SOLAR_RADIUS + self.EARTH_RADIUS_OVER_SOLAR_RADIUS_UPPER_UNCERTAINTY))
+        print('b = ', (impact_parameter + impact_parameter_lower_uncertainty))
         tc = math.sqrt(tc)        
         tc = tc * (star_radius + star_radius_upper_uncertainty)/3.1416/(semi_major_axis + semi_major_axis_lower_uncertainty) * (orbital_period + orbital_period_upper_uncertainty) * (self.SOLAR_RADIUS_OVER_AU + self.SOLAR_RADIUS_OVER_AU_UPPER_UNCERTAINTY) * 24
         #last 24 is for converting 1 day to 24 hours
@@ -276,8 +275,7 @@ class TransitingExoplanet:
         return tc #in hours
 
     def find_transit_duration_lower_limit_if_circular_orbit(self,
-                                                            star_radius,
-                                                            star_radius_upper_uncertainty,
+                                                            star_radius,                                                            
                                                             star_radius_lower_uncertainty,
                                                             planet_radius,                                                            
                                                             planet_radius_lower_uncertainty,
@@ -293,7 +291,7 @@ class TransitingExoplanet:
   
         Parameters: 
             star_radius                           (float): Radius of the star in the unit of the Sun's radius, SOLAR_RADIUS
-            star_radius_upper_uncertainty         (float): The upper uncertainty associated with the radius of the star in the unit of the Sun's radius, SOLAR_RADIUS
+            
             star_radius_lower_uncertainty         (float): The lower uncertainty associated with the radius of the star in the unit of the Sun's radius, SOLAR_RADIUS  
             planet_radius                         (float): Radius of the planet in the unit of the Earth's radius, EARTH_RADIUS
             
@@ -311,9 +309,11 @@ class TransitingExoplanet:
             
         """
 
-        tc = (1+(planet_radius + planet_radius_lower_uncertainty)/(star_radius + star_radius_upper_uncertainty) * (self.EARTH_RADIUS_OVER_SOLAR_RADIUS + self.EARTH_RADIUS_OVER_SOLAR_RADIUS_LOWER_UNCERTAINTY))        
+        tc = (1+(planet_radius + planet_radius_lower_uncertainty)/(star_radius + star_radius_lower_uncertainty) * (self.EARTH_RADIUS_OVER_SOLAR_RADIUS + self.EARTH_RADIUS_OVER_SOLAR_RADIUS_LOWER_UNCERTAINTY))        
         tc = tc*tc - (impact_parameter + impact_parameter_upper_uncertainty)*(impact_parameter + impact_parameter_upper_uncertainty)
-        tc = math.sqrt(max(tc,0))        
+        print('rp over rs = ', (planet_radius + planet_radius_lower_uncertainty)/(star_radius + star_radius_lower_uncertainty) * (self.EARTH_RADIUS_OVER_SOLAR_RADIUS + self.EARTH_RADIUS_OVER_SOLAR_RADIUS_LOWER_UNCERTAINTY))
+        print('hgvg  b = ', (impact_parameter + impact_parameter_upper_uncertainty))
+        tc = math.sqrt(tc)        
         tc = tc * (star_radius + star_radius_lower_uncertainty)/3.1416/(semi_major_axis + semi_major_axis_upper_uncertainty) * (orbital_period + orbital_period_lower_uncertainty) * (self.SOLAR_RADIUS_OVER_AU + self.SOLAR_RADIUS_OVER_AU_LOWER_UNCERTAINTY) * 24
         #last 24 is for converting 1 day to 24 hours
         
