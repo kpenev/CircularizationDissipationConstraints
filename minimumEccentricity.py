@@ -391,15 +391,14 @@ class TransitingExoplanet:
         Returns: 
             minimum eccentricity of the exoplanet's orbit (float)
         """
-        if abs(delta)<1:
-            d = delta + delta_lower_uncertainty
+        
+        a = delta + delta_lower_uncertainty
+        b = delta + delta_upper_uncertainty
             
-        else:
-            d = delta + delta_upper_uncertainty
-
-        print('emin upper = ', abs((d*d-1)/(d*d+1)))
-
-        return abs((d*d-1)/(d*d+1))
+        return max(abs((a*a-1)/(a*a+1)), abs((b*b-1)/(b*b+1)))
+            
+            
+        
         
         
     def find_emin_lower_limit(self, delta, delta_upper_uncertainty, delta_lower_uncertainty):
@@ -414,13 +413,19 @@ class TransitingExoplanet:
         """
 
         if abs(delta)<1:
-            d = delta + delta_upper_uncertainty
-            
+              
+             b = delta + delta_upper_uncertainty
+             if abs(b)<1:
+                 return abs((b*b-1)/(b*b+1))
+             else:
+                 return 0
         else:
-            d = delta + delta_lower_uncertainty
-        print('emin lower = ', abs((d*d-1)/(d*d+1)))
-        return abs((d*d-1)/(d*d+1))
-
+             a = delta + delta_lower_uncertainty
+             if abs(a)>1:
+                 return abs((a*a-1)/(a*a+1))
+             else:
+                 return 0
+       
         
     def print_attributes(self):
         """ 
