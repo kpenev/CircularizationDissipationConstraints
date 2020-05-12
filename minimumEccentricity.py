@@ -266,8 +266,6 @@ class TransitingExoplanet:
 
         tc = (1+(planet_radius + planet_radius_upper_uncertainty)/(star_radius + star_radius_upper_uncertainty) * (self.EARTH_RADIUS_OVER_SOLAR_RADIUS + self.EARTH_RADIUS_OVER_SOLAR_RADIUS_UPPER_UNCERTAINTY))        
         tc = tc*tc - (impact_parameter + impact_parameter_lower_uncertainty)*(impact_parameter + impact_parameter_lower_uncertainty)
-        print('rp over rs = ', (planet_radius + planet_radius_upper_uncertainty)/(star_radius + star_radius_upper_uncertainty) * (self.EARTH_RADIUS_OVER_SOLAR_RADIUS + self.EARTH_RADIUS_OVER_SOLAR_RADIUS_UPPER_UNCERTAINTY))
-        print('b = ', (impact_parameter + impact_parameter_lower_uncertainty))
         tc = math.sqrt(tc)        
         tc = tc * (star_radius + star_radius_upper_uncertainty)/3.1416/(semi_major_axis + semi_major_axis_lower_uncertainty) * (orbital_period + orbital_period_upper_uncertainty) * (self.SOLAR_RADIUS_OVER_AU + self.SOLAR_RADIUS_OVER_AU_UPPER_UNCERTAINTY) * 24
         #last 24 is for converting 1 day to 24 hours
@@ -311,8 +309,6 @@ class TransitingExoplanet:
 
         tc = (1+(planet_radius + planet_radius_lower_uncertainty)/(star_radius + star_radius_lower_uncertainty) * (self.EARTH_RADIUS_OVER_SOLAR_RADIUS + self.EARTH_RADIUS_OVER_SOLAR_RADIUS_LOWER_UNCERTAINTY))        
         tc = tc*tc - (impact_parameter + impact_parameter_upper_uncertainty)*(impact_parameter + impact_parameter_upper_uncertainty)
-        print('rp over rs = ', (planet_radius + planet_radius_lower_uncertainty)/(star_radius + star_radius_lower_uncertainty) * (self.EARTH_RADIUS_OVER_SOLAR_RADIUS + self.EARTH_RADIUS_OVER_SOLAR_RADIUS_LOWER_UNCERTAINTY))
-        print('hgvg  b = ', (impact_parameter + impact_parameter_upper_uncertainty))
         tc = math.sqrt(tc)        
         tc = tc * (star_radius + star_radius_lower_uncertainty)/3.1416/(semi_major_axis + semi_major_axis_upper_uncertainty) * (orbital_period + orbital_period_lower_uncertainty) * (self.SOLAR_RADIUS_OVER_AU + self.SOLAR_RADIUS_OVER_AU_LOWER_UNCERTAINTY) * 24
         #last 24 is for converting 1 day to 24 hours
