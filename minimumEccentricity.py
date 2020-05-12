@@ -58,7 +58,7 @@ class TransitingExoplanet:
       
     SOLAR_RADIUS = 696342000
     SOLAR_RADIUS_UPPER_UNCERTAINTY = 65000
-    SOLAR_RADIUS_LOWER_UNCERTAINTY = 65000
+    SOLAR_RADIUS_LOWER_UNCERTAINTY = -65000
     
     EARTH_RADIUS = 6378000
     EARTH_RADIUS_UPPER_UNCERTAINTY = 0
@@ -378,7 +378,7 @@ class TransitingExoplanet:
         Returns: 
             minimum eccentricity of the exoplanet's orbit (float)
         """
-        
+        print('emin = ',abs((delta * delta - 1)/(delta * delta+1)))
         return abs((delta * delta - 1)/(delta * delta+1))
 
     def find_emin_upper_limit(self, delta, delta_upper_uncertainty, delta_lower_uncertainty):
@@ -391,9 +391,17 @@ class TransitingExoplanet:
         Returns: 
             minimum eccentricity of the exoplanet's orbit (float)
         """
-        
-        return abs(max((delta + delta_lower_uncertainty) * (delta + delta_lower_uncertainty) - 1, (delta + delta_upper_uncertainty) * (delta + delta_upper_uncertainty) - 1)/((delta + delta_lower_uncertainty) * (delta + delta_lower_uncertainty)+1))
+        if abs(delta)<1:
+            d = delta + delta_lower_uncertainty
+            
+        else:
+            d = delta + delta_upper_uncertainty
 
+        print('emin upper = ', abs((d*d-1)/(d*d+1)))
+
+        return abs((d*d-1)/(d*d+1))
+        
+        
     def find_emin_lower_limit(self, delta, delta_upper_uncertainty, delta_lower_uncertainty):
         """ 
         The function to calculate the lower uncertainty limit of the minimum eccentricity of the exoplanet's orbit
@@ -404,10 +412,16 @@ class TransitingExoplanet:
         Returns: 
             minimum eccentricity of the exoplanet's orbit (float)
         """
-        
-        return abs(min((delta + delta_upper_uncertainty) * (delta + delta_upper_uncertainty) - 1, (delta + delta_lower_uncertainty) * (delta + delta_lower_uncertainty) - 1)/((delta + delta_upper_uncertainty) * (delta + delta_upper_uncertainty)+1))
 
-    
+        if abs(delta)<1:
+            d = delta + delta_upper_uncertainty
+            
+        else:
+            d = delta + delta_lower_uncertainty
+        print('emin lower = ', abs((d*d-1)/(d*d+1)))
+        return abs((d*d-1)/(d*d+1))
+
+        
     def print_attributes(self):
         """ 
         The function to print attributes of exoplanet
