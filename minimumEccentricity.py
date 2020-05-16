@@ -264,8 +264,10 @@ class TransitingExoplanet:
         tc = math.sqrt(tc)        
         tc = tc * star_radius/3.1416/semi_major_axis * orbital_period * self.SOLAR_RADIUS_OVER_AU * 24
         #last 24 is for converting 1 day to 24 hours
-        j = star_radius/semi_major_axis * orbital_period * self.SOLAR_RADIUS_OVER_AU * 24
+        j = star_radius/semi_major_axis * orbital_period * self.SOLAR_RADIUS/self.AU * 24
         print('rs P/a = ',j)
+        j = star_radius/semi_major_axis * orbital_period * self.SOLAR_RADIUS_OVER_AU * 24
+        print('rs P/a qqq= ',j)
         return tc #in hours
 
     def find_transit_duration_upper_limit_if_circular_orbit(self,
@@ -390,7 +392,7 @@ class TransitingExoplanet:
         tc = tc*tc - impact_parameter*impact_parameter
         tc = max(tc, 0)
         tc = math.sqrt(tc)
-        const = pow(4*3.14159*3.14159/self.G, 1.0/3.0)
+        const = pow(4 * 3.14159 * 3.14159/self.G, 1.0/3.0)
         smass = star_mass * self.SOLAR_MASS
         pmass = planet_mass * self.EARTH_MASS
         starRadius = star_radius * self.SOLAR_RADIUS
