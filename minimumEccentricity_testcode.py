@@ -45,6 +45,14 @@ impact_parameter = readPlanet.pl_imppar
 impact_parameter_upper_uncertainty = readPlanet.pl_impparerr1
 impact_parameter_lower_uncertainty = readPlanet.pl_impparerr2
 
+planet_mass = readPlanet.pl_masse
+planet_mass_upper_uncertainty = readPlanet.pl_masseerr1
+planet_mass_lower_uncertainty = readPlanet.pl_masseerr2
+
+star_mass = readPlanet.st_mass
+star_mass_upper_uncertainty = readPlanet.st_masserr1
+star_mass_lower_uncertainty = readPlanet.st_masserr2
+
 #Following command is to print the attributes of the table
 #print('Planet Name', '    ', '  semi_major_axis', '    ', '    orbital_period', '    ', '    transit_duration', '    ', '    planet_radius', '   ', ' star_radius', ' ', '    impact_parameter', '    ', '         transit_duration_if_circular_orbit', '    ','             delta','   ','              emin')
 
@@ -55,6 +63,12 @@ for i in range(0, (len(planet_id)-1)):
     if not(math.isnan(semi_major_axis[i]) or math.isnan(orbital_period[i])or math.isnan(transit_duration[i])or math.isnan(planet_radius[i]) or math.isnan(star_radius[i]) or math.isnan(impact_parameter[i])):
         j = j + 1
         planet = planet + [TransitingExoplanet(planet_id[i],
+                                               planet_mass[i],
+                                               planet_mass_upper_uncertainty[i],
+                                               planet_mass_lower_uncertainty[i],
+                                               star_mass[i],
+                                               star_mass_upper_uncertainty[i],
+                                               star_mass_lower_uncertainty[i],
                                                semi_major_axis[i],
                                                semi_major_axis_upper_uncertainty[i],
                                                semi_major_axis_lower_uncertainty[i],

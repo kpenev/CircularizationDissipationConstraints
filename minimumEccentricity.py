@@ -79,6 +79,12 @@ class TransitingExoplanet:
     
     def __init__(self,
                  planet_id,
+                 planet_mass,
+                 planet_mass_upper_uncertainty,
+                 planet_mass_lower_uncertainty,
+                 star_mass,
+                 star_mass_upper_uncertainty,
+                 star_mass_lower_uncertainty,
                  semi_major_axis,
                  semi_major_axis_upper_uncertainty,
                  semi_major_axis_lower_uncertainty,
