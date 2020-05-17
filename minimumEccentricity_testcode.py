@@ -85,5 +85,5 @@ for i in range(0, (len(planet_id)-1)):
                                                impact_parameter_upper_uncertainty[i],
                                                impact_parameter_lower_uncertainty[i])]
         
-        #print('Number: ', j)
-        #planet[j].print_attributes()
+        print('Number: ', j)
+        planet[j].print_attributes()

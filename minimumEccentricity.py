@@ -227,10 +227,6 @@ class TransitingExoplanet:
         self.minimum_eccentricity = self.find_emin(self.delta)
         self.minimum_eccentricity_upper_uncertainty = self.find_emin_upper_limit(self.delta, self.delta_upper_uncertainty, self.delta_lower_uncertainty) - self.minimum_eccentricity
         self.minimum_eccentricity_lower_uncertainty = self.find_emin_lower_limit(self.delta, self.delta_upper_uncertainty, self.delta_lower_uncertainty) - self.minimum_eccentricity
-
-        #if self.minimum_eccentricity + self.minimum_eccentricity_lower_uncertainty <0:
-        #    self.minimum_eccentricity_lower_uncertainty = self.minimum_eccentricity
-            
     
 
 
@@ -261,13 +257,11 @@ class TransitingExoplanet:
         tc = (1+planet_radius/star_radius * self.EARTH_RADIUS_OVER_SOLAR_RADIUS)        
         tc = tc*tc - impact_parameter*impact_parameter
         tc = max(tc, 0)
-        tc = math.sqrt(tc)        
+        tc = math.sqrt(tc)
         tc = tc * star_radius/3.1416/semi_major_axis * orbital_period * self.SOLAR_RADIUS_OVER_AU * 24
         #last 24 is for converting 1 day to 24 hours
         j = star_radius/semi_major_axis * orbital_period * self.SOLAR_RADIUS/self.AU * 24
-        print('rs P/a = ',j)
         j = star_radius/semi_major_axis * orbital_period * self.SOLAR_RADIUS_OVER_AU * 24
-        print('rs P/a qqq= ',j)
         return tc #in hours
 
     def find_transit_duration_upper_limit_if_circular_orbit(self,
@@ -396,15 +390,9 @@ class TransitingExoplanet:
         smass = star_mass * self.SOLAR_MASS
         pmass = planet_mass * self.EARTH_MASS
         starRadius = star_radius * self.SOLAR_RADIUS
-        temp = orbital_period * 24 / (smass + pmass)
+        temp = orbital_period * 24*60*60 / (smass + pmass) #At first we have to convert P from days to seconds
         temp = pow(temp,1.0/3.0)
-        tc = tc * starRadius /3.1416 * const * temp
-        #last 24 is for converting 1 day to 24 hours
-
-        j = const * temp * starRadius
-
-        print(' j by m = ', j)
-
+        tc = tc * starRadius /3.1416 * const * temp/60/60 #We divide tc twice by 60 to convert it from seconds to hours
         
         return tc #in hours
     
