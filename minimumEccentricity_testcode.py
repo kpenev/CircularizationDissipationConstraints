@@ -57,7 +57,45 @@ star_mass_lower_uncertainty = readPlanet.st_masserr2
 planet = []
 j = -1
 for i in range(0, (len(planet_id)-1)):
-    if not(math.isnan(planet_mass[i]) or math.isnan(star_mass[i]) or math.isnan(semi_major_axis[i]) or math.isnan(orbital_period[i])or math.isnan(transit_duration[i])or math.isnan(planet_radius[i]) or math.isnan(star_radius[i]) or math.isnan(impact_parameter[i])):
+    if not(math.isnan(planet_mass[i])
+           or math.isnan(planet_mass_upper_uncertainty[i])
+           or math.isnan(planet_mass_lower_uncertainty[i])               
+           or math.isnan(star_mass[i])
+           or math.isnan(star_mass_upper_uncertainty[i])
+           or math.isnan(star_mass_lower_uncertainty[i])
+           or math.isnan(semi_major_axis[i])
+           or math.isnan(semi_major_axis_upper_uncertainty[i])
+           or math.isnan(semi_major_axis_lower_uncertainty[i])
+           or math.isnan(orbital_period[i])
+           or math.isnan(orbital_period_upper_uncertainty[i])
+           or math.isnan(orbital_period_lower_uncertainty[i])
+           or math.isnan(transit_duration[i])
+           or math.isnan(transit_duration_upper_uncertainty[i])
+           or math.isnan(transit_duration_lower_uncertainty[i])
+           or math.isnan(planet_radius[i])
+           or math.isnan(planet_radius_upper_uncertainty[i])
+           or math.isnan(planet_radius_lower_uncertainty[i])
+           or math.isnan(star_radius[i])
+           or math.isnan(star_radius_upper_uncertainty[i])
+           or math.isnan(star_radius_lower_uncertainty[i])
+           or math.isnan(impact_parameter[i])
+           or math.isnan(impact_parameter_upper_uncertainty[i])
+           or math.isnan(impact_parameter_lower_uncertainty[i]))and ((planet_mass_upper_uncertainty[i] <= 0.1*planet_mass[i])
+                                                                     and (-planet_mass_lower_uncertainty[i] <= 0.1*planet_mass[i])
+                                                                     and (star_mass_upper_uncertainty[i] <= 0.1*star_mass[i])
+                                                                     and (-star_mass_lower_uncertainty[i] <= 0.1*star_mass[i])
+                                                                     and (semi_major_axis_upper_uncertainty[i] <= 0.1*semi_major_axis[i])
+                                                                     and (-semi_major_axis_lower_uncertainty[i] <= 0.1*semi_major_axis[i])
+                                                                     and (orbital_period_upper_uncertainty[i] <= 0.1*orbital_period[i])
+                                                                     and (-orbital_period_lower_uncertainty[i] <= 0.1*orbital_period[i])
+                                                                     and (transit_duration_upper_uncertainty[i] <= 0.1*transit_duration[i])
+                                                                     and (-transit_duration_lower_uncertainty[i] <= 0.1*transit_duration[i])
+                                                                     and (planet_radius_upper_uncertainty[i] <= 0.1*planet_radius[i])
+                                                                     and (-planet_radius_lower_uncertainty[i] <= 0.1*planet_radius[i])
+                                                                     and (star_radius_upper_uncertainty[i] <= 0.1*star_radius[i])
+                                                                     and (-star_radius_lower_uncertainty[i] <= 0.1*star_radius[i])
+                                                                     and (impact_parameter_upper_uncertainty[i] <= 0.1*impact_parameter[i])
+                                                                     and (-impact_parameter_lower_uncertainty[i] <= 0.1*impact_parameter[i])):
         j = j + 1
         planet = planet + [TransitingExoplanet(planet_id[i],
                                                planet_mass[i],
