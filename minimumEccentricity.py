@@ -186,13 +186,8 @@ class TransitingExoplanet:
                                                                                                self.planet_radius,
                                                                                                self.impact_parameter,
                                                                                                self.semi_major_axis,
-                                                                                               self.orbital_period)
-        self.transit_duration_if_circular_orbit_knowing_m = self.find_transit_duration_if_circular_orbit_knowing_m(self.star_radius,
-                                                                                               self.planet_radius,
-                                                                                               self.impact_parameter,
-                                                                                               self.planet_mass,
-                                                                                               self.star_mass,
-                                                                                               self.orbital_period)
+                                                                                               self.orbital_period)#Here, a is for semi-major axis of the planet's orbit
+        
         self.simple_estimate_of_transit_duration_upper_uncertainty_if_circular_orbit = -self.transit_duration_if_circular_orbit_knowing_a + self.find_simple_estimate_of_transit_duration_upper_limit_if_circular_orbit(
                                                             self.star_radius,
                                                             self.star_radius_upper_uncertainty,                                                            
@@ -215,20 +210,61 @@ class TransitingExoplanet:
                                                             self.semi_major_axis_upper_uncertainty,
                                                             self.orbital_period,
                                                             self.orbital_period_lower_uncertainty)
-        self.delta = self.find_delta(self.transit_duration, self.transit_duration_if_circular_orbit_knowing_a)
-        self.simple_estimate_of_delta_upper_uncertainty = - self.delta + self.find_simple_estimate_of_delta_upper_limit(self.transit_duration,
+        self.delta_a = self.find_delta(self.transit_duration, self.transit_duration_if_circular_orbit_knowing_a) #Here, a is for semi-major axis of the planet's orbit
+        self.simple_estimate_of_delta_upper_uncertainty = - self.delta_a + self.find_simple_estimate_of_delta_upper_limit(self.transit_duration,
                                                                                   self.transit_duration_if_circular_orbit_knowing_a,
                                                                                   self.transit_duration_upper_uncertainty,
                                                                                   self.simple_estimate_of_transit_duration_lower_uncertainty_if_circular_orbit)
-        self.simple_estimate_of_delta_lower_uncertainty = -self.delta + self.find_simple_estimate_of_delta_lower_limit(self.transit_duration,
+        self.simple_estimate_of_delta_lower_uncertainty = -self.delta_a + self.find_simple_estimate_of_delta_lower_limit(self.transit_duration,
                                                                                  self.transit_duration_if_circular_orbit_knowing_a,
                                                                                  self.transit_duration_lower_uncertainty,
                                                                                  self.simple_estimate_of_transit_duration_upper_uncertainty_if_circular_orbit) 
-        self.minimum_eccentricity = self.find_emin(self.delta)
-        self.simple_estimate_of_minimum_eccentricity_upper_uncertainty = self.find_simple_estimate_of_emin_upper_limit(self.delta, self.simple_estimate_of_delta_upper_uncertainty, self.simple_estimate_of_delta_lower_uncertainty) - self.minimum_eccentricity
-        self.simple_estimate_of_minimum_eccentricity_lower_uncertainty = self.find_simple_estimate_of_emin_lower_limit(self.delta, self.simple_estimate_of_delta_upper_uncertainty, self.simple_estimate_of_delta_lower_uncertainty) - self.minimum_eccentricity
+        self.minimum_eccentricity_a = self.find_emin(self.delta_a) #Here, a is for semi-major axis of the planet's orbit
+        self.simple_estimate_of_minimum_eccentricity_upper_uncertainty = self.find_simple_estimate_of_emin_upper_limit(self.delta_a, self.simple_estimate_of_delta_upper_uncertainty, self.simple_estimate_of_delta_lower_uncertainty) - self.minimum_eccentricity_a
+        self.simple_estimate_of_minimum_eccentricity_lower_uncertainty = self.find_simple_estimate_of_emin_lower_limit(self.delta_a, self.simple_estimate_of_delta_upper_uncertainty, self.simple_estimate_of_delta_lower_uncertainty) - self.minimum_eccentricity_a
     
-
+        self.transit_duration_if_circular_orbit_knowing_m = self.find_transit_duration_if_circular_orbit_knowing_m(self.star_radius,
+                                                                                               self.planet_radius,
+                                                                                               self.impact_parameter,
+                                                                                               self.planet_mass,
+                                                                                               self.star_mass,
+                                                                                               self.orbital_period)#Here, m is for the mass of the planets and the star
+        self.transit_duration_upper_uncertainty_if_circular_orbit = self.find_transit_duration_uncertainty_if_circular_orbit(self.star_radius,
+                                                            self.star_radius_upper_uncertainty,
+                                                            self.planet_radius,
+                                                            self.planet_radius_upper_uncertainty,
+                                                            self.impact_parameter,
+                                                            self.impact_parameter_upper_uncertainty,
+                                                            self.planet_mass,
+                                                            self.planet_mass_upper_uncertainty,
+                                                            self.star_mass,
+                                                            self.star_mass_upper_uncertainty,
+                                                            self.orbital_period,
+                                                            self.orbital_period_upper_uncertainty)
+        self.transit_duration_lower_uncertainty_if_circular_orbit = self.find_transit_duration_uncertainty_if_circular_orbit(self.star_radius,
+                                                            self.star_radius_lower_uncertainty,
+                                                            self.planet_radius,
+                                                            self.planet_radius_lower_uncertainty,
+                                                            self.impact_parameter,
+                                                            self.impact_parameter_lower_uncertainty,
+                                                            self.planet_mass,
+                                                            self.planet_mass_lower_uncertainty,
+                                                            self.star_mass,
+                                                            self.star_mass_lower_uncertainty,
+                                                            self.orbital_period,
+                                                            self.orbital_period_lower_uncertainty)
+        self.delta_m = self.find_delta(self.transit_duration, self.transit_duration_if_circular_orbit_knowing_m) #Here, m is for mass of the star and the planets
+        self.delta_upper_uncertainty = self.find_delta_uncertainty(self.transit_duration,
+                               self.transit_duration_if_circular_orbit_knowing_m,
+                               self.transit_duration_upper_uncertainty,
+                               self.transit_duration_upper_uncertainty_if_circular_orbit)
+        self.delta_lower_uncertainty = self.find_delta_uncertainty(self.transit_duration,
+                               self.transit_duration_if_circular_orbit_knowing_m,
+                               self.transit_duration_lower_uncertainty,
+                               self.transit_duration_lower_uncertainty_if_circular_orbit)
+        self.minimum_eccentricity_m = self.find_emin(self.delta_m)#Here, m is for mass of the star and the planets
+        self.minimum_eccentricity_upper_uncertainty = self.find_emin_uncertainty(self.delta_m, self.delta_upper_uncertainty)
+        self.minimum_eccentricity_lower_uncertainty = self.find_emin_uncertainty(self.delta_m, self.delta_lower_uncertainty)
 
     def find_transit_duration_if_circular_orbit_knowing_a(self,
                                                 star_radius,
@@ -264,6 +300,10 @@ class TransitingExoplanet:
         j = star_radius/semi_major_axis * orbital_period * self.SOLAR_RADIUS/self.AU * 24
         j = star_radius/semi_major_axis * orbital_period * self.SOLAR_RADIUS_OVER_AU * 24
         return tc #in hours
+
+    
+
+        
 
     def find_simple_estimate_of_transit_duration_upper_limit_if_circular_orbit(self,
                                                             star_radius,
@@ -396,6 +436,79 @@ class TransitingExoplanet:
         tc = tc * starRadius /3.1416 * const * temp/60/60 #We divide tc twice by 60 to convert it from seconds to hours
         
         return tc #in hours
+
+    def find_transit_duration_uncertainty_if_circular_orbit(self,
+                                                            star_radius,
+                                                            star_radius_uncertainty,
+                                                            planet_radius,
+                                                            planet_radius_uncertainty,
+                                                            impact_parameter,
+                                                            impact_parameter_uncertainty,
+                                                            planet_mass,
+                                                            planet_mass_uncertainty,
+                                                            star_mass,
+                                                            star_mass_uncertainty,
+                                                            orbital_period,
+                                                            orbital_period_uncertainty):
+        """ 
+        The function to workout the uncertainty of the transit duration if the orbit were circular
+        (transit_duration_if_circular_orbit) in the unit of hours in the method of the summation of
+        squares of uncertainties. 
+  
+        Parameters: 
+            star_radius                     (float): Radius of the star in the unit of the Sun's radius, SOLAR_RADIUS
+            star_radius_uncertainty         (float): The uncertainty associated with the radius of the star in the unit of the Sun's radius, SOLAR_RADIUS
+            planet_radius                   (float): Radius of the planet in the unit of the Earth's radius, EARTH_RADIUS
+            planet_radius_uncertainty       (float): The uncertainty associated with the radius of the planet in the unit of the Earth's radius, EARTH_RADIUS
+            impact_parameter                (float): Impact parameter in the unit of the parent star's radius
+            impact_parameter_uncertainty    (float): The uncertainty associated with the impact parameter in the unit of the parent star's radius
+            planet_mass                     (float): The mass of the planet
+            planet_mass_uncertainty         (float): The uncertainty associated with the planet's mass
+            star_mass                       (float): The star's mass
+            star_mass_uncertainty           (float): The uncertainty associated with the star's mass
+            orbital_period                  (float): Orbital period in days
+            orbital_period_uncertainty      (float): The uncertainty associated with the orbital period in days
+            
+        Returns: 
+            pow(var_tc, 0.5)                (float): The uncertainty of the transit Duration, in hours, if the orbit were circular
+            
+        """
+
+
+        var_rp = pow(planet_radius_uncertainty, 2)
+        var_rs = pow(star_radius_uncertainty, 2)
+        var_b = pow(impact_parameter_uncertainty, 2)
+        var_P = pow(orbital_period_uncertainty * 24 * 60 * 60, 2)
+        var_ms = pow(star_mass_uncertainty * self.SOLAR_MASS, 2)
+        var_mp = pow(planet_mass_uncertainty * self.EARTH_MASS, 2)
+
+
+        rs = star_radius
+        rp = planet_radius
+        b = impact_parameter
+        P = orbital_period * 24 * 60 * 60 #days to seconds coversion
+        ms = star_mass * self.SOLAR_MASS
+        mp = planet_mass * self.EARTH_MASS
+
+        
+        r = planet_radius/star_radius * self.EARTH_RADIUS_OVER_SOLAR_RADIUS
+        var_r = (var_rp + r*r * var_rs)/(rs*rs)
+
+        f = pow((1+r)*(1+r)-b*b,0.5)
+        var_f = ((1+r)*(1+r)*var_r + b*b * var_b)/(f*f)
+
+        m = ms + mp
+        var_m = var_ms + var_mp
+
+        k = pow(P/m, 1/3)
+        var_k = (var_P + pow(P/m,2) * var_m)/(3*k*k*m*m)
+
+        tc = r * rs * k * pow(4 /self.G /3.141592654, 1/3)
+        var_tc = tc*tc * (var_r/r/r + var_rs/rs/rs + var_k/k/k)
+
+        return pow(var_tc, 0.5)/60/60 #converting from second to hours
+
+    
     
 
     def find_delta(self, transit_duration, transit_duration_if_circular_orbit):
@@ -412,7 +525,11 @@ class TransitingExoplanet:
         """
         return transit_duration/transit_duration_if_circular_orbit
 
-    def find_simple_estimate_of_delta_upper_limit(self, transit_duration, transit_duration_if_circular_orbit, transit_duration_upper_uncertainty, transit_duration_lower_uncertainty_if_circular_orbit ):
+    def find_simple_estimate_of_delta_upper_limit(self,
+                                                  transit_duration,
+                                                  transit_duration_if_circular_orbit,
+                                                  transit_duration_upper_uncertainty,
+                                                  transit_duration_lower_uncertainty_if_circular_orbit):
         """ 
         The function to calculate the upper uncertainty limit of the delta factor, i.e. the ratio of the transit duration
         to the transit duration if the orbit were circular.
@@ -423,12 +540,16 @@ class TransitingExoplanet:
             transit_duration_upper_uncertainty  (float): The upper uncertainty of the transit duration
             transit_duration_lower_uncertainty_if_circular_orbit  (float): The lower uncertainty of the transit duration if the circuit were circular
         Returns: 
-            (transit_duration + transit_duration_upper_uncertainty)/(transit_duration_if_circular_orbit - transit_duration_lower_uncertainty_if_circular_orbit) (float): delta 
+            (transit_duration + transit_duration_upper_uncertainty)/(transit_duration_if_circular_orbit - transit_duration_lower_uncertainty_if_circular_orbit) (float): Upper limit of the value of delta 
         """
 
         return (transit_duration + transit_duration_upper_uncertainty)/(transit_duration_if_circular_orbit + transit_duration_lower_uncertainty_if_circular_orbit)
 
-    def find_simple_estimate_of_delta_lower_limit(self, transit_duration, transit_duration_if_circular_orbit, transit_duration_lower_uncertainty, transit_duration_upper_uncertainty_if_circular_orbit ):
+    def find_simple_estimate_of_delta_lower_limit(self,
+                                                  transit_duration,
+                                                  transit_duration_if_circular_orbit,
+                                                  transit_duration_lower_uncertainty,
+                                                  transit_duration_upper_uncertainty_if_circular_orbit):
         """ 
         The function to calculate the lower uncertainty limit of the delta factor, i.e. the ratio of the transit duration
         to the transit duration if the orbit were circular.
@@ -439,10 +560,47 @@ class TransitingExoplanet:
             transit_duration_lower_uncertainty  (float): The lower uncertainty of the transit duration
             transit_duration_upper_uncertainty_if_circular_orbit  (float): The upper uncertainty of the transit duration if the circuit were circular
         Returns: 
-            (transit_duration - transit_duration_lower_uncertainty)/(transit_duration_if_circular_orbit + transit_duration_upper_uncertainty_if_circular_orbit) (float): delta 
+            (transit_duration - transit_duration_lower_uncertainty)/(transit_duration_if_circular_orbit + transit_duration_upper_uncertainty_if_circular_orbit) (float): lower limit of the value of delta 
         """
         return (transit_duration + transit_duration_lower_uncertainty)/(transit_duration_if_circular_orbit + transit_duration_upper_uncertainty_if_circular_orbit)
     
+    def find_delta_uncertainty(self,
+                               transit_duration,
+                               transit_duration_if_circular_orbit,
+                               transit_duration_uncertainty,
+                               transit_duration_uncertainty_if_circular_orbit):
+        """ 
+        The function to calculate the uncertainty of the delta factor, i.e. the ratio of the transit duration
+        to the transit duration if the orbit were circular, by the method of the square of summations of uncertainties
+        associated with the independent variables.
+  
+        Parameters: 
+            transit_duration                                (float): The transit duration of the exoplanet
+            transit_duration_if_circular_orbit              (float): The transit duration if the orbit were circular
+            transit_duration_uncertainty                    (float): The uncertainty of the transit duration
+            transit_duration_uncertainty_if_circular_orbit  (float): The uncertainty of the transit duration if the circuit were circular
+        Returns: 
+            pow(var_delta, 0.5)                             (float): The uncertainty associated with the delta factor
+        """
+
+
+        t = transit_duration
+        tc = transit_duration_if_circular_orbit
+        delta = t/tc
+
+        var_t = transit_duration_uncertainty*transit_duration_uncertainty
+        var_tc = transit_duration_uncertainty_if_circular_orbit*transit_duration_uncertainty_if_circular_orbit
+
+        var_delta = (var_t + delta*delta* var_tc)/tc/tc
+
+        return pow(var_delta,0.5)
+
+        
+
+
+
+
+
         
     def find_emin(self, delta):
         """ 
@@ -465,7 +623,7 @@ class TransitingExoplanet:
             delta (float): Delta factor, i.e. the ratio of the transit time to the transit time for circular orbit.
             delta_lower_uncertainty (float): The lower uncertainty of the delta factor          
         Returns: 
-            minimum eccentricity of the exoplanet's orbit (float)
+            upper limit of the minimum eccentricity of the exoplanet's orbit (float)
         """
         
         a = delta + delta_lower_uncertainty
@@ -485,7 +643,7 @@ class TransitingExoplanet:
             delta (float): Delta factor, i.e. the ratio of the transit time to the transit time for circular orbit.
             delta_upper_uncertainty (float): The upper uncertainty of the delta factor          
         Returns: 
-            minimum eccentricity of the exoplanet's orbit (float)
+            lower limit of the minimum eccentricity of the exoplanet's orbit (float)
         """
 
         if abs(delta)<1:
@@ -502,22 +660,46 @@ class TransitingExoplanet:
              else:
                  return 0
        
+    def find_emin_uncertainty(self, delta, delta_uncertainty):
+        """ 
+        The function to calculate the uncertainty of the minimum eccentricity of the exoplanet's orbit
+        by using the method of summation of the squares of the uncertainties associated with the independent variables.
+  
+        Parameters: 
+            delta             (float): Delta factor, i.e. the ratio of the transit time to the transit time for circular orbit.
+            delta_uncertainty (float): The uncertainty of the delta factor          
+        Returns: 
+            uncertainty with the minimum eccentricity of the exoplanet's orbit (float)
+        """
+
+        return 4*delta*delta_uncertainty/(delta*delta+1)
+
+
         
     def print_attributes(self):
         """ 
-        The function to print attributes of exoplanet
+        The function to print attributes of exoplanet with their simple estimates of uncertainties 
           
         """
         print('Planet ID: ',self.planet_id,
               '\n Transit duration if the orbit were circular knowing a: ', self.transit_duration_if_circular_orbit_knowing_a,
               '\n Transit duration if the orbit were circular knowing m: ', self.transit_duration_if_circular_orbit_knowing_m,
               '\n A simple estimate of the upper uncertainty of transit duration if the orbit were circular: ', self.simple_estimate_of_transit_duration_upper_uncertainty_if_circular_orbit,
+              '\n The upper uncertainty of transit duration if the orbit were circular: ', self.transit_duration_upper_uncertainty_if_circular_orbit,
               '\n A simple estimate of the lower uncertainty of transit duration if the orbit were circular: ', self.simple_estimate_of_transit_duration_lower_uncertainty_if_circular_orbit, 
-              '\n Delta: ', self.delta,
+              '\n The lower uncertainty of transit duration if the orbit were circular: ', self.transit_duration_lower_uncertainty_if_circular_orbit,
+              '\n Delta knowing a: ', self.delta_a,
+              '\n Delta knowing m: ', self.delta_m,
               '\n A simple estimate of the upper uncertainty of Delta: ', self.simple_estimate_of_delta_upper_uncertainty,
+              '\n The upper uncertainty of Delta: ', self.delta_upper_uncertainty,
               '\n A simple estimate of the lower uncertainty of Delta: ', self.simple_estimate_of_delta_lower_uncertainty,
-              '\n Minimum Eccentricity: ', self.minimum_eccentricity,
+              '\n The lower uncertainty of Delta: ', self.delta_lower_uncertainty,
+              '\n Minimum Eccentricity by knowing a: ', self.minimum_eccentricity_a,
+              '\n Minimum Eccentricity by knowing m: ', self.minimum_eccentricity_m,
               '\n A simple estimate of the upper uncertainty of minimum eccentricity: ', self.simple_estimate_of_minimum_eccentricity_upper_uncertainty,
-              '\n A simple estiamte of the lower uncertainty of minimum eccentricity: ', self.simple_estimate_of_minimum_eccentricity_lower_uncertainty,'\n\n')
+              '\n The upper uncertainty of minimum eccentricity: ', self.minimum_eccentricity_upper_uncertainty,
+              '\n A simple estiamte of the lower uncertainty of minimum eccentricity: ', self.simple_estimate_of_minimum_eccentricity_lower_uncertainty,
+              '\n The lower uncertainty of minimum eccentricity: ', self.minimum_eccentricity_lower_uncertainty,
+              '\n\n')
 
              
