@@ -229,7 +229,7 @@ class TransitingExoplanet:
                                                                                                self.planet_mass,
                                                                                                self.star_mass,
                                                                                                self.orbital_period)#Here, m is for the mass of the planets and the star
-        self.transit_duration_max_uncertainty_if_circular_orbit = self.find_transit_duration_uncertainty_if_circular_orbit(self.star_radius,
+        self.transit_duration_max_uncertainty_if_circular_orbit_m = self.find_transit_duration_uncertainty_if_circular_orbit_knowing_m(self.star_radius,
                                                             max(self.star_radius_upper_uncertainty,-self.star_radius_lower_uncertainty),
                                                             self.planet_radius,
                                                             max(self.planet_radius_upper_uncertainty, -self.planet_radius_lower_uncertainty),
@@ -241,7 +241,7 @@ class TransitingExoplanet:
                                                             max(self.star_mass_upper_uncertainty, -self.star_mass_lower_uncertainty),
                                                             self.orbital_period,
                                                             max(self.orbital_period_upper_uncertainty, -self.orbital_period_lower_uncertainty))
-        self.transit_duration_min_uncertainty_if_circular_orbit = self.find_transit_duration_uncertainty_if_circular_orbit(self.star_radius,
+        self.transit_duration_min_uncertainty_if_circular_orbit_m = self.find_transit_duration_uncertainty_if_circular_orbit_knowing_m(self.star_radius,
                                                             min(self.star_radius_upper_uncertainty,-self.star_radius_lower_uncertainty),
                                                             self.planet_radius,
                                                             min(self.planet_radius_upper_uncertainty, -self.planet_radius_lower_uncertainty),
@@ -253,18 +253,53 @@ class TransitingExoplanet:
                                                             min(self.star_mass_upper_uncertainty, -self.star_mass_lower_uncertainty),
                                                             self.orbital_period,
                                                             min(self.orbital_period_upper_uncertainty, -self.orbital_period_lower_uncertainty))
+
+
+        self.transit_duration_max_uncertainty_if_circular_orbit_a = self.find_transit_duration_uncertainty_if_circular_orbit_knowing_a(self.star_radius,
+                                                            max(self.star_radius_upper_uncertainty,-self.star_radius_lower_uncertainty),
+                                                            self.planet_radius,
+                                                            max(self.planet_radius_upper_uncertainty, -self.planet_radius_lower_uncertainty),
+                                                            self.impact_parameter,
+                                                            max(self.impact_parameter_upper_uncertainty, -self.impact_parameter_lower_uncertainty),
+                                                            self.semi_major_axis,
+                                                            max(self.semi_major_axis_upper_uncertainty, -self.semi_major_axis_lower_uncertainty),
+                                                            self.orbital_period,
+                                                            max(self.orbital_period_upper_uncertainty, -self.orbital_period_lower_uncertainty))
+        self.transit_duration_min_uncertainty_if_circular_orbit_a = self.find_transit_duration_uncertainty_if_circular_orbit_knowing_a(self.star_radius,
+                                                            min(self.star_radius_upper_uncertainty,-self.star_radius_lower_uncertainty),
+                                                            self.planet_radius,
+                                                            min(self.planet_radius_upper_uncertainty, -self.planet_radius_lower_uncertainty),
+                                                            self.impact_parameter,
+                                                            min(self.impact_parameter_upper_uncertainty, -self.impact_parameter_lower_uncertainty),
+                                                            self.semi_major_axis,
+                                                            min(self.semi_major_axis_upper_uncertainty, -self.semi_major_axis_lower_uncertainty),
+                                                            self.orbital_period,
+                                                            min(self.orbital_period_upper_uncertainty, -self.orbital_period_lower_uncertainty))
+
+
+
         self.delta_m = self.find_delta(self.transit_duration, self.transit_duration_if_circular_orbit_knowing_m) #Here, m is for mass of the star and the planets
-        self.delta_max_uncertainty = self.find_delta_uncertainty(self.transit_duration,
+        self.delta_max_uncertainty_m = self.find_delta_uncertainty(self.transit_duration,
                                self.transit_duration_if_circular_orbit_knowing_m,
                                max(self.transit_duration_upper_uncertainty, -self.transit_duration_lower_uncertainty),
-                               self.transit_duration_max_uncertainty_if_circular_orbit)
-        self.delta_min_uncertainty = self.find_delta_uncertainty(self.transit_duration,
+                               self.transit_duration_max_uncertainty_if_circular_orbit_m)
+        self.delta_min_uncertainty_m = self.find_delta_uncertainty(self.transit_duration,
                                self.transit_duration_if_circular_orbit_knowing_m,
                                min(self.transit_duration_upper_uncertainty,-self.transit_duration_lower_uncertainty),
-                               self.transit_duration_min_uncertainty_if_circular_orbit)
+                               self.transit_duration_min_uncertainty_if_circular_orbit_m)
+        self.delta_max_uncertainty_a = self.find_delta_uncertainty(self.transit_duration,
+                               self.transit_duration_if_circular_orbit_knowing_a,
+                               max(self.transit_duration_upper_uncertainty, -self.transit_duration_lower_uncertainty),
+                               self.transit_duration_max_uncertainty_if_circular_orbit_a)
+        self.delta_min_uncertainty_a = self.find_delta_uncertainty(self.transit_duration,
+                               self.transit_duration_if_circular_orbit_knowing_a,
+                               min(self.transit_duration_upper_uncertainty,-self.transit_duration_lower_uncertainty),
+                               self.transit_duration_min_uncertainty_if_circular_orbit_a)
         self.minimum_eccentricity_m = self.find_emin(self.delta_m)#Here, m is for mass of the star and the planets
-        self.minimum_eccentricity_max_uncertainty = self.find_emin_uncertainty(self.delta_m, self.delta_max_uncertainty)
-        self.minimum_eccentricity_min_uncertainty = self.find_emin_uncertainty(self.delta_m, self.delta_min_uncertainty)
+        self.minimum_eccentricity_max_uncertainty_m = self.find_emin_uncertainty(self.delta_m, self.delta_max_uncertainty_m)
+        self.minimum_eccentricity_min_uncertainty_m = self.find_emin_uncertainty(self.delta_m, self.delta_min_uncertainty_m)
+        self.minimum_eccentricity_max_uncertainty_a = self.find_emin_uncertainty(self.delta_a, self.delta_max_uncertainty_a)
+        self.minimum_eccentricity_min_uncertainty_a = self.find_emin_uncertainty(self.delta_a, self.delta_min_uncertainty_a)
 
     def find_transit_duration_if_circular_orbit_knowing_a(self,
                                                 star_radius,
@@ -437,7 +472,7 @@ class TransitingExoplanet:
         
         return tc #in hours
 
-    def find_transit_duration_uncertainty_if_circular_orbit(self,
+    def find_transit_duration_uncertainty_if_circular_orbit_knowing_m(self,
                                                             star_radius,
                                                             star_radius_uncertainty,
                                                             planet_radius,
@@ -509,7 +544,66 @@ class TransitingExoplanet:
         return pow(var_tc, 0.5)/60/60 #converting from second to hours
 
     
-    
+    def find_transit_duration_uncertainty_if_circular_orbit_knowing_a(self,
+                                                            star_radius,
+                                                            star_radius_uncertainty,
+                                                            planet_radius,
+                                                            planet_radius_uncertainty,
+                                                            impact_parameter,
+                                                            impact_parameter_uncertainty,
+                                                            semi_major_axis,
+                                                            semi_major_axis_uncertainty,                                                                      
+                                                            orbital_period,
+                                                            orbital_period_uncertainty):
+        """ 
+        The function to workout the uncertainty of the transit duration if the orbit were circular
+        (transit_duration_if_circular_orbit) in the unit of hours in the method of the summation of
+        squares of uncertainties. 
+  
+        Parameters: 
+            star_radius                     (float): Radius of the star in the unit of the Sun's radius, SOLAR_RADIUS
+            star_radius_uncertainty         (float): The uncertainty associated with the radius of the star in the unit of the Sun's radius, SOLAR_RADIUS
+            planet_radius                   (float): Radius of the planet in the unit of the Earth's radius, EARTH_RADIUS
+            planet_radius_uncertainty       (float): The uncertainty associated with the radius of the planet in the unit of the Earth's radius, EARTH_RADIUS
+            impact_parameter                (float): Impact parameter in the unit of the parent star's radius
+            impact_parameter_uncertainty    (float): The uncertainty associated with the impact parameter in the unit of the parent star's radius
+            semi_major_axis                 (float): The semi major axis of the orbit of the planet in AU
+            semi_major_axis_uncertainty     (float): The uncertainty associated with the semi major axis of the orbit of the planet
+            orbital_period                  (float): Orbital period in days
+            orbital_period_uncertainty      (float): The uncertainty associated with the orbital period in days
+            
+        Returns: 
+            pow(var_tc, 0.5)                (float): The uncertainty of the transit Duration, in hours, if the orbit were circular
+            
+        """
+
+
+        var_rp = pow(planet_radius_uncertainty * self.EARTH_RADIUS, 2)
+        var_rs = pow(star_radius_uncertainty * self.SOLAR_RADIUS, 2)
+        var_b = pow(impact_parameter_uncertainty, 2)
+        var_P = pow(orbital_period_uncertainty * 24 * 60 * 60, 2)
+        var_a = pow(semi_major_axis_uncertainty * self.AU,2)
+        
+
+        rs = star_radius * self.SOLAR_RADIUS
+        rp = planet_radius * self.EARTH_RADIUS
+        b = impact_parameter
+        P = orbital_period * 24 * 60 * 60 #days to seconds coversion
+        a = semi_major_axis * self.AU
+                
+        r = rp/rs
+        var_r = (var_rp + r*r * var_rs)/(rs*rs)
+
+        f = pow((1+r)*(1+r)-b*b,0.5)
+        var_f = ((1+r)*(1+r)*var_r + b*b * var_b)/(f*f)
+
+        k = rs/a 
+        var_k = (var_rs + k*k * var_a)/(a*a)
+
+        tc = f * k * P /3.141592654
+        var_tc = tc*tc * (var_f/f/f + var_k/k/k + var_P/P/P)
+
+        return pow(var_tc, 0.5)/60/60 #converting from seconds to hours
 
     def find_delta(self, transit_duration, transit_duration_if_circular_orbit):
         """ 
@@ -686,20 +780,26 @@ class TransitingExoplanet:
               '\n Transit duration if the orbit were circular knowing mass of the star and the exoplanet and other staffs: ', self.transit_duration_if_circular_orbit_knowing_m,
               '\n A simple estimate of the upper uncertainty of transit duration if the orbit were circular: ', self.simple_estimate_of_transit_duration_upper_uncertainty_if_circular_orbit,
               '\n A simple estimate of the lower uncertainty of transit duration if the orbit were circular: ', self.simple_estimate_of_transit_duration_lower_uncertainty_if_circular_orbit,
-              '\n The maximum value of |uncertainty| of transit duration if the orbit were circular: ', self.transit_duration_max_uncertainty_if_circular_orbit,
-              '\n The minimum value of |uncertainty| of transit duration if the orbit were circular: ', self.transit_duration_min_uncertainty_if_circular_orbit,
+              '\n The maximum value of |uncertainty| of transit duration if the orbit were circular knowing masses: ', self.transit_duration_max_uncertainty_if_circular_orbit_m,
+              '\n The minimum value of |uncertainty| of transit duration if the orbit were circular knowing masses: ', self.transit_duration_min_uncertainty_if_circular_orbit_m,
+              '\n The maximum value of |uncertainty| of transit duration if the orbit were circular knowing semi major axis: ', self.transit_duration_max_uncertainty_if_circular_orbit_a,
+              '\n The minimum value of |uncertainty| of transit duration if the orbit were circular knowing semi major axis: ', self.transit_duration_min_uncertainty_if_circular_orbit_a,
               '\n Delta knowing semi major axis of the planetary orbit and other staffs: ', self.delta_a,
               '\n Delta knowing mass of the star and the exoplanet and other staffs: ', self.delta_m,
               '\n A simple estimate of the upper uncertainty of Delta: ', self.simple_estimate_of_delta_upper_uncertainty,
               '\n A simple estimate of the lower uncertainty of Delta: ', self.simple_estimate_of_delta_lower_uncertainty,
-              '\n The maximum |uncertainty| of Delta: ', self.delta_max_uncertainty,              
-              '\n The minimum |uncertainty| of Delta: ', self.delta_min_uncertainty,
+              '\n The maximum |uncertainty| of Delta knowing masses: ', self.delta_max_uncertainty_m,              
+              '\n The minimum |uncertainty| of Delta knowing masses: ', self.delta_min_uncertainty_m,
+              '\n The maximum |uncertainty| of Delta knowing semi major axis: ', self.delta_max_uncertainty_a,              
+              '\n The minimum |uncertainty| of Delta knowing semi major axis: ', self.delta_min_uncertainty_a,
               '\n Minimum Eccentricity by knowing semi major axis of the planetary orbit and other staffs: ', self.minimum_eccentricity_a,
               '\n Minimum Eccentricity by knowing mass of the star and the exoplanet and other staffs: ', self.minimum_eccentricity_m,
               '\n A simple estimate of the upper uncertainty of minimum eccentricity: ', self.simple_estimate_of_minimum_eccentricity_upper_uncertainty,
               '\n A simple estiamte of the lower uncertainty of minimum eccentricity: ', self.simple_estimate_of_minimum_eccentricity_lower_uncertainty,
-              '\n The maximum |uncertainty| of minimum eccentricity: ', self.minimum_eccentricity_max_uncertainty,              
-              '\n The minimum |uncertainty| of minimum eccentricity: ', self.minimum_eccentricity_min_uncertainty,
+              '\n The maximum |uncertainty| of minimum eccentricity knowing masses: ', self.minimum_eccentricity_max_uncertainty_m,              
+              '\n The minimum |uncertainty| of minimum eccentricity knowing masses: ', self.minimum_eccentricity_min_uncertainty_m,
+              '\n The maximum |uncertainty| of minimum eccentricity knowing semi major axis: ', self.minimum_eccentricity_max_uncertainty_a,              
+              '\n The minimum |uncertainty| of minimum eccentricity knowing semi major axis: ', self.minimum_eccentricity_min_uncertainty_a,
               '\n\n')
 
              
