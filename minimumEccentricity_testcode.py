@@ -45,25 +45,11 @@ impact_parameter = readPlanet.pl_imppar
 impact_parameter_upper_uncertainty = readPlanet.pl_impparerr1
 impact_parameter_lower_uncertainty = readPlanet.pl_impparerr2
 
-planet_mass = readPlanet.pl_masse
-planet_mass_upper_uncertainty = readPlanet.pl_masseerr1
-planet_mass_lower_uncertainty = readPlanet.pl_masseerr2
-
-star_mass = readPlanet.st_mass
-star_mass_upper_uncertainty = readPlanet.st_masserr1
-star_mass_lower_uncertainty = readPlanet.st_masserr2
-
 
 planet = []
 j = -1
 for i in range(0, (len(planet_id)-1)):
-    if not(math.isnan(planet_mass[i])
-           or math.isnan(planet_mass_upper_uncertainty[i])
-           or math.isnan(planet_mass_lower_uncertainty[i])               
-           or math.isnan(star_mass[i])
-           or math.isnan(star_mass_upper_uncertainty[i])
-           or math.isnan(star_mass_lower_uncertainty[i])
-           or math.isnan(semi_major_axis[i])
+    if not(math.isnan(semi_major_axis[i])
            or math.isnan(semi_major_axis_upper_uncertainty[i])
            or math.isnan(semi_major_axis_lower_uncertainty[i])
            or math.isnan(orbital_period[i])
@@ -80,11 +66,7 @@ for i in range(0, (len(planet_id)-1)):
            or math.isnan(star_radius_lower_uncertainty[i])
            or math.isnan(impact_parameter[i])
            or math.isnan(impact_parameter_upper_uncertainty[i])
-           or math.isnan(impact_parameter_lower_uncertainty[i]))and ((planet_mass_upper_uncertainty[i] <= 0.1*planet_mass[i])
-                                                                     and (-planet_mass_lower_uncertainty[i] <= 0.1*planet_mass[i])
-                                                                     and (star_mass_upper_uncertainty[i] <= 0.1*star_mass[i])
-                                                                     and (-star_mass_lower_uncertainty[i] <= 0.1*star_mass[i])
-                                                                     and (semi_major_axis_upper_uncertainty[i] <= 0.1*semi_major_axis[i])
+           or math.isnan(impact_parameter_lower_uncertainty[i]))and ((semi_major_axis_upper_uncertainty[i] <= 0.1*semi_major_axis[i])
                                                                      and (-semi_major_axis_lower_uncertainty[i] <= 0.1*semi_major_axis[i])
                                                                      and (orbital_period_upper_uncertainty[i] <= 0.1*orbital_period[i])
                                                                      and (-orbital_period_lower_uncertainty[i] <= 0.1*orbital_period[i])
@@ -97,13 +79,7 @@ for i in range(0, (len(planet_id)-1)):
                                                                      and (impact_parameter_upper_uncertainty[i] <= 0.1*impact_parameter[i])
                                                                      and (-impact_parameter_lower_uncertainty[i] <= 0.1*impact_parameter[i])):
         j = j + 1
-        planet = planet + [TransitingExoplanet(planet_id[i],
-                                               planet_mass[i],
-                                               planet_mass_upper_uncertainty[i],
-                                               planet_mass_lower_uncertainty[i],
-                                               star_mass[i],
-                                               star_mass_upper_uncertainty[i],
-                                               star_mass_lower_uncertainty[i],
+        planet = planet + [TransitingExoplanet(planet_id[i],                                              
                                                semi_major_axis[i],
                                                semi_major_axis_upper_uncertainty[i],
                                                semi_major_axis_lower_uncertainty[i],

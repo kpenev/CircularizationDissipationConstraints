@@ -14,12 +14,6 @@ class TransitingExoplanet:
       
     Attributes: 
         planet_id                            (string): The identification label of the exoplanet
-        planet_mass                           (float): The mass of the planet in the unit of the Earth's mass
-        planet_mass_upper_uncertainty         (float): The upper uncertainty associated with the planet's mass
-        planet_mass_lower_uncertainty         (float): The lower uncertainty associated with the planet's mass
-        star_mass                             (float): The mass of the star in the unit of the solar mass
-        star_mass_upper_uncertainty           (float): The upper uncertainty associated with the star's mass
-        star_mass_lower_uncertainty           (float): The lower uncertainty associated with the star's mass
         semi_major_axis                       (float): The length of the semi-major axis of the exoplanet in AU
         semi_major_axis_upper_uncertainty     (float): The upper uncertainty associated with the length of the semi-major axis of the exoplanet in AU
         semi_major_axis_lower_uncertainty     (float): The lower uncertainty associated with the length of the semi-major axis of the exoplanet in AU
@@ -48,10 +42,11 @@ class TransitingExoplanet:
         delta_upper_uncertainty               (float): The upper uncertainty associated with the delta factor
         delta_lower_uncertainty               (float): The lower uncertainty associated with the delta factor        
         SOLAR_RADIUS                          (float): The radius of the Sun in meters. This is a constant quantity
-        EARTH_RADIUS                          (float): The radius of the Earth in meters. This is a constant quantity
-        AU                                    (float): Astronomical Unit in meters
-        SOLAR_RADIUS_OVER_AU                  (float): The Sun's radius divided by 1 AU
-        EARTH_RADIUS_OVER_SOLAR_RADIUS        (float): The Earth's radius divided by the Sun's radius
+        SOLAR_MASS                            (float): The mass of the Sun in the unit of kilograms. This is a constant quantity
+        EARTH_RADIUS                          (float): The radius of the Earth in the unit of meters. This is a constant quantity
+        AU                                    (float): Astronomical Unit in meters.This is a constant quantity
+        G                                     (float): The universal gravitational constant in Newton meter-square over kilogram-square 
+        
 
     Methods:
         find_transit_duration_if_circular_orbit   : Works out the transit duration, in hours, if the orbit were circular 
@@ -62,45 +57,16 @@ class TransitingExoplanet:
     """
     
       
-    SOLAR_RADIUS = 696342000
-    SOLAR_RADIUS_UPPER_UNCERTAINTY = 65000
-    SOLAR_RADIUS_LOWER_UNCERTAINTY = -65000
-
-    SOLAR_MASS = 1.98847 * math.pow(10,30)
-    SOLAR_MASS_UPPER_UNCERTAINTY = 0.00007 * math.pow(10,30)
-    SOLAR_MASS_LOWER_UNCERTAINTY = -0.00007 * math.pow(10,30)
-    
+    SOLAR_RADIUS = 696342000   
+    SOLAR_MASS = 1.98847 * math.pow(10,30) 
     EARTH_RADIUS = 6378000
-    EARTH_RADIUS_UPPER_UNCERTAINTY = 0
-    EARTH_RADIUS_LOWER_UNCERTAINTY = 0
-
     EARTH_MASS = 5.9722 * pow(10,24)
-    EARTH_MASS_UPPER_UNCERTAINTY = 6 * pow(10,20)
-    EARTH_MASS_LOWER_UNCERTAINTY = -6 * pow(10,20)
-
-    G = 6.67259 * math.pow(10,-11)
-
-
-    
+    G = 6.67259 * math.pow(10,-11)    
     AU = 149600000000
-    SOLAR_RADIUS_OVER_AU = SOLAR_RADIUS / AU #is the Sun's radius divided by 1AU
-    SOLAR_RADIUS_OVER_AU_UPPER_UNCERTAINTY = SOLAR_RADIUS_UPPER_UNCERTAINTY / AU
-    SOLAR_RADIUS_OVER_AU_LOWER_UNCERTAINTY = - SOLAR_RADIUS_LOWER_UNCERTAINTY / AU
-    
-    EARTH_RADIUS_OVER_SOLAR_RADIUS = EARTH_RADIUS / SOLAR_RADIUS #is the Earth's radius divided by the Sun's radius
-    EARTH_RADIUS_OVER_SOLAR_RADIUS_UPPER_UNCERTAINTY = (EARTH_RADIUS + EARTH_RADIUS_UPPER_UNCERTAINTY)/(SOLAR_RADIUS + SOLAR_RADIUS_LOWER_UNCERTAINTY)-EARTH_RADIUS_OVER_SOLAR_RADIUS
-    EARTH_RADIUS_OVER_SOLAR_RADIUS_LOWER_UNCERTAINTY = -(EARTH_RADIUS_OVER_SOLAR_RADIUS - (EARTH_RADIUS + EARTH_RADIUS_LOWER_UNCERTAINTY)/(SOLAR_RADIUS + SOLAR_RADIUS_UPPER_UNCERTAINTY))
-
-    
+        
     
     def __init__(self,
                  planet_id,
-                 planet_mass,
-                 planet_mass_upper_uncertainty,
-                 planet_mass_lower_uncertainty,
-                 star_mass,
-                 star_mass_upper_uncertainty,
-                 star_mass_lower_uncertainty,
                  semi_major_axis,
                  semi_major_axis_upper_uncertainty,
                  semi_major_axis_lower_uncertainty,
