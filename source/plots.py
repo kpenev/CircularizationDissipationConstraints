@@ -10,7 +10,7 @@ import pickle
 import collections
 import os.path
 
-sys.path.append(
+sys.path.extend([
     os.path.join(
         os.path.dirname(
             os.path.dirname(
@@ -18,8 +18,9 @@ sys.path.append(
             )
         ),
         'data'
-    )
-)
+    ),
+    os.path.dirname(os.path.abspath(__file__))
+])
 
 #Need to update sys.path before imports
 #pylint:disable=wrong-import-position
@@ -29,7 +30,7 @@ from astropy import units
 from configargparse import ArgumentParser, DefaultsFormatter
 import asteval
 
-from kelly_colors import kelly_colors
+from kelly_colors import kelly_colors as plot_colors
 
 from stellar_evolution.change_variables import QuantityEvaluator
 from stellar_evolution.manager import StellarEvolutionManager
@@ -54,7 +55,11 @@ from process_e_Q_grid import\
 from command_line_utilities import\
     add_path_cmdline_args,\
     add_assumptions_cmdline_args
+from manual_lgq_limit_fixes import manual_limits
+from moving_window_constraints import MovingWindowConstraints
 #pylint:enable=wrong-import-position
+
+plot_colors = plot_colors[2:]
 
 def parse_command_line():
     """Parse the command line defining the plots to create."""
@@ -176,6 +181,12 @@ def parse_command_line():
     result = parser.parse_args()
     return result
 
+def set_plot_colors(new_colors):
+    """Change the set of colors used in the plots."""
+
+    global plot_colors
+    plot_colors = new_colors
+
 def get_eccentricity_envelope(cmdline_args):
     """Return an EccentricityEnvelope instance set-up per the command line."""
 
@@ -267,15 +278,23 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
     def plot_selection(systems, selected, **kwargs):
         """Plot one selection of points."""
 
+        print('\n'.join([
+            'Stacking errors: ',
+            repr(numpy.abs(systems.pl_orbeccenerr2)),
+            repr(numpy.abs(systems.pl_orbeccenerr1))
+        ]))
         errors = numpy.dstack(
             (
                 numpy.abs(systems.pl_orbeccenerr2),
                 numpy.abs(systems.pl_orbeccenerr1)
             )
         )[0].T
+        print('Stacked errors: ' + repr(errors))
         limit_only = systems.pl_orbeccenlim > 0.5
         errors[0][limit_only] = systems.pl_orbeccen[limit_only]
         errors[1][limit_only] = 0.0
+        print('Selected: ' + repr(selected))
+        print('Plot y errors: ' + repr(errors[:, selected]))
         pyplot.errorbar(
             systems.pl_orbper[selected].to_value('day'),
             systems.pl_orbeccen[selected],
@@ -437,7 +456,7 @@ def plot_e_vs_P(cmdline_args, plot_fname=None, save_plot=True, **kwargs):
                                label='unknown')
             else:
                 plot_selection(plot_systems,
-                               None,
+                               slice(None),
                                fmt='o',
                                markersize=15)
         pyplot.xlim((2.0, 100))
@@ -739,6 +758,36 @@ def get_lgQ_constraints(lgQ_x_axes,
 
         fix_semimajor(system)
 
+    def get_lgQ_limits(hostname, *solve_args):
+        """Solve for lgQ limits and apply manual corrections."""
+
+        nominal_lgQ, min_lgQ, max_lgQ = solve_lgQ_limits(*solve_args)
+
+        if getattr(cmdline_args, 'use_binary_stars', None):
+            if (
+                    isinstance(cmdline_args.use_binary_stars, bool)
+                    and
+                    cmdline_args.use_binary_stars
+            ):
+                cluster_name = 'NGC188'
+            else:
+                cluster_name = cmdline_args.use_binary_stars.upper()
+
+            if hostname in manual_limits[cluster_name]:
+                print('Using manual data for ' + repr(hostname))
+                manual = manual_limits[cluster_name][hostname]
+                if manual[0] is not None:
+                    min_lgQ = manual[0]
+                if manual[1] is not None:
+                    nominal_lgQ = manual[1]
+                if manual[2] is not None:
+                    max_lgQ = manual[2]
+
+        print("log10(Q*') for %s: " % repr(hostname)
+              +
+              repr((nominal_lgQ, min_lgQ, max_lgQ)))
+        return nominal_lgQ, min_lgQ, max_lgQ
+
     systems = get_system_list(cmdline_args, interpolator)
     eccentricity_envelope = get_eccentricity_envelope(cmdline_args)
 
@@ -796,7 +845,8 @@ def get_lgQ_constraints(lgQ_x_axes,
             plot_lgQ['nominal'][index],
             plot_lgQ['min'][index],
             plot_lgQ['max'][index]
-        ) = solve_lgQ_limits(
+        ) = get_lgQ_limits(
+            system.hostname,
             lgQ_vs_period,
             nominal_eccentricity,
             min_eccenticity,
@@ -858,6 +908,9 @@ def get_lgQ_constraints(lgQ_x_axes,
     print(repr(useful))
     print(100 * '*')
 
+    plot_lgQ['min'][limit_flags['upper']] = -numpy.inf
+    plot_lgQ['max'][limit_flags['lower']] = numpy.inf
+
 
     result = plot_x, plot_lgQ, limit_flags, assumed_default_density, is_giant
     if get_hostnames:
@@ -893,11 +946,15 @@ def plot_lgQ_vs(lgQ_x_axes,
                 markersize=5,
                 linewidth=2,
                 fill_limit_markers=True,
-                limit_line_width=0.3):
+                moving_window_minx=-numpy.inf,
+                moving_window_maxx=numpy.inf,
+                limit_line_width=0.3,
+                z_order_offset=0,
+                points=True):
     """Make a plot of the log10(Q*') constraints vs orbital period."""
 
     if not hasattr(plot_lgQ_vs, "color_index"):
-        plot_lgQ_vs.color_index = 2
+        plot_lgQ_vs.color_index = 0
 
     def add_points(*,
                    plot_x,
@@ -908,6 +965,8 @@ def plot_lgQ_vs(lgQ_x_axes,
                    distinguish=None):
         """Add a set of points to the plot color-coding for default density."""
 
+        if not points:
+            return
         plot_style = dict(
             markersize=markersize,
             linewidth=limit_line_width,
@@ -915,28 +974,28 @@ def plot_lgQ_vs(lgQ_x_axes,
         )
         if limit == 'upper':
             plot_style['fmt'] = 'v'
-            plot_style['zorder'] = 0
+            plot_style['zorder'] = z_order_offset + 0
         elif limit == 'lower':
             plot_style['fmt'] = '^'
-            plot_style['zorder'] = 1
+            plot_style['zorder'] = z_order_offset + 1
         else:
             assert not limit
             plot_style['fmt'] = 'o'
             plot_style['linewidth'] = linewidth
-            plot_style['zorder'] = 2
+            plot_style['zorder'] = z_order_offset + 2
             plot_style['label'] = label
 
         for include in [
                 numpy.logical_not(assumed_default_density),
                 assumed_default_density
         ]:
-            plot_style['markeredgecolor'] = kelly_colors[
+            plot_style['markeredgecolor'] = plot_colors[
                 plot_lgQ_vs.color_index
             ]
-            plot_style['ecolor'] = kelly_colors[
+            plot_style['ecolor'] = plot_colors[
                 plot_lgQ_vs.color_index
             ]
-            plot_style['markerfacecolor'] = kelly_colors[
+            plot_style['markerfacecolor'] = plot_colors[
                 plot_lgQ_vs.color_index
             ] if fill_limit_markers or (not limit) else 'none'
 
@@ -959,6 +1018,56 @@ def plot_lgQ_vs(lgQ_x_axes,
                 plot_style['zorder'] -= 10
                 if 'label' in plot_style:
                     del plot_style['label']
+
+    def plot_moving_window_constraints(plot_x, plot_lgQ, zorder):
+        """Add an area showing the moving window constraints from data."""
+
+        logscale = pyplot.gca().get_xscale() == 'log'
+        print('plot_x.shape = ' + repr(plot_x.shape))
+        for q_key in plot_lgQ.dtype.names:
+            print('plot_lgQ[%s].shape = ' % repr(q_key)
+                  +
+                  repr(plot_lgQ[q_key].shape))
+        moving_window_args = dict(
+            x=(numpy.log2(plot_x) if logscale else plot_x),
+            ymin=plot_lgQ['nominal'],
+            ymax=plot_lgQ['max'],
+            ymax_stdev=0.5,
+            ymin_stdev=numpy.maximum(plot_lgQ['nominal'] - plot_lgQ['min'], 0.5),
+            window_width=2.0 * numpy.log2(1.5)
+        )
+
+        upper_limit = numpy.logical_not(numpy.isfinite(plot_lgQ['min']))
+        moving_window_args['ymin'][upper_limit] = -numpy.inf
+        moving_window_args['ymin_stdev'][upper_limit] = 1.0
+
+        print(repr(moving_window_args))
+
+        moving_windo_constraints = MovingWindowConstraints(
+            **moving_window_args,
+        )
+        plot_x, plot_y1, plot_y2 = moving_windo_constraints.get_plot_arguments(
+            minx=numpy.log2(moving_window_minx),
+            maxx=numpy.log2(moving_window_maxx)
+        )
+        if logscale:
+            plot_x = 2.0**plot_x
+        plot_config = dict(
+            color=plot_colors[
+                plot_lgQ_vs.color_index
+            ],
+            zorder=zorder,
+            alpha=0.5
+        )
+        if not points:
+            plot_config['label'] = label
+
+        pyplot.fill_between(
+            plot_x,
+            numpy.maximum(plot_y1, 3.0),
+            numpy.minimum(plot_y2, 10.0),
+            **plot_config
+        )
 
     (
         plot_x,
@@ -1044,9 +1153,11 @@ def plot_lgQ_vs(lgQ_x_axes,
         if cmdline_args.nasa_data:
             pyplot.axhspan(6, 7, color='lightgrey', zorder=-100)
 
+
+        plot_moving_window_constraints(plot_x[x_index], plot_lgQ, -200)
         if plot_fname is None:
             pyplot.show()
-            plot_lgQ_vs.color_index = 2
+            plot_lgQ_vs.color_index = 0
         elif save_plot:
             print('Saving and clearing: '
                   +
@@ -1060,7 +1171,7 @@ def plot_lgQ_vs(lgQ_x_axes,
                 dict(x_label=lgQ_x_axes[x_index][0].replace('/', ':'))
             )
             pyplot.cla()
-            plot_lgQ_vs.color_index = 2
+            plot_lgQ_vs.color_index = 0
         else:
             plot_lgQ_vs.color_index += 1
             print('Awaiting more points')
