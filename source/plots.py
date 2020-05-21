@@ -541,9 +541,13 @@ def solve_lgQ_limits(lgQ_vs_period,
                                    nominal_eccentricity),
         invert_eccentricity_vs_lgQ(lgQ_vs_period,
                                    low_eccentricity),
-        invert_eccentricity_vs_lgQ(lgQ_vs_period,
-                                   max(envelope_eccentricity, 0.005),
-                                   default_min=min(lgQ_vs_period.keys()))
+        invert_eccentricity_vs_lgQ(
+            lgQ_vs_period,
+            max(envelope_eccentricity, 0.005),
+            default_min=min(
+                k[0] for k in lgQ_vs_period.keys()
+            )
+        )
     )
 
 def plot_single_lgQ_vs_e(system,
@@ -1423,8 +1427,9 @@ def load_progress(progress_pickle):
 def get_dataset_label(cmdline_args):
     """Return a label to use for the dataset from a progress pickle."""
 
+    print('CMD Line: ' + repr(cmdline_args))
     if cmdline_args.nasa_data is not None:
-        assert not cmdline_args.use_binary_stars
+        assert not getattr(cmdline_args, 'use_binary_stars', None)
         return 'Exoplanets'
     if (
             (
