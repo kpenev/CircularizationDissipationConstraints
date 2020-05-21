@@ -574,8 +574,8 @@ def load_progress_pickle(progress_file):
         dict:
             * keys: host star name
             * values: dict:
-                * keys: lgQ
-                * values: (initial eccentricity, final eccentricity)
+                * keys: (lgQ, initial_eccentricity)
+                * values: final eccentricity
     """
 
     result = dict()
