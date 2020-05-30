@@ -1,5 +1,6 @@
 import math
 import planetary_system_io
+
 class TransitingExoplanet:
     """ 
     This is a class for calculating the minimum eccentricity
