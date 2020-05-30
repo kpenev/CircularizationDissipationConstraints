@@ -1,5 +1,6 @@
 import math
 import planetary_system_io
+import astropy
 
 class TransitingExoplanet:
     """ 
