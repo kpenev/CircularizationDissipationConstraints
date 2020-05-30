@@ -340,7 +340,7 @@ class TransitingExoplanet:
                 transit duration, in hours, if the circuit were circular
             
         Returns: 
-            unc_delta (float):    The uncertainty associated with the delta factor
+            uncertainty_delta (float):    The uncertainty associated with the delta factor
         """
 
 
@@ -353,10 +353,10 @@ class TransitingExoplanet:
 
         var_delta = (var_t + delta*delta* var_tc)/tc/tc
 
-        unc_delta = math.sqrt(var_delta)
+        uncertainty_delta = math.sqrt(var_delta)
 
 
-        return unc_delta
+        return uncertainty_delta
 
         
     def find_emin(self, delta):
@@ -390,13 +390,13 @@ class TransitingExoplanet:
             delta_uncertainty (float):    The uncertainty of the delta factor
             
         Returns: 
-            unc_emin          (float): Uncertainty with the minimum eccentricity
+            uncertainty_emin (float):    Uncertainty with the minimum eccentricity
                 of the exoplanet's orbit (float)
         """
 
-        unc_emin = 4*delta*delta_uncertainty/(delta*delta+1)
+        uncertainty_emin = 4*delta*delta_uncertainty/(delta*delta+1)
 
-        return unc_emin
+        return uncertainty_emin
 
 
         
