@@ -284,19 +284,18 @@ class TransitingExoplanet:
         var_r = planet_radius_over_star_radius_uncertainty**2
         var_b = impact_parameter_uncertainty**2
         var_P = (orbital_period_uncertainty * 24)**2
-        var_f = planet_radius_over_star_radius_uncertainty**2
+        var_f = semi_major_axis_over_star_radius_uncertainty**2
         
         
 
-        r = semi_major_axis_over_star_radius
+        r = planet_radius_over_star_radius_uncertainty
         b = impact_parameter
-        P = orbital_period * 24 #days to seconds coversion
-        f = planet_radius_over_star_radius_uncertainty
+        P = orbital_period * 24 #days to hours coversion
+        f = semi_major_axis_over_star_radius
                 
-        var_tc = (((P/f/3.141592654)**2)/((1+r)**2-b**2)*((1+r)**2 * var_r + (b**2) * var_b)
-                     + ((1+r)**2-b**2)/((f*3.141592654)**2)*(var_p + (P**2)/(f**2) * var_f))
+        var_tc = (((P/f/3.141592654)**2)/((1+r)**2-b**2)*((1+r)**2 * var_r + (b**2) * var_b) + ((1+r)**2-b**2)/((f*3.141592654)**2)*(var_P + (P**2)/(f**2) * var_f))
         orbital_period_uncertainty_if_circular_orbit = math.sqrt(var_tc)
-
+        
         return orbital_period_uncertainty_if_circular_orbit 
 
     def find_delta(self, transit_duration, transit_duration_if_circular_orbit):
