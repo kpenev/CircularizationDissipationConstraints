@@ -416,4 +416,7 @@ class TransitingExoplanet:
               '\n The minimum |uncertainty| of minimum eccentricity: ', self.minimum_eccentricity_min_uncertainty,
               '\n\n')
 
+
+    
+
              
