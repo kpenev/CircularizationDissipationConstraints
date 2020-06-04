@@ -144,6 +144,7 @@ class TestingTransitingExoplanet:
                                                     impact_parameter_upper_uncertainty[i],
                                                     impact_parameter_lower_uncertainty[i])]
              print('Number: ', (j+1))
+             
              planet[j].print_attributes()
 
 
