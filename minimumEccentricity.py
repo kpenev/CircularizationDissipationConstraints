@@ -393,7 +393,7 @@ class TransitingExoplanet:
                 of the exoplanet's orbit (float)
         """
 
-        uncertainty_emin = 4*delta*delta_uncertainty/(delta*delta+1)
+        uncertainty_emin = 4*delta*delta_uncertainty/((delta*delta+1)**2)
 
         return uncertainty_emin
 
