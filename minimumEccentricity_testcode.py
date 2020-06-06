@@ -52,7 +52,9 @@ class TestingTransitingExoplanet:
           planet[i].print_attributes()
 
 
-    def test_Nasa_Exoplanet_data(self):
+   
+
+    def test_Nasa_Exoplanet_data(self, path, tolerance):
        
        """
        Testing TransitingExoplanet by Nasa Exoplanet data
@@ -63,7 +65,7 @@ class TestingTransitingExoplanet:
 
 
 
-       readPlanet = planetary_system_io.read_nasa_planets('C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv',
+       readPlanet = planetary_system_io.read_nasa_planets(path,
                      eliminate=('SWEEPS-11',
                                 'HD 41004 B',
                                 'PSR J1719-1438',
@@ -72,6 +74,8 @@ class TestingTransitingExoplanet:
                      )
 
        #Now we are taking data on planets from the file
+
+       
 
 
 
@@ -116,16 +120,16 @@ class TestingTransitingExoplanet:
                  or math.isnan(planet_radius_over_star_radius_lower_uncertainty[i])
                  or math.isnan(impact_parameter[i])
                  or math.isnan(impact_parameter_upper_uncertainty[i])
-                 or math.isnan(impact_parameter_lower_uncertainty[i]))and ((semi_major_axis_over_star_radius_upper_uncertainty[i] <= 0.1*semi_major_axis_over_star_radius[i])
-                                                                           and (-semi_major_axis_over_star_radius_lower_uncertainty[i] <= 0.1*semi_major_axis_over_star_radius[i])
-                                                                           and (orbital_period_upper_uncertainty[i] <= 0.1*orbital_period[i])
-                                                                           and (-orbital_period_lower_uncertainty[i] <= 0.1*orbital_period[i])
-                                                                           and (transit_duration_upper_uncertainty[i] <= 0.1*transit_duration[i])
-                                                                           and (-transit_duration_lower_uncertainty[i] <= 0.1*transit_duration[i])
-                                                                           and (planet_radius_over_star_radius_upper_uncertainty[i] <= 0.1*planet_radius_over_star_radius[i])
-                                                                           and (-planet_radius_over_star_radius_lower_uncertainty[i] <= 0.1*planet_radius_over_star_radius[i])
-                                                                           and (impact_parameter_upper_uncertainty[i] <= 0.1*impact_parameter[i])
-                                                                           and (-impact_parameter_lower_uncertainty[i] <= 0.1*impact_parameter[i])):
+                 or math.isnan(impact_parameter_lower_uncertainty[i]))and ((semi_major_axis_over_star_radius_upper_uncertainty[i] <= tolerance*semi_major_axis_over_star_radius[i])
+                                                                           and (-semi_major_axis_over_star_radius_lower_uncertainty[i] <= tolerance*semi_major_axis_over_star_radius[i])
+                                                                           and (orbital_period_upper_uncertainty[i] <= tolerance*orbital_period[i])
+                                                                           and (-orbital_period_lower_uncertainty[i] <= tolerance*orbital_period[i])
+                                                                           and (transit_duration_upper_uncertainty[i] <= tolerance*transit_duration[i])
+                                                                           and (-transit_duration_lower_uncertainty[i] <= tolerance*transit_duration[i])
+                                                                           and (planet_radius_over_star_radius_upper_uncertainty[i] <= tolerance*planet_radius_over_star_radius[i])
+                                                                           and (-planet_radius_over_star_radius_lower_uncertainty[i] <= tolerance*planet_radius_over_star_radius[i])
+                                                                           and (impact_parameter_upper_uncertainty[i] <= tolerance*impact_parameter[i])
+                                                                           and (-impact_parameter_lower_uncertainty[i] <= tolerance*impact_parameter[i])):
              j = j + 1
              planet = planet + [TransitingExoplanet(planet_id[i],
                                                     semi_major_axis_over_star_radius[i],
@@ -152,6 +156,7 @@ class TestingTransitingExoplanet:
 
 test = TestingTransitingExoplanet()
 test.test_Barnes_data()
-test.test_Nasa_Exoplanet_data()
+test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv', tolerance = 0.1)
+test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2019.09.18_13.19.49.csv', tolerance = 0.4)
 
 

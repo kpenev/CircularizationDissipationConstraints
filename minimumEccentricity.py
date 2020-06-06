@@ -294,6 +294,7 @@ class TransitingExoplanet:
         f = semi_major_axis_over_star_radius
                 
         var_tc = (((P/f/3.141592654)**2)/((1+r)**2-b**2)*((1+r)**2 * var_r + (b**2) * var_b) + ((1+r)**2-b**2)/((f*3.141592654)**2)*(var_P + (P**2)/(f**2) * var_f))
+        print('var_tc = ',var_tc)
         orbital_period_uncertainty_if_circular_orbit = math.sqrt(var_tc)
         
         return orbital_period_uncertainty_if_circular_orbit 
