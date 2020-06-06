@@ -27,7 +27,7 @@ class TestingTransitingExoplanet:
        planet_radius = [14.42, 22.29, 04.67, 11.79, 05.65, 00.66, 03.72, 15.88, 11.06, 17.37, 17.58]
        y = 6.3781 * (10**6)/696342000
        planet_radius_over_star_radius = [14.42/1.06*y, 22.29/2.71*y, 04.67/0.74*y, 11.79/2.60*y, 05.65/1.42*y, 00.66/1.42*y, 3.72/1.27*y, 15.88/1.56*y, 11.06/1.08*y, 17.37/2.02*y, 17.58/1.38*y] 
-       impact_parameter = [0.822, 0.128, 0.029, 0.946, 0.951, 0.750, 0.640, 0.029, 0.006, 0.018]
+       impact_parameter = [0.822, 0.128, 0.029, 0.946, 0.951, 0.750, 0.714, 0.640, 0.029, 0.006, 0.018]
        transit_duration_if_circular_orbit = [1.984, 5.810, 2.612, 2.764, 1.716, 3.169, 2.431, 3.682, 3.015, 5.282, 4.338]
 
        #We are going to reproduce the table 1 of Barnes' paper.
@@ -41,28 +41,23 @@ class TestingTransitingExoplanet:
 
        #Now we are running a loop to insert records of rest of the planets
        #in the table:
-
-       for i in range(0, (len(planet_id)-1)):
-          planet = planet + [TransitingExoplanet(planet_id[i],
-                                          semi_major_axis_over_star_radius[i], 0, 0,
-                                          orbital_period[i], 0,0,
-                                          transit_duration[i], 0,0,
-                                          planet_radius_over_star_radius[i], 0,0,
-                                          impact_parameter[i],0,0)]
-          planet[i].print_attributes()
-
-
+       
+       for i in range(0, len(planet_id)):
+          planet = planet + [TransitingExoplanet(planet_id = planet_id[i],
+                                          semi_major_axis_over_star_radius = semi_major_axis_over_star_radius[i],
+                                          orbital_period = orbital_period[i],
+                                          transit_duration = transit_duration[i], 
+                                          planet_radius_over_star_radius = planet_radius_over_star_radius[i],
+                                          impact_parameter = impact_parameter[i])]
+          
+          planet[i].print_attributes(need_uncertainty = False)
    
 
-    def test_Nasa_Exoplanet_data(self, path, tolerance):
+    def test_Nasa_Exoplanet_data(self, path, tolerance, need_uncertainty):
        
        """
        Testing TransitingExoplanet by Nasa Exoplanet data
        """
-
-
-       #Data from planets_2020.04.10_14.52.24.csv found in the Data folder
-
 
 
        readPlanet = planetary_system_io.read_nasa_planets(path,
@@ -73,7 +68,7 @@ class TestingTransitingExoplanet:
                      need_ages=False,
                      )
 
-       #Now we are taking data on planets from the file
+       #Now we are taking data on planets from the file in the location specified by path
 
        
 
@@ -82,31 +77,29 @@ class TestingTransitingExoplanet:
        planet_id = readPlanet.pl_name
 
        semi_major_axis_over_star_radius = readPlanet.pl_ratdor
-       semi_major_axis_over_star_radius_upper_uncertainty = readPlanet.pl_ratdorerr1
-       semi_major_axis_over_star_radius_lower_uncertainty = readPlanet.pl_ratdorerr2
-
        orbital_period = readPlanet.pl_orbper
-       orbital_period_upper_uncertainty = readPlanet.pl_orbpererr1
-       orbital_period_lower_uncertainty = readPlanet.pl_orbpererr2
-
        transit_duration = readPlanet.pl_trandur
-       transit_duration_upper_uncertainty = readPlanet.pl_trandurerr1
-       transit_duration_lower_uncertainty = readPlanet.pl_trandurerr2
-
-
        planet_radius_over_star_radius = readPlanet.pl_ratror
-       planet_radius_over_star_radius_upper_uncertainty = readPlanet.pl_ratrorerr1
-       planet_radius_over_star_radius_lower_uncertainty = readPlanet.pl_ratrorerr2
-
        impact_parameter = readPlanet.pl_imppar
-       impact_parameter_upper_uncertainty = readPlanet.pl_impparerr1
-       impact_parameter_lower_uncertainty = readPlanet.pl_impparerr2
+
+       if need_uncertainty:
+           semi_major_axis_over_star_radius_upper_uncertainty = readPlanet.pl_ratdorerr1
+           semi_major_axis_over_star_radius_lower_uncertainty = readPlanet.pl_ratdorerr2
+           orbital_period_upper_uncertainty = readPlanet.pl_orbpererr1
+           orbital_period_lower_uncertainty = readPlanet.pl_orbpererr2
+           transit_duration_upper_uncertainty = readPlanet.pl_trandurerr1
+           transit_duration_lower_uncertainty = readPlanet.pl_trandurerr2
+           planet_radius_over_star_radius_upper_uncertainty = readPlanet.pl_ratrorerr1
+           planet_radius_over_star_radius_lower_uncertainty = readPlanet.pl_ratrorerr2
+           impact_parameter_upper_uncertainty = readPlanet.pl_impparerr1
+           impact_parameter_lower_uncertainty = readPlanet.pl_impparerr2
+       
 
 
        planet = []
        j = -1
-       for i in range(0, (len(planet_id)-1)):
-          if not(math.isnan(semi_major_axis_over_star_radius[i])
+       for i in range(0, len(planet_id)):
+          if need_uncertainty and not(math.isnan(semi_major_axis_over_star_radius[i])
                  or math.isnan(semi_major_axis_over_star_radius_upper_uncertainty[i])
                  or math.isnan(semi_major_axis_over_star_radius_lower_uncertainty[i])
                  or math.isnan(orbital_period[i])
@@ -129,34 +122,57 @@ class TestingTransitingExoplanet:
                                                                            and (planet_radius_over_star_radius_upper_uncertainty[i] <= tolerance*planet_radius_over_star_radius[i])
                                                                            and (-planet_radius_over_star_radius_lower_uncertainty[i] <= tolerance*planet_radius_over_star_radius[i])
                                                                            and (impact_parameter_upper_uncertainty[i] <= tolerance*impact_parameter[i])
-                                                                           and (-impact_parameter_lower_uncertainty[i] <= tolerance*impact_parameter[i])):
+                                                                           and (-impact_parameter_lower_uncertainty[i] <= tolerance*impact_parameter[i])
+                                                                           and (impact_parameter[i]<=1)):
              j = j + 1
-             planet = planet + [TransitingExoplanet(planet_id[i],
-                                                    semi_major_axis_over_star_radius[i],
-                                                    semi_major_axis_over_star_radius_upper_uncertainty[i],
-                                                    semi_major_axis_over_star_radius_lower_uncertainty[i],
-                                                    orbital_period[i],
-                                                    orbital_period_upper_uncertainty[i],
-                                                    orbital_period_lower_uncertainty[i],
-                                                    transit_duration[i]*24,
-                                                    transit_duration_upper_uncertainty[i]*24,
-                                                    transit_duration_lower_uncertainty[i]*24,
-                                                    planet_radius_over_star_radius[i],
-                                                    planet_radius_over_star_radius_upper_uncertainty[i],
-                                                    planet_radius_over_star_radius_lower_uncertainty[i],
-                                                    impact_parameter[i],
-                                                    impact_parameter_upper_uncertainty[i],
-                                                    impact_parameter_lower_uncertainty[i])]
+             planet = planet + [TransitingExoplanet(planet_id = planet_id[i],
+                                                    semi_major_axis_over_star_radius = semi_major_axis_over_star_radius[i],
+                                                    orbital_period = orbital_period[i],
+                                                    transit_duration = transit_duration[i]*24,
+                                                    impact_parameter = impact_parameter[i],
+                                                    planet_radius_over_star_radius = planet_radius_over_star_radius[i],
+                                                    semi_major_axis_over_star_radius_upper_uncertainty = semi_major_axis_over_star_radius_upper_uncertainty[i],
+                                                    semi_major_axis_over_star_radius_lower_uncertainty = semi_major_axis_over_star_radius_lower_uncertainty[i],                                                    
+                                                    orbital_period_upper_uncertainty = orbital_period_upper_uncertainty[i],
+                                                    orbital_period_lower_uncertainty = orbital_period_lower_uncertainty[i],                                                    
+                                                    transit_duration_upper_uncertainty = transit_duration_upper_uncertainty[i]*24,
+                                                    transit_duration_lower_uncertainty = transit_duration_lower_uncertainty[i]*24,                                                    
+                                                    planet_radius_over_star_radius_upper_uncertainty = planet_radius_over_star_radius_upper_uncertainty[i],
+                                                    planet_radius_over_star_radius_lower_uncertainty = planet_radius_over_star_radius_lower_uncertainty[i],                                                    
+                                                    impact_parameter_upper_uncertainty = impact_parameter_upper_uncertainty[i],
+                                                    impact_parameter_lower_uncertainty = impact_parameter_lower_uncertainty[i], need_uncertainty = True)]
              print('Number: ', (j+1))
+             planet[j].print_attributes(need_uncertainty)
              
-             planet[j].print_attributes()
+
+          if not(need_uncertainty) and not(math.isnan(semi_major_axis_over_star_radius[i])
+                                           or math.isnan(orbital_period[i])
+                                           or math.isnan(transit_duration[i])
+                                           or math.isnan(planet_radius_over_star_radius[i])
+                                           or math.isnan(impact_parameter[i]))and (impact_parameter[i]<=1):
+             j = j + 1
+             planet = planet + [TransitingExoplanet(planet_id = planet_id[i],
+                                                    semi_major_axis_over_star_radius = semi_major_axis_over_star_radius[i],
+                                                    orbital_period = orbital_period[i],
+                                                    transit_duration = transit_duration[i]*24,
+                                                    planet_radius_over_star_radius = planet_radius_over_star_radius[i],
+                                                    impact_parameter = impact_parameter[i])]
+             print('Number: ', (j+1))
+             planet[j].print_attributes(need_uncertainty)
+          
+    
+             
 
 
 
 
 test = TestingTransitingExoplanet()
 test.test_Barnes_data()
-test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv', tolerance = 0.1)
-test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2019.09.18_13.19.49.csv', tolerance = 0.4)
+test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv',
+                              tolerance = 0.1,
+                              need_uncertainty = True)
+test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2019.09.18_13.19.49.csv',
+                              tolerance = 0.4,
+                              need_uncertainty = False)
 
 
