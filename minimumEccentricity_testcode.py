@@ -1,6 +1,8 @@
 import math
 import planetary_system_io
 from minimumEccentricity import TransitingExoplanet
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 
@@ -81,6 +83,7 @@ class TestingTransitingExoplanet:
        transit_duration = readPlanet.pl_trandur
        planet_radius_over_star_radius = readPlanet.pl_ratror
        impact_parameter = readPlanet.pl_imppar
+       
 
        if need_uncertainty:
            semi_major_axis_over_star_radius_upper_uncertainty = readPlanet.pl_ratdorerr1
@@ -97,7 +100,7 @@ class TestingTransitingExoplanet:
 
 
        planet = []
-       j = -1
+       
        for i in range(0, len(planet_id)):
           if need_uncertainty and not(math.isnan(semi_major_axis_over_star_radius[i])
                  or math.isnan(semi_major_axis_over_star_radius_upper_uncertainty[i])
@@ -124,7 +127,7 @@ class TestingTransitingExoplanet:
                                                                            and (impact_parameter_upper_uncertainty[i] <= tolerance*impact_parameter[i])
                                                                            and (-impact_parameter_lower_uncertainty[i] <= tolerance*impact_parameter[i])
                                                                            and (impact_parameter[i]<=1)):
-             j = j + 1
+             
              planet = planet + [TransitingExoplanet(planet_id = planet_id[i],
                                                     semi_major_axis_over_star_radius = semi_major_axis_over_star_radius[i],
                                                     orbital_period = orbital_period[i],
@@ -141,8 +144,7 @@ class TestingTransitingExoplanet:
                                                     planet_radius_over_star_radius_lower_uncertainty = planet_radius_over_star_radius_lower_uncertainty[i],                                                    
                                                     impact_parameter_upper_uncertainty = impact_parameter_upper_uncertainty[i],
                                                     impact_parameter_lower_uncertainty = impact_parameter_lower_uncertainty[i], need_uncertainty = True)]
-             print('Number: ', (j+1))
-             planet[j].print_attributes(need_uncertainty)
+             
              
 
           if not(need_uncertainty) and not(math.isnan(semi_major_axis_over_star_radius[i])
@@ -150,29 +152,36 @@ class TestingTransitingExoplanet:
                                            or math.isnan(transit_duration[i])
                                            or math.isnan(planet_radius_over_star_radius[i])
                                            or math.isnan(impact_parameter[i]))and (impact_parameter[i]<=1):
-             j = j + 1
+             
              planet = planet + [TransitingExoplanet(planet_id = planet_id[i],
                                                     semi_major_axis_over_star_radius = semi_major_axis_over_star_radius[i],
                                                     orbital_period = orbital_period[i],
                                                     transit_duration = transit_duration[i]*24,
                                                     planet_radius_over_star_radius = planet_radius_over_star_radius[i],
                                                     impact_parameter = impact_parameter[i])]
-             print('Number: ', (j+1))
-             planet[j].print_attributes(need_uncertainty)
-          
+                       
     
-             
+       return(planet)      
 
 
+
+    def print_planets_attributes(self, planets, need_uncertainty):
+        for i in range(0, len(planets)):
+            print('Planet Number: ', (i+1))
+            planets[i].print_attributes(need_uncertainty)
 
 
 test = TestingTransitingExoplanet()
 test.test_Barnes_data()
-test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv',
+a = test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv',
                               tolerance = 0.1,
                               need_uncertainty = True)
-test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2019.09.18_13.19.49.csv',
-                              tolerance = 0.4,
+test.print_planets_attributes(a, need_uncertainty = True)
+
+
+b = test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2019.09.18_13.19.49.csv',
+                              tolerance = 0.1,
                               need_uncertainty = False)
+test.print_planets_attributes(b, need_uncertainty = False)
 
 
