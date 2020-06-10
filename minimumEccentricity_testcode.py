@@ -204,14 +204,15 @@ class TestingTransitingExoplanet:
     def plot_eccentricity_vs_planet_number(self, planets_with_known_eccentricity, need_uncertainty):
         # example data
 
+        n = len(planets_with_known_eccentricity.planets)
 
         planet_number = []
-        for i in range(0, len(planets_with_known_eccentricity.planets)):
+        for i in range(0, n):
             planet_number = planet_number + [(i+1)]            
         x = planet_number
         
         minimum_eccentricities = []
-        for i in range(0, len(planets_with_known_eccentricity.planets)):
+        for i in range(0, n):
             minimum_eccentricities = minimum_eccentricities + [planets_with_known_eccentricity.planets[i].minimum_eccentricity]
         y = minimum_eccentricities
 
@@ -219,9 +220,7 @@ class TestingTransitingExoplanet:
         z = eccentricities        
 
         if need_uncertainty:
-            # error bar values w/ different -/+ errors that
-            # also vary with the x-position
-
+            
             minimum_eccentricities_upper_uncertainty = []
             for i in range(0, len(planets_with_known_eccentricity.planets)):
                 minimum_eccentricities_upper_uncertainty = minimum_eccentricities_upper_uncertainty + [planets_with_known_eccentricity.planets[i].minimum_eccentricity_max_uncertainty]
@@ -232,11 +231,11 @@ class TestingTransitingExoplanet:
 
             asymmetric_minimum_eccentricities_uncertainty = [minimum_eccentricities_upper_uncertainty, minimum_eccentricities_lower_uncertainty]
             asymmetric_eccentricities_uncertainty = [planets_with_known_eccentricity.planets_eccentricity_upper_uncertainty, planets_with_known_eccentricity.planets_eccentricity_lower_uncertainty]
-            #fig, (ax0, ax1) = plt.subplots(nrows=2, sharex=True)
-            plt.errorbar(x, z, yerr=asymmetric_eccentricities_uncertainty, fmt='-.', label = "Minimum Eccentricities vs. Planets")
-            #ax0.set_title('Eccentricity vs. Planet')
+            
+            plt.errorbar(x, z, yerr=asymmetric_eccentricities_uncertainty, fmt='-.', label = "Eccentricities vs. Planets")
+            
 
-            plt.errorbar(x, y, yerr=asymmetric_minimum_eccentricities_uncertainty, fmt='-.', label = "Eccentricities vs. Planets")
+            plt.errorbar(x, y, yerr=asymmetric_minimum_eccentricities_uncertainty, fmt='-.', label = "Minimum Eccentricities vs. Planets")
             # giving a title to my graph 
             plt.title('Minimum Eccentricity and Eccentricity vs Planet') 
   
@@ -280,6 +279,6 @@ planets_with_known_eccentricity2 = test.test_Nasa_Exoplanet_data(path = 'C:/User
 test.print_planets_attributes(planets_with_known_eccentricity2.planets, need_uncertainty = False)
 
 test.plot_eccentricity_vs_planet_number(planets_with_known_eccentricity1, need_uncertainty = True)
-#test.plot_eccentricity_vs_planet_number(planets_with_known_eccentricity2, need_uncertainty = False)
+test.plot_eccentricity_vs_planet_number(planets_with_known_eccentricity2, need_uncertainty = False)
 
 
