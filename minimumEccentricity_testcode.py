@@ -146,8 +146,6 @@ class TestingTransitingExoplanet:
                                                                            and (-planet_radius_over_star_radius_lower_uncertainty[i] <= tolerance*planet_radius_over_star_radius[i])
                                                                            and (impact_parameter_upper_uncertainty[i] <= tolerance*impact_parameter[i])
                                                                            and (-impact_parameter_lower_uncertainty[i] <= tolerance*impact_parameter[i])
-                                                                           and (eccentricity_upper_uncertainty[i] <= tolerance*impact_parameter[i])
-                                                                           and (-eccentricity_lower_uncertainty[i] <= tolerance*impact_parameter[i])
                                                                            and (impact_parameter[i]<=1)):
              
              planets = planets + [TransitingExoplanet(planet_id = planet_id[i],
@@ -227,10 +225,12 @@ class TestingTransitingExoplanet:
             
             minimum_eccentricities_lower_uncertainty = []
             for i in range(0, len(planets_with_known_eccentricity.planets)):
-                minimum_eccentricities_lower_uncertainty = minimum_eccentricities_lower_uncertainty + [-1 * planets_with_known_eccentricity.planets[i].minimum_eccentricity_max_uncertainty]
-
+                minimum_eccentricities_lower_uncertainty = minimum_eccentricities_lower_uncertainty + [planets_with_known_eccentricity.planets[i].minimum_eccentricity_max_uncertainty]
+             
             asymmetric_minimum_eccentricities_uncertainty = [minimum_eccentricities_upper_uncertainty, minimum_eccentricities_lower_uncertainty]
-            asymmetric_eccentricities_uncertainty = [planets_with_known_eccentricity.planets_eccentricity_upper_uncertainty, planets_with_known_eccentricity.planets_eccentricity_lower_uncertainty]
+            
+
+            asymmetric_eccentricities_uncertainty = [planets_with_known_eccentricity.planets_eccentricity_upper_uncertainty, abs(np.array(planets_with_known_eccentricity.planets_eccentricity_lower_uncertainty))]
             
             plt.errorbar(x, z, yerr=asymmetric_eccentricities_uncertainty, fmt='-.', label = "Eccentricities vs. Planets")
             
@@ -263,13 +263,15 @@ class TestingTransitingExoplanet:
             plt.show() 
              
 
-
 test = TestingTransitingExoplanet()
 test.test_Barnes_data()
 planets_with_known_eccentricity1 = test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv',
                               tolerance = 0.25,
                               need_uncertainty = True)
 test.print_planets_attributes(planets_with_known_eccentricity1.planets, need_uncertainty = True)
+
+test.plot_eccentricity_vs_planet_number(planets_with_known_eccentricity1, need_uncertainty = True)
+
 
 
 
@@ -278,7 +280,7 @@ planets_with_known_eccentricity2 = test.test_Nasa_Exoplanet_data(path = 'C:/User
                               need_uncertainty = False)
 test.print_planets_attributes(planets_with_known_eccentricity2.planets, need_uncertainty = False)
 
-test.plot_eccentricity_vs_planet_number(planets_with_known_eccentricity1, need_uncertainty = True)
+
 test.plot_eccentricity_vs_planet_number(planets_with_known_eccentricity2, need_uncertainty = False)
 
 
