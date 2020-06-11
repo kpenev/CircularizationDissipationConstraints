@@ -5,6 +5,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class PlanetsWithKnownEccentricity:
+    """ 
+    Class of an object representing a list of transiting planets, whose eccentricity of orbits
+    is known  
+
+    """
 
     def __init__(self,
                  planets,
@@ -30,7 +35,8 @@ class TestingTransitingExoplanet:
 
     def test_Barnes_data(self):
        """
-       Testing TransitingExoplanet by
+       Testing TransitingExoplanet by the data table 1 given in "A METHOD TO IDENTIFY THE BOUNDARY BETWEEN ROCKY AND GASEOUS EXOPLANETS FROM
+       TIDAL THEORY AND TRANSIT DURATIONS", Rory Barnes, 2018 
        """
        planet_id = [01.01, 02.01, 03.01, 04.01, 05.01, 05.02, 07.01, 10.01, 17.01, 18.01, 20.01]
        semi_major_axis = [0.036, 0.039, 0.052, 0.056, 0.058, 0.075, 0.044, 0.047, 0.045, 0.052, 0.056]
@@ -69,158 +75,176 @@ class TestingTransitingExoplanet:
    
 
     def test_Nasa_Exoplanet_data(self, path, tolerance, need_uncertainty):
-       
-       """
-       Testing TransitingExoplanet by Nasa Exoplanet data
-       """
+        
+        """
+        Testing TransitingExoplanet by Nasa Exoplanet data
+        """
 
+        readPlanet = planetary_system_io.read_nasa_planets(path,
+                                                           eliminate=('SWEEPS-11',
+                                                                      'HD 41004 B',
+                                                                      'PSR J1719-1438',
+                                                                      'K2-22'),
+                                                           need_ages=False,
+                                                           )
 
-       readPlanet = planetary_system_io.read_nasa_planets(path,
-                     eliminate=('SWEEPS-11',
-                                'HD 41004 B',
-                                'PSR J1719-1438',
-                                'K2-22'),
-                     need_ages=False,
-                     )
+        planet_id = readPlanet.pl_name
 
-       #Now we are taking data on planets from the file in the location specified by path
+        semi_major_axis_over_star_radius = readPlanet.pl_ratdor
+        orbital_period = readPlanet.pl_orbper
+        transit_duration = readPlanet.pl_trandur
+        planet_radius_over_star_radius = readPlanet.pl_ratror
+        impact_parameter = readPlanet.pl_imppar
+        eccentricity = readPlanet.pl_orbeccen
 
-       
-
-
-
-       planet_id = readPlanet.pl_name
-
-       semi_major_axis_over_star_radius = readPlanet.pl_ratdor
-       orbital_period = readPlanet.pl_orbper
-       transit_duration = readPlanet.pl_trandur
-       planet_radius_over_star_radius = readPlanet.pl_ratror
-       impact_parameter = readPlanet.pl_imppar
-       eccentricity = readPlanet.pl_orbeccen
-
-       if need_uncertainty:
-           semi_major_axis_over_star_radius_upper_uncertainty = readPlanet.pl_ratdorerr1
-           semi_major_axis_over_star_radius_lower_uncertainty = readPlanet.pl_ratdorerr2
-           orbital_period_upper_uncertainty = readPlanet.pl_orbpererr1
-           orbital_period_lower_uncertainty = readPlanet.pl_orbpererr2
-           transit_duration_upper_uncertainty = readPlanet.pl_trandurerr1
-           transit_duration_lower_uncertainty = readPlanet.pl_trandurerr2
-           planet_radius_over_star_radius_upper_uncertainty = readPlanet.pl_ratrorerr1
-           planet_radius_over_star_radius_lower_uncertainty = readPlanet.pl_ratrorerr2
-           impact_parameter_upper_uncertainty = readPlanet.pl_impparerr1
-           impact_parameter_lower_uncertainty = readPlanet.pl_impparerr2
-           eccentricity_upper_uncertainty = readPlanet.pl_orbeccenerr1
-           eccentricity_lower_uncertainty = readPlanet.pl_orbeccenerr2
+        if need_uncertainty:
+            
+            semi_major_axis_over_star_radius_upper_uncertainty = readPlanet.pl_ratdorerr1
+            semi_major_axis_over_star_radius_lower_uncertainty = readPlanet.pl_ratdorerr2
+            orbital_period_upper_uncertainty = readPlanet.pl_orbpererr1
+            orbital_period_lower_uncertainty = readPlanet.pl_orbpererr2
+            transit_duration_upper_uncertainty = readPlanet.pl_trandurerr1
+            transit_duration_lower_uncertainty = readPlanet.pl_trandurerr2
+            planet_radius_over_star_radius_upper_uncertainty = readPlanet.pl_ratrorerr1
+            planet_radius_over_star_radius_lower_uncertainty = readPlanet.pl_ratrorerr2
+            impact_parameter_upper_uncertainty = readPlanet.pl_impparerr1
+            impact_parameter_lower_uncertainty = readPlanet.pl_impparerr2
+            eccentricity_upper_uncertainty = readPlanet.pl_orbeccenerr1
+            eccentricity_lower_uncertainty = readPlanet.pl_orbeccenerr2
        
 
 
-       planets = []
-       planets_eccentricity = []
-       planets_eccentricity_upper_uncertainty = []
-       planets_eccentricity_lower_uncertainty = []
-       for i in range(0, len(planet_id)):
-          if need_uncertainty and not(math.isnan(semi_major_axis_over_star_radius[i])
-                 or math.isnan(semi_major_axis_over_star_radius_upper_uncertainty[i])
-                 or math.isnan(semi_major_axis_over_star_radius_lower_uncertainty[i])
-                 or math.isnan(orbital_period[i])
-                 or math.isnan(orbital_period_upper_uncertainty[i])
-                 or math.isnan(orbital_period_lower_uncertainty[i])
-                 or math.isnan(transit_duration[i])
-                 or math.isnan(transit_duration_upper_uncertainty[i])
-                 or math.isnan(transit_duration_lower_uncertainty[i])
-                 or math.isnan(planet_radius_over_star_radius[i])
-                 or math.isnan(planet_radius_over_star_radius_upper_uncertainty[i])
-                 or math.isnan(planet_radius_over_star_radius_lower_uncertainty[i])
-                 or math.isnan(impact_parameter[i])
-                 or math.isnan(impact_parameter_upper_uncertainty[i])
-                 or math.isnan(impact_parameter_lower_uncertainty[i])
-                 or math.isnan(eccentricity[i])
-                 or math.isnan(eccentricity_upper_uncertainty[i])
-                 or math.isnan(eccentricity_lower_uncertainty[i]))and ((semi_major_axis_over_star_radius_upper_uncertainty[i] <= tolerance*semi_major_axis_over_star_radius[i])
-                                                                           and (-semi_major_axis_over_star_radius_lower_uncertainty[i] <= tolerance*semi_major_axis_over_star_radius[i])
-                                                                           and (orbital_period_upper_uncertainty[i] <= tolerance*orbital_period[i])
-                                                                           and (-orbital_period_lower_uncertainty[i] <= tolerance*orbital_period[i])
-                                                                           and (transit_duration_upper_uncertainty[i] <= tolerance*transit_duration[i])
-                                                                           and (-transit_duration_lower_uncertainty[i] <= tolerance*transit_duration[i])
-                                                                           and (planet_radius_over_star_radius_upper_uncertainty[i] <= tolerance*planet_radius_over_star_radius[i])
-                                                                           and (-planet_radius_over_star_radius_lower_uncertainty[i] <= tolerance*planet_radius_over_star_radius[i])
-                                                                           and (impact_parameter_upper_uncertainty[i] <= tolerance*impact_parameter[i])
-                                                                           and (-impact_parameter_lower_uncertainty[i] <= tolerance*impact_parameter[i])
-                                                                           and (impact_parameter[i]<=1)):
+        planets = []
+        planets_eccentricity = []
+        planets_eccentricity_upper_uncertainty = []
+        planets_eccentricity_lower_uncertainty = []
+        for i in range(0, len(planet_id)):
+           if need_uncertainty and not(math.isnan(semi_major_axis_over_star_radius[i])
+                  or math.isnan(semi_major_axis_over_star_radius_upper_uncertainty[i])
+                  or math.isnan(semi_major_axis_over_star_radius_lower_uncertainty[i])
+                  or math.isnan(orbital_period[i])
+                  or math.isnan(orbital_period_upper_uncertainty[i])
+                  or math.isnan(orbital_period_lower_uncertainty[i])
+                  or math.isnan(transit_duration[i])
+                  or math.isnan(transit_duration_upper_uncertainty[i])
+                  or math.isnan(transit_duration_lower_uncertainty[i])
+                  or math.isnan(planet_radius_over_star_radius[i])
+                  or math.isnan(planet_radius_over_star_radius_upper_uncertainty[i])
+                  or math.isnan(planet_radius_over_star_radius_lower_uncertainty[i])
+                  or math.isnan(impact_parameter[i])
+                  or math.isnan(impact_parameter_upper_uncertainty[i])
+                  or math.isnan(impact_parameter_lower_uncertainty[i])
+                  or math.isnan(eccentricity[i])
+                  or math.isnan(eccentricity_upper_uncertainty[i])
+                  or math.isnan(eccentricity_lower_uncertainty[i]))and ((semi_major_axis_over_star_radius_upper_uncertainty[i] <= tolerance*semi_major_axis_over_star_radius[i])
+                                                                            and (-semi_major_axis_over_star_radius_lower_uncertainty[i] <= tolerance*semi_major_axis_over_star_radius[i])
+                                                                            and (orbital_period_upper_uncertainty[i] <= tolerance*orbital_period[i])
+                                                                            and (-orbital_period_lower_uncertainty[i] <= tolerance*orbital_period[i])
+                                                                            and (transit_duration_upper_uncertainty[i] <= tolerance*transit_duration[i])
+                                                                            and (-transit_duration_lower_uncertainty[i] <= tolerance*transit_duration[i])
+                                                                            and (planet_radius_over_star_radius_upper_uncertainty[i] <= tolerance*planet_radius_over_star_radius[i])
+                                                                            and (-planet_radius_over_star_radius_lower_uncertainty[i] <= tolerance*planet_radius_over_star_radius[i])
+                                                                            and (impact_parameter_upper_uncertainty[i] <= tolerance*impact_parameter[i])
+                                                                            and (-impact_parameter_lower_uncertainty[i] <= tolerance*impact_parameter[i])
+                                                                            and (impact_parameter[i]<=1)):
              
-             planets = planets + [TransitingExoplanet(planet_id = planet_id[i],
-                                                    semi_major_axis_over_star_radius = semi_major_axis_over_star_radius[i],
-                                                    orbital_period = orbital_period[i],
-                                                    transit_duration = transit_duration[i]*24,
-                                                    impact_parameter = impact_parameter[i],
-                                                    planet_radius_over_star_radius = planet_radius_over_star_radius[i],
-                                                    semi_major_axis_over_star_radius_upper_uncertainty = semi_major_axis_over_star_radius_upper_uncertainty[i],
-                                                    semi_major_axis_over_star_radius_lower_uncertainty = semi_major_axis_over_star_radius_lower_uncertainty[i],                                                    
-                                                    orbital_period_upper_uncertainty = orbital_period_upper_uncertainty[i],
-                                                    orbital_period_lower_uncertainty = orbital_period_lower_uncertainty[i],                                                    
-                                                    transit_duration_upper_uncertainty = transit_duration_upper_uncertainty[i]*24,
-                                                    transit_duration_lower_uncertainty = transit_duration_lower_uncertainty[i]*24,                                                    
-                                                    planet_radius_over_star_radius_upper_uncertainty = planet_radius_over_star_radius_upper_uncertainty[i],
-                                                    planet_radius_over_star_radius_lower_uncertainty = planet_radius_over_star_radius_lower_uncertainty[i],                                                    
-                                                    impact_parameter_upper_uncertainty = impact_parameter_upper_uncertainty[i],
-                                                    impact_parameter_lower_uncertainty = impact_parameter_lower_uncertainty[i], need_uncertainty = True)]
-             planets_eccentricity = planets_eccentricity + [eccentricity[i]]
-             planets_eccentricity_upper_uncertainty = planets_eccentricity_upper_uncertainty + [eccentricity_upper_uncertainty[i]]
-             planets_eccentricity_lower_uncertainty = planets_eccentricity_lower_uncertainty + [eccentricity_lower_uncertainty[i]]
-             list_of_planets = PlanetsWithKnownEccentricity(planets,
-                                                  planets_eccentricity,
-                                                  planets_eccentricity_upper_uncertainty,
-                                                  planets_eccentricity_lower_uncertainty, need_uncertainty = True)                                                                         
+              planets = planets + [TransitingExoplanet(planet_id = planet_id[i],
+                                                     semi_major_axis_over_star_radius = semi_major_axis_over_star_radius[i],
+                                                     orbital_period = orbital_period[i],
+                                                     transit_duration = transit_duration[i]*24,
+                                                     impact_parameter = impact_parameter[i],
+                                                     planet_radius_over_star_radius = planet_radius_over_star_radius[i],
+                                                     semi_major_axis_over_star_radius_upper_uncertainty = semi_major_axis_over_star_radius_upper_uncertainty[i],
+                                                     semi_major_axis_over_star_radius_lower_uncertainty = semi_major_axis_over_star_radius_lower_uncertainty[i],                                                    
+                                                     orbital_period_upper_uncertainty = orbital_period_upper_uncertainty[i],
+                                                     orbital_period_lower_uncertainty = orbital_period_lower_uncertainty[i],                                                    
+                                                     transit_duration_upper_uncertainty = transit_duration_upper_uncertainty[i]*24,
+                                                     transit_duration_lower_uncertainty = transit_duration_lower_uncertainty[i]*24,                                                    
+                                                     planet_radius_over_star_radius_upper_uncertainty = planet_radius_over_star_radius_upper_uncertainty[i],
+                                                     planet_radius_over_star_radius_lower_uncertainty = planet_radius_over_star_radius_lower_uncertainty[i],                                                    
+                                                     impact_parameter_upper_uncertainty = impact_parameter_upper_uncertainty[i],
+                                                     impact_parameter_lower_uncertainty = impact_parameter_lower_uncertainty[i], need_uncertainty = True)]
+              planets_eccentricity = planets_eccentricity + [eccentricity[i]]
+              planets_eccentricity_upper_uncertainty = planets_eccentricity_upper_uncertainty + [eccentricity_upper_uncertainty[i]]
+              planets_eccentricity_lower_uncertainty = planets_eccentricity_lower_uncertainty + [eccentricity_lower_uncertainty[i]]
+              list_of_planets = PlanetsWithKnownEccentricity(planets,
+                                                   planets_eccentricity,
+                                                   planets_eccentricity_upper_uncertainty,
+                                                   planets_eccentricity_lower_uncertainty, need_uncertainty = True)                                                                         
              
 
-          if not(need_uncertainty) and not(math.isnan(semi_major_axis_over_star_radius[i])
-                                           or math.isnan(orbital_period[i])
-                                           or math.isnan(transit_duration[i])
-                                           or math.isnan(planet_radius_over_star_radius[i])
-                                           or math.isnan(impact_parameter[i]))and (impact_parameter[i]<=1):
+           if not(need_uncertainty) and not(math.isnan(semi_major_axis_over_star_radius[i])
+                                            or math.isnan(orbital_period[i])
+                                            or math.isnan(transit_duration[i])
+                                            or math.isnan(planet_radius_over_star_radius[i])
+                                            or math.isnan(impact_parameter[i]))and (impact_parameter[i]<=1):
              
-             planets = planets + [TransitingExoplanet(planet_id = planet_id[i],
-                                                    semi_major_axis_over_star_radius = semi_major_axis_over_star_radius[i],
-                                                    orbital_period = orbital_period[i],
-                                                    transit_duration = transit_duration[i]*24,
-                                                    planet_radius_over_star_radius = planet_radius_over_star_radius[i],
-                                                    impact_parameter = impact_parameter[i])]
-             planets_eccentricity = planets_eccentricity + [eccentricity[i]]
-             list_of_planets = PlanetsWithKnownEccentricity(planets,
-                                                  planets_eccentricity, need_uncertainty = False)
+              planets = planets + [TransitingExoplanet(planet_id = planet_id[i],
+                                                     semi_major_axis_over_star_radius = semi_major_axis_over_star_radius[i],
+                                                     orbital_period = orbital_period[i],
+                                                     transit_duration = transit_duration[i]*24,
+                                                     planet_radius_over_star_radius = planet_radius_over_star_radius[i],
+                                                     impact_parameter = impact_parameter[i])]
+              planets_eccentricity = planets_eccentricity + [eccentricity[i]]
+              list_of_planets = PlanetsWithKnownEccentricity(planets,
+                                                   planets_eccentricity, need_uncertainty = False)
     
 
-       return(list_of_planets)      
+        return(list_of_planets)
+        
+
+       
+        
+
+       
 
 
+
+             
+
+
+
+
+       
 
     def print_planets_attributes(self, planets, need_uncertainty):
+        """
+
+        Prints the attributes of a list of planets
+        """
         for i in range(0, len(planets)):
             print('Planet Number: ', (i+1))
             planets[i].print_attributes(need_uncertainty)
 
     def plot_eccentricity_vs_planet_number(self, planets_with_known_eccentricity, need_uncertainty):
-        # example data
+        """
 
+        Plots eccentricity and minimum eccentricity vs. planet's index graph
+        """
+        
         n = len(planets_with_known_eccentricity.planets)
 
         planet_number = []
         for i in range(0, n):
             planet_number = planet_number + [(i+1)]            
         x = planet_number
-        
+
         minimum_eccentricities = []
+
         for i in range(0, n):
             minimum_eccentricities = minimum_eccentricities + [planets_with_known_eccentricity.planets[i].minimum_eccentricity]
         y = minimum_eccentricities
+
+
 
         eccentricities = planets_with_known_eccentricity.planets_eccentricity        
         z = eccentricities        
 
         if need_uncertainty:
             
+            
             minimum_eccentricities_upper_uncertainty = []
-            for i in range(0, len(planets_with_known_eccentricity.planets)):
+            for i in range(0, len(planets_with_known_eccentricity.planets)):                
                 minimum_eccentricities_upper_uncertainty = minimum_eccentricities_upper_uncertainty + [planets_with_known_eccentricity.planets[i].minimum_eccentricity_max_uncertainty]
             
             minimum_eccentricities_lower_uncertainty = []
@@ -260,7 +284,10 @@ class TestingTransitingExoplanet:
             plt.legend() 
   
             # function to show the plot 
-            plt.show() 
+            plt.show()
+        
+        
+         
              
 
 test = TestingTransitingExoplanet()
