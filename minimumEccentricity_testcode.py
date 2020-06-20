@@ -287,6 +287,84 @@ class TestingTransitingExoplanet:
             plt.show()
         
         
+
+    def plot_eccentricity_vs_orbital_period(self, planets_with_known_eccentricity, need_uncertainty):
+        """
+
+        Plots eccentricity vs. planet's orbital period
+        """
+              
+        n = len(planets_with_known_eccentricity.planets)
+        
+        periods = []        
+        for i in range(0, n):
+            periods = periods + [planets_with_known_eccentricity.planets[i].orbital_period]
+        x = periods
+
+        
+
+
+        eccentricities = planets_with_known_eccentricity.planets_eccentricity        
+        y = eccentricities
+
+
+
+        if need_uncertainty:
+            periods_upper_uncertainty = []
+            for i in range(0, len(planets_with_known_eccentricity.planets)):                
+                periods_upper_uncertainty = periods_upper_uncertainty + [planets_with_known_eccentricity.planets[i].orbital_period_upper_uncertainty]
+            
+            periods_lower_uncertainty = []
+            for i in range(0, len(planets_with_known_eccentricity.planets)):
+                periods_lower_uncertainty = periods_lower_uncertainty + [planets_with_known_eccentricity.planets[i].orbital_period_lower_uncertainty]
+
+            asymmetric_periods_uncertainty = [periods_upper_uncertainty, periods_lower_uncertainty]
+           
+            asymmetric_eccentricities_uncertainty = [planets_with_known_eccentricity.planets_eccentricity_upper_uncertainty, abs(np.array(planets_with_known_eccentricity.planets_eccentricity_lower_uncertainty))]
+            
+            plt.errorbar(x, y, xerr=asymmetric_periods_uncertainty, yerr=asymmetric_eccentricities_uncertainty, fmt='o', label = "Eccentricities vs. Periods")
+            # giving a title to my graph 
+            plt.title('Eccentricity vs Period') 
+            # naming the x axis 
+            plt.xlabel('Period') 
+            # naming the y axis 
+            plt.ylabel('Eccentricity') 
+            # function to show the plot 
+            plt.show()
+            
+        if not need_uncertainty:            
+       
+            plt.plot(x, y, 'o',  label = "Eccentricities vs. Periods")
+  
+            # naming the x axis 
+            plt.xlabel('Period') 
+            # naming the y axis 
+            plt.ylabel('Eccentricity') 
+            # giving a title to my graph 
+            plt.title('Eccentricity vs Period')        
+            # function to show the plot 
+            plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
          
              
 
@@ -296,6 +374,8 @@ planets_with_known_eccentricity1 = test.test_Nasa_Exoplanet_data(path = 'C:/User
                               tolerance = 0.25,
                               need_uncertainty = True)
 test.print_planets_attributes(planets_with_known_eccentricity1.planets, need_uncertainty = True)
+
+test.plot_eccentricity_vs_orbital_period(planets_with_known_eccentricity1, need_uncertainty = True)
 
 test.plot_eccentricity_vs_planet_number(planets_with_known_eccentricity1, need_uncertainty = True)
 
@@ -307,7 +387,9 @@ planets_with_known_eccentricity2 = test.test_Nasa_Exoplanet_data(path = 'C:/User
                               need_uncertainty = False)
 test.print_planets_attributes(planets_with_known_eccentricity2.planets, need_uncertainty = False)
 
-
+test.plot_eccentricity_vs_orbital_period(planets_with_known_eccentricity2, need_uncertainty = False)
 test.plot_eccentricity_vs_planet_number(planets_with_known_eccentricity2, need_uncertainty = False)
 
 
+
+ 
