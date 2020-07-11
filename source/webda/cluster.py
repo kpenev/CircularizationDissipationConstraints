@@ -38,14 +38,23 @@ class Cluster:
         star_data
     """
 
-    _webda_dir = os.path.dirname(__file__)
+    _webda_dir = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            '..',
+            '..',
+            'data',
+            'webda'
+        )
+    )
     _cluster_info = pandas.read_html(
         os.path.join(_webda_dir, 'cluster_table.html'),
         index_col='Cluster_name'
     )[0]
 
     _tables_with_errors = ['elem.orb']
-    _drop_stars = {'Melotte 25': ['0169']}
+    _drop_stars = {'Melotte 25': ['0169'],
+                   'NGC 2632': ['0040', '0367']}
 
     @staticmethod
     def _unique_combine_star_lists(index1, index2):
@@ -79,16 +88,18 @@ class Cluster:
         def is_table(fname):
             """Return True iff the given filename is a WEBDA table."""
 
-            return not os.path.splitext(fname)[1] in ['.rst', '.tar']
+            return not os.path.splitext(fname)[1] in ['.rst', '.tar', '.png']
 
         result = dict()
         for fname in filter(is_table, glob(os.path.join(data_dir, '*'))):
-            table = os.path.basename(fname)
-            result[table] = read_table(
+            table_name = os.path.basename(fname)
+            table_data = read_table(
                 fname,
-                has_errors=(table in self._tables_with_errors),
+                has_errors=(table_name in self._tables_with_errors),
                 drop_stars=self._drop_stars[self.names[0]]
             )
+            if table_data is not None:
+                result[table_name] = table_data
         return result
 
     @staticmethod
@@ -105,18 +116,8 @@ class Cluster:
                 The selected entry from the input.
         """
 
-        print('Selectnig best orbit among: ')
-        print(orbit)
         porb_best = orbit['err_Po'].idxmin()
         k1_best = orbit['err_K1'].idxmin()
-
-        print('Po best: ' + repr(porb_best))
-        print('K1 best: ' + repr(k1_best))
-        if not isinstance(porb_best, float):
-            print('best err_Po: ' + repr(orbit['err_Po'][porb_best]))
-        if not isinstance(k1_best, float):
-            print('best err_K1: ' + repr(orbit['err_K1'][k1_best]))
-
 
         if isinstance(porb_best, float):
             assert numpy.isnan(porb_best)
@@ -346,21 +347,46 @@ class Cluster:
 def examples():
     """Run examples without polluting global scope."""
 
-    hyades = Cluster('Melotte 25')
+    clusters = dict(
+        hyades=Cluster('Melotte 25'),
+        praesepe=Cluster('NGC 2632')
+    )
 
-    binaries = hyades.get_binaries(require_orbit=True)
+    binaries = {
+        cluster: clusters[cluster].get_binaries(require_orbit=True)
+        for cluster in clusters
+    }
     print(binaries)
 
 
-    cmd_data_singles = hyades.get_color_magnitude()
-    cmd_data_binaries = hyades.get_color_magnitude(binaries='only')
-    print('Age: ' + repr(hyades.age.to_value('Gyr')))
-    print('[Fe/H]: ' + repr(hyades.feh))
+    for cluster_name, styles in [('hyades', 'ox+'),
+                            ('praesepe', 'sv^')]:
+        cmd_data_singles = clusters[cluster_name].get_color_magnitude()
+        cmd_data_binaries = clusters[cluster_name].get_color_magnitude(binaries='only')
+        print('Age: ' + repr(clusters[cluster_name].age.to_value('Gyr')))
+        print('[Fe/H]: ' + repr(clusters[cluster_name].feh))
 
-    pyplot.plot(cmd_data_singles['BV'], -cmd_data_singles['V'], 'ok')
-    pyplot.plot(cmd_data_binaries['BV'], -cmd_data_binaries['V'], 'xr')
-    pyplot.plot(binaries['BV'], -binaries['V'], '+g')
+        pyplot.plot(cmd_data_singles['BV'], -cmd_data_singles['V'],
+                    styles[0] + 'k')
+        pyplot.plot(cmd_data_binaries['BV'], -cmd_data_binaries['V'],
+                    styles[1] + 'r')
+        pyplot.plot(binaries[cluster_name]['BV'], -binaries[cluster_name]['V'],
+                    styles[2] + 'g')
+
     pyplot.show()
+    pyplot.cla()
+
+    pyplot.xscale('log')
+    for cluster_name in ['hyades', 'praesepe']:
+        pyplot.errorbar(binaries[cluster_name]['Po'],
+                        binaries[cluster_name]['e'],
+                        yerr=binaries[cluster_name]['err_e'],
+                        fmt='o')
+
+    pyplot.xlim(0.1, 100)
+    pyplot.ylim(0, None)
+    pyplot.show()
+    pyplot.cla()
 
 if __name__ == '__main__':
     from matplotlib import pyplot

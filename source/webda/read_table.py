@@ -39,12 +39,17 @@ def read_table(fname,
     with open(fname, 'r') as table_file:
         colnames = table_file.readline().split(None, 2)
         has_references = len(colnames) > 1 and colnames[1] == 'Ref'
+        if 'No' not in colnames:
+            return None
+    column_dtype = {'No': str, 'Ref': str}
+    for column in ['Vo', 'V', 'BV', 'UB', 'e']:
+        column_dtype[column] = float
     data = pandas.read_csv(
         fname,
         sep='\t',
         header=0,
         skiprows=[1],
-        dtype={'No': str, 'Ref': int, 'Vo': float},
+        dtype=column_dtype,
         index_col=False,
         skip_blank_lines=False,
         encoding='ascii',
