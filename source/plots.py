@@ -30,7 +30,7 @@ from astropy import units
 from configargparse import ArgumentParser, DefaultsFormatter
 import asteval
 
-from kelly_colors import kelly_colors as plot_colors
+#from kelly_colors import kelly_colors as plot_colors
 
 from stellar_evolution.change_variables import QuantityEvaluator
 from stellar_evolution.manager import StellarEvolutionManager
@@ -59,7 +59,9 @@ from manual_lgq_limit_fixes import manual_limits
 from moving_window_constraints import MovingWindowConstraints
 #pylint:enable=wrong-import-position
 
-plot_colors = plot_colors[2:]
+plot_colors = ['red', 'green', 'blue']
+default_density_colors = ['orange', 'cyan', 'purple']
+#plot_colors = plot_colors[1::2]
 
 def parse_command_line():
     """Parse the command line defining the plots to create."""
@@ -176,6 +178,13 @@ def parse_command_line():
         help='Should the eccentricity vs orbital period plot distinguish '
         'between systems with hot vs cold primary/host stars.'
     )
+    parser.add_argument(
+        '--color-index-offset',
+        type=int,
+        default=0,
+        help='An offset to add to the index used to choose a plot color. Useful'
+        ' when trying to match colors between figures. Default: %(default)s.'
+    )
     add_path_cmdline_args(parser)
     add_assumptions_cmdline_args(parser)
     result = parser.parse_args()
@@ -210,9 +219,9 @@ def get_eccentricity_envelope(cmdline_args):
         if cmdline_args.use_binary_stars.upper().startswith('PRAESEPE'):
             return MeibomEccentricityEnvelope(5.7, 0.65, 10.0, 1.0)
 
-    return LinearEccentricityEnvelope(min_period=0.8,
-                                      max_period=5.0,
-                                      max_eccentricity=0.6)
+    return LinearEccentricityEnvelope(min_period=1.0,
+                                      max_period=4.5,
+                                      max_eccentricity=0.5)
 #Handling the multiple cases is the whole point
 #pylint: disable=too-many-return-statements
 #False positive with astropy
@@ -537,8 +546,13 @@ def solve_lgQ_limits(lgQ_vs_period,
     """Return lgQ to reproduce nominal, low and envolpe eccentricity."""
 
     return (
-        invert_eccentricity_vs_lgQ(lgQ_vs_period,
-                                   nominal_eccentricity),
+        invert_eccentricity_vs_lgQ(
+            lgQ_vs_period,
+            min(
+                nominal_eccentricity,
+                max(envelope_eccentricity, 0.005)
+            )
+        ),
         invert_eccentricity_vs_lgQ(lgQ_vs_period,
                                    low_eccentricity),
         invert_eccentricity_vs_lgQ(
@@ -861,6 +875,9 @@ def get_lgQ_constraints(lgQ_x_axes,
                 system.eccentricity
             )
         )
+        #TODO: get rid of this hack
+        if cmdline_args.nasa_data is not None and plot_lgQ['min'][index] > 7.0:
+            plot_lgQ['min'][index] = 6.8
 
         x_evaluator.symtable = vars(system)
         for x_expression_index, (x_expr, x_units) in enumerate(lgQ_x_axes):
@@ -947,18 +964,19 @@ def plot_lgQ_vs(lgQ_x_axes,
                 plot_fname=None,
                 save_plot=True,
                 label='',
-                markersize=5,
-                linewidth=2,
+                markersize=6,
+                linewidth=1.5,
                 fill_limit_markers=True,
                 moving_window_minx=-numpy.inf,
                 moving_window_maxx=numpy.inf,
                 limit_line_width=0.3,
                 z_order_offset=0,
-                points=True):
+                points=True,
+                color_code_limits=True):
     """Make a plot of the log10(Q*') constraints vs orbital period."""
 
     if not hasattr(plot_lgQ_vs, "color_index"):
-        plot_lgQ_vs.color_index = 0
+        plot_lgQ_vs.color_index = cmdline_args.color_index_offset
 
     def add_points(*,
                    plot_x,
@@ -974,7 +992,7 @@ def plot_lgQ_vs(lgQ_x_axes,
         plot_style = dict(
             markersize=markersize,
             linewidth=limit_line_width,
-            markeredgewidth=limit_line_width
+            markeredgewidth=linewidth
         )
         if limit == 'upper':
             plot_style['fmt'] = 'v'
@@ -989,20 +1007,10 @@ def plot_lgQ_vs(lgQ_x_axes,
             plot_style['zorder'] = z_order_offset + 2
             plot_style['label'] = label
 
-        for include in [
-                numpy.logical_not(assumed_default_density),
-                assumed_default_density
+        for include, color_list in [
+                (numpy.logical_not(assumed_default_density), plot_colors),
+                (assumed_default_density, default_density_colors)
         ]:
-            plot_style['markeredgecolor'] = plot_colors[
-                plot_lgQ_vs.color_index
-            ]
-            plot_style['ecolor'] = plot_colors[
-                plot_lgQ_vs.color_index
-            ]
-            plot_style['markerfacecolor'] = plot_colors[
-                plot_lgQ_vs.color_index
-            ] if fill_limit_markers or (not limit) else 'none'
-
             if distinguish is None:
                 sub_include_list = [include]
             else:
@@ -1011,7 +1019,19 @@ def plot_lgQ_vs(lgQ_x_axes,
                     numpy.logical_and(numpy.logical_not(distinguish), include)
                 ]
 
+            plot_style['markeredgecolor'] = color_list[
+                plot_lgQ_vs.color_index % len(color_list)
+            ]
+            plot_style['ecolor'] = color_list[
+                plot_lgQ_vs.color_index % len(color_list)
+            ]
+            plot_style['markerfacecolor'] = color_list[
+                plot_lgQ_vs.color_index % len(color_list)
+            ] if fill_limit_markers or (not limit) else 'none'
+
+
             for sub_include in sub_include_list:
+
                 pyplot.errorbar(
                     x=plot_x[sub_include],
                     y=plot_y[sub_include],
@@ -1022,6 +1042,8 @@ def plot_lgQ_vs(lgQ_x_axes,
                 plot_style['zorder'] -= 10
                 if 'label' in plot_style:
                     del plot_style['label']
+        if color_code_limits and limit:
+            plot_lgQ_vs.color_index += 1
 
     def plot_moving_window_constraints(plot_x, plot_lgQ, zorder):
         """Add an area showing the moving window constraints from data."""
@@ -1051,14 +1073,17 @@ def plot_lgQ_vs(lgQ_x_axes,
             **moving_window_args,
         )
         plot_x, plot_y1, plot_y2 = moving_windo_constraints.get_plot_arguments(
-            minx=numpy.log2(moving_window_minx),
+            minx=(
+                numpy.log2(moving_window_minx) if moving_window_minx > 0
+                else -numpy.inf
+            ),
             maxx=numpy.log2(moving_window_maxx)
         )
         if logscale:
             plot_x = 2.0**plot_x
         plot_config = dict(
             color=plot_colors[
-                plot_lgQ_vs.color_index
+                plot_lgQ_vs.color_index % len(plot_colors)
             ],
             zorder=zorder,
             alpha=0.5
@@ -1110,19 +1135,20 @@ def plot_lgQ_vs(lgQ_x_axes,
         print('lgQ nominal: ' + repr(plot_lgQ['nominal'][limit_flags['lower']]))
         print('lgQ min: ' + repr(plot_lgQ['min'][limit_flags['lower']]))
 
-        add_points(
-            plot_x=plot_x[x_index, limit_flags['lower']],
-            plot_y=plot_lgQ['nominal'][limit_flags['lower']],
-            plot_errors=[
-                lower_errors[limit_flags['lower']],
-                lgQ_range[1] - plot_lgQ['nominal'][limit_flags['lower']]
-            ],
-            assumed_default_density=assumed_default_density[
-                limit_flags['lower']
-            ],
-            limit='lower',
-            distinguish=is_giant[limit_flags['lower']]
-        )
+        if cmdline_args.nasa_data is None:
+            add_points(
+                plot_x=plot_x[x_index, limit_flags['lower']],
+                plot_y=plot_lgQ['nominal'][limit_flags['lower']],
+                plot_errors=[
+                    lower_errors[limit_flags['lower']],
+                    lgQ_range[1] - plot_lgQ['nominal'][limit_flags['lower']]
+                ],
+                assumed_default_density=assumed_default_density[
+                    limit_flags['lower']
+                ],
+                limit='lower',
+                distinguish=is_giant[limit_flags['lower']]
+            )
 
         #False positive
         #pylint: disable=assignment-from-no-return
@@ -1158,7 +1184,9 @@ def plot_lgQ_vs(lgQ_x_axes,
             pyplot.axhspan(6, 7, color='lightgrey', zorder=-100)
 
 
-        plot_moving_window_constraints(plot_x[x_index], plot_lgQ, -200)
+        if cmdline_args.nasa_data is None:
+            plot_moving_window_constraints(plot_x[x_index], plot_lgQ, -200)
+            pyplot.legend()
         if plot_fname is None:
             pyplot.show()
             plot_lgQ_vs.color_index = 0
@@ -1168,7 +1196,6 @@ def plot_lgQ_vs(lgQ_x_axes,
                   plot_fname
                   %
                   dict(x_label=lgQ_x_axes[x_index][0].replace('/', ':')))
-            pyplot.legend()
             pyplot.savefig(
                 plot_fname
                 %
@@ -1452,6 +1479,7 @@ def main():
     cmdline_args = parse_command_line()
 
     rcParams['font.size'] = cmdline_args.font_size
+    rcParams['figure.dpi'] = 300
     figure = pyplot.figure(figsize=cmdline_args.figure_size)
     #The axes become the default axes so they do get used.
     #pylint: disable=unused-variable
@@ -1498,10 +1526,14 @@ def main():
                 progress = interpolator = None
             else:
                 plot_cmdline_args, progress = load_progress(plot_pickle)
-                plot_cmdline_args.pickle_systems = cmdline_args.pickle_systems
-                plot_cmdline_args.pretend_min_eccentricity = (
-                    cmdline_args.pretend_min_eccentricity
-                )
+                for attribute in ['pickle_systems',
+                                  'color_index_offset',
+                                  'pretend_min_eccentricity',
+                                  'split_by_temperature']:
+                    setattr(plot_cmdline_args,
+                            attribute,
+                            getattr(cmdline_args, attribute))
+
             arguments = dict(progress=progress,
                              lgQ_x_axes=cmdline_args.lgQ_x_axis,
                              cmdline_args=plot_cmdline_args,
