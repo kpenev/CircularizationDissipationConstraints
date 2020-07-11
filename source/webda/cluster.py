@@ -384,7 +384,7 @@ def examples():
                         fmt='o')
 
     pyplot.xlim(0.1, 100)
-    pyplot.ylim(0, None)
+    pyplot.ylim(0, 1)
     pyplot.show()
     pyplot.cla()
 
