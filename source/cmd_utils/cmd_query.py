@@ -4,9 +4,35 @@
 
 import requests
 from bs4 import BeautifulSoup
+from astropy import units as u
 
-if __name__ == '__main__':
+
+#TODO: decite retrun format: file vs interpolator
+def query_cmd(age, feh=0.0, visual_extinction=0.0, output_fname=None):
+    """
+    Query the CMD database for a single isochrone with the given parameters.
+
+    Args:
+        visual_extinction(float):    The visual extinciton to query in
+            magnitudes.
+
+        age(astropy time):    The age to query for the isochrone, along with
+            appropriate units.
+
+        feh(float):    The [Fe/H] value to query.
+
+        output_fname(str or None):    The file name to use for saving the
+            downloaded isochrone. If `None`, the isochrone is returned as a
+            string.
+
+    Returns:
+        str or None:
+            If output_fname is specified, returns None, else returns the
+    """
+
     cmd_url = 'http://stev.oapd.inaf.it/cgi-bin'
+    age_str = '%.5f' % age.to_value('yr')
+    feh_str = '%.5f' % feh
     response = requests.post(
         cmd_url + '/cmd',
         {
@@ -20,25 +46,25 @@ if __name__ == '__main__':
             'kind_postagb': '-1',
             'photsys_file': 'tab_mag_odfnew/tab_mag_ubvrijhk.dat',
             'photsys_version': 'YBC',
-            'dust_sourceM': 'nodustM',
-            'dust_sourceC': 'nodustC',
+            'dust_sourceM': 'dpmod60alox40',
+            'dust_sourceC': 'AMCSIC15',
             'kind_mag': '2',
             'kind_dust': '0',
-            'extinction_av': '0.0',
+            'extinction_av': '%.3f' % visual_extinction,
             'extinction_coeff': 'constant',
             'extinction_curve': 'cardelli',
             'imf_file': 'tab_imf/imf_kroupa_orig.dat',
             'isoc_isagelog': '0',
-            'isoc_agelow': '1.0e9',
-            'isoc_ageupp': '1.0e10',
+            'isoc_agelow': age_str,
+            'isoc_ageupp': age_str,
             'isoc_dage': '0.0',
             'isoc_dlage': '0.0',
-            'isoc_ismetlog': '0',
+            'isoc_ismetlog': '1',
             'isoc_zlow': '0.0152',
             'isoc_zupp': '0.03',
             'isoc_dz': '0.0',
-            'isoc_metlow': '-2',
-            'isoc_metupp': '0.3',
+            'isoc_metlow': feh_str,
+            'isoc_metupp': feh_str,
             'isoc_dmet': '0.0',
             'output_kind': '0',
             'output_evstage': '1',
@@ -46,7 +72,7 @@ if __name__ == '__main__':
             'lf_magsup': '20',
             'lf_deltamag': '0.5',
             'sim_mtot': '1.0e4',
-            'output_gzip': '1',
+            'output_gzip': '0',
             'submit_form': 'Submit',
             '.cgifields': ['photsys_version',
                            'isoc_ismetlog',
@@ -66,14 +92,21 @@ if __name__ == '__main__':
     downloaded = False
     for link in bs_response.find_all('a'):
         link_url = link.get('href')
-        if link_url.endswith('.dat.gz'):
+        if link_url.endswith('.dat'):
             assert not downloaded
             data_url = '%s/%s' % (cmd_url, link_url)
             print('Downloading: ' + data_url)
-            with open('test_download_cmd.dat.gz', 'wb') as destination:
-                destination.write(
-                    requests.get(data_url, allow_redirects=True).content
-                )
+            if output_fname:
+                with open(output_fname, 'wb') as destination:
+                    destination.write(
+                        requests.get(data_url, allow_redirects=True).content
+                    )
+            else:
+                result = requests.get(data_url, allow_redirects=True).content
             print('Done')
             downloaded = True
     assert downloaded
+    return result
+
+if __name__ == '__main__':
+    print(query_cmd(age=1.0 * u.Gyr).decode())
