@@ -370,9 +370,14 @@ class TestingTransitingExoplanet:
 
 test = TestingTransitingExoplanet()
 test.test_Barnes_data()
-planets_with_known_eccentricity1 = test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv',
+#planets_with_known_eccentricity1 = test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv',
+#                              tolerance = 0.25,
+#                              need_uncertainty = True)
+
+planets_with_known_eccentricity1 = test.test_Nasa_Exoplanet_data(path = '/home/mmmahmud/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv',
                               tolerance = 0.25,
                               need_uncertainty = True)
+
 test.print_planets_attributes(planets_with_known_eccentricity1.planets, need_uncertainty = True)
 
 test.plot_eccentricity_vs_orbital_period(planets_with_known_eccentricity1, need_uncertainty = True)
@@ -382,9 +387,14 @@ test.plot_eccentricity_vs_planet_number(planets_with_known_eccentricity1, need_u
 
 
 
-planets_with_known_eccentricity2 = test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2019.09.18_13.19.49.csv',
+#planets_with_known_eccentricity2 = test.test_Nasa_Exoplanet_data(path = 'C:/Users/moham/OneDrive/Documents/GitHub/CircularizationDissipationConstraints/data/planets_2019.09.18_13.19.49.csv',
+#                              tolerance = 0.1,
+#                              need_uncertainty = False)
+
+planets_with_known_eccentricity2 = test.test_Nasa_Exoplanet_data(path = '/home/mmmahmud/CircularizationDissipationConstraints/data/planets_2019.09.18_13.19.49.csv',
                               tolerance = 0.1,
                               need_uncertainty = False)
+
 test.print_planets_attributes(planets_with_known_eccentricity2.planets, need_uncertainty = False)
 
 test.plot_eccentricity_vs_orbital_period(planets_with_known_eccentricity2, need_uncertainty = False)
