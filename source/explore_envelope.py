@@ -59,10 +59,53 @@ def parse_configuration():
 
     return parser.parse_args()
 
+class ProcessScenario:
+    """
+    Run the evolution for single set of ICs and extract plot data.
+
+    Attrs:
+        config:    The configuration parsed from the command line.
+
+        required_ages:    The ages at which period and eccentricity are required
+            for plotting.
+    """
+
+    def __init__(self, config):
+        """Prepare to run evolutions using the given configuration."""
+
+        self.config = config
+        self.required_ages = numpy.linspace(*config.plot_ages)
+
+    def __call__(self, initial_conditions):
+        """
+        Calculate and return the evolution for the given initial conditions.
+
+        Args:
+            initial_conditions(tuple):    The initial period and eccentricity
+                to calculate the evolution for. The rest of the system
+                parameters are from the configuration passed to __init__().
+
+        Returns:
+            tuple(array, array):
+                The orbital period and eccentricity at the ages in
+                `self.required_ages`
+        """
+
+        self.config.initial_orbital_period, self.config.initial_eccentricity = (
+            initial_conditions
+        )
+        evolution = run_evolution(self.config,
+                                  required_ages=self.required_ages,
+                                  required_ages_only=True)
+        return (
+            evolution.age,
+            evolution.orbital_period,
+            evolution.eccentricity
+        )
+
 def main(config):
     """Avoid polluting global namespace."""
 
-    required_ages = numpy.linspace(*config.plot_ages)
     period_eccentricity = zip(
         *(
             entry.flatten()
@@ -75,9 +118,7 @@ def main(config):
     for period, eccentircity in period_eccentricity:
         print(repr(period) + '\t' + repr(eccentircity))
 
-    config.initial_eccentricity = 0.3
-    config.initial_orbital_period = 5.0
-    print(run_evolution(config).format())
+    print(repr(ProcessScenario(config)((5.0, 0.3))))
 
 if __name__ == '__main__':
     main(parse_configuration())
