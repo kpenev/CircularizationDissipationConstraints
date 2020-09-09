@@ -2,9 +2,13 @@
 
 """Evolve a grid of initial orbital period/eccentircity to study envelope."""
 
-import numpy
+from multiprocessing import Pool
 
-from configargparse import ArgumentParser, DefaultsFormatter
+import numpy
+from configargparse import\
+    ArgumentParser,\
+    DefaultsFormatter,\
+    Action as ArgparseAction
 
 from orbital_evolution.command_line_util import\
     add_binary_config,\
@@ -13,6 +17,17 @@ from orbital_evolution.command_line_util import\
 
 def parse_configuration():
     """Return the configuration for the grid to run."""
+
+    class ParseGrid(ArgparseAction):
+
+        def __call__(self, parser, namespace, values, option_string):
+            """Parse a grid option to a numpy.arary()."""
+
+            setattr(namespace,
+                    self.dest,
+                    numpy.linspace(float(values[0]),
+                                   float(values[1]),
+                                   int(values[2])))
 
     parser = ArgumentParser(
         description=__doc__,
@@ -31,35 +46,41 @@ def parse_configuration():
     add_evolution_config(parser)
     parser.add_argument(
         '--eccentricity-grid', '--e-grid',
-        type=float,
         nargs=3,
-        default=(0, 0.5, 6),
+        action=ParseGrid,
+        default=('0', '0.5', '6'),
         metavar=('MIN_ECC', 'MAX_ECC', 'NUM_ECC'),
         help='The eccentricies for which to calculate evolutions. The arguments'
         'are the same as numpy.linspace.'
     )
     parser.add_argument(
         '--orbital-period-grid', '--porb-grid',
-        type=float,
         nargs=3,
-        default=(3, 20, 35),
+        default=numpy.linspace(3.0, 20.0, 35),
+        action=ParseGrid,
         metavar=('MIN_PER', 'MAX_PER', 'NUM_PER'),
         help='The orbital periods for which to calculate evolutions. The '
         'arguments are the same as numpy.linspace.'
     )
     parser.add_argument(
         '--plot-ages',
-        type=float,
         nargs=3,
-        default=(0.1, 10.0, 100),
+        default=numpy.linspace(0.1, 10.0, 100),
+        action=ParseGrid,
         metavar=('MIN_AGE', 'MAX_AGE', 'NUM_AGES'),
         help='The ages at which to plot the eccentricity envelope. The '
         'arguments are the same as numpy.linspace.'
     )
+    parser.add_argument(
+        '--number-parallel-processes', '--num-parallel',
+        type=int,
+        default=1,
+        help='How many parallel processes to use to carry out the calculations.'
+    )
 
     return parser.parse_args()
 
-class ProcessScenario:
+class EvolveScenario:
     """
     Run the evolution for single set of ICs and extract plot data.
 
@@ -74,7 +95,6 @@ class ProcessScenario:
         """Prepare to run evolutions using the given configuration."""
 
         self.config = config
-        self.required_ages = numpy.linspace(*config.plot_ages)
 
     def __call__(self, initial_conditions):
         """
@@ -95,8 +115,11 @@ class ProcessScenario:
             initial_conditions
         )
         evolution = run_evolution(self.config,
-                                  required_ages=self.required_ages,
+                                  required_ages=self.config.plot_ages,
                                   required_ages_only=True)
+        print('Calculated evolution for P0=%f, e0=%f'
+              %
+              initial_conditions)
         return (
             evolution.age,
             evolution.orbital_period,
@@ -106,19 +129,24 @@ class ProcessScenario:
 def main(config):
     """Avoid polluting global namespace."""
 
-    period_eccentricity = zip(
+    scenarios = zip(
         *(
             entry.flatten()
             for entry in numpy.meshgrid(
-                numpy.linspace(*config.orbital_period_grid),
-                numpy.linspace(*config.eccentricity_grid)
+                config.orbital_period_grid,
+                config.eccentricity_grid
             )
         )
     )
-    for period, eccentircity in period_eccentricity:
-        print(repr(period) + '\t' + repr(eccentircity))
+    evolve_scenario = EvolveScenario(config)
 
-    print(repr(ProcessScenario(config)((5.0, 0.3))))
+    if config.number_parallel_processes == 1:
+        evolutions = [evolve_scenario(s) for s in scenarios]
+    else:
+        with Pool(cmdline_args.number_parallel_processes) as process_pool:
+            evolutions = process_pool.map(scenarios)
+
+    print(repr(evolutions))
 
 if __name__ == '__main__':
     main(parse_configuration())
