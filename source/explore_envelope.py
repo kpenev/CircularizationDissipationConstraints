@@ -55,7 +55,7 @@ def parse_configuration():
         '--eccentricity-grid', '--e-grid',
         nargs=3,
         action=ParseGrid,
-        default=('0', '0.5', '6'),
+        default=numpy.linspace(0, 0.5, 6),
         metavar=('MIN_ECC', 'MAX_ECC', 'NUM_ECC'),
         help='The eccentricies for which to calculate evolutions. The arguments'
         'are the same as numpy.linspace.'
