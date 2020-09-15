@@ -2,3 +2,6 @@
 *.out
 *.pickle
 *.outerr
+*.avi
+*.mp4
+eccentricity_envelope_frames
