@@ -3,7 +3,8 @@
 """Plot the evolution of the eccentricity envelope from pickled calculations."""
 
 import pickle
-from os import path, makedirs
+from os import path, makedirs, remove
+from subprocess import call
 
 from matplotlib import pyplot
 from configargparse import\
@@ -34,9 +35,23 @@ def parse_configuration():
     )
     parser.add_argument(
         '--frame-fname-pattern',
-        default='eccentricity_envelope_frames/frame%(frame)05d.jpg',
+        default='eccentricity_envelope_frames/frame%05d.jpg',
         help='A %%-substitution pattern to generate filenames for output '
         'frames.'
+    )
+    parser.add_argument(
+        '--movie-fname',
+        default='eccentricity_envelope_evolution.mp4',
+        help='A filename to save the movie as. If empty sting, no movie is '
+        'created just tho individual frames which are then always preserved.'
+    )
+    parser.add_argument(
+        '--keep-frames',
+        action='store_true',
+        help='If this argument is passed, the frames that were generated when '
+        'creating the movie are not deleted at the end. Note that if '
+        'directories are created for storing the frames they will not be '
+        'automatically deleted!'
     )
 
     return parser.parse_args()
@@ -46,28 +61,32 @@ def unpickle_data(pickle_fname):
 
     with open(pickle_fname, 'rb') as pickle_file:
         pickled_config = pickle.load(pickle_file)
-        period_evolutions = numpy.empty(
+        period_evolutions = numpy.full(
             shape=(pickled_config.plot_ages.size,
                    pickled_config.orbital_period_grid.size,
                    pickled_config.eccentricity_grid.size),
+            fill_value=numpy.nan,
             dtype=numpy.float64
         )
-        eccentricity_evolutions = numpy.empty(shape=period_evolutions.shape,
-                                              dtype=numpy.float64)
+        eccentricity_evolutions = numpy.full(
+            shape=period_evolutions.shape,
+            fill_value=numpy.nan,
+            dtype=numpy.float64
+        )
 
         try:
             while True:
                 period_index = pickled_config.orbital_period_grid.searchsorted(
                     pickle.load(pickle_file)
                 )
-                eccentricity_index = pickled_config.eccentricity_grid.searchsorted(
+                ecc_index = pickled_config.eccentricity_grid.searchsorted(
                     pickle.load(pickle_file)
                 )
                 evolution = pickle.load(pickle_file)
-                period_evolutions[:, period_index, eccentricity_index] = (
+                period_evolutions[:, period_index, ecc_index] = (
                     evolution.orbital_period
                 )
-                eccentricity_evolutions[:, period_index, eccentricity_index] = (
+                eccentricity_evolutions[:, period_index, ecc_index] = (
                     evolution.eccentricity
                 )
         except EOFError:
@@ -77,16 +96,33 @@ def unpickle_data(pickle_fname):
             period_evolutions,
             eccentricity_evolutions)
 
+def create_movie(frame_pattern, movie_fname):
+    """Stitch the generated frames into a movie."""
+
+    call(['ffmpeg',
+          '-f', 'image2',
+          '-framerate', '10',
+          '-i', frame_pattern,
+          movie_fname])
+
 if __name__ == '__main__':
     config = parse_configuration()
+    frame_fnames = []
     for frame, (age, periods, eccentricities) in enumerate(
             zip(*unpickle_data(config.evolutions_pickle))
     ):
         pyplot.plot(periods, eccentricities, 'ok')
         pyplot.title('Age = %f' % age)
-        outfname = config.frame_fname_pattern % dict(frame=frame)
+        outfname = config.frame_fname_pattern % frame
         outdir = path.dirname(outfname)
         if outdir and not path.exists(outdir):
             makedirs(outdir)
         pyplot.savefig(outfname)
         pyplot.cla()
+        frame_fnames.append(outfname)
+
+    if config.movie_fname:
+        create_movie(config.frame_fname_pattern, config.movie_fname)
+        if not config.keep_frames:
+            for oufname in frame_fnames:
+                remove(oufname)
