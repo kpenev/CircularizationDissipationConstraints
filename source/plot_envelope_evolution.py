@@ -5,6 +5,7 @@
 import pickle
 from os import path, makedirs, remove
 from subprocess import call
+import warnings
 
 from matplotlib import pyplot
 from configargparse import\
@@ -83,10 +84,24 @@ def unpickle_data(pickle_fname):
                     pickle.load(pickle_file)
                 )
                 evolution = pickle.load(pickle_file)
-                period_evolutions[:, period_index, ecc_index] = (
+                num_steps = evolution.age.size
+                print(
+                    'Comparing:\n%s\nto\n%s'
+                    %
+                    (repr(pickled_config.plot_ages[:num_steps]), repr(evolution.age))
+                )
+                if not (
+                    numpy.abs(pickled_config.plot_ages[:num_steps]
+                              -
+                              evolution.age)
+                    <
+                    1e-10
+                ).all():
+                    continue
+                period_evolutions[:num_steps, period_index, ecc_index] = (
                     evolution.orbital_period
                 )
-                eccentricity_evolutions[:, period_index, ecc_index] = (
+                eccentricity_evolutions[:num_steps, period_index, ecc_index] = (
                     evolution.eccentricity
                 )
         except EOFError:
