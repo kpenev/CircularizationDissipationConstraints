@@ -107,9 +107,14 @@ def unpickle_data(pickle_fname):
         except EOFError:
             pass
 
-    return (pickled_config.plot_ages,
+    return (
+        pickled_config,
+        (
+            pickled_config.plot_ages,
             period_evolutions,
-            eccentricity_evolutions)
+            eccentricity_evolutions
+        )
+    )
 
 def create_movie(frame_pattern, movie_fname):
     """Stitch the generated frames into a movie."""
@@ -123,11 +128,16 @@ def create_movie(frame_pattern, movie_fname):
 if __name__ == '__main__':
     config = parse_configuration()
     frame_fnames = []
+    calc_config, plot_data = unpickle_data(config.evolutions_pickle)
     for frame, (age, periods, eccentricities) in enumerate(
-            zip(*unpickle_data(config.evolutions_pickle))
+            zip(*plot_data)
     ):
         pyplot.plot(periods, eccentricities, 'ok')
-        pyplot.title('Age = %f' % age)
+        pyplot.xlim(calc_config.orbital_period_grid[0],
+                    calc_config.orbital_period_grid[-1])
+        pyplot.ylim(calc_config.eccentricity_grid[0],
+                    calc_config.eccentricity_grid[-1])
+        pyplot.title('Age = %.3f' % age)
         outfname = config.frame_fname_pattern % frame
         outdir = path.dirname(outfname)
         if outdir and not path.exists(outdir):
