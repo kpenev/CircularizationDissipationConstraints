@@ -879,7 +879,7 @@ def get_lgQ_constraints(lgQ_x_axes,
         if cmdline_args.nasa_data is not None and plot_lgQ['min'][index] > 7.0:
             plot_lgQ['min'][index] = 6.8
 
-        x_evaluator.symtable = vars(system)
+        x_evaluator.symtable.update(vars(system))
         for x_expression_index, (x_expr, x_units) in enumerate(lgQ_x_axes):
             plot_x[x_expression_index, index] = units.Quantity(
                 x_evaluator(x_expr)
