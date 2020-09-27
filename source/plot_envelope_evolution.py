@@ -55,6 +55,12 @@ def parse_configuration():
         'directories are created for storing the frames they will not be '
         'automatically deleted!'
     )
+    parser.add_argument(
+        '--label', '-l',
+        default=None,
+        help='A %%-substitution pattern involving configuration entries from '
+        'the pickles to use as the label to display for each set of points.'
+    )
 
     return parser.parse_args()
 
@@ -152,9 +158,14 @@ if __name__ == '__main__':
                 )
         ) in enumerate(data):
             color = plot_colors[color_index % len(plot_colors)]
-            pyplot.plot(periods[frame], eccentricities[frame], 'o',
-                        markeredgecolor=color,
-                        markerfacecolor=color)
+            plot_config = dict(markeredgecolor=color,
+                               markerfacecolor=color)
+            if config.label is not None:
+                plot_config['label'] = config.label % vars(system_config)
+            pyplot.plot(periods[frame].flatten(),
+                        eccentricities[frame].flatten(),
+                        'o',
+                        **plot_config)
             xmin = min(system_config.orbital_period_grid[0], xmin)
             xmax = max(system_config.orbital_period_grid[-1], xmax)
             ymin = min(system_config.eccentricity_grid[0], ymin)
@@ -162,6 +173,7 @@ if __name__ == '__main__':
 
         pyplot.xlim(xmin, xmax)
         pyplot.ylim(ymin, ymax)
+        pyplot.legend(loc=2)
         pyplot.title('Age = %.3f' % age)
         outfname = config.frame_fname_pattern % frame
         outdir = path.dirname(outfname)
