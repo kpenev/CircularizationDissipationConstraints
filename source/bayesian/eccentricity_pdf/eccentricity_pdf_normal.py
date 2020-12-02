@@ -29,7 +29,7 @@ class EccentricityPDFNormal(EccentricityPDFBase):
                  *,
                  e_envelope_mean=1.0,
                  e_envelope_stddev=0.0,
-                 integration_options=None):
+                 **base_args):
         """
         Set-up the PDF per the specified mean and standard deviations.
 
@@ -47,11 +47,12 @@ class EccentricityPDFNormal(EccentricityPDFBase):
                 distribution giving the envelope eccentricity PDF. If zero, a
                 delta function is assumed.
 
+            base_args:    Passed directly to
+                :meth:`EccentricityPDFBase.__init__`.
+
         Returns:
             None
         """
-
-        super().__init__(integration_options)
 
         self.e_observed_mean = e_observed_mean
         self.e_observed_stddev = e_observed_stddev
@@ -62,20 +63,40 @@ class EccentricityPDFNormal(EccentricityPDFBase):
             self.envelope_eccentricity = partial(norm.pdf,
                                                  loc=e_envelope_mean,
                                                  scale=e_envelope_stddev)
+
+        super().__init__(**base_args)
 #pylint: enable=too-few-public-methods
 
 if __name__ == '__main__':
-    pdf = vectorize(EccentricityPDFNormal(0.3, 0.1))
     plot_e = linspace(0, 1, 100)
+
+    pdf = vectorize(EccentricityPDFNormal(0.3, 0.1))
     pyplot.plot(plot_e, pdf(plot_e))
     pyplot.show()
 
     pdf = vectorize(EccentricityPDFNormal(0.3, 0.01, e_envelope_mean=0.5))
-    plot_e = linspace(0, 1, 100)
     pyplot.plot(plot_e, pdf(plot_e))
     pyplot.show()
 
     pdf = vectorize(EccentricityPDFNormal(0.3, 0.1, e_envelope_mean=0.5))
-    plot_e = linspace(0, 1, 100)
     pyplot.plot(plot_e, pdf(plot_e))
+    pyplot.show()
+
+    pdf = vectorize(
+        EccentricityPDFNormal(0.3,
+                              0.1,
+                              e_envelope_mean=0.5,
+                              e_envelope_stddev=0.1)
+    )
+    pyplot.plot(plot_e, pdf(plot_e), '-g')
+
+    with open('test_interp.pkl', 'rb') as interp_file:
+        pdf = vectorize(
+            EccentricityPDFNormal(0.3,
+                                  0.1,
+                                  e_envelope_mean=0.5,
+                                  e_envelope_stddev=0.1,
+                                  load_interp_from=interp_file)
+        )
+        pyplot.plot(plot_e, pdf(plot_e), ':r')
     pyplot.show()
