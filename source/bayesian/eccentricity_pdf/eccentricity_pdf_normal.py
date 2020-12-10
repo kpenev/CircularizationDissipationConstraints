@@ -5,7 +5,7 @@ from functools import partial
 
 from scipy.stats import norm
 
-from eccentricity_pdf_base import EccentricityPDFBase
+from .eccentricity_pdf_base import EccentricityPDFBase
 
 if __name__ == '__main__':
     from matplotlib import pyplot
@@ -17,11 +17,14 @@ class EccentricityPDFNormal(EccentricityPDFBase):
     """Final eccen. PDF assuming normal PDF for observed and envelope eccen."""
 
     def observed_eccentricity(self, e_now):
-        """The PDF of the present day eccentricity per observation data."""
+        """Evaluate the observed eccentricity PDF."""
 
-        return norm.pdf(e_now,
-                        loc=self.e_observed_mean,
-                        scale=self.e_observed_stddev)
+        return norm.pdf(
+            e_now,
+            loc=self.e_observed_mean,
+            scale=self.e_observed_stddev[0 if e_now > self.e_observed_stddev
+                                         else 1]
+        )
 
     def __init__(self,
                  e_observed_mean,
@@ -38,7 +41,10 @@ class EccentricityPDFNormal(EccentricityPDFBase):
                 present day eccentricity PDF.
 
             e_observed_stddev:    The standard deviation of the normal
-                distribution giving the present day eccentricity PDF.
+                distribution giving the present day eccentricity PDF. It can
+                either be a single number in which case the error is assumet
+                symmetrical or a 2-iterable of poisitive and negative error (in
+                that order).
 
             e_envelope_mean:    The mean of the normal distribution giving the
                 envelope eccentricity PDF.
@@ -55,7 +61,14 @@ class EccentricityPDFNormal(EccentricityPDFBase):
         """
 
         self.e_observed_mean = e_observed_mean
-        self.e_observed_stddev = e_observed_stddev
+        try:
+            self.e_observed_stddev = (
+                float(e_observed_stddev),
+                float(e_observed_stddev)
+            )
+        except TypeError:
+            assert len(e_observed_stddev) == 2
+            self.e_observed_stddev = e_observed_stddev
 
         if e_envelope_stddev == 0:
             self.envelope_eccentricity = e_envelope_mean
