@@ -196,6 +196,4 @@ class EccentricityPDFBase(metaclass=ABCMeta):
                 (e_predicted, result, abserr, max_abserr)
             )
 
-        assert abserr < max_abserr
-
         return result
