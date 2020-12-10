@@ -106,8 +106,8 @@ class CurrentEccentricityCalculator:
             return None
 
         print('Trying %s, lgQ = %g, e0 = %g' % (system.hostname,
-                                                 lgQ,
-                                                 initial_eccentricity))
+                                                lgQ,
+                                                initial_eccentricity))
 
         default_dissipation = dict(
             tidal_frequency_breaks=None,
