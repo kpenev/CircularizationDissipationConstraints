@@ -1,0 +1,118 @@
+"""Define a bookkeeping class for the parameters used in the evolution."""
+
+import logging
+
+from astropy import units
+
+class EvolutionParameters:
+    """
+    Define interface for working with parameters required to find the evolution.
+
+    Attrs:
+        parameter_names_units:    The names and units of the collection of
+            parameters fully determining the orbital evolution for a system.
+
+        parameter_order:    The order in which parameters appear in the input
+            array to :meth:`__call__`.
+    """
+
+    parameter_names_units = dict(
+        dissipation=[
+        ],
+        evolution=[
+            ('disk_dissipation_age', units.Gyr),
+            ('disk_period', units.day),
+            ('primary_wind_strength', 1),
+            ('prinmary_wind_saturation', 1),
+            ('primary_core_envelope_coupling_timescale', units.Gyr)
+        ],
+        system=[
+            ('age', units.Gyr),
+            ('feh', 1),
+            ('orbital_period', units.day),
+            ('primary_mass', units.M_sun),
+            ('secondary_mass', units.M_sun)
+        ]
+    )
+
+    _logger = logging.getLogger(__name__)
+
+    def log_parameters(self, message, parameters, level):
+        """
+        Issue log message along with a description of this step's parameters.
+
+        Args:
+            parameters(array):    The parameter array defining the current steps
+                being attempted (to be included in the message).
+
+            message(str):    The message to issue before describing the
+                parameters.
+
+            level(str):    One of `'debug'`, `'warning'`, `'info'`, `'error'`,
+                `'critical'` definng the importance level of the message to
+                issue.
+
+        Returns:
+            None
+        """
+
+        self._logger.log(
+            level,
+            message + '\n\t%s: %s' * parameters.size(),
+            *(
+                sub
+                for param_name in self.parameter_names_units
+                for sub in (param_name, self.get_parameter_value(parameters,
+                                                                 param_name))
+            )
+        )
+
+    def __init__(self, secondary_is_star):
+        """
+        Prepare to manage the parameters for a given system.
+
+        Args:
+             secondary_is_star(bool):    True iff the secondary in the system is
+                an evolving star.
+
+        Returns:
+            None
+        """
+
+        if secondary_is_star:
+            self.parameter_names_units['evolution'].extend(
+                [
+                    ('secondary_disk_period', units.day),
+                    ('secondary_wind_strength', 1),
+                    ('secondary_wind_saturation', 1),
+                    ('secondary_core_envelope_coupling_timescale', units.Gyr)
+                ]
+            )
+        else:
+            self.parameter_names_units['system'].append(
+                ('secondary_radius', units.R_sun)
+            )
+
+        self.parameter_order = (
+            self.parameter_names_units['dissipation']
+            +
+            self.parameter_names_units['evolution']
+            +
+            self.parameter_names_units['system']
+        )
+        self.parameter_indices = dict(
+            (name, index)
+            for index, (name, units) in enumerate(self.parameter_order)
+        )
+
+    def get_parameter_index_units(self, parameter_name):
+        """Return the index and units of the parameter with the given name."""
+
+        index = self.parameter_indices[parameter_name]
+        return index, self.parameter_order[index][1]
+
+    def get_parameter_value(self, parameters, parameter_name):
+        """Return the value with units of a parameter by name."""
+
+        index = self.parameter_indices[parameter_name]
+        return parameters[index] * self.parameter_order[index][1]
