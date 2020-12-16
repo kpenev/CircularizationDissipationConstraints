@@ -2,7 +2,6 @@
 """Pickle approximations to marginalized CDFs of stellar parameters."""
 
 from functools import partial
-import re
 from collections import namedtuple
 
 from matplotlib import pyplot
@@ -84,13 +83,12 @@ def parse_configuration():
         help='The largest difference between neighboring [Fe/H] grid points.'
     )
     parser.add_argument(
-        '--min-feh-pdf',
+        '--max-discarded-feh-probability',
         type=float,
         default=1e-8,
-        help='The range of [Fe/H] values considered is such that the '
-        'PDF([Fe/H])/max(PDF([Fe/H])) is bigger than the specified value. '
-        'Basically, the probability density of [Fe/H] outside the resulting '
-        'bounds is approximated as zero.'
+        help='The range of [Fe/H] values considered is such that sampled [Fe/H]'
+        ' values have at most the given probability of landing outside the '
+        'grid.'
     )
     parser.add_argument(
         '--time-ode-max-step',
@@ -141,52 +139,70 @@ def parse_configuration():
 
     return parser.parse_args()
 
-def get_initial_feh_grid(configuration):
+def get_initial_feh_grid(config):
     """
     Find the crudest [Fe/H] grid satisfying config ignoring interp. tolerances.
     """
 
-    scaled_range = scipy.sqrt(-2.0 * scipy.log(configuration.min_feh_pdf))
-    min_feh = (configuration.feh.value
-               -
-               scaled_range * configuration.feh.minus_error)
-    max_feh = (configuration.feh.value
-               +
-               scaled_range * configuration.feh.plus_error)
-    lower_feh, upper_feh = [min_feh], [max_feh]
+    def get_half_grid_offsets(side):
+        """Return the grid poinst on one side (plus or minus) of the median."""
 
-    upper_dist = norm(configuration.feh.value, configuration.feh.plus_error)
-    lower_dist = norm(configuration.feh.value, configuration.feh.minus_error)
+        assert side in ['plus', 'minus']
 
-    while min_feh < max_feh:
-        min_cdf = lower_dist.cdf(min_feh)
-        max_sf = upper_dist.sf(max_feh)
+        distribution = norm(scale=getattr(config.feh, side + '_error'))
 
-        min_feh = min(
-            min_feh + configuration.feh_max_step,
-            lower_dist.ppf(min_cdf + configuration.feh_max_cdf_step)
-        )
-        max_feh = max(
-            max_feh - configuration.feh_max_step,
-            lower_dist.isf(max_sf + configuration.feh_max_cdf_step)
-        )
-        if min_feh < max_feh:
-            lower_feh.append(min_feh)
-            upper_feh.append(max_feh)
+        offset = distribution.isf(config.max_discarded_feh_probability
+                                  /
+                                  2.0)
+        result = []
+        while offset > 0:
+            result.append(offset)
+            current_sf = distribution.sf(offset)
+            offset = max(offset - config.feh_max_step,
+                         distribution.isf(current_sf + config.feh_max_cdf_step))
 
-    upper_feh.reverse()
-    return scipy.array(lower_feh + [configuration.feh.value] + upper_feh)
+        result = scipy.array(result)
+        if side == 'minus':
+            return -result
+        else:
+            return result[ : : -1]
 
+    return scipy.concatenate((get_half_grid_offsets('minus'),
+                              [0],
+                              get_half_grid_offsets('plus'))) + config.feh.value
 
-def main(configuration):
+def plot_feh_grid(config, feh_grid):
+    """Display plots showing [Fe/H] grid was correctly generated."""
+
+    pyplot.plot(feh_grid, '.')
+    x_range = scipy.array([0, feh_grid.size - 1])
+    pyplot.plot(x_range,
+                x_range * config.feh_max_step + feh_grid[0],
+                '-')
+    pyplot.plot(x_range[::-1],
+                -x_range * config.feh_max_step + feh_grid[-1],
+                '-')
+    pyplot.axhline(config.feh.value)
+    pyplot.axhline(config.feh.value + config.feh.plus_error)
+    pyplot.axhline(config.feh.value - config.feh.minus_error)
+    pyplot.show()
+
+    scaled_feh_diff = feh_grid - config.feh.value
+    scaled_feh_diff[scaled_feh_diff > 0] /= config.feh.plus_error
+    scaled_feh_diff[scaled_feh_diff < 0] /= config.feh.minus_error
+    feh_cdf = norm.cdf(scaled_feh_diff)
+    x_med = scipy.argmin(scipy.fabs(feh_grid - config.feh.value))
+    pyplot.plot(feh_cdf, '.')
+    pyplot.plot(x_range,
+                0.5 + (x_range - x_med) * config.feh_max_cdf_step,
+                '-')
+    pyplot.show()
+
+def main(config):
     """Avoid polluting the global namespace."""
 
-    feh_grid = get_initial_feh_grid(configuration)
-    pyplot.plot(feh_grid, '.')
-    pyplot.axhline(configuration.feh.value)
-    pyplot.axhline(configuration.feh.value + configuration.feh.plus_error)
-    pyplot.axhline(configuration.feh.value - configuration.feh.minus_error)
-    pyplot.show()
+    feh_grid = get_initial_feh_grid(config)
+    plot_feh_grid(config, feh_grid)
 
 if __name__ == '__main__':
     main(parse_configuration())
