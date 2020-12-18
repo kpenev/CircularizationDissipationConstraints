@@ -96,7 +96,8 @@ class EccentricityDistribution(SuperEccentricityDistribution):
                 return 0
             # For the right part of the eccentricity vs. log(orbital period) graph where eccentricity excedes 0.5:
             w = lambda e_now: self.distribution_of_present_eccentricity(e_now) / (1 - e_now)
-            value = quad(w, 0, e)
+            value = nquad(w, [[0, e]])
+
             return value
         # For the middle part of the eccentricity vs. log(orbital period) graph where we have to find the envelop.
         return nquad(lambda e_now, e_envelop: self.distribution_of_present_eccentricity(
@@ -357,13 +358,15 @@ class BayesianAnalysis:
         if mean_e_env == -1:
             print('There is no envelop.')
             e_env_exists = False
+        if mean_e_env == 0:
+            e_env_exists = False
 
         def f(e):
             return b.distribution_of_eccentricity_by_nquad(e, e_env_exists)
 
         return f
 
-    def log_prob(self, theta):
+    def log_prob(self, theta, initial_eccentricity = 0.5):
         # theta = (primary_mass, secondary_mass, secondary_radius, feh, orbital_period, obliquity, age, vsini)
 
         primary_mass = theta[0]
@@ -373,7 +376,6 @@ class BayesianAnalysis:
         orbital_period = theta[4]
         obliquity = theta[5]
         age = theta[6]
-        initial_eccentricity = 0.8
         vsini = theta[7]
         argument_of_phase_lag_function = theta[8]
 
@@ -412,11 +414,10 @@ class BayesianAnalysis:
         print('eccentricity_now = ', eccentricity_now, 'age = ', b.age[len(b.eccentricity) - 1], age)
         print('eccentricity', b.eccentricity)
         print('value of present eccentricity found in archive = ',
-              self.eccentricity_now[self.position_of_binary_system])
+              self.eccentricity_now[self.position_of_binary_system], 'position of the binary system =', self.position_of_binary_system)
         #       print(repr(dir(b)))
         if not (eccentricity_now == 0 or eccentricity_now < 0):
-            probability_density_of_eccentricity_now = \
-            self.probability_density_distribution_of_eccentricity(eccentricity_now)[0]
+            probability_density_of_eccentricity_now = self.probability_density_distribution_of_eccentricity(eccentricity_now)[0]
 
             probability_density = probability_density_of_eccentricity_now * priors
             if probability_density <= 0:
@@ -583,6 +584,50 @@ class BayesianAnalysis:
 
         return
 
+    def testing_log_prob(self):
+        k = 0
+        for j in range(0, len(self.orbital_period) - 1):
+            theta0 = self.create_initial_theta_and_probability_density_distribution_of_eccentricity(j)
+
+            if not theta0[0] == -5:
+                print('______________________________')
+                k = k + 1
+                print('k = ', k)
+                print('theta0 = ', theta0)
+                print('probability_density_distribution_of_eccentricity(0.2) = ',
+                      self.probability_density_distribution_of_eccentricity(0.2))
+
+        theta0 = self.create_initial_theta_and_probability_density_distribution_of_eccentricity(j=10)  # I am choosing j=20
+        prob = []
+        Qpl = []
+        theta0[8]=6.5
+        print('log_prob for Qpl = 6.5,', self.log_prob(theta0))
+        for i in range(1, 10):
+            theta0[8] = i*1
+            Qpl = Qpl + [i*1]
+            prob = prob + [self.log_prob(theta0)]
+            print('>>>>>>>>>>>>>>>>>>', i)
+
+
+   #     print('Qpl = ', Qpl)
+  #      print('prob = ', prob)
+
+        plt.plot(Qpl, prob, label="Prob vs. Qpl")
+
+        # naming the x axis
+        plt.xlabel('Qpl')
+        # naming the y axis
+        plt.ylabel('log-prob')
+        # giving a title to my graph
+        plt.title('Log Probability vs Qpl')
+
+        # show a legend on the plot
+        plt.legend()
+
+        # function to show the plot
+        plt.show()
+        return
+
     def test_Nasa_Exoplanet_data(self, interpolator):
 
         """
@@ -699,7 +744,8 @@ class BayesianAnalysis:
 
 if __name__ == '__main__':
     test = BayesianAnalysis()
-    test.MCMC()
+    test.testing_log_prob()
+    #test.MCMC()
 
     #    b = EccentricityDistribution(mean_e_now=0.2, e_now_stdev=0.5, mean_e_env=0.8, e_env_stdev=0.5)
     #    print('The value of b is quad = ', b.distribution_of_eccentricity_by_quad(e=0.6))
