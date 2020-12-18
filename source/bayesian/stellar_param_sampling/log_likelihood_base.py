@@ -1,16 +1,15 @@
 """Define base class for stellar parameter log-likelihood functions."""
 
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 
 from scipy.integrate import solve_ivp
 from astropy import units as u
 
-class LogLikelihoodBase(meta=ABCMeta):
+class LogLikelihoodBase(ABC):
     """Common interface for log-likelihood functions of stellar paramseters."""
 
-
     @abstractmethod
-    def _age_integrand(self, age, _, mass, feh):
+    def _age_cdf_integrand(self, age, _, mass, feh):
         """Unnormalized posterior PDF excluding direct [Fe/H] measurement."""
 
     def __init__(self,
@@ -59,17 +58,27 @@ class LogLikelihoodBase(meta=ABCMeta):
                     self.interpolator.track_feh[-1])
         super().__setattr__(name, value)
 
-    def age_integral(self, mass=self.default_mass, feh=self.default_feh):
-        """Return age integral re-using results when possible."""
+    def age_integral(self, mass=None, feh=None):
+        """
+        Return age integral re-using results when possible.
 
-        if (mass, fe) not in self._age_integrals:
+        If mass and/or feh are not None, the default values are used.
+        """
+
+        if mass is None:
+            mass = self.default_mass
+
+        if feh is None:
+            feh = self.default_feh
+
+        if (mass, feh) not in self._age_integrals:
             radius = self.interpolator('radius',
-                                       mass.to_value(units.M_sun),
+                                       mass.to_value(u.M_sun),
                                        feh)
             solution = solve_ivp(self._age_cdf_integrand,
                                  (radius.min_age, radius.max_age),
-                                 0.0,
-                                 args=(mass, feh),
+                                 [0.0],
+                                 args=(mass.to_value(u.M_sun), feh),
                                  dense_output=True,
                                  **self._solve_ivp_options)
             assert solution.success

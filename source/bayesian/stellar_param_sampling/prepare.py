@@ -11,6 +11,9 @@ import numpy
 
 from stellar_evolution.manager import StellarEvolutionManager
 
+from star_sampler import StarSampler
+from gaussian_log_likelihood import GaussianLogLikelihood
+
 #TODO: make parsed command line match exactly system.
 def parse_configuration():
     """Return the configuration to use per the command line."""
@@ -30,6 +33,14 @@ def parse_configuration():
             minus_error=float(minus_error_str) * units
         )
 
+    debug_plots = StarSampler.list_debug_plots()
+
+    def parse_debug_plot(value_str):
+        """Parse a debug plot argument (see help message for format)."""
+
+        plot_type, filename = (entry.strip() for entry in value_str.split('='))
+        assert plot_type in debug_plots
+        return plot_type, filename
 
     parser = ArgumentParser(
         description=__doc__,
@@ -142,7 +153,7 @@ def parse_configuration():
     parser.add_argument(
         '--age-cdf-check-log-ages',
         type=lambda v: numpy.linspace(*v),
-        default=numpy.linspace(-3, 1, 100),
+        default=numpy.linspace(-3, 1, 10),
         help='The log10 of the ages at which to check if the age CDF is well '
         'approximated by the current interpolation on mass and [Fe/H].'
     )
@@ -162,6 +173,19 @@ def parse_configuration():
         default=4,
         help='The number of simultaneous processes to use for the calculations.'
     )
+    parser.add_argument(
+        '--debug-plot',
+        action='append',
+        type=parse_debug_plot,
+        help=(
+            'Enable another debugging plot. The format is '
+            '<which_plot>=<filaneme>, with <which_plot> one of: '
+            +
+            ', '.join(debug_plots)
+            +
+            '. If <filename> is empty, the plot is displayed instead of saved.'
+        )
+    )
 
     return parser.parse_args()
 
@@ -174,21 +198,16 @@ def main(config):
         'default'
     )
 
-
-    age_cdf, mass_cdf = calculate_cdfs(log_likelihood, mass_grid, feh_grid)
-
-    converged = False
-
-    while not converged:
-            if check_convergence(feh_grid=feh_grid,
-                                 mass_grid=mass_grid,
-                                 age_cdf=age_cdf,
-                                 mass_cdf=mass_cdf,
-                                 feh_grid,
-                                 new_masses,
-                                 config):
-
-
+    log_likelihood = GaussianLogLikelihood(
+        mean=[5.0, 1.0, 0.0],
+        covariance=[
+            [1.00, 0.10, 0.20],
+            [0.10, 0.20, 0.05],
+            [0.20, 0.05, 0.50]
+        ],
+        interpolator=interpolator
+    )
+    StarSampler(log_likelihood, config)
 
 if __name__ == '__main__':
     main(parse_configuration())
