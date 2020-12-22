@@ -1,6 +1,7 @@
 """The class that implements efficient sampling of stellar properties."""
 
 import inspect
+from itertools import count
 
 from matplotlib import pyplot
 import numpy
@@ -12,16 +13,23 @@ from astropy import units as u
 class StarSampler:
     """Implenet calculation, saving, and loading of star parameter sampling."""
 
-    def _handle_debug_plot(self):
+    def _handle_debug_plot(self, **fname_substitutions):
         """Either save of display the currently set-up plot."""
 
         caller = inspect.stack()[1].function
         assert caller.startswith('_plot_')
 
-        filename = self._debug_plots[caller[len('_plot_'):]]
+        filename = (
+            self._debug_plots[caller[len('_plot_'):]]
+            %
+            dict(
+                fname_substitutions,
+                grid_refinement_i=self._grid_refinement_iteration
+            )
+        )
         if filename:
             pyplot.savefig(filename)
-            pyplot.cla()
+            pyplot.clf()
         else:
             pyplot.show()
 
@@ -65,7 +73,8 @@ class StarSampler:
                                         interpolated_values,
                                         feh_grid,
                                         mass_grid,
-                                        tolerance):
+                                        tolerance,
+                                        title):
         """Show plot of how the interpolation performs as grid is refined."""
 
         def get_plot_grid(grid):
@@ -132,7 +141,9 @@ class StarSampler:
                     difference[ :, max_discrepancy_ind[1]])
         pyplot.xlabel('[Fe/H]')
 
-        self._handle_debug_plot()
+        pyplot.suptitle(title)
+
+        self._handle_debug_plot(title=title)
 
     @classmethod
     def list_debug_plots(cls):
@@ -284,7 +295,7 @@ class StarSampler:
             )
         )
 
-    def _get_mismatch_indices(self, values, tolerance):
+    def _get_mismatch_indices(self, values, tolerance, debug_title):
         """
         Return indices where interpolating values fails on current grid.
 
@@ -324,7 +335,10 @@ class StarSampler:
                     interpolated_values=interpolated_values,
                     feh_grid=self._feh_grid[feh_offset : : 2],
                     mass_grid=self._mass_grid[mass_offset : : 2],
-                    tolerance=tolerance
+                    tolerance=tolerance,
+                    title=(debug_title
+                           +
+                           ' feh_di=%d, m_di=%d' % (feh_offset, mass_offset))
                 )
 
                 mismatch_indices = numpy.argwhere(
@@ -382,7 +396,7 @@ class StarSampler:
             """Return new values to add per the given mismatch indices."""
 
             below_indices = numpy.unique(
-                numpy.concatenate(
+                numpy.concatenate((
                     (
                         mismatch_indices
                         if mismatch_indices[-1] < current_grid.size - 1 else
@@ -393,7 +407,7 @@ class StarSampler:
                         if mismatch_indices[0] > 0 else
                         mismatch_indices[1:]
                     ) - 1
-                )
+                ))
             )
             return (
                 0.5 * (current_grid[below_indices]
@@ -405,24 +419,29 @@ class StarSampler:
         mismatch_indices = list(
             self._get_mismatch_indices(
                 self._mass_cdf,
-                self.config.mass_cdf_interp_tolerance
+                self.config.mass_cdf_interp_tolerance,
+                'CDF(M)'
             )
         )
 
         for age in 10.0**(self.config.age_cdf_check_log_ages):
             new_mismatches = self._get_mismatch_indices(
                 self._eval_age_cdfs(age),
-                self.config.age_cdf_interp_tolerance
+                self.config.age_cdf_interp_tolerance,
+                'CDF(t=%g)' % age
             )
+            print('Current mismatch indices: ' + repr(mismatch_indices))
+            print('New mismatch indices: ' + repr(new_mismatches))
             mismatch_indices = [
-                numpy.unique(numpy.concatenate(old, new))
+                numpy.unique(numpy.concatenate((old, new)))
                 for old, new in zip(mismatch_indices, new_mismatches)
             ]
+            print('Updated mismatch indices: ' + repr(mismatch_indices))
 
-        return (
+        return [
             get_new_grid_points(*args)
             for args in zip(mismatch_indices, [self._feh_grid, self._mass_grid])
-        )
+        ]
 
     def _tune_grid_resolution(self):
         """Increase grid resolution until interpolation tolerances are met."""
@@ -459,7 +478,7 @@ class StarSampler:
 
                 current_start = current_end
 
-            destination[current_start + new.size : ] = current[current_start : ]
+            destination[current_start + len(new) : ] = current[current_start : ]
 
         def add_grid_points(grid, new_points, num_smaller):
             """
@@ -478,12 +497,12 @@ class StarSampler:
                     The new grid.
             """
 
-            result = numpy.empty(size=(grid.size + new_points.size),
+            result = numpy.empty(shape=(grid.size + new_points.size),
                                  dtype=grid.dtype)
             insert_entries(grid, new_points, num_smaller, result)
             return result
 
-        while True:
+        for self._grid_refinement_iteration in count():
             grid_refinement = self._get_grid_refinement()
 
             if grid_refinement[0][0].size == grid_refinement[1][0].size == 0:
@@ -504,15 +523,16 @@ class StarSampler:
                 dtype=self._mass_cdf.dtype
             )
             new_mass_old_feh_age_cdfs = [[None] * new_mass_grid.size
-                                         for feh in self._feh_grid.size]
-            insert_entries(self._mass_cdf,
-                           cdfs_to_add[1],
-                           grid_refinement[1][1],
-                           new_mass_old_feh_mass_cdfs)
-            insert_entries(self._age_cdf,
-                           cdfs_to_add[0],
-                           grid_refinement[1][1],
-                           new_mass_old_feh_age_cdfs)
+                                         for feh in self._feh_grid]
+            for feh_index in range(self._feh_grid.size):
+                insert_entries(self._mass_cdf[feh_index],
+                               cdfs_to_add[1][feh_index],
+                               grid_refinement[1][1],
+                               new_mass_old_feh_mass_cdfs[feh_index])
+                insert_entries(self._age_cdf[feh_index],
+                               cdfs_to_add[0][feh_index],
+                               grid_refinement[1][1],
+                               new_mass_old_feh_age_cdfs[feh_index])
 
             cdfs_to_add = self._calculate_cdfs(new_mass_grid,
                                                grid_refinement[0][0])
@@ -567,4 +587,5 @@ class StarSampler:
         self._age_cdf, self._mass_cdf = self._calculate_cdfs(self._mass_grid,
                                                              self._feh_grid)
 
+        self._grid_refinement_iteration = None
         self._tune_grid_resolution()
