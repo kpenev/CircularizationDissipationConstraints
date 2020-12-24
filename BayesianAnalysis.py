@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from astropy import units as u
 from astropy import constants as cnst
-import matplotlib.pyplot as plt
 from abc import ABCMeta, abstractmethod
 from scipy.integrate import quad, dblquad, nquad
 import random
@@ -112,8 +111,16 @@ class EccentricityDistribution(SuperEccentricityDistribution):
 
 
 class System:
-    def __init__(self, primary_mass, secondary_mass, secondary_radius, feh, orbital_period, obliquity, age,
-                 eccentricity, vsini):
+    def __init__(self,
+                 primary_mass,
+                 secondary_mass,
+                 secondary_radius,
+                 feh,
+                 orbital_period,
+                 obliquity,
+                 age,
+                 eccentricity,
+                 vsini):
         self.primary_mass = primary_mass
         self.Mprimary = primary_mass
         self.secondary_mass = secondary_mass
@@ -129,15 +136,15 @@ class System:
         self.Vsini = vsini
 
     def printing(self):
-        print('Primary mass = ', self.primary_mass)
-        print('Secondary mass = ', self.secondary_mass)
-        print('Secondary radius = ', self.secondary_radius)
-        print('Metallicity = ', self.feh)
-        print('Orbital period = ', self.orbital_period)
-        print('Obliquity = ', self.obliquity)
-        print('Eccentricity = ', self.eccentricity)
-        print('Age = ', self.age)
-        print('Vsini = ', self.Vsini)
+        print('Primary mass = ', self.primary_mass, '=', self.primary_mass.to(u.kg))
+        print('Secondary mass = ', self.secondary_mass, '=', self.secondary_mass.to(u.kg))
+        print('Secondary radius = ', self.secondary_radius, '=', self.secondary_radius.to(u.m))
+        print('Metallicity = ', self.feh.to(u.dimensionless_unscaled))
+        print('Orbital period = ', self.orbital_period, '=', self.orbital_period.to(u.s))
+        print('Obliquity = ', self.obliquity.to(u.deg))
+        print('Eccentricity = ', self.eccentricity.to(u.dimensionless_unscaled))
+        print('Age = ', self.age, '=', self.age.to(u.s))
+        print('Vsini = ', self.Vsini, '=', self.Vsini.to(u.m /u.s))
 
 
 class BayesianAnalysis:
@@ -259,6 +266,7 @@ class BayesianAnalysis:
 
         x = []
         y = []
+        z = []
         j = 0
         for i in range(0, len(self.orbital_period)):
             if not (math.isnan(self.orbital_period[i])
@@ -268,8 +276,9 @@ class BayesianAnalysis:
                         self.metallicity[i] > -1.014 and self.metallicity[i] < 0.537):
                     j = j + 1
                     x = x + [math.log(self.orbital_period[i], 10)]
-
                     y = y + [self.eccentricity_now[i]]
+                    z = z +  [self.planet_name[i]]
+                    print('planet name = ', self.planet_name[i], ', period = ', self.orbital_period[i], ', log(period) = ', math.log(self.orbital_period[i], 10), ', e_now = ',self.eccentricity_now[i])
             if j > 5000:
                 break
 
@@ -279,10 +288,13 @@ class BayesianAnalysis:
                 if x[i] > x[k]:
                     temp = x[k]
                     temp2 = y[k]
+                    temp3 = z[k]
                     x[k] = x[i]
                     y[k] = y[i]
+                    z[k] = z[i]
                     x[i] = temp
                     y[i] = temp2
+                    z[i] = temp3
 
         step = (x[len(x) - 1] - x[0]) / nsegments
 
@@ -299,6 +311,11 @@ class BayesianAnalysis:
             if j > len(x) - 1: break
             if x[j] > x[i] + step:
                 v = v + [max(y[i:j])]
+                m = max(y[i:j])
+                for k in range(i, j):
+                    if y[k]==m:
+                        print('Planet on the envelope = ', z[k], ', actual log(period) = ', x[k], ' log(period) for envelope =',((x[i] + x[j]) / 2), ', eccentricity = ', m )
+
                 u = u + [(x[i] + x[j]) / 2]  # if we assume the maximum v occurs at the midpoint of u-interval
                 # u = u + [x[i]] #We are assuming the maximum v occurs at the left end of u-interval. We are overestimating the envelop-eccentricity by doing so
                 i = j
@@ -376,8 +393,9 @@ class BayesianAnalysis:
         orbital_period = theta[4]
         obliquity = theta[5]
         age = theta[6]
-        vsini = theta[7]
-        argument_of_phase_lag_function = theta[8]
+        eccentricity_now = theta[7]
+        vsini = theta[8]
+        argument_of_phase_lag_function = theta[9]
 
         priors = self.priors(theta)
         if priors == 0:
@@ -390,7 +408,7 @@ class BayesianAnalysis:
                    orbital_period * u.d,
                    obliquity * u.deg,
                    age * u.Gyr,
-                   initial_eccentricity,
+                   eccentricity_now * u.dimensionless_unscaled,
                    vsini * u.kilometer / u.second
                    )
 
@@ -405,26 +423,50 @@ class BayesianAnalysis:
             )
         )
 
+
+
         b = find_evolution(system=a,
-                           interpolator=self.interpolator,
+                           interpolator=interpolator,
                            dissipation=dissipation,
+                           max_age=age * u.Gyr,
+                           initial_eccentricity=initial_eccentricity,
+                           initial_obliquity=0.0,
+                           disk_period=None,
+                           disk_dissipation_age=2e-3 * units.Gyr,
+                           primary_wind_strength=0.17,
+                           primary_wind_saturation=2.78,
+                           primary_core_envelope_coupling_timescale=0.05,
+                           secondary_wind_strength=0.0,
+                           secondary_wind_saturation=100.0,
+                           secondary_core_envelope_coupling_timescale=0.05,
+                           orbital_period_tolerance=1e-6,
                            solve=True,
-                           required_ages=numpy.arange(0.1, age, 0.1))
-        eccentricity_now = b.eccentricity[len(b.eccentricity) - 1]
-        print('eccentricity_now = ', eccentricity_now, 'age = ', b.age[len(b.eccentricity) - 1], age)
-        print('eccentricity', b.eccentricity)
-        print('value of present eccentricity found in archive = ',
-              self.eccentricity_now[self.position_of_binary_system], 'position of the binary system =', self.position_of_binary_system)
+                           secondary_is_star=False)
+
+
+        calculated_eccentricity_now = b.eccentricity[- 1]
+        print('Calculated eccentricity_now = ',
+              calculated_eccentricity_now,
+              ' actual present eccentricity = ',
+              eccentricity_now,
+              ' at calculated age = ', b.age[- 1],
+              ', where actual age of the star = ', age)
+
+
         #       print(repr(dir(b)))
-        if not (eccentricity_now == 0 or eccentricity_now < 0):
-            probability_density_of_eccentricity_now = self.probability_density_distribution_of_eccentricity(eccentricity_now)[0]
+        if  calculated_eccentricity_now >= 0 and calculated_eccentricity_now <=1:
+            probability_density_of_eccentricity_now = self.probability_density_distribution_of_eccentricity(calculated_eccentricity_now)[0]
 
             probability_density = probability_density_of_eccentricity_now * priors
-            if probability_density <= 0:
+            if probability_density == 0:
                 return -math.inf
+
+            if probability_density < 0:
+                print('probability density cannot be less than zero.')
+                return
             return np.log(probability_density)
-        if eccentricity_now == 0: return -math.inf
-        return -math.inf
+        print('calculated_eccentricity_now cannot be less that zero or greater than one')
+        return
 
     def priors(self, theta):
         def prior_orbital_period(orbital_period):
@@ -496,6 +538,7 @@ class BayesianAnalysis:
                                   self.orbital_period[i],
                                   self.obliquity[i],
                                   self.stellar_age[i],
+                                  self.eccentricity_now[i],
                                   self.vsini[i],
                                   argument_of_phase_lag_function]
 
@@ -678,8 +721,11 @@ class BayesianAnalysis:
                                orbital_period[i] * u.d,
                                obliquity[i] * u.deg,
                                stellar_age[i] * u.Gyr,
-                               eccentricity[i],
+                               0.07 * u.dimensionless_unscaled,
                                vsini[i] * u.kilometer / u.second)
+
+                    a.printing()
+                    print('eccentricity found in the NASA archive is ', eccentricity[i])
 
                     dissipation = dict(
                         primary=None,
@@ -688,22 +734,44 @@ class BayesianAnalysis:
                             spin_frequency_breaks=None,
                             tidal_frequency_powers=numpy.array([0.0]),
                             spin_frequency_powers=numpy.array([0.0]),
-                            reference_phase_lag=phase_lag(6.0)
+                            reference_phase_lag=phase_lag(8)
                         )
                     )
-                    final_age = 500
+                    final_age = stellar_age[i]
                     print(repr(interpolator))
-                    b = find_evolution(system=a,
+
+                    b = find_evolution(system = a,
                                        interpolator=interpolator,
                                        dissipation=dissipation,
+                                       max_age=stellar_age[i] * u.Gyr,
+                                       initial_eccentricity=0.5,
+                                       initial_obliquity=0.0,
+                                       disk_period=None,
+                                       disk_dissipation_age=2e-3 * units.Gyr,
+                                       primary_wind_strength=0.17,
+                                       primary_wind_saturation=2.78,
+                                       primary_core_envelope_coupling_timescale=0.05,
+                                       secondary_wind_strength=0.0,
+                                       secondary_wind_saturation=100.0,
+                                       secondary_core_envelope_coupling_timescale=0.05,
+                                       orbital_period_tolerance=1e-6,
                                        solve=True,
-                                       required_ages=numpy.arange(0.1, final_age, 0.1))
+                                       secondary_is_star=False)
+                                       #required_ages=numpy.arange(0.1, final_age, 0.1))
 
-                    y = b.orbital_period[1:42534]
-                    z = b.eccentricity[1:42534]
+                    init = 0
+                    final = len(b.orbital_period)
+                    #final = 5000
+
+                    y = b.orbital_period[init:final]
+                    z = b.eccentricity[init:final]
                     x = []
-                    for i in range(1, 42534):
-                        x = x + [math.log(b.age[i])]
+                    #for i in range(init, len(y)):
+                    #    x = x + [math.log(b.age[i])]
+
+                    x = b.age[init:final]
+
+                    print('length of array =', len(b.orbital_period))
 
                     plt.plot(x, y, label="Orbital period vs. ages")
 
@@ -734,6 +802,10 @@ class BayesianAnalysis:
 
                     # function to show the plot
                     plt.show()
+                    print('age ',x)
+                    print('eccentricity ',z)
+                    print('orbital period ', y)
+                    print('final age = ', final_age)
 
                     evolutionary_data = evolutionary_data + [b]
                     print(repr(dir(b)))
@@ -744,7 +816,21 @@ class BayesianAnalysis:
 
 if __name__ == '__main__':
     test = BayesianAnalysis()
-    test.testing_log_prob()
+    eccentricity_expansion_fname = b"/home/mmmahmud/poet/scripts/eccentricity_expansion_coef.txt"
+    orbital_evolution_library.read_eccentricity_expansion_coefficients(
+        eccentricity_expansion_fname
+    )
+    serialized_dir = '/home/mmmahmud/poet/stellar_evolution_interpolators'
+    manager = StellarEvolutionManager(serialized_dir)
+
+    interpolator = manager.get_interpolator_by_name('default')
+
+    evolutionary_data = test.test_Nasa_Exoplanet_data(interpolator=(interpolator, interpolator))
+
+    print('end')
+
+
+    #test.testing_log_prob()
     #test.MCMC()
 
     #    b = EccentricityDistribution(mean_e_now=0.2, e_now_stdev=0.5, mean_e_env=0.8, e_env_stdev=0.5)
@@ -760,19 +846,7 @@ if __name__ == '__main__':
     #  c = test.pick_a_tuple_from_the_multi_variable_Gaussian_distribution(mean = [2,3,4], standard_deviation=[.2,.4,.5])
     #   print('a random tuple from gaussian distribution: ',c)
 
-    #    eccentricity_expansion_fname = b"/home/mmmahmud/poet/scripts/eccentricity_expansion_coef.txt"
-    #    orbital_evolution_library.read_eccentricity_expansion_coefficients(
-    #        eccentricity_expansion_fname
-    #    )
-    #   serialized_dir = '/home/mmmahmud/poet/stellar_evolution_interpolators'
-    #   manager = StellarEvolutionManager(serialized_dir)
 
-    #   interpolator = manager.get_interpolator_by_name('default')
-
-    #    evolutionary_data = test.test_Nasa_Exoplanet_data(interpolator= (interpolator, interpolator))
-
-
-    print('end')
 
 
 
