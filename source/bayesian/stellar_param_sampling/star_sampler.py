@@ -7,7 +7,7 @@ from matplotlib import pyplot
 import numpy
 from scipy.stats import norm
 from scipy.integrate import cumtrapz
-from scipy.interpolate import RegularGridInterpolator
+from scipy.interpolate import RectBivariateSpline
 from astropy import units as u
 
 class StarSampler:
@@ -16,8 +16,15 @@ class StarSampler:
     def _handle_debug_plot(self, **fname_substitutions):
         """Either save of display the currently set-up plot."""
 
-        caller = inspect.stack()[1].function
+        for caller in inspect.stack()[1:]:
+            if caller.function.startswith('_plot_'):
+                break
+
+        #This should fail if caller remains undefined
+        #pylint: disable=undefined-loop-variable
+        caller = caller.function
         assert caller.startswith('_plot_')
+        #pylint: enable=undefined-loop-variable
 
         filename = (
             self._debug_plots[caller[len('_plot_'):]]
@@ -67,13 +74,15 @@ class StarSampler:
 
         self._handle_debug_plot()
 
+    #Sufficient structure provided by sub-functions.
+    #pylint: disable=too-many-statements
     def _plot_interpolation_performance(self,
                                         *,
                                         calculated_values,
                                         interpolated_values,
                                         feh_grid,
                                         mass_grid,
-                                        tolerance,
+                                        interp_data,
                                         title):
         """Show plot of how the interpolation performs as grid is refined."""
 
@@ -87,43 +96,138 @@ class StarSampler:
             return result
 
 
-        pyplot.subplot(221)
-        plot_feh = get_plot_grid(feh_grid)
-        plot_masses = get_plot_grid(mass_grid)
-        pyplot.pcolormesh(plot_masses,
-                          plot_feh,
-                          calculated_values,
-                          edgecolors='black',
-                          linewidth=0.1)
-        pyplot.xlabel('$M_\star$ [$M_\odot$]')
-        pyplot.ylabel('[Fe/H]')
-        pyplot.title('Calculated')
-        pyplot.colorbar()
+        def plot_interp_details(difference,
+                                max_discrepancy_ind,
+                                direction):
+            """Show the interpolation in mass."""
 
-        pyplot.subplot(222)
-        pyplot.pcolormesh(plot_masses,
-                          plot_feh,
-                          interpolated_values,
-                          edgecolors='black',
-                          linewidth=0.1)
-        pyplot.xlabel('$M_\star$ [$M_\odot$]')
-        pyplot.ylabel('[Fe/H]')
-        pyplot.title('Interpolated')
-        pyplot.colorbar()
+            assert direction in ['mass', 'feh']
 
-        pyplot.subplot(223)
+            interp_grid = getattr(self, '_%s_grid' % direction)
+            interp_x = numpy.linspace(interp_grid[0], interp_grid[-1], 100)
+            interp_y = self._interpolate(
+                self._feh_grid[ : : 2],
+                self._mass_grid[ : : 2],
+                interp_data,
+                (
+                    feh_grid[max_discrepancy_ind[0]: max_discrepancy_ind[0] + 1]
+                    if direction == 'mass' else
+                    interp_x
+                ),
+                (
+                    interp_x
+                    if direction == 'mass' else
+                    mass_grid[
+                        max_discrepancy_ind[1]
+                        :
+                        max_discrepancy_ind[1] + 1
+                    ]
+                )
+            ).flatten()
+            main_plot = pyplot.subplot(211)
+
+            plot_slice = (
+                numpy.s_[max_discrepancy_ind[0], :]
+                if direction == 'mass' else
+                numpy.s_[:, max_discrepancy_ind[1]]
+            )
+            pyplot.plot(interp_x, interp_y, '-r', linewidth=0.25)
+
+            pyplot.plot(
+                interp_grid[ : : 2],
+                interp_data[plot_slice],
+                '.r',
+                label='interp input'
+            )
+
+            plot_grid = mass_grid if direction == 'mass' else feh_grid
+            pyplot.plot(
+                plot_grid,
+                calculated_values[plot_slice],
+                '.g',
+                label='calculated'
+            )
+            pyplot.plot(
+                plot_grid,
+                interpolated_values[plot_slice],
+                '.b',
+                label='interpolated'
+            )
+            pyplot.legend()
+
+            pyplot.subplot(212, sharex=main_plot)
+            pyplot.plot(
+                plot_grid,
+                difference[plot_slice],
+                '.k'
+            )
+            self._handle_debug_plot(
+                title=(
+                    title
+                    +
+                    '_interp_vs_calc_'
+                    +
+                    (
+                        'vM_FeH=%g' % feh_grid[max_discrepancy_ind[0]]
+                        if direction == 'mass' else
+                        'vFeH_M=%g' % mass_grid[max_discrepancy_ind[1]]
+                    )
+                )
+            )
+
+        def plot_interp_performance(difference, max_discrepancy_ind):
+            """Create multi-panel plot showing the current interpolation."""
+
+            pyplot.subplot(221)
+            plot_feh = get_plot_grid(feh_grid)
+            plot_masses = get_plot_grid(mass_grid)
+            pyplot.pcolormesh(plot_masses,
+                              plot_feh,
+                              calculated_values,
+                              edgecolors='none')
+            pyplot.xlabel(r'$M_\star$ [$M_\odot$]')
+            pyplot.ylabel('[Fe/H]')
+            pyplot.title('Calculated')
+            pyplot.colorbar()
+
+            pyplot.subplot(222)
+            pyplot.pcolormesh(plot_masses,
+                              plot_feh,
+                              interpolated_values,
+                              edgecolors='none')
+            pyplot.xlabel(r'$M_\star$ [$M_\odot$]')
+            pyplot.ylabel('[Fe/H]')
+            pyplot.title('Interpolated')
+            pyplot.colorbar()
+
+            pyplot.subplot(223)
+            pyplot.pcolormesh(plot_masses,
+                              plot_feh,
+                              difference,
+                              edgecolors='none')
+            pyplot.xlabel(r'$M_\star$ [$M_\odot$]')
+            pyplot.ylabel('[Fe/H]')
+            pyplot.title('Calculated - Interpolated')
+            pyplot.colorbar()
+
+            pyplot.subplot(224)
+            pyplot.plot(mass_grid,
+                        difference[max_discrepancy_ind[0], : ],
+                        '.r')
+            pyplot.xlabel(r'$M_\star$ [$M_\odot$]')
+            pyplot.ylabel('calc - interp')
+
+            pyplot.twiny()
+            pyplot.plot(feh_grid,
+                        difference[ :, max_discrepancy_ind[1]],
+                        '.b')
+            pyplot.xlabel('[Fe/H]')
+
+            pyplot.suptitle(title)
+
+            self._handle_debug_plot(title=title)
+
         difference = calculated_values - interpolated_values
-        pyplot.pcolormesh(plot_masses,
-                          plot_feh,
-                          difference,
-                          edgecolors='black',
-                          linewidth=0.1)
-        pyplot.xlabel('$M_\star$ [$M_\odot$]')
-        pyplot.ylabel('[Fe/H]')
-        pyplot.title('Calculated - Interpolated')
-        pyplot.colorbar()
-
-        pyplot.subplot(224)
         max_discrepancy_ind = numpy.unravel_index(
             numpy.argmax(
                 numpy.absolute(difference),
@@ -131,19 +235,12 @@ class StarSampler:
             ),
             calculated_values.shape
         )
-        pyplot.plot(mass_grid,
-                    difference[max_discrepancy_ind[0], : ])
-        pyplot.xlabel('$M_\star$ [$M_\odot$]')
-        pyplot.ylabel('calc - interp')
+        plot_interp_details(difference, max_discrepancy_ind, 'mass')
+        plot_interp_details(difference, max_discrepancy_ind, 'feh')
 
-        pyplot.twiny()
-        pyplot.plot(feh_grid,
-                    difference[ :, max_discrepancy_ind[1]])
-        pyplot.xlabel('[Fe/H]')
+        plot_interp_performance(difference, max_discrepancy_ind)
 
-        pyplot.suptitle(title)
-
-        self._handle_debug_plot(title=title)
+    #pylint: enable=too-many-statements
 
     @classmethod
     def list_debug_plots(cls):
@@ -153,9 +250,9 @@ class StarSampler:
                 for k in vars(cls).keys()
                 if k.startswith('_plot_')]
 
-    def _calculate_cdfs(self, mass_grid, feh_grid):
+    def _calculate_age_cdfs(self, mass_grid, feh_grid):
         """
-        Calculate the mass and age CDFs at the given  grid of points.
+        Calculate unnormalized age CDFs at the given grid points.
 
         Args:
             mass_grid(1-D array):     The masses at which to calculate the CDFs.
@@ -168,16 +265,9 @@ class StarSampler:
                 Unnormalized CDF(age | mass, [Fe/H]) at each mass [Fe/H]
                 combination. The first index is over [Fe/H] and the second is
                 over mass.
-
-            2-D array(float):
-                CDF(mass | [Fe/H]) marginalized over age. The first index is
-                over [Fe/H] and the second is over mass.
         """
 
-        mass_cdf = numpy.empty(shape=(feh_grid.size, mass_grid.size),
-                               dtype=float)
-
-        age_cdf = [
+        return [
             [
                 self._log_likelihood.age_integral(mass * u.M_sun, feh)
                 for mass in mass_grid
@@ -185,16 +275,31 @@ class StarSampler:
             for feh_index, feh in enumerate(feh_grid)
         ]
 
-        for feh_index, feh_age_cdf in enumerate(age_cdf):
+
+    def _update_mass_cdfs(self):
+        """
+        Update the mass CDFs for a new grid assuming age CDFs have been updated.
+
+        Angs:
+            None
+
+        Returns:
+            None
+        """
+
+        self._mass_cdf = numpy.empty(
+            shape=(self._feh_grid.size, self._mass_grid.size),
+            dtype=float
+        )
+
+        for feh_index, feh_age_cdf in enumerate(self._age_cdf):
             age_cdf_norm = numpy.array([
                 float(cdf(cdf.t_max)) for cdf in feh_age_cdf
             ])
-            mass_cdf[feh_index, :] = cumtrapz(age_cdf_norm,
-                                              mass_grid,
-                                              initial=0.0)
-            mass_cdf[feh_index, :] /= mass_cdf[feh_index, -1]
-
-        return age_cdf, mass_cdf
+            self._mass_cdf[feh_index, :] = cumtrapz(age_cdf_norm,
+                                                    self._mass_grid,
+                                                    initial=0.0)
+            self._mass_cdf[feh_index, :] /= self._mass_cdf[feh_index, -1]
 
     def _get_initial_feh_grid(self, min_feh, max_feh):
         """
@@ -286,13 +391,12 @@ class StarSampler:
                 target_massses.
         """
 
-        return RegularGridInterpolator(
-            (feh_grid, mass_grid), values
+        return RectBivariateSpline(
+            feh_grid, mass_grid, values, kx=1, ky=1
         )(
-            numpy.stack(
-                numpy.meshgrid(target_feh, target_masses, indexing='ij'),
-                2
-            )
+            target_feh,
+            target_masses,
+            grid=True
         )
 
     def _get_mismatch_indices(self, values, tolerance, debug_title):
@@ -335,7 +439,7 @@ class StarSampler:
                     interpolated_values=interpolated_values,
                     feh_grid=self._feh_grid[feh_offset : : 2],
                     mass_grid=self._mass_grid[mass_offset : : 2],
-                    tolerance=tolerance,
+                    interp_data=values[ : : 2, : : 2],
                     title=(debug_title
                            +
                            ' feh_di=%d, m_di=%d' % (feh_offset, mass_offset))
@@ -430,13 +534,10 @@ class StarSampler:
                 self.config.age_cdf_interp_tolerance,
                 'CDF(t=%g)' % age
             )
-            print('Current mismatch indices: ' + repr(mismatch_indices))
-            print('New mismatch indices: ' + repr(new_mismatches))
             mismatch_indices = [
                 numpy.unique(numpy.concatenate((old, new)))
                 for old, new in zip(mismatch_indices, new_mismatches)
             ]
-            print('Updated mismatch indices: ' + repr(mismatch_indices))
 
         return [
             get_new_grid_points(*args)
@@ -514,45 +615,32 @@ class StarSampler:
                     (self._feh_grid, self._mass_grid), grid_refinement
                 )
             )
+            print('New [Fe/H] grid: ' + repr(new_feh_grid.T))
+            print('New M* grid: ' + repr(new_mass_grid.T))
 
-
-            cdfs_to_add = self._calculate_cdfs(grid_refinement[1][0],
-                                               self._feh_grid)
-            new_mass_old_feh_mass_cdfs = numpy.empty(
-                shape=(self._feh_grid.size, new_mass_grid.size),
-                dtype=self._mass_cdf.dtype
-            )
+            age_cdfs_to_add = self._calculate_age_cdfs(grid_refinement[1][0],
+                                                       self._feh_grid)
             new_mass_old_feh_age_cdfs = [[None] * new_mass_grid.size
                                          for feh in self._feh_grid]
             for feh_index in range(self._feh_grid.size):
-                insert_entries(self._mass_cdf[feh_index],
-                               cdfs_to_add[1][feh_index],
-                               grid_refinement[1][1],
-                               new_mass_old_feh_mass_cdfs[feh_index])
                 insert_entries(self._age_cdf[feh_index],
-                               cdfs_to_add[0][feh_index],
+                               age_cdfs_to_add[feh_index],
                                grid_refinement[1][1],
                                new_mass_old_feh_age_cdfs[feh_index])
 
-            cdfs_to_add = self._calculate_cdfs(new_mass_grid,
-                                               grid_refinement[0][0])
-            self._mass_cdf = numpy.empty(
-                shape=(new_feh_grid.size, new_mass_grid.size),
-                dtype=self._mass_cdf.dtype,
-            )
+            age_cdfs_to_add = self._calculate_age_cdfs(new_mass_grid,
+                                                       grid_refinement[0][0])
             self._age_cdf = [[None] * new_mass_grid.size
                              for feh in new_feh_grid]
-            insert_entries(new_mass_old_feh_mass_cdfs,
-                           cdfs_to_add[1],
-                           grid_refinement[0][1],
-                           self._mass_cdf)
             insert_entries(new_mass_old_feh_age_cdfs,
-                           cdfs_to_add[0],
+                           age_cdfs_to_add,
                            grid_refinement[0][1],
                            self._age_cdf)
 
             self._mass_grid = new_mass_grid
             self._feh_grid = new_feh_grid
+
+            self._update_mass_cdfs()
 
     def __init__(self, log_likelihood, config):
         """
@@ -584,8 +672,9 @@ class StarSampler:
         )
         self._plot_initial_feh_grid()
 
-        self._age_cdf, self._mass_cdf = self._calculate_cdfs(self._mass_grid,
-                                                             self._feh_grid)
+        self._age_cdf = self._calculate_age_cdfs(self._mass_grid,
+                                                 self._feh_grid)
+        self._update_mass_cdfs()
 
         self._grid_refinement_iteration = None
         self._tune_grid_resolution()
