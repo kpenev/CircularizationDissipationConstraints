@@ -4,7 +4,9 @@
 from functools import partial
 from collections import namedtuple
 import os.path
+import sys
 
+import matplotlib
 from configargparse import ArgumentParser, DefaultsFormatter
 from astropy import units as u
 import numpy
@@ -13,6 +15,7 @@ from stellar_evolution.manager import StellarEvolutionManager
 
 from star_sampler import StarSampler
 from gaussian_log_likelihood import GaussianLogLikelihood
+from continous_max_age import plot_max_age
 
 #TODO: make parsed command line match exactly system.
 def parse_configuration():
@@ -186,11 +189,19 @@ def parse_configuration():
             '. If <filename> is empty, the plot is displayed instead of saved.'
         )
     )
+    parser.add_argument(
+        '--debug-plot-dpi',
+        type=int,
+        default=300,
+        help='The resoution to use for debugging plots.'
+    )
 
     return parser.parse_args()
 
 def main(config):
     """Avoid polluting the global namespace."""
+
+#    numpy.set_printoptions(sys.maxsize)
 
     interpolator = StellarEvolutionManager(
         config.stellar_evolution_interpolator_dir
@@ -198,15 +209,31 @@ def main(config):
         'default'
     )
 
+    plot_max_age(interpolator)
+
+    matplotlib.rcParams['figure.dpi'] = config.debug_plot_dpi
+    matplotlib.rcParams['figure.autolayout'] = True
+
     log_likelihood = GaussianLogLikelihood(
         mean=[5.0, 1.0, 0.0],
         covariance=[
-            [1.00, 0.10, 0.20],
-            [0.10, 0.20, 0.05],
-            [0.20, 0.05, 0.50]
+            [0.50, 0.00, 0.00],
+            [0.00, 0.20, 0.00],
+            [0.00, 0.00, 0.50]
         ],
         interpolator=interpolator
     )
+
+    plot_masses, plot_feh = numpy.meshgrid(
+        numpy.linspace(1.11875, 1.11875, 1),
+        numpy.linspace(0.002, -0.002, 5)
+    )
+    log_likelihood.plot_age_cdf_integrand(
+        mass=plot_masses.flatten() * u.M_sun,
+        feh=plot_feh.flatten()
+    )
+    sys.exit(1)
+
     StarSampler(log_likelihood, config)
 
 if __name__ == '__main__':
