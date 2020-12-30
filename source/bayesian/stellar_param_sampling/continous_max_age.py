@@ -53,6 +53,7 @@ def plot_max_age(interpolator):
     pyplot.colorbar()
     pyplot.show()
 
+#TODO: allow using finer grid with smaller offset
 def get_continuous_max_age(interpolator):
     """Return continous f(mass, [Fe/H]) giving max age in POET stellar evol."""
 
