@@ -2,6 +2,8 @@
 
 from abc import ABC, abstractmethod
 
+from matplotlib import pyplot
+import numpy
 from scipy.integrate import solve_ivp
 from astropy import units as u
 
@@ -58,6 +60,67 @@ class LogLikelihoodBase(ABC):
                     self.interpolator.track_feh[-1])
         super().__setattr__(name, value)
 
+    def plot_age_cdf_integrand(self, mass, feh, save_as=None):
+        """
+        Plot the integrant used to calculate CDF(age) and its integral.
+
+        Args:
+            mass:     The mass at which to create plots, along with units. If
+                iterable, multiple plots are created each labeled by the
+                mass & [Fe/H].
+
+            feh:     The [Fe/H] at which to plot. Should have the same shape as
+                mass.
+
+            save_as:    The filename to save the plot as. If None, the plot is
+                displayed instead.
+
+        Returns:
+            None
+        """
+
+        try:
+            mass_feh_zipped = zip(mass, feh)
+        except TypeError:
+            print('Not arrays')
+            mass_feh_zipped = zip([mass], [feh])
+
+
+        integrand_plot = pyplot.subplot(211)
+        integral_plot = pyplot.subplot(212, sharex=integrand_plot)
+
+        for plot_mass, plot_feh in mass_feh_zipped:
+            integral = self.age_integral(plot_mass, plot_feh)
+            plot_ages = numpy.linspace(integral.t_min, integral.t_max, 1000)
+
+            label = r'$M_\star=%g,\ [Fe/H]=%g$' % (plot_mass.to_value(u.M_sun),
+                                                   plot_feh)
+
+            integrand_plot.plot(
+                plot_ages,
+                [
+                    self._age_cdf_integrand(t,
+                                            None,
+                                            plot_mass.to_value(u.M_sun),
+                                            plot_feh)
+                    for t in plot_ages
+                ],
+                '-',
+                label=label
+            )
+
+            integral_plot.plot(plot_ages,
+                               integral(plot_ages).flatten(),
+                               '-')
+
+        integrand_plot.legend()
+
+        if save_as is None:
+            pyplot.show()
+        else:
+            pyplot.savefig(save_as)
+            pyplot.clf()
+
     def age_integral(self, mass=None, feh=None):
         """
         Return age integral re-using results when possible.
@@ -75,6 +138,9 @@ class LogLikelihoodBase(ABC):
             radius = self.interpolator('radius',
                                        mass.to_value(u.M_sun),
                                        feh)
+            print('Integrating age CDF(M=%g, [Fe/H]=%g) for %g < t < %g.'
+                  %
+                  (mass.to_value(u.M_sun), feh, radius.min_age, radius.max_age))
             solution = solve_ivp(self._age_cdf_integrand,
                                  (radius.min_age, radius.max_age),
                                  [0.0],
@@ -83,5 +149,6 @@ class LogLikelihoodBase(ABC):
                                  **self._solve_ivp_options)
             assert solution.success
             self._age_integrals[(mass, feh)] = solution.sol
+            print('Norm: ' + repr(solution.sol(solution.sol.t_max)))
 
         return self._age_integrals[(mass, feh)]
