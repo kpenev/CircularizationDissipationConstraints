@@ -7,6 +7,8 @@ import numpy
 from scipy.integrate import solve_ivp
 from astropy import units as u
 
+from continous_max_age import get_continuous_max_age
+
 class LogLikelihoodBase(ABC):
     """Common interface for log-likelihood functions of stellar paramseters."""
 
@@ -40,6 +42,8 @@ class LogLikelihoodBase(ABC):
         self.default_mass = mass
         self.default_feh = feh
         self._solve_ivp_options = solve_ivp_options
+
+        self._get_max_age = get_continuous_max_age(interpolator)
 
         self._age_integrals = dict()
 
@@ -135,20 +139,17 @@ class LogLikelihoodBase(ABC):
             feh = self.default_feh
 
         if (mass, feh) not in self._age_integrals:
-            radius = self.interpolator('radius',
-                                       mass.to_value(u.M_sun),
-                                       feh)
-            print('Integrating age CDF(M=%g, [Fe/H]=%g) for %g < t < %g.'
-                  %
-                  (mass.to_value(u.M_sun), feh, radius.min_age, radius.max_age))
+            min_age = self.interpolator('radius',
+                                        mass.to_value(u.M_sun),
+                                        feh).min_age
+            max_age = self._get_max_age(mass, feh)
             solution = solve_ivp(self._age_cdf_integrand,
-                                 (radius.min_age, radius.max_age),
+                                 (min_age, max_age),
                                  [0.0],
                                  args=(mass.to_value(u.M_sun), feh),
                                  dense_output=True,
                                  **self._solve_ivp_options)
             assert solution.success
             self._age_integrals[(mass, feh)] = solution.sol
-            print('Norm: ' + repr(solution.sol(solution.sol.t_max)))
 
         return self._age_integrals[(mass, feh)]
