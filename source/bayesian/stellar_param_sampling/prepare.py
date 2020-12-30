@@ -209,10 +209,13 @@ def main(config):
         'default'
     )
 
-    plot_max_age(interpolator)
+#    plot_max_age(interpolator)
 
     matplotlib.rcParams['figure.dpi'] = config.debug_plot_dpi
     matplotlib.rcParams['figure.autolayout'] = True
+
+    age_ode_tolerance = 1e-2 * min(config.age_cdf_interp_tolerance,
+                                   config.mass_cdf_interp_tolerance)
 
     log_likelihood = GaussianLogLikelihood(
         mean=[5.0, 1.0, 0.0],
@@ -221,18 +224,20 @@ def main(config):
             [0.00, 0.20, 0.00],
             [0.00, 0.00, 0.50]
         ],
-        interpolator=interpolator
+        interpolator=interpolator,
+        rtol=age_ode_tolerance,
+        atol=age_ode_tolerance
     )
 
     plot_masses, plot_feh = numpy.meshgrid(
-        numpy.linspace(1.11875, 1.11875, 1),
-        numpy.linspace(0.002, -0.002, 5)
+        numpy.linspace(0.98125, 0.98125, 1),
+        numpy.linspace(-0.3, 0.3, 7)
     )
     log_likelihood.plot_age_cdf_integrand(
         mass=plot_masses.flatten() * u.M_sun,
         feh=plot_feh.flatten()
     )
-    sys.exit(1)
+#    sys.exit(1)
 
     StarSampler(log_likelihood, config)
 
