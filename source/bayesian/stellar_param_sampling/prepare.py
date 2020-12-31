@@ -146,7 +146,7 @@ def parse_configuration():
     parser.add_argument(
         '--age-cdf-interp-tolerance',
         type=float,
-        default=1e-6,
+        default=1e-4,
         help='The maximum absolute difference between 2-D interpolation of time'
         ' CDF(t|M, [Fe/H]) based on grid with 1/4 of the points (1/2 in each '
         'dimension) and the remaining 3/4 of the values. The mass-[Fe/H] grid '
@@ -163,12 +163,22 @@ def parse_configuration():
     parser.add_argument(
         '--mass-cdf-interp-tolerance',
         type=float,
-        default=1e-6,
+        default=1e-4,
         help='The maximum absolute difference between 1-D interpolation of '
         'CDF(M|[Fe/H]) (marginalized over age) based on grid with 1/4 of the '
         'point and the calculated values at the remaining 3/4 of the points. '
         'The resolution of the mass-[Fe/H] grid is increased until this '
         'criterion is satisfied.'
+    )
+    parser.add_argument(
+        '--grid-refine-algorithm',
+        choices=['all', 'worst'],
+        default='worst',
+        help='Choose how interpolation grid for CDFs is going to be refined. If'
+        " `'all'`, all indices in each dimension for which precision is not "
+        "satisfied get new neighbors added. If `'worst'`, only the worst "
+        'deviating mass and [Fe/H] entries get higher resolution at the next '
+        'iteration.'
     )
     parser.add_argument(
         '--num-parallel-processes', '-p',
@@ -214,9 +224,6 @@ def main(config):
     matplotlib.rcParams['figure.dpi'] = config.debug_plot_dpi
     matplotlib.rcParams['figure.autolayout'] = True
 
-    age_ode_tolerance = 1e-2 * min(config.age_cdf_interp_tolerance,
-                                   config.mass_cdf_interp_tolerance)
-
     log_likelihood = GaussianLogLikelihood(
         mean=[5.0, 1.0, 0.0],
         covariance=[
@@ -225,8 +232,8 @@ def main(config):
             [0.00, 0.00, 0.50]
         ],
         interpolator=interpolator,
-        rtol=age_ode_tolerance,
-        atol=age_ode_tolerance
+        rtol=config.time_ode_rtol,
+        atol=config.time_ode_atol
     )
 
     plot_masses, plot_feh = numpy.meshgrid(
