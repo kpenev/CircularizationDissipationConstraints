@@ -2,7 +2,8 @@
 
 import inspect
 from itertools import count
-from pickle import Pickler, Unpickler, UnpicklingError
+from pickle import Pickler, Unpickler
+import os.path
 
 from matplotlib import pyplot
 import numpy
@@ -504,7 +505,15 @@ class StarSampler:
         return numpy.array(
             [
                 [
-                    float(age_cdf(age)) for age_cdf in feh_age_cdf_funcs
+                    float(
+                        age_cdf(
+                            max(
+                                min(age, age_cdf.t_max),
+                                age_cdf.t_min
+                            )
+                        )
+                    )
+                    for age_cdf in feh_age_cdf_funcs
                 ]
                 for feh_age_cdf_funcs in self._age_cdf
             ]
@@ -531,6 +540,9 @@ class StarSampler:
 
         def get_new_grid_points(mismatch_indices, current_grid):
             """Return new values to add per the given mismatch indices."""
+
+            if mismatch_indices.size == 0:
+                return numpy.array([])
 
             below_indices = numpy.unique(
                 numpy.concatenate((
@@ -738,6 +750,9 @@ class StarSampler:
             return pickled_cfg_dict == input_cfg_dict
 
 
+        if not os.path.exists(self.config.pickle_fname):
+            open(self.config.pickle_fname, 'wb').close()
+            return False
         try:
             with open(self.config.pickle_fname, 'rb') as pickle_file:
                 unpickler = Unpickler(pickle_file)
@@ -762,7 +777,7 @@ class StarSampler:
 
                     for _ in range(nobjects):
                         unpickler.load()
-        except UnpicklingError:
+        except EOFError:
             return False
 
     def _add_to_pickle_file(self):
