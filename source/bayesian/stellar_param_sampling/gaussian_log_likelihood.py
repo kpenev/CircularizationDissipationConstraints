@@ -14,6 +14,30 @@ class GaussianLogLikelihood(LogLikelihoodBase):
 
         return self.distribution.pdf([age, mass, feh])
 
+    def __eq__(self, other):
+
+        return (
+            type(self).__name__ == type(other).__name__
+            and
+            (self.distribution.mean == other.distribution.mean).all()
+            and
+            (self.distribution.cov == other.distribution.cov).all()
+            and
+            super().__eq__(other)
+
+        )
+
+    def __getstate__(self):
+        """Add distribution to parent's pickled state."""
+
+        return super().__getstate__(), self.distribution
+
+    def __setstate__(self, state):
+        """Set the distribution and pass to parent to finish unpickling."""
+
+        super().__setstate__(state[0])
+        self.distribution = state[1]
+
     def __init__(self, mean, covariance, *args, **kwargs):
         """
         Set up the log-likelihood with the given mean and covariance.

@@ -16,6 +16,32 @@ class LogLikelihoodBase(ABC):
     def _age_cdf_integrand(self, age, _, mass, feh):
         """Unnormalized posterior PDF excluding direct [Fe/H] measurement."""
 
+
+    def __eq__(self, other):
+        """Is other mathematicall the same log-likelihood."""
+
+        return (
+            self.default_mass == other.default_mass
+            and
+            self.default_feh == other.default_feh
+            and
+            self._solve_ivp_options == other._solve_ivp_options
+            and
+            self.interpolator.name == other.interpolator.name
+            and
+            self.interpolator.smoothing == other.interpolator.smoothing
+            and
+            self.interpolator.nodes == other.interpolator.nodes
+            and
+            self.interpolator.vs_log_age == other.interpolator.vs_log_age
+            and
+            self.interpolator.log_quantity == other.interpolator.log_quantity
+            and
+            self.interpolator.track_masses == other.interpolator.track_masses
+            and
+            self.interpolator.track_feh == other.interpolator.track_feh
+        )
+
     def __init__(self,
                  interpolator,
                  mass=1.0 * u.M_sun,
@@ -63,6 +89,32 @@ class LogLikelihoodBase(ABC):
                     <
                     self.interpolator.track_feh[-1])
         super().__setattr__(name, value)
+
+    def __getstate__(self):
+        """
+        Do not pickle cached integrals or interpolator (must be set manually).
+        """
+
+        return (
+            self._get_max_age,
+            self.default_mass,
+            self.default_feh,
+            self._solve_ivp_options
+        )
+
+    def __setstate__(self, state):
+        """
+        Load a pickled likelihood (interpolator must already be defined).
+        """
+
+        (
+            self._get_max_age,
+            self.default_mass,
+            self.default_feh,
+            self._solve_ivp_options
+        ) = state
+        assert not hasattr(self, '_age_integrals')
+        self._age_integrals = dict()
 
     def plot_age_cdf_integrand(self, mass, feh, save_as=None):
         """
