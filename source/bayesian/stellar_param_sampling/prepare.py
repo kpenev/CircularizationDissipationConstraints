@@ -233,7 +233,8 @@ def main(config):
         ],
         interpolator=interpolator,
         rtol=config.time_ode_rtol,
-        atol=config.time_ode_atol
+        atol=config.time_ode_atol,
+        max_step=config.time_ode_max_step
     )
 
     plot_masses, plot_feh = numpy.meshgrid(
