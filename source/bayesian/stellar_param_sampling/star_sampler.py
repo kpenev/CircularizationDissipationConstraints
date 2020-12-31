@@ -2,6 +2,7 @@
 
 import inspect
 from itertools import count
+from pickle import Pickler, Unpickler
 
 from matplotlib import pyplot
 import numpy
@@ -12,6 +13,13 @@ from astropy import units as u
 
 class StarSampler:
     """Implenet calculation, saving, and loading of star parameter sampling."""
+
+    _mass_cdf = None
+    _age_cdf = None
+    _log_likelihood = None
+    _feh_grid = None
+    _mass_grid = None
+    _grid_refinement_iteration = None
 
     def _handle_debug_plot(self, **fname_substitutions):
         """Either save of display the currently set-up plot."""
@@ -399,6 +407,40 @@ class StarSampler:
             grid=True
         )
 
+    @staticmethod
+    def _select_mismatches_all(calculated_values,
+                               interpolated_values,
+                               tolerance):
+        """Return [Fe/H] and mass indices to refine."""
+
+        return numpy.nonzero(
+            numpy.absolute(calculated_values - interpolated_values)
+            >
+            tolerance
+        )
+
+    @staticmethod
+    def _select_mismatches_worst(calculated_values,
+                                 interpolated_values,
+                                 tolerance):
+        """Return [Fe/H], mass index of worst mismatch as 1-element arrays."""
+
+        abs_difference = numpy.absolute(calculated_values - interpolated_values)
+        worst_index = numpy.unravel_index(
+            numpy.argmax(
+                abs_difference,
+                axis=None
+            ),
+            calculated_values.shape
+        )
+
+        if abs_difference[worst_index] <= tolerance:
+            return numpy.array([], dtype=int), numpy.array([], dtype=int)
+
+        return tuple(
+            numpy.array([ind]) for ind in worst_index
+        )
+
     def _get_mismatch_indices(self, values, tolerance, debug_title):
         """
         Return indices where interpolating values fails on current grid.
@@ -419,8 +461,7 @@ class StarSampler:
                 fails.
         """
 
-        mass_mismatches = numpy.array([], dtype=int)
-        feh_mismatches = numpy.array([], dtype=int)
+        mismatches = (numpy.array([], dtype=int), numpy.array([], dtype=int))
         for feh_offset in [0, 1]:
             for mass_offset in [0, 1]:
                 if feh_offset == mass_offset == 0:
@@ -445,25 +486,24 @@ class StarSampler:
                            ' feh_di=%d, m_di=%d' % (feh_offset, mass_offset))
                 )
 
-                mismatch_indices = numpy.argwhere(
-                    numpy.absolute(calculated_values - interpolated_values)
-                    >
-                    tolerance
-                )
-                feh_mismatches = numpy.unique(
-                    numpy.concatenate((
-                        feh_mismatches,
-                        2 * mismatch_indices[:, 0] + feh_offset
-                    ))
-                )
-                mass_mismatches = numpy.unique(
-                    numpy.concatenate((
-                        mass_mismatches,
-                        2 * mismatch_indices[:, 1] + mass_offset
-                    ))
+                new_mismatches = getattr(
+                    self,
+                    '_select_mismatches_' + self.config.grid_refine_algorithm
+                )(calculated_values, interpolated_values, tolerance)
+
+                mismatches = tuple(
+                    numpy.unique(
+                        numpy.concatenate((
+                            old,
+                            2 * new + offset
+                        ))
+                    )
+                    for new, old, offset in zip(new_mismatches,
+                                                mismatches,
+                                                [feh_offset, mass_offset])
                 )
 
-        return feh_mismatches, mass_mismatches
+        return mismatches
 
     def _eval_age_cdfs(self, age):
         """Return the same shape as self._age_cdf but evaluated at age."""
@@ -538,6 +578,7 @@ class StarSampler:
                 numpy.unique(numpy.concatenate((old, new)))
                 for old, new in zip(mismatch_indices, new_mismatches)
             ]
+            print('Mismatch indices: ' + repr(mismatch_indices))
 
         return [
             get_new_grid_points(*args)
@@ -642,18 +683,12 @@ class StarSampler:
 
             self._update_mass_cdfs()
 
-    def __init__(self, log_likelihood, config):
+    def _prepare_new_sampler(self, log_likelihood, config):
         """
-        Find sampler for the given log_likelihood satisfying the given config.
+        Build new sampler of the given log_likelihood satisfying given config.
 
         Args:
-            log_likelihood(LogLikelihoodBase):     The log-likelihood function
-                to base sampling on. It should not include the direct
-                measurement of the metallicity specified through config.
-
-            config:    The configuration specifying what is considered good
-                approximation to the true distributoin. See command lines of
-                `prepare.py` executable.
+            See :meth:`__init__`.
 
         Returns:
             None
@@ -676,5 +711,53 @@ class StarSampler:
                                                  self._feh_grid)
         self._update_mass_cdfs()
 
-        self._grid_refinement_iteration = None
         self._tune_grid_resolution()
+
+    def _check_for_pickled(self, log_likelihood, config):
+        """
+        Check for a pre-pickled sampler for the given log_likelihood and config.
+
+        Args:
+            see :meth:`__init__`
+
+        Returns:
+            bool:
+                Whether a matching sampler was found.
+        """
+
+        def compare_config(pickled_config):
+            """Return True iff the pickled config matches input config."""
+
+        with open(config.pickle_fname, 'rb') as pickle_file:
+            unpickler = Unpickler(pickle_file)
+            while True:
+                section, nobjects = unpickler.load()
+                assert isinstance(section, str)
+                assert isinstance(nobjects, int)
+                if section == 'StarSampler':
+                    assert nobjects == 6
+                    nobjects -= 1
+                    if not compare_config(unpickler.load()):
+                        break
+
+                for _ in range(nobjects):
+                    unpickler.load()
+
+    def __init__(self, log_likelihood, config):
+        """
+        Find sampler for the given log_likelihood satisfying the given config.
+
+        Args:
+            log_likelihood(LogLikelihoodBase):     The log-likelihood function
+                to base sampling on. It should not include the direct
+                measurement of the metallicity specified through config.
+
+            config:    The configuration specifying what is considered good
+                approximation to the true distributoin. See command lines of
+                `prepare.py` executable.
+
+        Returns:
+            None
+        """
+
+        self._prepare_new_sampler(log_likelihood, config)
