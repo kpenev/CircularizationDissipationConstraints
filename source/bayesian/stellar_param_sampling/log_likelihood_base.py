@@ -12,6 +12,15 @@ from continous_max_age import get_continuous_max_age
 class LogLikelihoodBase(ABC):
     """Common interface for log-likelihood functions of stellar paramseters."""
 
+    interpolator = None
+
+    @classmethod
+    def set_interpolator(cls, interpolator):
+        """Define a shared interpolator to be used by all log-likelihoods."""
+
+        assert cls.interpolator is None
+        cls.interpolator = interpolator
+
     @abstractmethod
     def _age_cdf_integrand(self, age, _, mass, feh):
         """Unnormalized posterior PDF excluding direct [Fe/H] measurement."""
@@ -43,7 +52,6 @@ class LogLikelihoodBase(ABC):
         )
 
     def __init__(self,
-                 interpolator,
                  mass=1.0 * u.M_sun,
                  feh=0.0,
                  **solve_ivp_options):
@@ -64,12 +72,11 @@ class LogLikelihoodBase(ABC):
                 calculating the integral of the age PDF.
         """
 
-        self.interpolator = interpolator
         self.default_mass = mass
         self.default_feh = feh
         self._solve_ivp_options = solve_ivp_options
 
-        self._get_max_age = get_continuous_max_age(interpolator)
+        self._get_max_age = get_continuous_max_age(self.interpolator)
 
         self._age_integrals = dict()
 
@@ -177,11 +184,11 @@ class LogLikelihoodBase(ABC):
             pyplot.savefig(save_as)
             pyplot.clf()
 
-    def age_integral(self, mass=None, feh=None):
+    def age_integral(self, mass=None, feh=None, disable_caching=False):
         """
         Return age integral re-using results when possible.
 
-        If mass and/or feh are not None, the default values are used.
+        If mass and/or feh are None, the default values are used.
         """
 
         if mass is None:
@@ -190,18 +197,23 @@ class LogLikelihoodBase(ABC):
         if feh is None:
             feh = self.default_feh
 
-        if (mass, feh) not in self._age_integrals:
-            min_age = self.interpolator('radius',
-                                        mass.to_value(u.M_sun),
-                                        feh).min_age
-            max_age = self._get_max_age(mass, feh)
-            solution = solve_ivp(self._age_cdf_integrand,
-                                 (min_age, max_age),
-                                 [0.0],
-                                 args=(mass.to_value(u.M_sun), feh),
-                                 dense_output=True,
-                                 **self._solve_ivp_options)
-            assert solution.success
-            self._age_integrals[(mass, feh)] = solution.sol
+        if (mass, feh) in self._age_integrals:
+            return self._age_integrals[(mass, feh)]
 
-        return self._age_integrals[(mass, feh)]
+        #False positive
+        #pylint: disable=not-callable
+        min_age = self.interpolator('radius',
+                                    mass.to_value(u.M_sun),
+                                    feh).min_age
+        #pylint: enable=not-callable
+        max_age = self._get_max_age(mass, feh)
+        solution = solve_ivp(self._age_cdf_integrand,
+                             (min_age, max_age),
+                             [0.0],
+                             args=(mass.to_value(u.M_sun), feh),
+                             dense_output=True,
+                             **self._solve_ivp_options)
+        assert solution.success
+        if not disable_caching:
+            self._age_integrals[(mass, feh)] = solution.sol
+        return solution.sol

@@ -7,11 +7,19 @@ import os.path
 
 from matplotlib import pyplot
 import numpy
-from scipy.stats import norm
+from scipy.stats import rv_continuous
+from scipy.stats.distributions import rv_frozen
 from scipy.integrate import cumtrapz
-from scipy.interpolate import RectBivariateSpline
+from scipy.interpolate import RectBivariateSpline, InterpolatedUnivariateSpline
+from scipy.optimize import brentq
+#False positive
+#pylint: disable=no-name-in-module
+from scipy.special import erf
+#pylint: enable=no-name-in-module
 from astropy import units as u
 
+#Could not find reasonable way to reduce attributes.
+#pylint: disable=too-many-instance-attributes
 class StarSampler:
     """Implenet calculation, saving, and loading of star parameter sampling."""
 
@@ -59,16 +67,20 @@ class StarSampler:
                     -x_range * self.config.feh_max_step + self._feh_grid[-1],
                     #pylint: enable=invalid-unary-operand-type
                     '-')
-        pyplot.axhline(self.config.feh.value)
-        pyplot.axhline(self.config.feh.value + self.config.feh.plus_error)
-        pyplot.axhline(self.config.feh.value - self.config.feh.minus_error)
+
+        tail = erf(2.0**-0.5) / 2.0
+        feh_mode = self.config.feh.kwds['loc']
+        feh_interval = (self.config.feh.ppf(tail), self.config.feh.isf(tail))
+        pyplot.axhline(feh_mode)
+        pyplot.axhline(feh_interval[0])
+        pyplot.axhline(feh_interval[1])
         pyplot.show()
 
-        scaled_feh_diff = self._feh_grid - self.config.feh.value
-        scaled_feh_diff[scaled_feh_diff > 0] /= self.config.feh.plus_error
-        scaled_feh_diff[scaled_feh_diff < 0] /= self.config.feh.minus_error
-        feh_cdf = norm.cdf(scaled_feh_diff)
-        x_med = numpy.argmin(numpy.fabs(self._feh_grid - self.config.feh.value))
+        scaled_feh_diff = self._feh_grid - feh_mode
+        scaled_feh_diff[scaled_feh_diff > 0] /= feh_interval[1] - feh_mode
+        scaled_feh_diff[scaled_feh_diff < 0] /= feh_mode - feh_interval[0]
+        feh_cdf = self.config.feh.cdf(scaled_feh_diff)
+        x_med = numpy.argmin(numpy.fabs(self._feh_grid - feh_mode))
         pyplot.plot(feh_cdf, '.')
         pyplot.plot(x_range,
                     0.5 + (x_range - x_med) * self.config.feh_max_cdf_step,
@@ -87,6 +99,9 @@ class StarSampler:
                                         interp_data,
                                         title):
         """Show plot of how the interpolation performs as grid is refined."""
+
+        if 'interpolation_performance' not in self._debug_plots:
+            return
 
         def get_plot_grid(grid):
             """Return a new grid with point 1/2 between input grid."""
@@ -244,6 +259,19 @@ class StarSampler:
 
     #pylint: enable=too-many-statements
 
+    def _plot_feh_cdf(self):
+        """Plot CDF([Fe/H])."""
+
+        if 'feh_cdf' not in self._debug_plots:
+            return
+
+        feh = numpy.linspace(self._feh_grid[0], self._feh_grid[-1], 1000)
+        cdf = self._feh_cdf(feh)
+        pyplot.plot(feh, cdf)
+        pyplot.xlabel('CDF([Fe/H])')
+        pyplot.ylabel('[Fe/H]')
+        self._handle_debug_plot()
+
     @classmethod
     def list_debug_plots(cls):
         """List all debug plots this class can generate."""
@@ -252,7 +280,7 @@ class StarSampler:
                 for k in vars(cls).keys()
                 if k.startswith('_plot_')]
 
-    def _calculate_age_cdfs(self, mass_grid, feh_grid):
+    def _calculate_age_cdf_norms(self, mass_grid, feh_grid):
         """
         Calculate unnormalized age CDFs at the given grid points.
 
@@ -269,14 +297,14 @@ class StarSampler:
                 over mass.
         """
 
-        return [
-            [
-                self._log_likelihood.age_integral(mass * u.M_sun, feh)
-                for mass in mass_grid
-            ]
-            for feh_index, feh in enumerate(feh_grid)
-        ]
+        result = numpy.empty((feh_grid.size, mass_grid.size), dtype=float)
+        for feh_index, feh in enumerate(feh_grid):
+            for mass_index, mass in enumerate(mass_grid):
+                age_integral = self._log_likelihood.age_integral(mass * u.M_sun,
+                                                                 feh)
+                result[feh_index, mass_index] = age_integral(age_integral.t_max)
 
+        return result
 
     def _update_mass_cdfs(self):
         """
@@ -294,60 +322,69 @@ class StarSampler:
             dtype=float
         )
 
-        for feh_index, feh_age_cdf in enumerate(self._age_cdf):
-            age_cdf_norm = numpy.array([
-                float(cdf(cdf.t_max)) for cdf in feh_age_cdf
-            ])
-            self._mass_cdf[feh_index, :] = cumtrapz(age_cdf_norm,
+        for feh_index, feh_age_cdf_norms in enumerate(self._age_cdf_norms):
+            self._mass_cdf[feh_index, :] = cumtrapz(feh_age_cdf_norms,
                                                     self._mass_grid,
                                                     initial=0.0)
-            self._mass_cdf[feh_index, :] /= self._mass_cdf[feh_index, -1]
+
+    def _update_feh_cdf(self):
+        """Update the [Fe/H] CDF per the current setup."""
+
+        feh_cdf = cumtrapz(
+            self.config.feh.pdf(self._feh_grid) * self._mass_cdf[:, -1],
+            self._feh_grid,
+            initial=0.0
+        )
+        print('[Fe/H] CDF: ' + repr(feh_cdf / feh_cdf[-1]))
+        self._feh_cdf = InterpolatedUnivariateSpline(
+            self._feh_grid,
+            feh_cdf / feh_cdf[-1],
+            k=2,
+            ext=2
+        )
+
+    def _get_mass(self, feh, mass_random_variable):
+        """Return the inverse of CDF(M*|[Fe/H])."""
+
+        mass_cdf = self._interpolate(
+            self._feh_grid,
+            self._mass_grid,
+            self._mass_cdf,
+            feh,
+            self._mass_grid
+        )
+
+        return InterpolatedUnivariateSpline(
+            mass_cdf / mass_cdf[-1],
+            self._mass_grid,
+            k=1,
+            ext=2
+        )(
+            mass_random_variable
+        )
 
     def _get_initial_feh_grid(self, min_feh, max_feh):
         """
         Create the initial [Fe/H] grid to start deriving the interpolation from.
         """
 
-        def get_half_grid_offsets(side):
-            """Return the grid pts on one side (plus or minus) of the median."""
+        tail = self.config.max_discarded_feh_probability / 2.0
+        feh = max(self.config.feh.ppf(tail), min_feh)
 
-            assert side in ['plus', 'minus']
+        max_feh = min(max_feh, self.config.feh.isf(tail))
 
-            distribution = norm(scale=getattr(self.config.feh, side + '_error'))
-
-            offset = distribution.isf(self.config.max_discarded_feh_probability
-                                      /
-                                      2.0)
-            offset = min(
-                offset,
-                (
-                    max_feh - self.config.feh.value if side == 'plus'
-                    else self.config.feh.value - min_feh
-                )
+        result = []
+        while feh < max_feh:
+            result.append(feh)
+            current_cdf = self.config.feh.cdf(feh)
+            feh = min(
+                feh + self.config.feh_max_step,
+                self.config.feh.ppf(current_cdf + self.config.feh_max_cdf_step)
             )
 
-            result = []
-            while offset > 0:
-                result.append(offset)
-                current_sf = distribution.sf(offset)
-                offset = max(
-                    offset - self.config.feh_max_step,
-                    distribution.isf(current_sf + self.config.feh_max_cdf_step)
-                )
+        result.append(max_feh)
 
-            result = numpy.array(result)
-            if side == 'minus':
-                #False positive
-                #pylint: disable=invalid-unary-operand-type
-                return -result
-                #pylint: enable=invalid-unary-operand-type
-            return result[ : : -1]
-
-        return numpy.concatenate(
-            (get_half_grid_offsets('minus'),
-             [0],
-             get_half_grid_offsets('plus'))
-        ) + self.config.feh.value
+        return numpy.array(result)
 
     def _get_initial_mass_grid(self, min_mass, max_mass):
         """
@@ -499,27 +536,6 @@ class StarSampler:
 
         return mismatches
 
-    def _eval_age_cdfs(self, age):
-        """Return the same shape as self._age_cdf but evaluated at age."""
-
-        return numpy.array(
-            [
-                [
-                    float(
-                        age_cdf(
-                            max(
-                                min(age, age_cdf.t_max),
-                                age_cdf.t_min
-                            )
-                        )
-                    )
-                    for age_cdf in feh_age_cdf_funcs
-                ]
-                for feh_age_cdf_funcs in self._age_cdf
-            ]
-        )
-
-
     def _get_grid_refinement(self):
         """
         Return [Fe/H] and masses to add to grid to improve the interpolation.
@@ -542,7 +558,7 @@ class StarSampler:
             """Return new values to add per the given mismatch indices."""
 
             if mismatch_indices.size == 0:
-                return numpy.array([])
+                return numpy.array([], dtype=float), numpy.array([], dtype=int)
 
             below_indices = numpy.unique(
                 numpy.concatenate((
@@ -573,17 +589,7 @@ class StarSampler:
             )
         )
 
-        for age in 10.0**(self.config.age_cdf_check_log_ages):
-            new_mismatches = self._get_mismatch_indices(
-                self._eval_age_cdfs(age),
-                self.config.age_cdf_interp_tolerance,
-                'CDF(t=%g)' % age
-            )
-            mismatch_indices = [
-                numpy.unique(numpy.concatenate((old, new)))
-                for old, new in zip(mismatch_indices, new_mismatches)
-            ]
-            print('Mismatch indices: ' + repr(mismatch_indices))
+        print('Mismatch indices: ' + repr(mismatch_indices))
 
         return [
             get_new_grid_points(*args)
@@ -664,24 +670,28 @@ class StarSampler:
             print('New [Fe/H] grid: ' + repr(new_feh_grid.T))
             print('New M* grid: ' + repr(new_mass_grid.T))
 
-            age_cdfs_to_add = self._calculate_age_cdfs(grid_refinement[1][0],
-                                                       self._feh_grid)
-            new_mass_old_feh_age_cdfs = [[None] * new_mass_grid.size
-                                         for feh in self._feh_grid]
+            age_cdf_norms_to_add = self._calculate_age_cdf_norms(
+                grid_refinement[1][0],
+                self._feh_grid
+            )
+            new_mass_old_feh_age_cdf_norms = [[None] * new_mass_grid.size
+                                              for feh in self._feh_grid]
             for feh_index in range(self._feh_grid.size):
-                insert_entries(self._age_cdf[feh_index],
-                               age_cdfs_to_add[feh_index],
+                insert_entries(self._age_cdf_norms[feh_index],
+                               age_cdf_norms_to_add[feh_index],
                                grid_refinement[1][1],
-                               new_mass_old_feh_age_cdfs[feh_index])
+                               new_mass_old_feh_age_cdf_norms[feh_index])
 
-            age_cdfs_to_add = self._calculate_age_cdfs(new_mass_grid,
-                                                       grid_refinement[0][0])
-            self._age_cdf = [[None] * new_mass_grid.size
-                             for feh in new_feh_grid]
-            insert_entries(new_mass_old_feh_age_cdfs,
+            age_cdfs_to_add = self._calculate_age_cdf_norms(
+                new_mass_grid,
+                grid_refinement[0][0]
+            )
+            self._age_cdf_norms = [[None] * new_mass_grid.size
+                                   for feh in new_feh_grid]
+            insert_entries(new_mass_old_feh_age_cdf_norms,
                            age_cdfs_to_add,
                            grid_refinement[0][1],
-                           self._age_cdf)
+                           self._age_cdf_norms)
 
             self._mass_grid = new_mass_grid
             self._feh_grid = new_feh_grid
@@ -699,7 +709,6 @@ class StarSampler:
             None
         """
 
-        self._debug_plots = dict(self.config.debug_plot)
         self._feh_grid = self._get_initial_feh_grid(
             float(self._log_likelihood.interpolator.track_feh[0]),
             float(self._log_likelihood.interpolator.track_feh[-1])
@@ -710,8 +719,8 @@ class StarSampler:
         )
         self._plot_initial_feh_grid()
 
-        self._age_cdf = self._calculate_age_cdfs(self._mass_grid,
-                                                 self._feh_grid)
+        self._age_cdf_norms = self._calculate_age_cdf_norms(self._mass_grid,
+                                                            self._feh_grid)
         self._update_mass_cdfs()
 
         self._tune_grid_resolution()
@@ -747,6 +756,24 @@ class StarSampler:
                 if arg in input_cfg_dict:
                     del input_cfg_dict[arg]
 
+            for key in list(pickled_cfg_dict.keys()):
+                if key not in input_cfg_dict:
+                    return False
+                pickled_value = pickled_cfg_dict[key]
+                if isinstance(pickled_value, (rv_continuous, rv_frozen)):
+                    if pickled_value.kwds != input_cfg_dict[key].kwds:
+                        return False
+                    del pickled_cfg_dict[key]
+                    del input_cfg_dict[key]
+                elif isinstance(pickled_value, numpy.ndarray):
+                    if not (pickled_value == input_cfg_dict[key]).all():
+                        return False
+                    del pickled_cfg_dict[key]
+                    del input_cfg_dict[key]
+
+            print('Pickled config: ' + repr(pickled_cfg_dict))
+            print('Current config: ' + repr(input_cfg_dict))
+
             return pickled_cfg_dict == input_cfg_dict
 
 
@@ -764,13 +791,16 @@ class StarSampler:
                         assert nobjects == 6
                         nobjects -= 1
                         if not compare_config(unpickler.load()):
+                            print('Configurations do not match.')
                             break
                         nobjects -= 1
                         if self._log_likelihood != unpickler.load():
+                            print('Log-likelihoods do not match.')
                             break
 
+                        print('Match found')
                         self._mass_cdf = unpickler.load()
-                        self._age_cdf = unpickler.load()
+                        self._age_cdf_norms = unpickler.load()
                         self._feh_grid = unpickler.load()
                         self._mass_grid = unpickler.load()
                         return True
@@ -789,7 +819,7 @@ class StarSampler:
             pickler.dump(self.config)
             pickler.dump(self._log_likelihood)
             pickler.dump(self._mass_cdf)
-            pickler.dump(self._age_cdf)
+            pickler.dump(self._age_cdf_norms)
             pickler.dump(self._feh_grid)
             pickler.dump(self._mass_grid)
 
@@ -813,11 +843,51 @@ class StarSampler:
         self.config = config
         self._log_likelihood = log_likelihood
         self._mass_cdf = None
-        self._age_cdf = None
+        self._age_cdf_norms = None
         self._feh_grid = None
         self._mass_grid = None
         self._grid_refinement_iteration = None
+        self._feh_cdf = None
+        self._debug_plots = dict(self.config.debug_plot)
 
         if not self._check_for_pickled():
             self._prepare_new_sampler()
             self._add_to_pickle_file()
+
+        self._update_feh_cdf()
+
+        self._plot_feh_cdf()
+
+    def __call__(self, unit_cube):
+        """
+        Map unit cube to stellar [Fe/H], mass, age with proper distribution.
+
+        Args:
+            unit_cube(3-element collection):     Three independently sampled
+                uniform(0, 1) random values to convert to stellar parameters.
+
+        Returns:
+            double:
+                The [Fe/H] value.
+
+            double:
+                The stellar mass.
+
+            double:
+                The stellar age.
+        """
+
+        assert unit_cube.shape == (3,)
+        feh = brentq(lambda feh: self._feh_cdf(feh) - unit_cube[0],
+                     self._feh_grid[0],
+                     self._feh_grid[-1])
+        mass = self._get_mass(feh, unit_cube[1])
+        age_cdf = self._log_likelihood.age_integral(mass * u.M_sun, feh)
+        age_cdf_norm = age_cdf(age_cdf.t_max)
+        age = brentq(
+            lambda t: age_cdf(t) / age_cdf_norm - unit_cube[2],
+            age_cdf.t_min,
+            age_cdf.t_max
+        )
+        return feh, mass, age
+#pylint: enable=too-many-instance-attributes

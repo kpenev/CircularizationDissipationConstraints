@@ -4,7 +4,6 @@
 from functools import partial
 from collections import namedtuple
 import os.path
-import sys
 
 import matplotlib
 from configargparse import ArgumentParser, DefaultsFormatter
@@ -12,28 +11,31 @@ from astropy import units as u
 import numpy
 
 from stellar_evolution.manager import StellarEvolutionManager
+from split_normal_distribution import split_normal
 
 from star_sampler import StarSampler
 from gaussian_log_likelihood import GaussianLogLikelihood
-from continous_max_age import plot_max_age
+
+RandomQuantity = namedtuple('RandomQuantity', ['distribution', 'units'])
 
 #TODO: make parsed command line match exactly system.
 def parse_configuration():
     """Return the configuration to use per the command line."""
 
-    def parse_quanitty_with_errors(value_str, units=1):
+    def parse_quantity_with_errors(value_str, units=None):
         """Parse a string like 5.0 +- 1.3 or 5.0 +0.2 -0.8 (space optional)."""
 
         value_str, error_str = value_str.rsplit('+', 1)
         plus_error_str, minus_error_str = error_str.rsplit('-', 1)
 
-        ValueWithErrors = namedtuple('ValueWithErrors', ['value',
-                                                         'plus_error',
-                                                         'minus_error'])
-        return ValueWithErrors(
-            value=float(value_str) * units,
-            plus_error=float(plus_error_str or minus_error_str) * units,
-            minus_error=float(minus_error_str) * units
+        distribution = split_normal.freeze_error_bar(
+            mode=float(value_str),
+            abs_plus_error=float(plus_error_str or minus_error_str),
+            abs_minus_error=float(minus_error_str)
+        )
+        return (
+            distribution if units is None
+            else RandomQuantity(distribution, units)
         )
 
     debug_plots = StarSampler.list_debug_plots()
@@ -68,28 +70,28 @@ def parse_configuration():
     )
     parser.add_argument(
         '--feh',
-        type=parse_quanitty_with_errors,
+        type=parse_quantity_with_errors,
         help='The measured [Fe/H] for the star as well as its estimated '
         'standard deviation(s), possibly asymmetric. If using command line '
         'system parameters, this argument must be specified.'
     )
     parser.add_argument(
         '--logg',
-        type=parse_quanitty_with_errors,
+        type=parse_quantity_with_errors,
         help='If known, the masured value of log10(g) at the surface of the '
         'star as well as its estimated standard deviation(s), possibly '
         'asymmetric.'
     )
     parser.add_argument(
         '--Teff',
-        type=partial(parse_quanitty_with_errors, units=u.K),
+        type=partial(parse_quantity_with_errors, units=u.K),
         help='If known, the masured value of the effective temperature of the '
         'star, in Kelvin, as well as its estimated standard deviation(s), '
         'possibly asymmetric.'
     )
     parser.add_argument(
         '--mean-density', '--density', '--rho',
-        type=partial(parse_quanitty_with_errors, units=u.g / u.cm**3),
+        type=partial(parse_quantity_with_errors, units=u.g / u.cm**3),
         help='If known, the mesured mean stellar density in g/cm3, as well as '
         'its estimated standard deviation(s), possibly asymmetric.'
     )
@@ -211,27 +213,24 @@ def parse_configuration():
 def main(config):
     """Avoid polluting the global namespace."""
 
-#    numpy.set_printoptions(sys.maxsize)
-
     interpolator = StellarEvolutionManager(
         config.stellar_evolution_interpolator_dir
     ).get_interpolator_by_name(
         'default'
     )
 
-#    plot_max_age(interpolator)
-
     matplotlib.rcParams['figure.dpi'] = config.debug_plot_dpi
     matplotlib.rcParams['figure.autolayout'] = True
+
+    GaussianLogLikelihood.set_interpolator(interpolator)
 
     log_likelihood = GaussianLogLikelihood(
         mean=[5.0, 1.0, 0.0],
         covariance=[
-            [0.50, 0.00, 0.00],
-            [0.00, 0.20, 0.00],
-            [0.00, 0.00, 0.50]
+            [+0.50, +0.10, -0.07],
+            [+0.10, +0.20, +0.10],
+            [-0.07, +0.10, +0.50]
         ],
-        interpolator=interpolator,
         rtol=config.time_ode_rtol,
         atol=config.time_ode_atol,
         max_step=config.time_ode_max_step
