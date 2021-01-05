@@ -352,15 +352,17 @@ class StarSampler:
             self._mass_cdf,
             feh,
             self._mass_grid
-        )
+        ).flatten()
 
-        return InterpolatedUnivariateSpline(
-            mass_cdf / mass_cdf[-1],
-            self._mass_grid,
-            k=1,
-            ext=2
-        )(
-            mass_random_variable
+        return float(
+            InterpolatedUnivariateSpline(
+                mass_cdf / mass_cdf[-1],
+                self._mass_grid,
+                k=1,
+                ext=2
+            )(
+                mass_random_variable
+            )
         )
 
     def _get_initial_feh_grid(self, min_feh, max_feh):
@@ -790,20 +792,20 @@ class StarSampler:
                     if section == 'StarSampler':
                         assert nobjects == 6
                         nobjects -= 1
-                        if not compare_config(unpickler.load()):
+                        if compare_config(unpickler.load()):
+                            nobjects -= 1
+                            if self._log_likelihood == unpickler.load():
+                                print('Match found')
+                                self._mass_cdf = unpickler.load()
+                                self._age_cdf_norms = unpickler.load()
+                                self._feh_grid = unpickler.load()
+                                self._mass_grid = unpickler.load()
+                                return True
+                            else:
+                                print('Log-likelihoods do not match.')
+                        else:
                             print('Configurations do not match.')
-                            break
-                        nobjects -= 1
-                        if self._log_likelihood != unpickler.load():
-                            print('Log-likelihoods do not match.')
-                            break
 
-                        print('Match found')
-                        self._mass_cdf = unpickler.load()
-                        self._age_cdf_norms = unpickler.load()
-                        self._feh_grid = unpickler.load()
-                        self._mass_grid = unpickler.load()
-                        return True
 
                     for _ in range(nobjects):
                         unpickler.load()
