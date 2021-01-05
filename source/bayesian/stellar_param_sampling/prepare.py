@@ -74,8 +74,7 @@ def parse_configuration():
         '--feh',
         type=parse_quantity_with_errors,
         help='The measured [Fe/H] for the star as well as its estimated '
-        'standard deviation(s), possibly asymmetric. If using command line '
-        'system parameters, this argument must be specified.'
+        'standard deviation(s), possibly asymmetric.'
     )
     parser.add_argument(
         '--logg',
@@ -229,9 +228,9 @@ def main(config):
     mean = numpy.array([5.0, 1.0, 0.0])
     covariance = numpy.array(
         [
-            [+0.50, +0.10, -0.07],
-            [+0.10, +0.20, +0.10],
-            [-0.07, +0.10, +0.50]
+            [+0.200, +0.010, -0.007],
+            [+0.010, +0.040, +0.030],
+            [-0.007, +0.030, +0.200]
         ]
     )
 
@@ -253,12 +252,34 @@ def main(config):
 #    )
 
     star_sampler = StarSampler(log_likelihood, config)
-    samples = numpy.empty((1000, 3))
+    samples = numpy.empty((10000, 3), dtype=numpy.float64)
     for i in range(samples.shape[0]):
+        if i % 100 == 0:
+            print(repr(i) + '/' + repr(samples.shape[0]), end='\r')
         samples[i] = star_sampler(rand(3))
 
-    pyplot.plot(samples[:, 0], samples[:, 1], 'xk')
-    pyplot.show()
+    cdf_x = numpy.empty((2*samples.shape[0],),
+                        dtype=samples.dtype)
+
+    cdf_y = numpy.empty(cdf_x.shape, dtype=samples.dtype)
+    cdf_y[::2] = (numpy.arange(samples.shape[0], dtype=numpy.float64)
+                  /
+                  samples.shape[0])
+    cdf_y[1::2] = cdf_y[::2] + 1.0 / samples.shape[0]
+
+    for var_index in range(3):
+        cdf_x[::2] = numpy.sort(samples[:, var_index])
+        cdf_x[1::2] = cdf_x[::2]
+
+        pyplot.subplot(2, 3, var_index + 1)
+        pyplot.plot(cdf_x, cdf_y, '-k')
+        pyplot.title(['[Fe/H]', r'$M_\star\ [M_\odot]$', 't [Gyr]'][var_index])
+
+        pyplot.subplot(2, 3, var_index + 4)
+        pyplot.hist(samples[:, var_index],
+                    bins=samples.shape[0] // 100,
+                    density=True)
+    pyplot.savefig('marginalized_test_samples.eps')
 
 if __name__ == '__main__':
     main(parse_configuration())
