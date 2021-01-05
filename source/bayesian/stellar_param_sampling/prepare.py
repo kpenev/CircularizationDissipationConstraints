@@ -6,9 +6,11 @@ from collections import namedtuple
 import os.path
 
 import matplotlib
+from matplotlib import pyplot
 from configargparse import ArgumentParser, DefaultsFormatter
 from astropy import units as u
 import numpy
+from numpy.random import rand
 
 from stellar_evolution.manager import StellarEvolutionManager
 from split_normal_distribution import split_normal
@@ -224,13 +226,18 @@ def main(config):
 
     GaussianLogLikelihood.set_interpolator(interpolator)
 
-    log_likelihood = GaussianLogLikelihood(
-        mean=[5.0, 1.0, 0.0],
-        covariance=[
+    mean = numpy.array([5.0, 1.0, 0.0])
+    covariance = numpy.array(
+        [
             [+0.50, +0.10, -0.07],
             [+0.10, +0.20, +0.10],
             [-0.07, +0.10, +0.50]
-        ],
+        ]
+    )
+
+    log_likelihood = GaussianLogLikelihood(
+        mean=mean,
+        covariance=covariance,
         rtol=config.time_ode_rtol,
         atol=config.time_ode_atol,
         max_step=config.time_ode_max_step
@@ -240,13 +247,18 @@ def main(config):
         numpy.linspace(0.98125, 0.98125, 1),
         numpy.linspace(-0.3, 0.3, 7)
     )
-    log_likelihood.plot_age_cdf_integrand(
-        mass=plot_masses.flatten() * u.M_sun,
-        feh=plot_feh.flatten()
-    )
-#    sys.exit(1)
+#    log_likelihood.plot_age_cdf_integrand(
+#        mass=plot_masses.flatten() * u.M_sun,
+#        feh=plot_feh.flatten()
+#    )
 
-    StarSampler(log_likelihood, config)
+    star_sampler = StarSampler(log_likelihood, config)
+    samples = numpy.empty((1000, 3))
+    for i in range(samples.shape[0]):
+        samples[i] = star_sampler(rand(3))
+
+    pyplot.plot(samples[:, 0], samples[:, 1], 'xk')
+    pyplot.show()
 
 if __name__ == '__main__':
     main(parse_configuration())
