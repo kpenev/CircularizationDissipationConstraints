@@ -4,6 +4,8 @@ import inspect
 from itertools import count
 from pickle import Pickler, Unpickler
 import os.path
+from multiprocessing import Pool
+from functools import partial
 
 from matplotlib import pyplot
 import numpy
@@ -16,7 +18,6 @@ from scipy.optimize import brentq
 #pylint: disable=no-name-in-module
 from scipy.special import erf
 #pylint: enable=no-name-in-module
-from astropy import units as u
 
 #Could not find reasonable way to reduce attributes.
 #pylint: disable=too-many-instance-attributes
@@ -280,7 +281,7 @@ class StarSampler:
                 for k in vars(cls).keys()
                 if k.startswith('_plot_')]
 
-    def _calculate_age_cdf_norms(self, mass_grid, feh_grid):
+    def _calculate_age_cdf_norms(self, mass_grid, feh_grid, workers):
         """
         Calculate unnormalized age CDFs at the given grid points.
 
@@ -297,12 +298,20 @@ class StarSampler:
                 over mass.
         """
 
-        result = numpy.empty((feh_grid.size, mass_grid.size), dtype=float)
-        for feh_index, feh in enumerate(feh_grid):
-            for mass_index, mass in enumerate(mass_grid):
-                age_integral = self._log_likelihood.age_integral(mass * u.M_sun,
-                                                                 feh)
-                result[feh_index, mass_index] = age_integral(age_integral.t_max)
+        integrate_masses, integrate_feh = numpy.meshgrid(mass_grid,
+                                                         feh_grid)
+
+        get_cdf = partial(self._log_likelihood.age_integral, total_only=True)
+
+
+        result = numpy.array(
+            list(
+                workers.starmap(
+                    get_cdf,
+                    zip(integrate_masses.flatten(), integrate_feh.flatten())
+                )
+            )
+        ).reshape(feh_grid.size, mass_grid.size)
 
         return result
 
@@ -598,7 +607,7 @@ class StarSampler:
             for args in zip(mismatch_indices, [self._feh_grid, self._mass_grid])
         ]
 
-    def _tune_grid_resolution(self):
+    def _tune_grid_resolution(self, workers):
         """Increase grid resolution until interpolation tolerances are met."""
 
         def insert_entries(current, new, num_before, destination):
@@ -674,7 +683,8 @@ class StarSampler:
 
             age_cdf_norms_to_add = self._calculate_age_cdf_norms(
                 grid_refinement[1][0],
-                self._feh_grid
+                self._feh_grid,
+                workers
             )
             new_mass_old_feh_age_cdf_norms = [[None] * new_mass_grid.size
                                               for feh in self._feh_grid]
@@ -686,7 +696,8 @@ class StarSampler:
 
             age_cdfs_to_add = self._calculate_age_cdf_norms(
                 new_mass_grid,
-                grid_refinement[0][0]
+                grid_refinement[0][0],
+                workers
             )
             self._age_cdf_norms = [[None] * new_mass_grid.size
                                    for feh in new_feh_grid]
@@ -721,11 +732,15 @@ class StarSampler:
         )
         self._plot_initial_feh_grid()
 
-        self._age_cdf_norms = self._calculate_age_cdf_norms(self._mass_grid,
-                                                            self._feh_grid)
-        self._update_mass_cdfs()
 
-        self._tune_grid_resolution()
+        with Pool(self.config.num_parallel_processes) as workers:
+            self._age_cdf_norms = self._calculate_age_cdf_norms(self._mass_grid,
+                                                                self._feh_grid,
+                                                                workers)
+
+            self._update_mass_cdfs()
+
+            self._tune_grid_resolution(workers)
 
     def _check_for_pickled(self):
         """
@@ -801,8 +816,8 @@ class StarSampler:
                                 self._feh_grid = unpickler.load()
                                 self._mass_grid = unpickler.load()
                                 return True
-                            else:
-                                print('Log-likelihoods do not match.')
+
+                            print('Log-likelihoods do not match.')
                         else:
                             print('Configurations do not match.')
 
@@ -884,7 +899,7 @@ class StarSampler:
                      self._feh_grid[0],
                      self._feh_grid[-1])
         mass = self._get_mass(feh, unit_cube[1])
-        age_cdf = self._log_likelihood.age_integral(mass * u.M_sun, feh)
+        age_cdf = self._log_likelihood.age_integral(mass, feh)
         age_cdf_norm = age_cdf(age_cdf.t_max)
         age = brentq(
             lambda t: age_cdf(t) / age_cdf_norm - unit_cube[2],
