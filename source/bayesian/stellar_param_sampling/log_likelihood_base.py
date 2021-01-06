@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 from matplotlib import pyplot
 import numpy
 from scipy.integrate import solve_ivp
-from astropy import units as u
 
 from continous_max_age import get_continuous_max_age
 
@@ -52,7 +51,7 @@ class LogLikelihoodBase(ABC):
         )
 
     def __init__(self,
-                 mass=1.0 * u.M_sun,
+                 mass=1.0,
                  feh=0.0,
                  **solve_ivp_options):
         """
@@ -128,7 +127,7 @@ class LogLikelihoodBase(ABC):
         Plot the integrant used to calculate CDF(age) and its integral.
 
         Args:
-            mass:     The mass at which to create plots, along with units. If
+            mass:     The mass at which to create plots, in solar masses. If
                 iterable, multiple plots are created each labeled by the
                 mass & [Fe/H].
 
@@ -156,7 +155,7 @@ class LogLikelihoodBase(ABC):
             integral = self.age_integral(plot_mass, plot_feh)
             plot_ages = numpy.linspace(integral.t_min, integral.t_max, 1000)
 
-            label = r'$M_\star=%g,\ [Fe/H]=%g$' % (plot_mass.to_value(u.M_sun),
+            label = r'$M_\star=%g,\ [Fe/H]=%g$' % (plot_mass,
                                                    plot_feh)
 
             integrand_plot.plot(
@@ -164,7 +163,7 @@ class LogLikelihoodBase(ABC):
                 [
                     self._age_cdf_integrand(t,
                                             None,
-                                            plot_mass.to_value(u.M_sun),
+                                            plot_mass,
                                             plot_feh)
                     for t in plot_ages
                 ],
@@ -184,7 +183,10 @@ class LogLikelihoodBase(ABC):
             pyplot.savefig(save_as)
             pyplot.clf()
 
-    def age_integral(self, mass=None, feh=None, disable_caching=False):
+    def age_integral(self,
+                     mass=None,
+                     feh=None,
+                     total_only=False):
         """
         Return age integral re-using results when possible.
 
@@ -203,17 +205,22 @@ class LogLikelihoodBase(ABC):
         #False positive
         #pylint: disable=not-callable
         min_age = self.interpolator('radius',
-                                    mass.to_value(u.M_sun),
+                                    mass,
                                     feh).min_age
         #pylint: enable=not-callable
-        max_age = self._get_max_age(mass, feh)
+        max_age = float(self._get_max_age(mass, feh))
         solution = solve_ivp(self._age_cdf_integrand,
                              (min_age, max_age),
                              [0.0],
-                             args=(mass.to_value(u.M_sun), feh),
-                             dense_output=True,
+                             args=(mass, feh),
+                             dense_output=(not total_only),
+                             t_eval=numpy.array([max_age]),
                              **self._solve_ivp_options)
         assert solution.success
-        if not disable_caching:
+        if not total_only:
             self._age_integrals[(mass, feh)] = solution.sol
+
+        if total_only:
+            assert solution.t[-1] == max_age
+            return solution.y[-1]
         return solution.sol
