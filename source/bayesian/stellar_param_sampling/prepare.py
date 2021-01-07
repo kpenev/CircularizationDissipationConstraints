@@ -4,6 +4,7 @@
 from functools import partial
 from collections import namedtuple
 import os.path
+from multiprocessing import Pool
 
 import matplotlib
 from matplotlib import pyplot
@@ -14,6 +15,7 @@ from numpy.random import rand
 
 from stellar_evolution.manager import StellarEvolutionManager
 from split_normal_distribution import split_normal
+from marginalized_parameter_distribution import MarginalizedParamterDistribution
 
 from star_sampler import StarSampler
 from gaussian_log_likelihood import GaussianLogLikelihood
@@ -242,14 +244,37 @@ def main(config):
         max_step=config.time_ode_max_step
     )
 
-    plot_masses, plot_feh = numpy.meshgrid(
-        numpy.linspace(0.98125, 0.98125, 1),
-        numpy.linspace(-0.3, 0.3, 7)
-    )
+#    plot_masses, plot_feh = numpy.meshgrid(
+#        numpy.linspace(0.98125, 0.98125, 1),
+#        numpy.linspace(-0.3, 0.3, 7)
+#    )
 #    log_likelihood.plot_age_cdf_integrand(
 #        mass=plot_masses.flatten() * u.M_sun,
 #        feh=plot_feh.flatten()
 #    )
+
+    limits = dict(
+        feh=(
+            round(float(interpolator.track_feh[0]), 3),
+            round(float(interpolator.track_feh[-1]), 3)
+        ),
+        mass=(
+            round(float(interpolator.track_masses[0]), 3),
+            round(float(interpolator.track_masses[-1]), 3)
+        ),
+        age=(
+            log_likelihood.get_min_age,
+            log_likelihood.get_max_age
+        )
+    )
+
+    marginalized_distribution = MarginalizedParamterDistribution(
+        config.feh,
+        log_likelihood.distribution.pdf,
+        'feh',
+        limits,
+        name='marginalized_distribution'
+    )
 
     star_sampler = StarSampler(log_likelihood, config)
     samples = numpy.empty((10000, 3), dtype=numpy.float64)
@@ -267,7 +292,21 @@ def main(config):
                   samples.shape[0])
     cdf_y[1::2] = cdf_y[::2] + 1.0 / samples.shape[0]
 
-    for var_index in range(3):
+    for var_index, variable in enumerate(['feh', 'mass', 'age']):
+        marginalized_distribution.variable = variable
+        if variable == 'age':
+            marginalized_x = numpy.linspace(0, 14, 30)
+        else:
+            marginalized_x = numpy.linspace(*limits[variable], 30)
+
+        with Pool(config.num_parallel_processes) as workers:
+            marginalized_y = numpy.array(
+                workers.map(
+                    marginalized_distribution.pdf,
+                    marginalized_x
+                )
+            )
+
         cdf_x[::2] = numpy.sort(samples[:, var_index])
         cdf_x[1::2] = cdf_x[::2]
 
@@ -279,6 +318,9 @@ def main(config):
         pyplot.hist(samples[:, var_index],
                     bins=samples.shape[0] // 100,
                     density=True)
+        pyplot.plot(marginalized_x,
+                    marginalized_y,
+                    '-k')
     pyplot.savefig('marginalized_test_samples.eps')
 
 if __name__ == '__main__':
