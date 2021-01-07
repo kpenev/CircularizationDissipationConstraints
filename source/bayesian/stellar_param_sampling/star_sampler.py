@@ -723,12 +723,12 @@ class StarSampler:
         """
 
         self._feh_grid = self._get_initial_feh_grid(
-            float(self._log_likelihood.interpolator.track_feh[0]),
-            float(self._log_likelihood.interpolator.track_feh[-1])
+            round(float(self._log_likelihood.interpolator.track_feh[0]), 3),
+            round(float(self._log_likelihood.interpolator.track_feh[-1]), 3)
         )
         self._mass_grid = self._get_initial_mass_grid(
-            float(self._log_likelihood.interpolator.track_masses[0]),
-            float(self._log_likelihood.interpolator.track_masses[-1])
+            round(float(self._log_likelihood.interpolator.track_masses[0]), 3),
+            round(float(self._log_likelihood.interpolator.track_masses[-1]), 3)
         )
         self._plot_initial_feh_grid()
 
