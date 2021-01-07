@@ -1,4 +1,4 @@
-"""Define base class for stellar parameter log-likelihood functions."""
+"""Define base class for stellar parameter likelihood given [Fe/H] functions."""
 
 from abc import ABC, abstractmethod
 
@@ -6,9 +6,11 @@ from matplotlib import pyplot
 import numpy
 from scipy.integrate import solve_ivp
 
+from stellar_evolution.manager import StellarEvolutionManager
+
 from continous_max_age import get_continuous_max_age
 
-class LogLikelihoodBase(ABC):
+class FeHConditionalLikelihoodBase(ABC):
     """Common interface for log-likelihood functions of stellar paramseters."""
 
     interpolator = None
@@ -18,7 +20,14 @@ class LogLikelihoodBase(ABC):
         """Define a shared interpolator to be used by all log-likelihoods."""
 
         assert cls.interpolator is None
-        cls.interpolator = interpolator
+        if isinstance(interpolator, str):
+            cls.interpolator = StellarEvolutionManager(
+                interpolator
+            ).get_interpolator_by_name(
+                'default'
+            )
+        else:
+            cls.interpolator = interpolator
 
     @abstractmethod
     def _age_cdf_integrand(self, age, _, mass, feh):
@@ -83,17 +92,9 @@ class LogLikelihoodBase(ABC):
         """Return the default mass assumed by conditional distributions."""
 
         if name == 'defalut_mass':
-            assert (self.interpolator.track_masses[0]
-                    <
-                    value
-                    <
-                    self.interpolator.track_masses[-1])
+            assert self.interpolator.mass_in_range(value)
         elif name == 'default_feh':
-            assert (self.interpolator.track_feh[0]
-                    <
-                    value
-                    <
-                    self.interpolator.track_feh[-1])
+            assert self.interpolator.feh_in_range(value)
         super().__setattr__(name, value)
 
     def __getstate__(self):
@@ -105,7 +106,7 @@ class LogLikelihoodBase(ABC):
             self._get_max_age,
             self.default_mass,
             self.default_feh,
-            self._solve_ivp_options
+            self._solve_ivp_options,
         )
 
     def __setstate__(self, state):
@@ -119,6 +120,7 @@ class LogLikelihoodBase(ABC):
             self.default_feh,
             self._solve_ivp_options
         ) = state
+        assert self.interpolator is not None
         assert not hasattr(self, '_age_integrals')
         self._age_integrals = dict()
 

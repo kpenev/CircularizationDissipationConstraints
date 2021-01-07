@@ -19,6 +19,8 @@ from scipy.optimize import brentq
 from scipy.special import erf
 #pylint: enable=no-name-in-module
 
+from feh_conditional_likelihood_base import FeHConditionalLikelihoodBase
+
 #Could not find reasonable way to reduce attributes.
 #pylint: disable=too-many-instance-attributes
 class StarSampler:
@@ -723,17 +725,19 @@ class StarSampler:
         """
 
         self._feh_grid = self._get_initial_feh_grid(
-            round(float(self._log_likelihood.interpolator.track_feh[0]), 3),
-            round(float(self._log_likelihood.interpolator.track_feh[-1]), 3)
+            *self._log_likelihood.interpolator.feh_range()
         )
         self._mass_grid = self._get_initial_mass_grid(
-            round(float(self._log_likelihood.interpolator.track_masses[0]), 3),
-            round(float(self._log_likelihood.interpolator.track_masses[-1]), 3)
+            *self._log_likelihood.interpolator.mass_range()
         )
         self._plot_initial_feh_grid()
 
 
-        with Pool(self.config.num_parallel_processes) as workers:
+        with Pool(
+                self.config.num_parallel_processes,
+                initializer=FeHConditionalLikelihoodBase.set_interpolator,
+                initargs=(self.config.stellar_evolution_interpolator_dir,)
+        ) as workers:
             self._age_cdf_norms = self._calculate_age_cdf_norms(self._mass_grid,
                                                                 self._feh_grid,
                                                                 workers)

@@ -8,13 +8,11 @@ def plot_max_age(interpolator):
     """Display a plot of the max interp age as a function of M and [Fe/H]."""
 
     plot_masses = numpy.linspace(
-        float(interpolator.track_masses[0]),
-        float(interpolator.track_masses[-1]),
+        *interpolator.mass_range(),
         1000
     )
     plot_feh = numpy.linspace(
-        float(interpolator.track_feh[0]),
-        float(interpolator.track_feh[-1]),
+        interpolator.feh_range(),
         1000
     )
 

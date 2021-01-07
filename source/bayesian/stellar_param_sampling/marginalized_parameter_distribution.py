@@ -2,6 +2,7 @@
 
 from scipy.integrate import dblquad, tplquad
 
+#pylint: disable=too-few-public-methods
 class MarginalizedParamterDistribution:
     """Marginalized distribution of one star variable from full 3-D distro."""
 
@@ -57,19 +58,19 @@ class MarginalizedParamterDistribution:
             integrand,
             *self.limits['mass' if self.variable == 'feh' else 'feh'],
             *ylimits,
-            epsrel=1e-5
+            epsrel=self._epsrel
         )
         print('Result: ' + repr(integral))
         return integral[0] / self.normalization
     #pylint: enable=arguments-differ
 
     def __init__(self,
+                 *,
                  direct_metallicity_distribution,
                  conditional_mass_age_distribution,
                  variable,
                  limits,
-                 *parent_args,
-                 **parent_kwargs):
+                 epsrel=1e-5):
         """
         Set-up the distribution of one of the variables.
 
@@ -87,10 +88,6 @@ class MarginalizedParamterDistribution:
             limits:    Dictionary with keys `'mass'`, `'age'`, and `'feh'` each
                 containing a 2-tuple giving the lower and upper limits for the
                 corresponding variable.
-
-            parent_args:    Passed directly to parent's :meth:`__init__`.
-
-            parent_kwargs:    Passed directly to parent's :meth:`__init__`.
         """
 
         self.direct_metallicity_distribution = direct_metallicity_distribution
@@ -99,6 +96,7 @@ class MarginalizedParamterDistribution:
         )
         self.variable = variable
         self.limits = limits
+        self._epsrel = epsrel
 
         print('Calculating normalization')
         self.normalization = tplquad(
@@ -106,7 +104,8 @@ class MarginalizedParamterDistribution:
             *limits['feh'],
             *limits['mass'],
             *limits['age'],
-            epsrel=1e-5
+            epsrel=epsrel
         )
         print('Normalization = ' + repr(self.normalization))
         self.normalization = self.normalization[0]
+#pylint: enable=too-few-public-methods

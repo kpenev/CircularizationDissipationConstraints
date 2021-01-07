@@ -2,12 +2,9 @@
 
 from scipy.stats import multivariate_normal
 
-from log_likelihood_base import LogLikelihoodBase
+from feh_conditional_likelihood_base import FeHConditionalLikelihoodBase
 
-
-#Simply specialized abstract class.
-#pylint: disable=too-few-public-methods
-class GaussianLogLikelihood(LogLikelihoodBase):
+class GaussianLikelihood(FeHConditionalLikelihoodBase):
     """Log-likelihood class with 3-D correlated Gaussian for debugging."""
 
     def _age_cdf_integrand(self, age, _, mass, feh):
@@ -59,4 +56,3 @@ class GaussianLogLikelihood(LogLikelihoodBase):
 
         self.distribution = multivariate_normal(mean, covariance)
         super().__init__(*args, **kwargs)
-#pylint: enable=too-few-public-methods

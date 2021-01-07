@@ -4,7 +4,7 @@
 from functools import partial
 from collections import namedtuple
 import os.path
-from multiprocessing import Pool
+import multiprocessing as mp
 
 import matplotlib
 from matplotlib import pyplot
@@ -18,11 +18,10 @@ from split_normal_distribution import split_normal
 from marginalized_parameter_distribution import MarginalizedParamterDistribution
 
 from star_sampler import StarSampler
-from gaussian_log_likelihood import GaussianLogLikelihood
+from gaussian_likelihood import GaussianLikelihood
 
 RandomQuantity = namedtuple('RandomQuantity', ['distribution', 'units'])
 
-#TODO: make parsed command line match exactly system.
 def parse_configuration():
     """Return the configuration to use per the command line."""
 
@@ -213,7 +212,7 @@ def parse_configuration():
 
     return parser.parse_args()
 
-def main(config):
+def test_marginalized_pdfs(config):
     """Avoid polluting the global namespace."""
 
     interpolator = StellarEvolutionManager(
@@ -225,43 +224,25 @@ def main(config):
     matplotlib.rcParams['figure.dpi'] = config.debug_plot_dpi
     matplotlib.rcParams['figure.autolayout'] = True
 
-    GaussianLogLikelihood.set_interpolator(interpolator)
+    GaussianLikelihood.set_interpolator(interpolator)
 
-    mean = numpy.array([5.0, 1.0, 0.0])
-    covariance = numpy.array(
-        [
-            [+0.200, +0.010, -0.007],
-            [+0.010, +0.040, +0.030],
-            [-0.007, +0.030, +0.200]
-        ]
-    )
-
-    log_likelihood = GaussianLogLikelihood(
-        mean=mean,
-        covariance=covariance,
+    log_likelihood = GaussianLikelihood(
+        mean=numpy.array([5.0, 1.0, 0.0]),
+        covariance=numpy.array(
+            [
+                [+0.200, +0.010, -0.007],
+                [+0.010, +0.040, +0.030],
+                [-0.007, +0.030, +0.200]
+            ]
+        ),
         rtol=config.time_ode_rtol,
         atol=config.time_ode_atol,
         max_step=config.time_ode_max_step
     )
 
-#    plot_masses, plot_feh = numpy.meshgrid(
-#        numpy.linspace(0.98125, 0.98125, 1),
-#        numpy.linspace(-0.3, 0.3, 7)
-#    )
-#    log_likelihood.plot_age_cdf_integrand(
-#        mass=plot_masses.flatten() * u.M_sun,
-#        feh=plot_feh.flatten()
-#    )
-
     limits = dict(
-        feh=(
-            round(float(interpolator.track_feh[0]), 3),
-            round(float(interpolator.track_feh[-1]), 3)
-        ),
-        mass=(
-            round(float(interpolator.track_masses[0]), 3),
-            round(float(interpolator.track_masses[-1]), 3)
-        ),
+        feh=interpolator.feh_range(),
+        mass=interpolator.mass_range(),
         age=(
             log_likelihood.get_min_age,
             log_likelihood.get_max_age
@@ -269,11 +250,11 @@ def main(config):
     )
 
     marginalized_distribution = MarginalizedParamterDistribution(
-        config.feh,
-        log_likelihood.distribution.pdf,
-        'feh',
-        limits,
-        name='marginalized_distribution'
+        direct_metallicity_distribution=config.feh,
+        conditional_mass_age_distribution=log_likelihood.distribution.pdf,
+        variable='feh',
+        limits=limits,
+        epsrel=1e-5
     )
 
     star_sampler = StarSampler(log_likelihood, config)
@@ -295,11 +276,15 @@ def main(config):
     for var_index, variable in enumerate(['feh', 'mass', 'age']):
         marginalized_distribution.variable = variable
         if variable == 'age':
-            marginalized_x = numpy.linspace(0, 14, 30)
+            marginalized_x = numpy.linspace(0, 14, 300)
         else:
-            marginalized_x = numpy.linspace(*limits[variable], 30)
+            marginalized_x = numpy.linspace(*limits[variable], 300)
 
-        with Pool(config.num_parallel_processes) as workers:
+        with mp.Pool(
+                config.num_parallel_processes,
+                initializer=GaussianLikelihood.set_interpolator,
+                initargs=(config.stellar_evolution_interpolator_dir,)
+        ) as workers:
             marginalized_y = numpy.array(
                 workers.map(
                     marginalized_distribution.pdf,
@@ -324,4 +309,5 @@ def main(config):
     pyplot.savefig('marginalized_test_samples.eps')
 
 if __name__ == '__main__':
-    main(parse_configuration())
+    mp.set_start_method('forkserver')
+    test_marginalized_pdfs(parse_configuration())
