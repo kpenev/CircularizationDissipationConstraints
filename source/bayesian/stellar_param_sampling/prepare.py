@@ -16,6 +16,8 @@ from numpy.random import rand
 from stellar_evolution.manager import StellarEvolutionManager
 from split_normal_distribution import split_normal
 from marginalized_parameter_distribution import MarginalizedParamterDistribution
+from poet_interp_likelihood import POETInterpLikelihood
+from feh_conditional_likelihood_base import FeHConditionalLikelihoodBase
 
 from star_sampler import StarSampler
 from gaussian_likelihood import GaussianLikelihood
@@ -86,14 +88,14 @@ def parse_configuration():
     )
     parser.add_argument(
         '--Teff',
-        type=partial(parse_quantity_with_errors, units=u.K),
+        type=parse_quantity_with_errors,
         help='If known, the masured value of the effective temperature of the '
         'star, in Kelvin, as well as its estimated standard deviation(s), '
         'possibly asymmetric.'
     )
     parser.add_argument(
         '--mean-density', '--density', '--rho',
-        type=partial(parse_quantity_with_errors, units=u.g / u.cm**3),
+        type=parse_quantity_with_errors,
         help='If known, the mesured mean stellar density in g/cm3, as well as '
         'its estimated standard deviation(s), possibly asymmetric.'
     )
@@ -212,21 +214,73 @@ def parse_configuration():
 
     return parser.parse_args()
 
-def test_marginalized_pdfs(config):
-    """Avoid polluting the global namespace."""
+def marginalized_plots(config,
+                       star_sampler,
+                       interpolator,
+                       marginalized_distribution=None,
+                       fast=False):
+    """Make fig showing marginaziled PDF and CDF of sampled stellar params."""
 
-    interpolator = StellarEvolutionManager(
-        config.stellar_evolution_interpolator_dir
-    ).get_interpolator_by_name(
-        'default'
-    )
+    samples = numpy.empty(((100 if fast else 10000), 3), dtype=numpy.float64)
+    for i in range(samples.shape[0]):
+        if i % 100 == 0:
+            print(repr(i) + '/' + repr(samples.shape[0]), end='\r')
+        samples[i] = star_sampler(rand(3))
 
-    matplotlib.rcParams['figure.dpi'] = config.debug_plot_dpi
-    matplotlib.rcParams['figure.autolayout'] = True
+    cdf_x = numpy.empty((2 * samples.shape[0], ),
+                        dtype=samples.dtype)
 
-    GaussianLikelihood.set_interpolator(interpolator)
+    cdf_y = numpy.empty(cdf_x.shape, dtype=samples.dtype)
+    cdf_y[::2] = (numpy.arange(samples.shape[0], dtype=numpy.float64)
+                  /
+                  samples.shape[0])
+    cdf_y[1::2] = cdf_y[::2] + 1.0 / samples.shape[0]
 
-    log_likelihood = GaussianLikelihood(
+    for var_index, variable in enumerate(['feh', 'mass', 'age']):
+        cdf_x[::2] = numpy.sort(samples[:, var_index])
+        cdf_x[1::2] = cdf_x[::2]
+
+        pyplot.subplot(2, 3, var_index + 1)
+        pyplot.plot(cdf_x, cdf_y, '-k')
+        pyplot.title(['[Fe/H]', r'$M_\star\ [M_\odot]$', 't [Gyr]'][var_index])
+
+        pyplot.subplot(2, 3, var_index + 4)
+        pyplot.hist(samples[:, var_index],
+                    bins=samples.shape[0] // 100,
+                    density=True)
+
+        if marginalized_distribution is not None:
+            marginalized_distribution.variable = variable
+            if variable == 'age':
+                marginalized_x = numpy.linspace(0, 14, (10 if fast else 300))
+            else:
+                marginalized_x = numpy.linspace(
+                    *getattr(interpolator, variable + '_range')(),
+                    (10 if fast else 300)
+                )
+
+            with mp.Pool(
+                    config.num_parallel_processes,
+                    initializer=GaussianLikelihood.set_interpolator,
+                    initargs=(config.stellar_evolution_interpolator_dir,)
+            ) as workers:
+                marginalized_y = numpy.array(
+                    workers.map(
+                        marginalized_distribution.pdf,
+                        marginalized_x
+                    )
+                )
+            pyplot.plot(marginalized_x,
+                        marginalized_y,
+                        '-k')
+    pyplot.savefig('marginalized_test_samples.eps')
+
+
+
+def test_marginalized_pdfs(config, interpolator):
+    """Create plots for visually confirming sampler works for known PDF."""
+
+    likelihood = GaussianLikelihood(
         mean=numpy.array([5.0, 1.0, 0.0]),
         covariance=numpy.array(
             [
@@ -244,70 +298,66 @@ def test_marginalized_pdfs(config):
         feh=interpolator.feh_range(),
         mass=interpolator.mass_range(),
         age=(
-            log_likelihood.get_min_age,
-            log_likelihood.get_max_age
+            likelihood.get_min_age,
+            likelihood.get_max_age
         )
     )
 
     marginalized_distribution = MarginalizedParamterDistribution(
         direct_metallicity_distribution=config.feh,
-        conditional_mass_age_distribution=log_likelihood.distribution.pdf,
+        conditional_mass_age_distribution=likelihood.distribution.pdf,
         variable='feh',
         limits=limits,
         epsrel=1e-5
     )
 
-    star_sampler = StarSampler(log_likelihood, config)
-    samples = numpy.empty((10000, 3), dtype=numpy.float64)
-    for i in range(samples.shape[0]):
-        if i % 100 == 0:
-            print(repr(i) + '/' + repr(samples.shape[0]), end='\r')
-        samples[i] = star_sampler(rand(3))
+    star_sampler = StarSampler(likelihood, config)
 
-    cdf_x = numpy.empty((2*samples.shape[0],),
-                        dtype=samples.dtype)
+    marginalized_plots(config,
+                       star_sampler,
+                       interpolator,
+                       marginalized_distribution)
 
-    cdf_y = numpy.empty(cdf_x.shape, dtype=samples.dtype)
-    cdf_y[::2] = (numpy.arange(samples.shape[0], dtype=numpy.float64)
-                  /
-                  samples.shape[0])
-    cdf_y[1::2] = cdf_y[::2] + 1.0 / samples.shape[0]
+def serialize_poet_likelihood(config, interpolator):
+    """Create and pickle a sampler for POET based likelihood."""
 
-    for var_index, variable in enumerate(['feh', 'mass', 'age']):
-        marginalized_distribution.variable = variable
-        if variable == 'age':
-            marginalized_x = numpy.linspace(0, 14, 300)
-        else:
-            marginalized_x = numpy.linspace(*limits[variable], 300)
+    constraints = dict()
+    if config.logg is not None:
+        constraints['logg'] = config.logg
+    if config.Teff is not None:
+        constraints['teff'] = config.Teff
+    if config.mean_density is not None:
+        constraints['rho'] = config.mean_density
 
-        with mp.Pool(
-                config.num_parallel_processes,
-                initializer=GaussianLikelihood.set_interpolator,
-                initargs=(config.stellar_evolution_interpolator_dir,)
-        ) as workers:
-            marginalized_y = numpy.array(
-                workers.map(
-                    marginalized_distribution.pdf,
-                    marginalized_x
-                )
-            )
+    likelihood = POETInterpLikelihood(
+        **constraints,
+        rtol=config.time_ode_rtol,
+        atol=config.time_ode_atol,
+        max_step=config.time_ode_max_step
+    )
 
-        cdf_x[::2] = numpy.sort(samples[:, var_index])
-        cdf_x[1::2] = cdf_x[::2]
+    star_sampler = StarSampler(likelihood, config)
 
-        pyplot.subplot(2, 3, var_index + 1)
-        pyplot.plot(cdf_x, cdf_y, '-k')
-        pyplot.title(['[Fe/H]', r'$M_\star\ [M_\odot]$', 't [Gyr]'][var_index])
+    marginalized_plots(config, star_sampler, interpolator)
 
-        pyplot.subplot(2, 3, var_index + 4)
-        pyplot.hist(samples[:, var_index],
-                    bins=samples.shape[0] // 100,
-                    density=True)
-        pyplot.plot(marginalized_x,
-                    marginalized_y,
-                    '-k')
-    pyplot.savefig('marginalized_test_samples.eps')
+def main(config):
+    """Avoid polluting the global namespace."""
+
+    mp.set_start_method('forkserver')
+
+    interpolator = StellarEvolutionManager(
+        config.stellar_evolution_interpolator_dir
+    ).get_interpolator_by_name(
+        'default'
+    )
+
+    matplotlib.rcParams['figure.dpi'] = config.debug_plot_dpi
+    matplotlib.rcParams['figure.autolayout'] = True
+
+    FeHConditionalLikelihoodBase.set_interpolator(interpolator)
+
+#    test_marginalized_pdfs(config, interpolator)
+    serialize_poet_likelihood(config, interpolator)
 
 if __name__ == '__main__':
-    mp.set_start_method('forkserver')
-    test_marginalized_pdfs(parse_configuration())
+    main(parse_configuration())
