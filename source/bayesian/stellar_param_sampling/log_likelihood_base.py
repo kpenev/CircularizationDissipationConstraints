@@ -183,6 +183,19 @@ class LogLikelihoodBase(ABC):
             pyplot.savefig(save_as)
             pyplot.clf()
 
+    def get_min_age(self, feh, mass):
+        """Return the minimum age the likelihood is defined for."""
+
+        #False positive
+        #pylint: disable=not-callable
+        return self.interpolator('radius', mass, feh).min_age
+        #pylint: enable=not-callable
+
+    def get_max_age(self, feh, mass):
+        """Return the maximum age the likelihood is defined for."""
+
+        return float(self._get_max_age(mass, feh))
+
     def age_integral(self,
                      mass=None,
                      feh=None,
@@ -202,20 +215,16 @@ class LogLikelihoodBase(ABC):
         if (mass, feh) in self._age_integrals:
             return self._age_integrals[(mass, feh)]
 
-        #False positive
-        #pylint: disable=not-callable
-        min_age = self.interpolator('radius',
-                                    mass,
-                                    feh).min_age
-        #pylint: enable=not-callable
-        max_age = float(self._get_max_age(mass, feh))
-        solution = solve_ivp(self._age_cdf_integrand,
-                             (min_age, max_age),
-                             [0.0],
-                             args=(mass, feh),
-                             dense_output=(not total_only),
-                             t_eval=numpy.array([max_age]),
-                             **self._solve_ivp_options)
+        max_age = self.get_max_age(feh, mass)
+        solution = solve_ivp(
+            self._age_cdf_integrand,
+            (self.get_min_age(feh, mass), max_age),
+            [0.0],
+            args=(mass, feh),
+            dense_output=(not total_only),
+            t_eval=numpy.array([max_age]),
+            **self._solve_ivp_options
+        )
         assert solution.success
         if not total_only:
             self._age_integrals[(mass, feh)] = solution.sol
