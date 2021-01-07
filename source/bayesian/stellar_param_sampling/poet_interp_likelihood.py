@@ -17,9 +17,7 @@ class POETInterpLikelihood(FeHConditionalLikelihoodBase):
             predicted = getattr(self._evaluate, quantity)(mass, age, feh)
             if numpy.isnan(predicted):
                 return 0.0
-            result *= measurement.pdf(
-
-            )
+            result *= measurement.pdf(predicted)
         return result
 
     def __getstate__(self):
@@ -33,6 +31,21 @@ class POETInterpLikelihood(FeHConditionalLikelihoodBase):
         super().__setstate__(state[0])
         self._measurements = state[1]
         self._evaluate = QuantityEvaluator(self.interpolator)
+
+    def __eq__(self, other):
+
+        if not isinstance(other, type(self)):
+            return False
+        if self._measurements.keys() != other._measurements.keys():
+            return False
+        for quantity in self._measurements:
+            if (
+                    self._measurements[quantity].kwds
+                    !=
+                    other._measurements[quantity].kwds
+            ):
+                return False
+        return super().__eq__(other)
 
     def __init__(self, **kwargs):
         """
