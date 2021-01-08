@@ -87,6 +87,7 @@ class FeHConditionalLikelihoodBase(ABC):
         self._get_max_age = get_continuous_max_age(self.interpolator)
 
         self._age_integrals = dict()
+        self._cache_solutions = True
 
     def __setattr__(self, name, value):
         """Return the default mass assumed by conditional distributions."""
@@ -107,6 +108,7 @@ class FeHConditionalLikelihoodBase(ABC):
             self.default_mass,
             self.default_feh,
             self._solve_ivp_options,
+            self._cache_solutions
         )
 
     def __setstate__(self, state):
@@ -118,7 +120,8 @@ class FeHConditionalLikelihoodBase(ABC):
             self._get_max_age,
             self.default_mass,
             self.default_feh,
-            self._solve_ivp_options
+            self._solve_ivp_options,
+            self._cache_solutions
         ) = state
         assert self.interpolator is not None
         assert not hasattr(self, '_age_integrals')
@@ -198,6 +201,17 @@ class FeHConditionalLikelihoodBase(ABC):
 
         return float(self._get_max_age(mass, feh))
 
+    def disable_caching(self):
+        """Clears currently buffered integrals and stops accumulating more."""
+
+        self._age_integrals = dict()
+        self._cache_solutions = False
+
+    def enable_caching(self):
+        """Re-enables caching after it was previously disabled."""
+
+        self._cache_solutions = True
+
     def age_integral(self,
                      mass=None,
                      feh=None,
@@ -228,7 +242,7 @@ class FeHConditionalLikelihoodBase(ABC):
             **self._solve_ivp_options
         )
         assert solution.success
-        if not total_only:
+        if not total_only and self._cache_solutions:
             self._age_integrals[(mass, feh)] = solution.sol
 
         if total_only:

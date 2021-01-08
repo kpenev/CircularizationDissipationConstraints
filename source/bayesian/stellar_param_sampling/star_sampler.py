@@ -303,7 +303,7 @@ class StarSampler:
         integrate_masses, integrate_feh = numpy.meshgrid(mass_grid,
                                                          feh_grid)
 
-        get_cdf = partial(self._log_likelihood.age_integral, total_only=True)
+        get_cdf = partial(self.likelihood.age_integral, total_only=True)
 
 
         result = numpy.array(
@@ -715,7 +715,7 @@ class StarSampler:
 
     def _prepare_new_sampler(self):
         """
-        Build new sampler of the given log_likelihood satisfying given config.
+        Build new sampler of the given likelihood satisfying given config.
 
         Args:
             See :meth:`__init__`.
@@ -725,10 +725,10 @@ class StarSampler:
         """
 
         self._feh_grid = self._get_initial_feh_grid(
-            *self._log_likelihood.interpolator.feh_range()
+            *self.likelihood.interpolator.feh_range()
         )
         self._mass_grid = self._get_initial_mass_grid(
-            *self._log_likelihood.interpolator.mass_range()
+            *self.likelihood.interpolator.mass_range()
         )
         self._plot_initial_feh_grid()
 
@@ -748,7 +748,7 @@ class StarSampler:
 
     def _check_for_pickled(self):
         """
-        Check for a pre-pickled sampler for the given log_likelihood and config.
+        Check for a pre-pickled sampler for the given likelihood and config.
 
         Args:
             see :meth:`__init__`
@@ -813,7 +813,7 @@ class StarSampler:
                         nobjects -= 1
                         if compare_config(unpickler.load()):
                             nobjects -= 1
-                            if self._log_likelihood == unpickler.load():
+                            if self.likelihood == unpickler.load():
                                 print('Match found')
                                 self._mass_cdf = unpickler.load()
                                 self._age_cdf_norms = unpickler.load()
@@ -838,19 +838,19 @@ class StarSampler:
             pickler = Pickler(pickle_file)
             pickler.dump(('StarSampler', 6))
             pickler.dump(self.config)
-            pickler.dump(self._log_likelihood)
+            pickler.dump(self.likelihood)
             pickler.dump(self._mass_cdf)
             pickler.dump(self._age_cdf_norms)
             pickler.dump(self._feh_grid)
             pickler.dump(self._mass_grid)
 
-    def __init__(self, log_likelihood, config):
+    def __init__(self, likelihood, config):
         """
-        Find sampler for the given log_likelihood satisfying the given config.
+        Find sampler for the given likelihood satisfying the given config.
 
         Args:
-            log_likelihood(LogLikelihoodBase):     The log-likelihood function
-                to base sampling on. It should not include the direct
+            likelihood(FeHConditionalLikelihoodBase):     The likelihood
+                function to base sampling on. It should not include the direct
                 measurement of the metallicity specified through config.
 
             config:    The configuration specifying what is considered good
@@ -862,7 +862,7 @@ class StarSampler:
         """
 
         self.config = config
-        self._log_likelihood = log_likelihood
+        self.likelihood = likelihood
         self._mass_cdf = None
         self._age_cdf_norms = None
         self._feh_grid = None
@@ -903,7 +903,7 @@ class StarSampler:
                      self._feh_grid[0],
                      self._feh_grid[-1])
         mass = self._get_mass(feh, unit_cube[1])
-        age_cdf = self._log_likelihood.age_integral(mass, feh)
+        age_cdf = self.likelihood.age_integral(mass, feh)
         age_cdf_norm = age_cdf(age_cdf.t_max)
         age = brentq(
             lambda t: age_cdf(t) / age_cdf_norm - unit_cube[2],

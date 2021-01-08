@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Pickle approximations to marginalized CDFs of stellar parameters."""
 
-from functools import partial
 from collections import namedtuple
 import os.path
 import multiprocessing as mp
@@ -9,7 +8,6 @@ import multiprocessing as mp
 import matplotlib
 from matplotlib import pyplot
 from configargparse import ArgumentParser, DefaultsFormatter
-from astropy import units as u
 import numpy
 from numpy.random import rand
 
@@ -221,11 +219,18 @@ def marginalized_plots(config,
                        fast=False):
     """Make fig showing marginaziled PDF and CDF of sampled stellar params."""
 
-    samples = numpy.empty(((100 if fast else 10000), 3), dtype=numpy.float64)
-    for i in range(samples.shape[0]):
-        if i % 100 == 0:
-            print(repr(i) + '/' + repr(samples.shape[0]), end='\r')
-        samples[i] = star_sampler(rand(3))
+    star_sampler.likelihood.disable_caching()
+    unit_cube_samples = rand((100 if fast else 10000), 3)
+    with mp.Pool(
+            config.num_parallel_processes,
+            initializer=FeHConditionalLikelihoodBase.set_interpolator,
+            initargs=(config.stellar_evolution_interpolator_dir,)
+    ) as workers:
+        samples = numpy.array(
+            workers.map(star_sampler, unit_cube_samples)
+        )
+
+    star_sampler.likelihood.enable_caching()
 
     cdf_x = numpy.empty((2 * samples.shape[0], ),
                         dtype=samples.dtype)
@@ -338,7 +343,7 @@ def serialize_poet_likelihood(config, interpolator):
 
     star_sampler = StarSampler(likelihood, config)
 
-    marginalized_plots(config, star_sampler, interpolator)
+    marginalized_plots(config, star_sampler, interpolator, fast=False)
 
 def main(config):
     """Avoid polluting the global namespace."""
