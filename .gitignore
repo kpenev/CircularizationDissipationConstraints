@@ -113,3 +113,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+#MacOS nonsense
+.DS_Store
