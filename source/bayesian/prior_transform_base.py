@@ -1,0 +1,156 @@
+"""Define base class for transforming the unit cube to evolution parameters."""
+
+from abc import ABCMeta, abstractmethod
+
+import numpy
+
+#The foal is to define simple callable.
+#pylint: disable=too-few-public-methods
+class PriorTransformBase(metaclass=ABCMeta):
+    """
+    Base class for transforming the unit cube to evolution parameters.
+
+    Attrs:
+        independent_parameter_distributions(3-tuples):     The names,
+            distributions and units of the directly observable parameters we
+            will sample directly from. The distributions must provide the
+            `scipy.stats.continuous_rv` interface. For parameters for which
+            only a fixed values should be assumed, the distribution must be
+            specified as a single numeric value convertible to float. Fixed
+            value parameters do not consume unit cube entries. Finally, if
+            the distribution is None, the parameter is assumed to follow
+            uniform(0, 1) distribution with the specified units.
+    """
+
+    _priors_order = ['dissipation', 'evolution', 'system']
+
+    def _fill_independent_parameters(self, unit_cube_iter, model_parameters):
+        """
+        Consume unit-cube values to fill independently distributed parameters.
+
+        Args:
+            unit_cube_iter(iter):    Iterator over the unit cube values. Values
+                get consumed for all non-fixed independent parameters.
+
+            model_parameters(dict):    Updated with the values (and units) of
+                the independent model parameters corresponding to the unit cube.
+
+        Returns:
+            None
+        """
+
+        for (
+                name,
+                distribution,
+                param_units
+        ) in (
+            self.independent_parameter_distributions
+        ):
+            if distribution is None:
+                model_parameters[name] = next(unit_cube_iter) * param_units
+            elif hasattr(distribution, 'ppf'):
+                model_parameters[name] = (distribution.ppf(next(unit_cube_iter))
+                                          *
+                                          param_units)
+            else:
+                try:
+                    model_parameters[name] = float(distribution) * param_units
+                except TypeError:
+                    raise TypeError(
+                        'Inval:id direct observable %s = %s * %s! Should be '
+                        'scipy.stats distribution, None, or numeric.'
+                        %
+                        (repr(name), repr(distribution), repr(param_units))
+                    )
+
+    @abstractmethod
+    def _fill_coupled_parameters(self, unit_cube_iter, model_parameters):
+        """
+        Update input with parameters not distributed independntly of all others.
+
+        Args:
+            unit_cube_iter:    Iterator over the unit cube values which were not
+                consumed by :meth:`_fill_direct_observables()`. Values are
+                consumed to as needed.
+
+            model_parameters:    The independtly distributed parameters already
+                filled by :meth:`_fill_independent_parameters()`. Gets updated
+                with the dependent parameters.
+
+        Returns:
+            None
+        """
+
+    def __init__(self,
+                 *,
+                 independent_parameter_distributions,
+                 model_parameter_order):
+        """
+        Set-up the prior transform per the given system and evolution params.
+
+        Args:
+            independent_parameter_distributions:    See same name attribute.
+
+            model_parameter_order([2-tuples]):    The full list of model
+                parameter names and their corresponding units units the
+                transformation must produce.
+
+        Returns:
+            None
+        """
+
+        self.independent_parameter_distributions = (
+            independent_parameter_distributions
+        )
+        self.parameter_order = model_parameter_order
+
+    def __call__(self, unit_cube_values):
+        """Return an array of the parameter values for evolving the system."""
+
+        transformed_values = numpy.empty(shape=(len(self.parameter_order),),
+                                         fill_value=numpy.nan,
+                                         dtype=float)
+
+        model_parameters = dict()
+        unit_cube_iter = iter(unit_cube_values)
+        try:
+            self._fill_independent_parameters(unit_cube_iter, model_parameters)
+            self._fill_coupled_parameters(unit_cube_iter, model_parameters)
+        except StopIteration:
+            raise IndexError('Too few unit cube values provided to generate '
+                             'model parameters!')
+
+        try:
+            next(unit_cube_iter)
+        except StopIteration:
+            pass
+        else:
+            raise IndexError('Too many unit cube values provided for '
+                             'generating model parameters!')
+
+        for param_index, (param_name, param_units) in enumerate(
+                self.parameter_order
+        ):
+            if param_name in model_parameters:
+                transformed_values[param_index] = (
+                    model_parameters[param_name].to_value(param_units)
+                )
+            else:
+                try:
+                    transformed_values[param_index] = getattr(
+                        self,
+                        '_calculate_' + param_name
+                    )(
+                        model_parameters
+                    ).to_value(
+                        param_units
+                    )
+                except AttributeError:
+                    raise RuntimeError(
+                        'No method for calculating %s parameter found!'
+                        %
+                        repr(param_name)
+                    )
+
+        return transformed_values
+#pylint: enable=too-few-public-methods

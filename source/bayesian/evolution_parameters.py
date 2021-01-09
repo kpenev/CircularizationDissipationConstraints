@@ -16,25 +16,6 @@ class EvolutionParameters:
             array to :meth:`__call__`.
     """
 
-    parameter_names_units = dict(
-        dissipation=[
-        ],
-        evolution=[
-            ('disk_dissipation_age', units.Gyr),
-            ('disk_period', units.day),
-            ('primary_wind_strength', 1),
-            ('prinmary_wind_saturation', 1),
-            ('primary_core_envelope_coupling_timescale', units.Gyr)
-        ],
-        system=[
-            ('age', units.Gyr),
-            ('feh', 1),
-            ('orbital_period', units.day),
-            ('primary_mass', units.M_sun),
-            ('secondary_mass', units.M_sun)
-        ]
-    )
-
     _logger = logging.getLogger(__name__)
 
     def log_parameters(self, message, parameters, level):
@@ -67,7 +48,9 @@ class EvolutionParameters:
             )
         )
 
-    def __init__(self, secondary_is_star):
+    def __init__(self,
+                 secondary_is_star,
+                 dissipation_parameters):
         """
         Prepare to manage the parameters for a given system.
 
@@ -79,12 +62,31 @@ class EvolutionParameters:
             None
         """
 
+        #TODO: fix units of wind parameters
+        self.parameter_names_units = dict(
+            dissipation=dissipation_parameters,
+            evolution=[
+                ('disk_dissipation_age', units.Gyr),
+                ('disk_period', units.day),
+                ('primary_wind_strength', units.dimensionless_unscaled),
+                ('prinmary_wind_saturation', units.dimensionless_unscaled),
+                ('primary_core_envelope_coupling_timescale', units.Gyr)
+            ],
+            system=[
+                ('age', units.Gyr),
+                ('feh', units.dimensionless_unscaled),
+                ('orbital_period', units.day),
+                ('primary_mass', units.M_sun),
+                ('secondary_mass', units.M_sun)
+            ]
+        )
+
         if secondary_is_star:
             self.parameter_names_units['evolution'].extend(
                 [
                     ('secondary_disk_period', units.day),
-                    ('secondary_wind_strength', 1),
-                    ('secondary_wind_saturation', 1),
+                    ('secondary_wind_strength', units.dimensionless_unscaled),
+                    ('secondary_wind_saturation', units.dimensionless_unscaled),
                     ('secondary_core_envelope_coupling_timescale', units.Gyr)
                 ]
             )

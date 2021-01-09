@@ -1,8 +1,9 @@
 """Define the parent class for all log-likelihood functions."""
 
+from abc import ABCMeta, abstractmethod
+
 import logging
 from types import SimpleNamespace
-from abc import ABCMeta, abstractmethod
 
 import numpy
 
@@ -20,11 +21,12 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         interpolator:    Stellar evolution interpolator to use in orbital
             evolution calculations.
 
-        eccentricity_pdf:    Callable that return the probability density
-            for the final eccentricity
+        eccentricity_pdf(callable):    The probability density for the final
+            eccentricity.
 
-        initial_eccentricity:    The "high" initial eccentricity the evolution
-            will always start with.
+        initial_eccentricity(float):    The "high" initial eccentricity the
+            evolution will always start with.
+
     """
 
     _logger = logging.getLogger(__name__)
@@ -60,12 +62,14 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                  interpolator,
                  eccentricity_pdf,
                  secondary_is_star,
-                 initial_eccentricity):
+                 initial_eccentricity,
+                 **kwargs):
         """
         Set-up the log-likelihood calculator.
 
         Args:
-            interpolator:    See :attr:`interpolator`.
+            interpolator:    A POET stelar evolution interpolator to use for
+                calculating the orbital evolution.
 
             eccentricity_pdf:    See :attr:`eccentricity_pdf`.
 
@@ -73,6 +77,9 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 an evolving star.
 
             initial_eccentricity:    See :attr:`initial_eccentricity`.
+
+            kwargs:    Arguments in addition to `secondary_is_star` required by
+                the parent's :meth:`__init__()`.
 
         Returns:
             None
@@ -83,7 +90,8 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         self.initial_eccentricity = initial_eccentricity
 
         self.secondary_is_star = secondary_is_star
-        super().__init__(secondary_is_star)
+        super().__init__(secondary_is_star=secondary_is_star,
+                         **kwargs)
 
     def __call__(self, parameters):
         """
