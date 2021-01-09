@@ -1,28 +1,27 @@
+#!/usr/bin/env python3
 """Implement PDF of predicted eccentricity per observed and envelope."""
 
-from abc import ABCMeta, abstractmethod
 import pickle
 
+from matplotlib import pyplot
 import scipy.integrate
 from scipy.interpolate import InterpolatedUnivariateSpline
-import scipy
 import numpy
 
-class EccentricityPDFBase(metaclass=ABCMeta):
-    """Final eccentricity PDF agnostic of measured and envelope eccen. PDFs."""
+from split_normal_distribution import split_normal
 
-    envelope_eccentricity = 1.0
+#Intended to simply provide callable. No need for further public methods.
+#pylint: disable=too-few-public-methods
+class EccentricityPDF():
+    """Final eccentricity PDF agnostic of measured and envelope eccen. PDFs."""
 
     def _integrand_envelope_pdf(self, e_observed, e_envelope):
         """Integrand when both observed and envelope ecc. are PDFs."""
 
         return (
-            self.observed_eccentricity(e_observed)
+            self.observed_eccentricity.pdf(e_observed)
             *
-            #Only used if envelope_eccentricity is overwritten by callable
-            #pylint: disable=not-callable
-            self.envelope_eccentricity(e_envelope)
-            #pylint: enable=not-callable
+            self.envelope_eccentricity.pdf(e_envelope)
             /
             (e_envelope - e_observed)
         )
@@ -31,7 +30,7 @@ class EccentricityPDFBase(metaclass=ABCMeta):
         """Integrand when the envelope is only a single value."""
 
         return (
-            self.observed_eccentricity(e_observed)
+            self.observed_eccentricity.pdf(e_observed)
             /
             (self.envelope_eccentricity - e_observed)
         )
@@ -54,7 +53,7 @@ class EccentricityPDFBase(metaclass=ABCMeta):
     def _compute_interpolation(self, max_refinements=10):
         """Find an interpolation of sufficient precision."""
 
-        max_e = (1 if callable(self.envelope_eccentricity)
+        max_e = (1 if hasattr(self.envelope_eccentricity, 'pdf')
                  else self.envelope_eccentricity)
 
         (
@@ -63,19 +62,19 @@ class EccentricityPDFBase(metaclass=ABCMeta):
         ) = self._get_required_precision()
 
 
-        old_grid = scipy.linspace(0, max_e, 50)
+        old_grid = numpy.linspace(0, max_e, 50)
         calculate_values = scipy.vectorize(self.__call__)
         old_values = calculate_values(old_grid)
         interpolation = InterpolatedUnivariateSpline(old_grid, old_values)
 
         for refinement in range(max_refinements):
             grid_size = 2 * old_grid.size - 1
-            grid = scipy.linspace(0, max_e, grid_size)
+            grid = numpy.linspace(0, max_e, grid_size)
 
             new_values = calculate_values(grid[1::2])
             interpolated_new_values = interpolation(grid[1::2])
 
-            values = scipy.empty(grid_size)
+            values = numpy.empty(grid_size)
             values[0::2] = old_values
             values[1::2] = new_values
 
@@ -86,7 +85,7 @@ class EccentricityPDFBase(metaclass=ABCMeta):
                   %
                   (
                       refinement,
-                      scipy.amax(
+                      numpy.amax(
                           numpy.abs(new_values - interpolated_new_values)
                           /
                           numpy.maximum(required_abs_precision,
@@ -110,6 +109,9 @@ class EccentricityPDFBase(metaclass=ABCMeta):
         )
 
     def __init__(self,
+                 observed_eccentricity,
+                 envelope_eccentricity=1.0,
+                 *,
                  integration_options=None,
                  load_interp_from=None,
                  save_interp_to=None):
@@ -117,6 +119,13 @@ class EccentricityPDFBase(metaclass=ABCMeta):
         Prepare the PDF for evaluation.
 
         Args:
+            observed_eccentricity:    The distribution of the present day
+                eccentricity of the system. Should provide
+                `scipy.stats.rv_continuous` interface.
+
+            envelope_eccentricity:    Either a single float or another
+                distribution specifying the envelope eccentricity.
+
             integration_options:    The `opts` argument to pass to
                 `scipy.integrate.nquad`.
 
@@ -134,6 +143,9 @@ class EccentricityPDFBase(metaclass=ABCMeta):
                 interpolation instead of computing the required integrals.
         """
 
+        self.envelope_eccentricity = envelope_eccentricity
+        self.observed_eccentricity = observed_eccentricity
+
         self.integration_options = integration_options
 
         self._interpolation = None
@@ -147,17 +159,13 @@ class EccentricityPDFBase(metaclass=ABCMeta):
             self._interpolation = self._compute_interpolation()
             pickle.dump(self._interpolation, save_interp_to)
 
-    @abstractmethod
-    def observed_eccentricity(self, e_now):
-        """The PDF of the present day eccentricity per observation data."""
-
     def __call__(self, e_predicted):
         """Return the PDF evaluated at specified present day eccentricity."""
 
         assert 0 <= e_predicted <= 1
 
         if (
-                not callable(self.envelope_eccentricity)
+                not hasattr(self.envelope_eccentricity, 'pdf')
                 and
                 e_predicted > self.envelope_eccentricity
         ):
@@ -166,7 +174,7 @@ class EccentricityPDFBase(metaclass=ABCMeta):
         if self._interpolation is not None:
             return self._interpolation(e_predicted)
 
-        if callable(self.envelope_eccentricity):
+        if hasattr(self.envelope_eccentricity, 'pdf'):
 
             result, abserr = scipy.integrate.nquad(
                 self._integrand_envelope_pdf,
@@ -197,3 +205,77 @@ class EccentricityPDFBase(metaclass=ABCMeta):
             )
 
         return result
+#pylint: enable=too-few-public-methods
+
+if __name__ == '__main__':
+    plot_e = numpy.linspace(0, 1, 100)
+
+    e_now_distros = [
+        split_normal.freeze_error_bar(
+            mode=0.2,
+            abs_plus_error=0.1,
+            abs_minus_error=0.05
+        ),
+        split_normal.freeze_error_bar(
+            mode=0.2,
+            abs_plus_error=0.01,
+            abs_minus_error=0.008
+        ),
+        split_normal.freeze_error_bar(
+            mode=0.3,
+            abs_plus_error=0.1,
+            abs_minus_error=0.05
+        )
+    ]
+
+#    with open('test_eccentricity_pdf.pkl', 'wb') as pickle_f:
+#        EccentricityPDF(
+#            observed_eccentricity=e_now_distros[0],
+#            save_interp_to=pickle_f
+#        )
+#        EccentricityPDF(
+#            observed_eccentricity=e_now_distros[1],
+#            envelope_eccentricity=0.5,
+#            save_interp_to=pickle_f
+#        )
+#        EccentricityPDF(
+#            observed_eccentricity=e_now_distros[2],
+#            envelope_eccentricity=split_normal.freeze_error_bar(
+#                mode=0.5,
+#                abs_plus_error=0.1,
+#                abs_minus_error=0.1
+#            ),
+#            save_interp_to=pickle_f
+#        )
+
+    with open('test_eccentricity_pdf.pkl', 'rb') as pickle_f:
+        e_pdf = numpy.vectorize(
+            EccentricityPDF(
+                observed_eccentricity=e_now_distros[0],
+                load_interp_from=pickle_f
+            )
+        )
+        pyplot.plot(plot_e, e_pdf(plot_e), '-r')
+        pyplot.show()
+        e_pdf = numpy.vectorize(
+            EccentricityPDF(
+                observed_eccentricity=e_now_distros[1],
+                envelope_eccentricity=0.5,
+                load_interp_from=pickle_f
+            )
+        )
+        pyplot.plot(plot_e, e_pdf(plot_e), '-r')
+        pyplot.show()
+        e_pdf = numpy.vectorize(
+            EccentricityPDF(
+                observed_eccentricity=e_now_distros[2],
+                envelope_eccentricity=split_normal.freeze_error_bar(
+                    mode=0.5,
+                    abs_plus_error=0.1,
+                    abs_minus_error=0.1
+                ),
+                load_interp_from=pickle_f
+            )
+        )
+        pyplot.plot(plot_e, e_pdf(plot_e), '-r')
+        pyplot.show()
