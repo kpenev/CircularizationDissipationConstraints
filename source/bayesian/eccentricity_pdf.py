@@ -4,6 +4,7 @@
 import logging
 from pickle import Pickler, Unpickler
 import os.path
+from multiprocessing import Pool
 
 from matplotlib import pyplot
 import scipy.integrate
@@ -54,8 +55,16 @@ class EccentricityPDF():
 
         return 100.0 * default_precision, 100.0 * default_precision
 
-    def _compute_interpolation(self, max_refinements=10):
+    def _compute_interpolation(self,
+                               num_parallel_processes,
+                               max_refinements=20):
         """Find an interpolation of sufficient precision."""
+
+        def calculate_values(grid):
+            """Evaluate the function on a grid of eccentricities."""
+
+            with Pool(num_parallel_processes) as workers:
+                return numpy.array(workers.map(self, grid))
 
         max_e = (1 if hasattr(self.envelope_eccentricity, 'pdf')
                  else self.envelope_eccentricity)
@@ -67,18 +76,21 @@ class EccentricityPDF():
 
 
         old_grid = numpy.linspace(0, max_e, 50)
-        calculate_values = scipy.vectorize(self.__call__)
         old_values = calculate_values(old_grid)
         interpolation = InterpolatedUnivariateSpline(old_grid, old_values)
 
         for refinement in range(max_refinements):
-            grid_size = 2 * old_grid.size - 1
-            grid = numpy.linspace(0, max_e, grid_size)
+            grid = numpy.linspace(0, max_e, 2 * old_grid.size - 1)
 
             new_values = calculate_values(grid[1::2])
-            interpolated_new_values = interpolation(grid[1::2])
+            scaled_error = numpy.amax(
+                numpy.abs(new_values - interpolation(grid[1::2]))
+                /
+                numpy.maximum(required_abs_precision,
+                              required_rel_precision * new_values)
+            )
 
-            values = numpy.empty(grid_size)
+            values = numpy.empty(grid.size, dtype=numpy.float64)
             values[0::2] = old_values
             values[1::2] = new_values
 
@@ -88,20 +100,10 @@ class EccentricityPDF():
             self._logger.debug(
                 'Refinement %d: max error overshoot: %25.16e',
                 refinement,
-                numpy.amax(
-                    numpy.abs(new_values - interpolated_new_values)
-                    /
-                    numpy.maximum(required_abs_precision,
-                                  required_rel_precision * new_values)
-                )
+                scaled_error
             )
 
-            if (
-                    numpy.abs(new_values - interpolated_new_values)
-                    <
-                    numpy.maximum(required_abs_precision,
-                                  required_rel_precision * new_values)
-            ).all():
+            if scaled_error < 1:
                 return interpolation
 
             old_grid = grid
@@ -190,7 +192,8 @@ class EccentricityPDF():
                  envelope_eccentricity=1.0,
                  *,
                  integration_options=None,
-                 pickle_fname=None):
+                 pickle_fname=None,
+                 num_parallel_processes=4):
         """
         Prepare the PDF for evaluation.
 
@@ -221,7 +224,9 @@ class EccentricityPDF():
         self._interpolation = None
 
         if not self._check_for_pickled(pickle_fname):
-            self._interpolation = self._compute_interpolation()
+            self._interpolation = self._compute_interpolation(
+                num_parallel_processes=num_parallel_processes
+            )
             self._pickle_interpolation(pickle_fname)
 
     def __call__(self, e_predicted):
@@ -292,6 +297,11 @@ if __name__ == '__main__':
             mode=0.3,
             abs_plus_error=0.1,
             abs_minus_error=0.05
+        ),
+        split_normal.freeze_error_bar(
+            mode=0.2,
+            abs_plus_error=0.1,
+            abs_minus_error=0.05
         )
     ]
 
@@ -315,6 +325,19 @@ if __name__ == '__main__':
     e_pdf = numpy.vectorize(
         EccentricityPDF(
             observed_eccentricity=e_now_distros[2],
+            envelope_eccentricity=split_normal.freeze_error_bar(
+                mode=0.5,
+                abs_plus_error=0.1,
+                abs_minus_error=0.1
+            ),
+            pickle_fname='test_eccentricity_pdf.pkl'
+        )
+    )
+    pyplot.plot(plot_e, e_pdf(plot_e), '-r')
+    pyplot.show()
+    e_pdf = numpy.vectorize(
+        EccentricityPDF(
+            observed_eccentricity=e_now_distros[3],
             envelope_eccentricity=split_normal.freeze_error_bar(
                 mode=0.5,
                 abs_plus_error=0.1,
