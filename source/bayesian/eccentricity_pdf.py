@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Implement PDF of predicted eccentricity per observed and envelope."""
 
-import pickle
+import logging
+from pickle import Pickler, Unpickler
+import os.path
 
 from matplotlib import pyplot
 import scipy.integrate
@@ -14,6 +16,8 @@ from split_normal_distribution import split_normal
 #pylint: disable=too-few-public-methods
 class EccentricityPDF():
     """Final eccentricity PDF agnostic of measured and envelope eccen. PDFs."""
+
+    _logger = logging.getLogger(__name__)
 
     def _integrand_envelope_pdf(self, e_observed, e_envelope):
         """Integrand when both observed and envelope ecc. are PDFs."""
@@ -81,17 +85,16 @@ class EccentricityPDF():
             interpolation = InterpolatedUnivariateSpline(grid, values)
 
 
-            print('Refinement %d: max error overshoot: %25.16e'
-                  %
-                  (
-                      refinement,
-                      numpy.amax(
-                          numpy.abs(new_values - interpolated_new_values)
-                          /
-                          numpy.maximum(required_abs_precision,
-                                        required_rel_precision * new_values)
-                      )
-                  ))
+            self._logger.debug(
+                'Refinement %d: max error overshoot: %25.16e',
+                refinement,
+                numpy.amax(
+                    numpy.abs(new_values - interpolated_new_values)
+                    /
+                    numpy.maximum(required_abs_precision,
+                                  required_rel_precision * new_values)
+                )
+            )
 
             if (
                     numpy.abs(new_values - interpolated_new_values)
@@ -108,13 +111,86 @@ class EccentricityPDF():
             'Failed to find interpolation with sufficient precision.'
         )
 
+    def _check_for_pickled(self, pickle_fname):
+        """
+        Check if a pre-pickled interpolation exists for the current setup.
+
+        Args:
+            None
+
+        Returns:
+            bool:
+                Whether a matching interpolation was found.
+        """
+
+        def compare_next(pickled_observed_e,
+                         pickled_envelope_e,
+                         pickled_integration_opts):
+            """Check if the next pickled eccentricity PDF matches."""
+
+            if pickled_observed_e.kwds != self.observed_eccentricity.kwds:
+                return False
+            if hasattr(self.envelope_eccentricity, 'pdf'):
+                if(
+                        getattr(pickled_envelope_e, 'kwds', None)
+                        !=
+                        self.envelope_eccentricity.kwds
+                ):
+                    return False
+            else:
+                if pickled_envelope_e != self.envelope_eccentricity:
+                    return False
+            return pickled_integration_opts == self.integration_options
+
+        if pickle_fname is None:
+            return False
+
+        if not os.path.exists(pickle_fname):
+            return False
+
+        try:
+            with open(pickle_fname, 'rb') as pickle_file:
+                unpickler = Unpickler(pickle_file)
+                while True:
+                    section, nobjects = unpickler.load()
+                    if section == 'EccentricityPDF':
+                        assert nobjects == 4
+                        nobjects -= 3
+                        if compare_next(unpickler.load(),
+                                        unpickler.load(),
+                                        unpickler.load()):
+                            self._logger.info(
+                                'Found matching pickled eccentricity PDF.'
+                            )
+                            self._interpolation = unpickler.load()
+                            return True
+
+                    for _ in range(nobjects):
+                        unpickler.load()
+        except EOFError:
+            self._logger.info('No matching pickled eccentricity PDF found.')
+            return False
+
+    def _pickle_interpolation(self, pickle_fname):
+        """Appends a pickle of the currently set-up interpolation a file."""
+
+        if pickle_fname is None:
+            return
+
+        with open(pickle_fname, 'ab') as pickle_file:
+            pickler = Pickler(pickle_file)
+            pickler.dump(('EccentricityPDF', 4))
+            pickler.dump(self.observed_eccentricity)
+            pickler.dump(self.envelope_eccentricity)
+            pickler.dump(self.integration_options)
+            pickler.dump(self._interpolation)
+
     def __init__(self,
                  observed_eccentricity,
                  envelope_eccentricity=1.0,
                  *,
                  integration_options=None,
-                 load_interp_from=None,
-                 save_interp_to=None):
+                 pickle_fname=None):
         """
         Prepare the PDF for evaluation.
 
@@ -129,18 +205,12 @@ class EccentricityPDF():
             integration_options:    The `opts` argument to pass to
                 `scipy.integrate.nquad`.
 
-            load_interp_from:    If not None, this should be a file open for
-                binary reading to load a pickle of a pre-computed interpolation
-                from. In this case, :meth:`__call__` will return the value of
-                the loaded interpolation instead of computing the required
-                integrals.
+            pickled_fname:    If not None, this should be the name of a file to
+                load/save pre-computed interpolaiton with the given
+                configuration from/to.
 
-            save_interp_to:    If not None, this should be a file open for
-                binary writing. In this case, the function derives an
-                interpolation by calling itself on an adaptively refined grid of
-                points and saves that interpolation to the file. The
-                :meth:`__call__` will return the value of the calculated
-                interpolation instead of computing the required integrals.
+        Returns:
+            None
         """
 
         self.envelope_eccentricity = envelope_eccentricity
@@ -150,14 +220,9 @@ class EccentricityPDF():
 
         self._interpolation = None
 
-        assert load_interp_from is None or save_interp_to is None
-
-        if load_interp_from is not None:
-            self._interpolation = pickle.load(load_interp_from)
-
-        if save_interp_to is not None:
+        if not self._check_for_pickled(pickle_fname):
             self._interpolation = self._compute_interpolation()
-            pickle.dump(self._interpolation, save_interp_to)
+            self._pickle_interpolation(pickle_fname)
 
     def __call__(self, e_predicted):
         """Return the PDF evaluated at specified present day eccentricity."""
@@ -208,6 +273,8 @@ class EccentricityPDF():
 #pylint: enable=too-few-public-methods
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+
     plot_e = numpy.linspace(0, 1, 100)
 
     e_now_distros = [
@@ -228,54 +295,33 @@ if __name__ == '__main__':
         )
     ]
 
-#    with open('test_eccentricity_pdf.pkl', 'wb') as pickle_f:
-#        EccentricityPDF(
-#            observed_eccentricity=e_now_distros[0],
-#            save_interp_to=pickle_f
-#        )
-#        EccentricityPDF(
-#            observed_eccentricity=e_now_distros[1],
-#            envelope_eccentricity=0.5,
-#            save_interp_to=pickle_f
-#        )
-#        EccentricityPDF(
-#            observed_eccentricity=e_now_distros[2],
-#            envelope_eccentricity=split_normal.freeze_error_bar(
-#                mode=0.5,
-#                abs_plus_error=0.1,
-#                abs_minus_error=0.1
-#            ),
-#            save_interp_to=pickle_f
-#        )
-
-    with open('test_eccentricity_pdf.pkl', 'rb') as pickle_f:
-        e_pdf = numpy.vectorize(
-            EccentricityPDF(
-                observed_eccentricity=e_now_distros[0],
-                load_interp_from=pickle_f
-            )
+    e_pdf = numpy.vectorize(
+        EccentricityPDF(
+            observed_eccentricity=e_now_distros[0],
+            pickle_fname='test_eccentricity_pdf.pkl'
         )
-        pyplot.plot(plot_e, e_pdf(plot_e), '-r')
-        pyplot.show()
-        e_pdf = numpy.vectorize(
-            EccentricityPDF(
-                observed_eccentricity=e_now_distros[1],
-                envelope_eccentricity=0.5,
-                load_interp_from=pickle_f
-            )
+    )
+    pyplot.plot(plot_e, e_pdf(plot_e), '-r')
+    pyplot.show()
+    e_pdf = numpy.vectorize(
+        EccentricityPDF(
+            observed_eccentricity=e_now_distros[1],
+            envelope_eccentricity=0.5,
+            pickle_fname='test_eccentricity_pdf.pkl'
         )
-        pyplot.plot(plot_e, e_pdf(plot_e), '-r')
-        pyplot.show()
-        e_pdf = numpy.vectorize(
-            EccentricityPDF(
-                observed_eccentricity=e_now_distros[2],
-                envelope_eccentricity=split_normal.freeze_error_bar(
-                    mode=0.5,
-                    abs_plus_error=0.1,
-                    abs_minus_error=0.1
-                ),
-                load_interp_from=pickle_f
-            )
+    )
+    pyplot.plot(plot_e, e_pdf(plot_e), '-r')
+    pyplot.show()
+    e_pdf = numpy.vectorize(
+        EccentricityPDF(
+            observed_eccentricity=e_now_distros[2],
+            envelope_eccentricity=split_normal.freeze_error_bar(
+                mode=0.5,
+                abs_plus_error=0.1,
+                abs_minus_error=0.1
+            ),
+            pickle_fname='test_eccentricity_pdf.pkl'
         )
-        pyplot.plot(plot_e, e_pdf(plot_e), '-r')
-        pyplot.show()
+    )
+    pyplot.plot(plot_e, e_pdf(plot_e), '-r')
+    pyplot.show()
