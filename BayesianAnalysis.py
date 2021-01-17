@@ -10,6 +10,7 @@ import random
 import emcee
 import sys
 from scipy.optimize import curve_fit
+from scipy.stats import rice
 
 sys.path.append('/home/mmmahmud/poet/PythonPackage')
 sys.path.append('../scripts')
@@ -34,6 +35,13 @@ class SuperEccentricityDistribution(metaclass=ABCMeta):
     def __init__(self, mean_e_now, e_now_stdev, mean_e_env, e_env_stdev):
         self.mean_e_now = mean_e_now
         self.e_now_stdev = e_now_stdev
+        self.mean_w = 0 # Here, w = angle of periastron
+        self.w_upper_uncertainty = 0
+        self.w_lower_uncertainty = 0
+        self.mean_e_sin_w = 0 #Here e is for eccentricity
+        self.e_sin_w_stdev =0
+        self.mean_e_cos_w = 0
+        self.e_cos_w_stdev = 0
         self.mean_e_env = mean_e_env
         self.e_env_stdev = e_env_stdev
 
@@ -56,6 +64,21 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         return math.exp(-0.5 * ((e_now - self.mean_e_now) / self.e_now_stdev) ** 2) / self.e_now_stdev / math.sqrt(
             2 * math.pi)
 
+    def distribution_of_present_eccentricity_new(self, e_now):
+        integrand = lambda w: self.distribution_of_e_sin_w(e_now * math.sin(w)) * self.distribution_of_e_cos_w(e_now * math.cos(w))
+        value = nquad(integrand, [[0, 2 * math.pi]])
+
+        return value
+
+    def distribution_of_e_sin_w(self, s):
+        return math.exp(-0.5 * ((s - self.mean_e_sin_w) / self.e_sin_w_stdev) ** 2) / self.e_sin_w_stdev / math.sqrt(
+            2 * math.pi)
+
+    def distribution_of_e_cos_w(self, c):
+        return math.exp(-0.5 * ((c - self.mean_e_cos_w) / self.e_cos_w_stdev) ** 2) / self.e_cos_w_stdev / math.sqrt(
+            2 * math.pi)
+
+
     def distribution_of_envelop_eccentricity(self, e_env):
         if self.e_env_stdev == 0:
             if e_env == self.mean_e_env:
@@ -65,26 +88,6 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         return math.exp(-0.5 * ((e_env - self.mean_e_env) / self.e_env_stdev) ** 2) / self.e_env_stdev / math.sqrt(
             2 * math.pi)
 
-    def integrand_of_the_integral_of_the_distribution_of_envelop_density(self, e_env, e_now):
-        return self.distribution_of_envelop_eccentricity(e_env) / (e_env - e_now)
-
-    def integral_of_the_distribution_of_envelop_eccentricity(self, e, e_now):
-        return quad(self.integrand_of_the_integral_of_the_distribution_of_envelop_density, e, 1, args=(e_now))
-
-    def integrand_of_the_distribution_of_eccentricity_integral(self, e_now, e):
-        return self.integral_of_the_distribution_of_envelop_eccentricity(e, e_now)[
-                   0] * self.distribution_of_present_eccentricity(e_now)
-
-    def distribution_of_eccentricity_by_quad(self, e, e_env_exists=True):
-        if e > 1 or e < 0:
-            return 0
-        if not e_env_exists:
-            if self.mean_e_env == 0:
-                return 0
-            w = lambda e_now: self.distribution_of_present_eccentricity(e_now) / (1 - e_now)
-            value = quad(w, 0, e)
-            return value
-        return quad(self.integrand_of_the_distribution_of_eccentricity_integral, 0, e, args=(e))
 
     def distribution_of_eccentricity_by_nquad(self, e, e_env_exists=True):
         if e > 1 or e < 0:
@@ -815,17 +818,40 @@ class BayesianAnalysis:
 
 
 if __name__ == '__main__':
-    test = BayesianAnalysis()
+    fig, ax = plt.subplots(1, 1)
+    print(fig)
+    print(ax)
+
+    b = 0.775
+    mean, var, skew, kurt = rice.stats(b, moments='mvsk')
+    print('mean =', mean)
+    print('var =', var)
+    print('skew =', skew)
+    print('kurt =', kurt)
+    x = np.linspace(rice.ppf(0.01, b),
+                    rice.ppf(0.99, b), 100)
+    ax.plot(x, rice.pdf(x, b),'r-', lw=5, alpha=0.6, label='rice pdf')
+    rv = rice(b)
+    ax.plot(x, rv.pdf(x), 'k-', lw=2, label='frozen pdf')
+    vals = rice.ppf([0.001, 0.5, 0.999], b)
+    np.allclose([0.001, 0.5, 0.999], rice.cdf(vals, b))
+    r = rice.rvs(b, size=1000)
+    ax.hist(r, density=True, histtype='stepfilled', alpha=0.2)
+    ax.legend(loc='best', frameon=False)
+    plt.show()
+
+
+    #   test = BayesianAnalysis()
     eccentricity_expansion_fname = b"/home/mmmahmud/poet/scripts/eccentricity_expansion_coef.txt"
     orbital_evolution_library.read_eccentricity_expansion_coefficients(
         eccentricity_expansion_fname
     )
     serialized_dir = '/home/mmmahmud/poet/stellar_evolution_interpolators'
-    manager = StellarEvolutionManager(serialized_dir)
+ #   manager = StellarEvolutionManager(serialized_dir)
 
-    interpolator = manager.get_interpolator_by_name('default')
+#    interpolator = manager.get_interpolator_by_name('default')
 
-    evolutionary_data = test.test_Nasa_Exoplanet_data(interpolator=(interpolator, interpolator))
+#    evolutionary_data = test.test_Nasa_Exoplanet_data(interpolator=(interpolator, interpolator))
 
     print('end')
 
