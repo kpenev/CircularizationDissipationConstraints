@@ -6,6 +6,7 @@ from pickle import Pickler, Unpickler
 import os.path
 from multiprocessing import Pool
 from functools import partial
+import logging
 
 from matplotlib import pyplot
 import numpy
@@ -25,6 +26,8 @@ from feh_conditional_likelihood_base import FeHConditionalLikelihoodBase
 #pylint: disable=too-many-instance-attributes
 class StarSampler:
     """Implenet calculation, saving, and loading of star parameter sampling."""
+
+    _logger = logging.getLogger(__name__)
 
     def _handle_debug_plot(self, **fname_substitutions):
         """Either save of display the currently set-up plot."""
@@ -346,7 +349,6 @@ class StarSampler:
             self._feh_grid,
             initial=0.0
         )
-        print('[Fe/H] CDF: ' + repr(feh_cdf / feh_cdf[-1]))
         self._feh_cdf = InterpolatedUnivariateSpline(
             self._feh_grid,
             feh_cdf / feh_cdf[-1],
@@ -602,7 +604,7 @@ class StarSampler:
             )
         )
 
-        print('Mismatch indices: ' + repr(mismatch_indices))
+        self._logger.debug('Mismatch indices: %s', repr(mismatch_indices))
 
         return [
             get_new_grid_points(*args)
@@ -680,8 +682,8 @@ class StarSampler:
                     (self._feh_grid, self._mass_grid), grid_refinement
                 )
             )
-            print('New [Fe/H] grid: ' + repr(new_feh_grid.T))
-            print('New M* grid: ' + repr(new_mass_grid.T))
+            self._logger.debug('New [Fe/H] grid: %s', repr(new_feh_grid.T))
+            self._logger.debug('New M* grid: %s', repr(new_mass_grid.T))
 
             age_cdf_norms_to_add = self._calculate_age_cdf_norms(
                 grid_refinement[1][0],
@@ -751,7 +753,7 @@ class StarSampler:
         Check for a pre-pickled sampler for the given likelihood and config.
 
         Args:
-            see :meth:`__init__`
+            None
 
         Returns:
             bool:
@@ -762,6 +764,7 @@ class StarSampler:
             """Return True iff the pickled config matches input config."""
 
             ignore_args = ['pickle_fname',
+                           'star_sampler_pickle_fname',
                            'grid_refine_algorithm',
                            'num_parallel_processes',
                            'debug_plot',
@@ -782,7 +785,11 @@ class StarSampler:
                     return False
                 pickled_value = pickled_cfg_dict[key]
                 if isinstance(pickled_value, (rv_continuous, rv_frozen)):
-                    if pickled_value.kwds != input_cfg_dict[key].kwds:
+                    if (
+                            pickled_value.kwds != input_cfg_dict[key].kwds
+                            or
+                            pickled_value.args != input_cfg_dict[key].args
+                    ):
                         return False
                     del pickled_cfg_dict[key]
                     del input_cfg_dict[key]
@@ -792,17 +799,17 @@ class StarSampler:
                     del pickled_cfg_dict[key]
                     del input_cfg_dict[key]
 
-            print('Pickled config: ' + repr(pickled_cfg_dict))
-            print('Current config: ' + repr(input_cfg_dict))
+            self._logger.debug('Pickled config: %s', repr(pickled_cfg_dict))
+            self._logger.debug('Current config: %s', repr(input_cfg_dict))
 
             return pickled_cfg_dict == input_cfg_dict
 
 
-        if not os.path.exists(self.config.pickle_fname):
-            open(self.config.pickle_fname, 'wb').close()
+        if not os.path.exists(self.config.star_sampler_pickle_fname):
+            open(self.config.star_sampler_pickle_fname, 'wb').close()
             return False
         try:
-            with open(self.config.pickle_fname, 'rb') as pickle_file:
+            with open(self.config.star_sampler_pickle_fname, 'rb') as pickle_file:
                 unpickler = Unpickler(pickle_file)
                 while True:
                     section, nobjects = unpickler.load()
@@ -814,27 +821,30 @@ class StarSampler:
                         if compare_config(unpickler.load()):
                             nobjects -= 1
                             if self.likelihood == unpickler.load():
-                                print('Match found')
+                                self._logger.info(
+                                    'Matching pickled star sampler found.'
+                                )
                                 self._mass_cdf = unpickler.load()
                                 self._age_cdf_norms = unpickler.load()
                                 self._feh_grid = unpickler.load()
                                 self._mass_grid = unpickler.load()
                                 return True
 
-                            print('Log-likelihoods do not match.')
+                            self._logger.debug('Log-likelihoods do not match.')
                         else:
-                            print('Configurations do not match.')
+                            self._logger.debug('Configurations do not match.')
 
 
                     for _ in range(nobjects):
                         unpickler.load()
         except EOFError:
+            self._logger.info('None of the pickled star samplers matches.')
             return False
 
     def _add_to_pickle_file(self):
         """Append the current sampler to the pickle file specified in config."""
 
-        with open(self.config.pickle_fname, 'ab') as pickle_file:
+        with open(self.config.star_sampler_pickle_fname, 'ab') as pickle_file:
             pickler = Pickler(pickle_file)
             pickler.dump(('StarSampler', 6))
             pickler.dump(self.config)
