@@ -4,16 +4,23 @@
 Define a class that works with interpolated photometry from CMD isochrones.
 """
 
+import sys
 import re
+import os.path
 
 from matplotlib import pyplot
 from astropy import units
-import scipy
+import numpy
 
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
+#pylint: disable=wrong-import-position
 from planetary_system_io import read_cds_pipe_table
+#pylint: disable=import-error
 from command_line_utilities import data_dir
-
+#pylint: enable=import-error
 from cmd_isochrone_interpolator import CMDInterpolator
+#pylint: enable=wrong-import-position
 
 class CMDPhotometryInterpolator(CMDInterpolator):
     """
@@ -40,21 +47,21 @@ class CMDPhotometryInterpolator(CMDInterpolator):
         extinction_parse_rex = re.compile(
             'photometry includes extinction of Av=(?P<Av>[^ ,]*)[, ]'
         )
-        filchar_rex = re.compile(
-            '.*<i>(?P<filchars>[a-zA-Z]*)</i>'
-        )
         for line in self.header:
             if ':' in line:
                 keyword, value = line[1:].strip().split(':', 1)
-                if keyword.strip() == 'Photometric system':
-                    print('Matching ' + repr(value.strip()))
-                    parsed_filchars = filchar_rex.match(value.strip())
-                    assert parsed_filchars
-                    self.filchars = parsed_filchars['filchars']
                 if keyword.strip() == 'Attention':
-                    parsed_extinction = extinction_parse_rex.match(value.strip())
+                    parsed_extinction = extinction_parse_rex.match(
+                        value.strip()
+                    )
                     assert parsed_extinction
                     self.extinction = float(parsed_extinction['Av'])
+
+        self.available_filters = [col_name[:-3]
+                                  for col_name in self.data[0].dtype.names
+                                  if col_name.endswith('mag')]
+        print('Available filters: ' + repr(self.available_filters))
+
 
     def __init__(self, isochrone_fname):
         """Interpolate within the given isochrone grid."""
@@ -68,22 +75,22 @@ class CMDPhotometryInterpolator(CMDInterpolator):
         self.max_mass = self.data[0]['Mini'][-1] * units.M_sun
         self.feh = self.data[0]['MH'][0]
         #pylint: enable=no-member
-        assert scipy.unique(self.data[0]['logAge']).size == 1
+        assert numpy.unique(self.data[0]['logAge']).size == 1
         #False positive
         #pylint: disable=no-member
         self.age = 10.0**(self.data[0]['logAge'][0] - 9.0) * units.Gyr
         #pylint: enable=no-member
 
-        self.grid_mag = scipy.stack(
-            self.data[0][filchar + 'mag'] for filchar in self.filchars
+        self.grid_mag = numpy.stack(
+            self.data[0][filchar + 'mag'] for filchar in self.available_filters
         )
 
     def __call__(self, interp_mass):
         """Return the available photometry for the given mass(es)."""
 
-        return scipy.stack(
+        return numpy.stack(
             self.get_interpolated(mag_letter + 'mag', interp_mass, None)
-            for mag_letter in self.filchars
+            for mag_letter in self.available_filters
         )
 
     def get_binary_magnitudes(self, primary_mass, secondary_mass):
@@ -91,7 +98,7 @@ class CMDPhotometryInterpolator(CMDInterpolator):
 
         primary_mags = self(primary_mass)
         secondary_mags = self(secondary_mass)
-        return -2.5 * scipy.log10(10.0**(-primary_mags/2.5)
+        return -2.5 * numpy.log10(10.0**(-primary_mags/2.5)
                                   +
                                   10.0**(-secondary_mags/2.5))
 
@@ -103,7 +110,7 @@ if __name__ == '__main__':
         )
     )
     cluster_members = ngc_188_photometry[ngc_188_photometry['Memb'] > 0.5]
-    observed_ubvri = scipy.array((cluster_members["Umag"],
+    observed_ubvri = numpy.array((cluster_members["Umag"],
                                   cluster_members["Bmag"],
                                   cluster_members["Vmag"],
                                   cluster_members["Rmag"],
@@ -117,7 +124,10 @@ if __name__ == '__main__':
     )
 
     interp_masses = interpolator.data[0]['Mini']
-    predicted_ubvrijhk = interpolator(interp_masses)
+    predicted_ubvrijhk = numpy.rec.array(
+        interpolator(interp_masses).T.copy(),
+        dtype=[(filter, float) for filter in interpolator.available_filters]
+    )
 
     predicted_q1_binary_ubvrijhk = (
         interpolator.get_binary_magnitudes(
@@ -129,14 +139,27 @@ if __name__ == '__main__':
 #    pyplot.plot(predicted_ubvrijhk[1] - predicted_ubvrijhk[2],
 #                -predicted_ubvrijhk[2] - 11.23, 'or', markersize=10)
 
-    for left in range(5):
-        for right in range(left + 1, 5):
-            pyplot.plot(observed_ubvri[left] - observed_ubvri[right],
-                        -observed_ubvri[2],
-                        'ok')
-            pyplot.plot(predicted_ubvrijhk[left] - predicted_ubvrijhk[right],
-                        -predicted_ubvrijhk[2] - 11.23, '-r', linewidth=3)
-            pyplot.xlabel('%s - %s [mag]' % ('UBVRI'[left], 'UBVRI'[right]))
+    for left_index, left_filter in enumerate('UBVRI'):
+        for right_index, right_filter in enumerate('UBVRI'):
+            if right_index <= left_index:
+                continue
+            pyplot.plot(
+                observed_ubvri[left_index] - observed_ubvri[right_index],
+                -observed_ubvri[2],
+                'ok'
+            )
+            predicted_left = predicted_ubvrijhk[left_filter]
+            pyplot.plot(
+                (
+                    predicted_ubvrijhk[left_filter]
+                    -
+                    predicted_ubvrijhk[right_filter]
+                ),
+                -predicted_ubvrijhk['V'] - 11.23,
+                '.r',
+                linewidth=3
+            )
+            pyplot.xlabel('%s - %s [mag]' % (left_filter, right_filter))
             pyplot.ylabel('-V [mag]')
 
             pyplot.ylim(-23, None)
