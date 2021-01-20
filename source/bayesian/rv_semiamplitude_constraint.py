@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Define the distribution of RV semi-amplitude marginalized over incl."""
+"""Interface implementing constraint from RV semi-amplitude measurement."""
 
 from multiprocessing import Pool, set_start_method
 import os.path
@@ -17,8 +17,8 @@ import numpy
 
 from binary_utils import calculate_secondary_mass
 
-class MarginalizedRVKDistribution:
-    """Distributino of RV semi-amplitude marginalized over inclination."""
+class RVSemiAmplitudeConstraint:
+    """Secondary mass constraint from observed RV semi-amplitude."""
 
     _logger = logging.getLogger(__name__)
 
@@ -700,13 +700,13 @@ def main():
         ref=2
     )
 
-    distribution = MarginalizedRVKDistribution(
+    rvk_constraint = RVSemiAmplitudeConstraint(
         observed_rvk=stats.norm(system['K1'].to_value('m/s'),
                                 system['errK1'].to_value('m/s')),
         max_discarded_probabiity=1e-5,
         interpolation_accuracy=(0, 1e-4),
         num_parallel_processes=4,
-        pickle_fname='rvk_distributions.pkl',
+        pickle_fname='rvk_constraints.pkl',
         epsabs=0,
         epsrel=1e-8,
         limit=200,
@@ -719,7 +719,7 @@ def main():
         repr(
             #False positive
             #pylint: disable=no-member
-            distribution.rv_semi_amplitude(
+            rvk_constraint.rv_semi_amplitude(
                 cos_inclination=0.0,
                 primary_mass=(1.2 * u.M_sun),
                 secondary_mass=(0.2 * u.M_sun),
@@ -736,7 +736,7 @@ def main():
     right_plot = pyplot.subplot(133)
     for eccentricity in numpy.linspace(0.5, 0, 6):
 
-        distribution.prepare_secondary_sampling(
+        rvk_constraint.prepare_secondary_sampling(
             primary_mass=(1.2 * u.M_sun),
             orbital_period=system['Porb'],
             eccentricity=eccentricity,
@@ -747,10 +747,12 @@ def main():
 
         with Pool(4) as workers:
             plot_pdf = numpy.array(
-                workers.map(distribution.secondary_mass_pdf, plot_m2 * u.M_sun)
+                workers.map(rvk_constraint.secondary_mass_pdf,
+                            plot_m2 * u.M_sun)
             )
             plot_cdf = numpy.array(
-                workers.map(distribution.secondary_mass_cdf, plot_m2 * u.M_sun)
+                workers.map(rvk_constraint.secondary_mass_cdf,
+                            plot_m2 * u.M_sun)
             )
         if reference_pdf is None:
             reference_pdf = plot_pdf
