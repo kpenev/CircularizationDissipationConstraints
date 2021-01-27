@@ -84,7 +84,8 @@ class ColorMagnitudeConstraint:
             dense_output=True,
             max_step=1e-2,
             rtol=1e-6,
-            atol=1e-9 * numpy.exp(-minimization.fun)
+            atol=1e-9 * numpy.exp(-minimization.fun),
+            method='LSODA'
         )
         assert result.success
         return result.sol
@@ -249,24 +250,119 @@ class ColorMagnitudeConstraint:
 
         return self._cumulative_m1_likelihood(primary_mass)[0] / self._norm
 
+    def primary_mass_ppf(self, quantile):
+        """Find the primary mass for which the CDF matches given quantile."""
+
+        def equation(primary_mass):
+            return self.primary_mass_cdf(primary_mass) - quantile
+
+        return optimize.root_scalar(equation, bracket=self.mass_range).root
+
     def secondary_mass_cdf(self, primary_mass, secondary_mass):
         """CDF(m2|m1)."""
 
-        return (
-            integrate.quad(self._joint_likelihood,
-                           self.mass_range[0],
-                           secondary_mass,
-                           args=(primary_mass,),
-                           points=self._quad_points,
-                           **self._integration_config)[0]
-            /
-            integrate.quad(self._joint_likelihood,
-                           self.mass_range[0],
-                           primary_mass,
-                           args=(primary_mass,),
-                           points=self._quad_points,
-                           **self._integration_config)[0]
-        )
+        numerator = integrate.quad(self._joint_likelihood,
+                                   self.mass_range[0],
+                                   secondary_mass,
+                                   args=(primary_mass,),
+                                   points=self._quad_points,
+                                   **self._integration_config)
+        denominator = integrate.quad(self._joint_likelihood,
+                                     self.mass_range[0],
+                                     primary_mass,
+                                     args=(primary_mass,),
+                                     points=self._quad_points,
+                                     **self._integration_config)
+
+        return numerator[0] / denominator[0]
+
+def plot_m1_pdf(constraint):
+    """Display a plot of the PDF(primary_mass) marginalized over m2."""
+
+    plot_x = numpy.linspace(constraint.mass_range[0],
+                            constraint.mass_range[1],
+                            1000)
+    with Pool(4) as workers:
+        plot_z = numpy.array(workers.map(constraint.primary_mass_pdf, plot_x))
+    print('PDF(M1): ' + repr(plot_z))
+    pyplot.plot(plot_x, plot_z)
+    pyplot.show()
+
+def plot_m1_cdf(constraint):
+    """Display a plot of the CDF(primary_mass) marginalized over m2."""
+
+    plot_x = numpy.linspace(constraint.mass_range[0],
+                            constraint.mass_range[1],
+                            1000)
+    plot_z = numpy.vectorize(constraint.primary_mass_cdf)(plot_x)
+    pyplot.plot(plot_x, plot_z)
+    pyplot.show()
+
+def plot_joint_pdf(constraint):
+    """Display a 3-D plot of the PDF(m1, m2)."""
+
+    plot_x, plot_y = numpy.meshgrid(
+        numpy.linspace(constraint.mass_range[0],
+                       constraint.mass_range[1],
+                       300),
+        numpy.linspace(constraint.mass_range[0],
+                       constraint.mass_range[1],
+                       300)
+    )
+
+    with Pool(4) as workers:
+        plot_z = numpy.array(
+            workers.starmap(constraint.joint_pdf,
+                            zip(plot_x.flatten(), plot_y.flatten()))
+        ).reshape(plot_x.shape)
+    print('Plot z: ' + repr(plot_z))
+
+    axis = pyplot.gca(projection='3d')
+    axis.plot_surface(plot_x,
+                      plot_y,
+                      plot_z,
+                      #False positive
+                      #pylint: disable=no-member
+                      cmap=cm.coolwarm,
+                      #pylint: enable=no-member
+                      linewidth=0,
+                      antialiased=False)
+    pyplot.show()
+
+def plot_m2_cdf(constraint):
+    """Display a 3-D plot of CDF(m2|m1)."""
+
+    axis = pyplot.gca(projection='3d')
+    plot_x = numpy.vectorize(
+        constraint.primary_mass_ppf
+    )(
+        numpy.linspace(1e-6, 1.0 - 1e-6, 300)
+    )
+    print('Plot x: ' + repr(plot_x))
+    plot_x, plot_y = numpy.meshgrid(
+        plot_x,
+        numpy.linspace(constraint.mass_range[0],
+                       constraint.mass_range[1],
+                       300)
+    )
+    with Pool(4) as workers:
+        plot_z = numpy.array(
+            workers.starmap(constraint.secondary_mass_cdf,
+                            zip(plot_x.flatten(), plot_y.flatten()))
+        ).reshape(plot_x.shape)
+    print('Plot z: ' + repr(plot_z))
+
+    axis = pyplot.gca(projection='3d')
+    axis.plot_surface(plot_x,
+                      plot_y,
+                      plot_z,
+                      #False positive
+                      #pylint: disable=no-member
+                      cmap=cm.coolwarm,
+                      #pylint: enable=no-member
+                      linewidth=0,
+                      antialiased=False)
+    pyplot.show()
 
 def main():
     """Avoid polluting global namespace."""
@@ -302,72 +398,9 @@ def main():
     constraint = ColorMagnitudeConstraint([interpolator],
                                           measured_photometry,
                                           'color_magnitude_constraints.pkl')
-    plot_x, plot_y = numpy.meshgrid(
-        numpy.linspace(constraint.mass_range[0],
-                       constraint.mass_range[1],
-                       300),
-        numpy.linspace(constraint.mass_range[0],
-                       constraint.mass_range[1],
-                       300)
-    )
 
-    with Pool(4) as workers:
-        plot_z = numpy.array(
-            workers.starmap(constraint.joint_pdf,
-                            zip(plot_x.flatten(), plot_y.flatten()))
-        ).reshape(plot_x.shape)
-    print('Plot z: ' + repr(plot_z))
-
-    axis = pyplot.gca(projection='3d')
-    axis.plot_surface(plot_x,
-                      plot_y,
-                      plot_z,
-                      #False positive
-                      #pylint: disable=no-member
-                      cmap=cm.coolwarm,
-                      #pylint: enable=no-member
-                      linewidth=0,
-                      antialiased=False)
-    pyplot.show()
-    plot_x = numpy.linspace(constraint.mass_range[0],
-                            constraint.mass_range[1],
-                            1000)
-    with Pool(4) as workers:
-        plot_z = numpy.array(workers.map(constraint.primary_mass_pdf, plot_x))
-    print('PDF(M1): ' + repr(plot_z))
-    pyplot.plot(plot_x, plot_z)
-    pyplot.show()
-
-    plot_z = numpy.vectorize(constraint.primary_mass_cdf)(plot_x)
-    pyplot.plot(plot_x, plot_z)
-    pyplot.show()
-
-    plot_x, plot_y = numpy.meshgrid(
-        numpy.linspace(constraint.mass_range[0],
-                       constraint.mass_range[1],
-                       300),
-        numpy.linspace(constraint.mass_range[0],
-                       constraint.mass_range[1],
-                       300)
-    )
-    with Pool(4) as workers:
-        plot_z = numpy.array(
-            workers.starmap(constraint.secondary_mass_cdf,
-                            zip(plot_x.flatten(), plot_y.flatten()))
-        ).reshape(plot_x.shape)
-    print('Plot z: ' + repr(plot_z))
-
-    axis = pyplot.gca(projection='3d')
-    axis.plot_surface(plot_x,
-                      plot_y,
-                      plot_z,
-                      #False positive
-                      #pylint: disable=no-member
-                      cmap=cm.coolwarm,
-                      #pylint: enable=no-member
-                      linewidth=0,
-                      antialiased=False)
-    pyplot.show()
+    plot_m1_cdf(constraint)
+    plot_m2_cdf(constraint)
 
 if __name__ == '__main__':
     main()
