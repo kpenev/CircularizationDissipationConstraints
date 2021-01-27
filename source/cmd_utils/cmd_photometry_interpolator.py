@@ -4,22 +4,18 @@
 Define a class that works with interpolated photometry from CMD isochrones.
 """
 
-import sys
 import re
 import os.path
 
 from matplotlib import pyplot
-from astropy import units
 import numpy
-
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 #pylint: disable=wrong-import-position
 from planetary_system_io import read_cds_pipe_table
 #pylint: disable=import-error
 from command_line_utilities import data_dir
-#pylint: enable=import-error
 from cmd_isochrone_interpolator import CMDInterpolator
+#pylint: enable=import-error
 #pylint: enable=wrong-import-position
 
 class CMDPhotometryInterpolator(CMDInterpolator):
@@ -71,26 +67,31 @@ class CMDPhotometryInterpolator(CMDInterpolator):
         assert len(self.data) == 1
         #False positive
         #pylint: disable=no-member
-        self.min_mass = self.data[0]['Mini'][0] * units.M_sun
-        self.max_mass = self.data[0]['Mini'][-1] * units.M_sun
+        self.min_mass = self.data[0]['Mini'][0]
+        self.max_mass = self.data[0]['Mini'][-1]
         self.feh = self.data[0]['MH'][0]
         #pylint: enable=no-member
         assert numpy.unique(self.data[0]['logAge']).size == 1
         #False positive
         #pylint: disable=no-member
-        self.age = 10.0**(self.data[0]['logAge'][0] - 9.0) * units.Gyr
+        self.age = 10.0**(self.data[0]['logAge'][0] - 9.0)
         #pylint: enable=no-member
 
         self.grid_mag = numpy.stack(
-            self.data[0][filchar + 'mag'] for filchar in self.available_filters
+            [
+                self.data[0][filchar + 'mag']
+                for filchar in self.available_filters
+            ]
         )
 
     def __call__(self, interp_mass):
         """Return the available photometry for the given mass(es)."""
 
         return numpy.stack(
-            self.get_interpolated(mag_letter + 'mag', interp_mass, None)
-            for mag_letter in self.available_filters
+            [
+                self.get_interpolated(mag_letter + 'mag', interp_mass, None)
+                for mag_letter in self.available_filters
+            ]
         )
 
     def get_binary_magnitudes(self, primary_mass, secondary_mass):
@@ -98,9 +99,12 @@ class CMDPhotometryInterpolator(CMDInterpolator):
 
         primary_mags = self(primary_mass)
         secondary_mags = self(secondary_mass)
+        #False positive
+        #pylint: disable=invalid-unary-operand-type
         return -2.5 * numpy.log10(10.0**(-primary_mags/2.5)
                                   +
                                   10.0**(-secondary_mags/2.5))
+        #pylint: enable=invalid-unary-operand-type
 
 if __name__ == '__main__':
     ngc_188_photometry = read_cds_pipe_table(

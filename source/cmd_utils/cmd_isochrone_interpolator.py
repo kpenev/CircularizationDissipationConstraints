@@ -7,7 +7,10 @@ from matplotlib import pyplot
 import scipy
 import scipy.interpolate
 
+#False positive (handled in __init__.py)
+#pylint: disable=import-error
 from command_line_utilities import data_dir
+#pylint: enable=import-error
 
 class IsochroneFileIterator:
     """
@@ -99,6 +102,8 @@ class CMDInterpolator:
                 >=
                 0
             ).all()
+
+        self.isochrone_fname = isochrone_fname
 
     def get_interpolated(self, quantity, initial_mass, feh):
         """
