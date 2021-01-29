@@ -6,6 +6,7 @@ from multiprocessing import Pool, set_start_method
 import os.path
 from pickle import Pickler, Unpickler
 import logging
+import sys
 
 from matplotlib import pyplot, cm
 from scipy import integrate, stats, optimize
@@ -21,6 +22,8 @@ from command_line_utilities import data_dir
 def _identity(x):
     return x
 
+#Simplifying decreases readability
+#pylint: disable=too-many-instance-attributes
 class ColorMagnitudeConstraint:
     """Constraint on component masses from observed color & magnitude."""
 
@@ -28,6 +31,13 @@ class ColorMagnitudeConstraint:
 
     def _joint_likelihood(self, secondary_mass, primary_mass, return_log=False):
         """The likelihood of the observed colors and magnitudes given masses."""
+
+        if (
+                min(primary_mass, secondary_mass) < self.mass_range[0]
+                or
+                max(primary_mass, secondary_mass) > self.mass_range[1]
+        ):
+            return -numpy.inf if return_log else 0
 
         predicted_photometry = dict()
         for interpolator in self._photometry_interpolators:
@@ -47,7 +57,9 @@ class ColorMagnitudeConstraint:
                                    -
                                    predicted_photometry[mag2])
             else:
-                predicted_value = predicted_photometry[quantity.strip()]
+                predicted_value = (predicted_photometry[quantity.strip()]
+                                   +
+                                   self._distance_modulus)
 
             if return_log:
                 result += distribution.logpdf(predicted_value)
@@ -66,15 +78,19 @@ class ColorMagnitudeConstraint:
                                   primary_mass,
                                   args=(primary_mass,),
                                   points=self._quad_points,
+                                  limit=200,
                                   **self._integration_config)[0]
 
+        bounds = (self.mass_range[0] + 0.001, self.mass_range[1] - 0.001)
         minimization = optimize.minimize(
             lambda masses: -self._joint_likelihood(*masses, return_log=True),
             numpy.full((2,), 0.5 * (self.mass_range[0] + self.mass_range[1])),
-            bounds=(self.mass_range, self.mass_range)
+            bounds=(bounds, bounds)
         )
         assert minimization.success
-        self._logger.debug('Maximum log-likelihood: %s',
+        self._logger.debug('Maximum log-likelihood(m1=%s, m2=%s): %s',
+                           repr(minimization.x[0]),
+                           repr(minimization.x[1]),
                            repr(-minimization.fun))
 
         result = integrate.solve_ivp(
@@ -117,33 +133,30 @@ class ColorMagnitudeConstraint:
                     assert isinstance(section, str)
                     assert isinstance(nobjects, int)
                     if section == 'ColorMagnitudeConstraint':
-                        assert nobjects == 4
-                        nobjects -= 1
+                        assert nobjects == 5
+                        isochrone_fnames = unpickler.load()
+                        measured_photometry = unpickler.load()
+                        distance_modulus = unpickler.load()
+                        integration_config = unpickler.load()
+                        nobjects -= 4
+
                         if(
                                 tuple(
                                     interp.isochrone_fname
                                     for interp in self._photometry_interpolators
-                                )
-                                ==
-                                unpickler.load()
+                                ) == isochrone_fnames
+                                and
+                                compare_measured_photometry(measured_photometry)
+                                and
+                                self._distance_modulus == distance_modulus
+                                and
+                                self._integration_config == integration_config
                         ):
-                            nobjects -= 1
-                            if compare_measured_photometry(unpickler.load()):
-                                nobjects -= 1
-                                if(
-                                        self._integration_config
-                                        ==
-                                        unpickler.load()
-                                ):
-                                    self._logger.debug('Found matching pickle')
-                                    return unpickler.load()
-                                self._logger.debug(
-                                    'Integration configuration does not '
-                                    'match.'
-                                )
-                        else:
-                            self._logger.debug('Interpolator isochrones do not '
-                                               'match')
+                            self._logger.debug('Found matching pickle')
+                            return unpickler.load()
+
+                        self._logger.debug('Pickled constraint does not '
+                                           'match!')
 
                     for _ in range(nobjects):
                         unpickler.load()
@@ -159,18 +172,20 @@ class ColorMagnitudeConstraint:
 
         with open(pickle_fname, 'ab') as pickle_file:
             pickler = Pickler(pickle_file)
-            pickler.dump(('ColorMagnitudeConstraint', 4))
+            pickler.dump(('ColorMagnitudeConstraint', 5))
             pickler.dump(
                 tuple(interp.isochrone_fname
                       for interp in self._photometry_interpolators)
             )
             pickler.dump(self._measured_photometry)
+            pickler.dump(self._distance_modulus)
             pickler.dump(self._integration_config)
             pickler.dump(self._cumulative_m1_likelihood)
 
     def __init__(self,
                  photometry_interpolators,
                  measured_photometry,
+                 distance_modulus,
                  pickle_fname,
                  **integration_config):
         """
@@ -207,6 +222,7 @@ class ColorMagnitudeConstraint:
         self._integration_config = integration_config
         self._quad_points = numpy.linspace(*self.mass_range, 30)
         self._measured_photometry = measured_photometry
+        self._distance_modulus = distance_modulus
         self._cumulative_m1_likelihood = self._check_for_pickled(pickle_fname)
         if self._cumulative_m1_likelihood is None:
             self._cumulative_m1_likelihood = self._prepare_constraint()
@@ -261,20 +277,33 @@ class ColorMagnitudeConstraint:
     def secondary_mass_cdf(self, primary_mass, secondary_mass):
         """CDF(m2|m1)."""
 
+        if secondary_mass >= primary_mass:
+            return 1.0
         numerator = integrate.quad(self._joint_likelihood,
                                    self.mass_range[0],
                                    secondary_mass,
                                    args=(primary_mass,),
                                    points=self._quad_points,
+                                   limit=200,
                                    **self._integration_config)
         denominator = integrate.quad(self._joint_likelihood,
                                      self.mass_range[0],
                                      primary_mass,
                                      args=(primary_mass,),
                                      points=self._quad_points,
+                                     limit=200,
                                      **self._integration_config)
+        if denominator[0] == 0:
+            self._logger.warning('Undefined CDF(m2 = %s | m1 = %s) = %s / %s',
+                                 repr(secondary_mass),
+                                 repr(primary_mass),
+                                 repr(numerator),
+                                 repr(denominator))
+            return numpy.nan
 
         return numerator[0] / denominator[0]
+#pylint: enable=too-many-instance-attributes
+
 
 def plot_m1_pdf(constraint):
     """Display a plot of the PDF(primary_mass) marginalized over m2."""
@@ -302,11 +331,11 @@ def plot_joint_pdf(constraint):
     """Display a 3-D plot of the PDF(m1, m2)."""
 
     plot_x, plot_y = numpy.meshgrid(
-        numpy.linspace(constraint.mass_range[0],
-                       constraint.mass_range[1],
+        numpy.linspace(1.00,
+                       1.05,
                        300),
-        numpy.linspace(constraint.mass_range[0],
-                       constraint.mass_range[1],
+        numpy.linspace(0.6,
+                       0.8,
                        300)
     )
 
@@ -318,15 +347,16 @@ def plot_joint_pdf(constraint):
     print('Plot z: ' + repr(plot_z))
 
     axis = pyplot.gca(projection='3d')
-    axis.plot_surface(plot_x,
-                      plot_y,
-                      plot_z,
-                      #False positive
-                      #pylint: disable=no-member
-                      cmap=cm.coolwarm,
-                      #pylint: enable=no-member
-                      linewidth=0,
-                      antialiased=False)
+    axis.plot_wireframe(plot_x,
+                        plot_y,
+                        plot_z,
+                        color='black')
+                        #False positive
+                        #pylint: disable=no-member
+#                        cmap=cm.coolwarm,
+                        #pylint: enable=no-member
+#                        linewidth=0,
+#                        edgecolor='none')
     pyplot.show()
 
 def plot_m2_cdf(constraint):
@@ -336,14 +366,14 @@ def plot_m2_cdf(constraint):
     plot_x = numpy.vectorize(
         constraint.primary_mass_ppf
     )(
-        numpy.linspace(1e-6, 1.0 - 1e-6, 300)
+        numpy.linspace(1e-5, 1.0 - 1e-5, 300)
     )
     print('Plot x: ' + repr(plot_x))
     plot_x, plot_y = numpy.meshgrid(
         plot_x,
         numpy.linspace(constraint.mass_range[0],
                        constraint.mass_range[1],
-                       300)
+                       30)
     )
     with Pool(4) as workers:
         plot_z = numpy.array(
@@ -353,40 +383,57 @@ def plot_m2_cdf(constraint):
     print('Plot z: ' + repr(plot_z))
 
     axis = pyplot.gca(projection='3d')
-    axis.plot_surface(plot_x,
-                      plot_y,
-                      plot_z,
-                      #False positive
-                      #pylint: disable=no-member
-                      cmap=cm.coolwarm,
-                      #pylint: enable=no-member
-                      linewidth=0,
-                      antialiased=False)
+    axis.plot_wireframe(plot_x,
+                        plot_y,
+                        plot_z,
+                        color='black')
+                        #False positive
+                        #pylint: disable=no-member
+#                        cmap=cm.coolwarm,
+                        #pylint: enable=no-member
+#                        linewidth=0,
+#                        antialiased=False)
     pyplot.show()
 
 def main():
     """Avoid polluting global namespace."""
 
+#    numpy.set_printoptions(threshold=sys.maxsize)
+
     set_start_method('forkserver')
     logging.basicConfig(level=logging.DEBUG)
 
-    ngc_188_photometry = read_cds_pipe_table(
+    ngc188_photometry = read_cds_pipe_table(
         os.path.join(
             data_dir,
             'Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
         )
     )
+
+    ngc188_single_lined_binaries = read_cds_pipe_table(
+        os.path.join(
+            data_dir,
+            'Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
+        )
+    )
+
+
+    selected_photometry = ngc188_photometry[ngc188_photometry['PKM'] == 4080][0]
+    print(repr(selected_photometry))
+
     measured_photometry = dict()
-    index = 28
-    print('Membership probability(%d): %s'
+    print('Membership probability: %s'
           %
-          (index, repr(ngc_188_photometry[index]['Memb'])))
+          repr(selected_photometry['Memb']))
     for mag in 'UBVRI':
-        if numpy.isfinite(ngc_188_photometry[index][mag + 'mag']):
+        if numpy.isfinite(selected_photometry[mag + 'mag']):
             measured_photometry[mag] = stats.norm(
-                ngc_188_photometry[index][mag + 'mag'],
-                ngc_188_photometry[index]['e_' + mag + 'mag']
+                selected_photometry[mag + 'mag'],
+                max(selected_photometry['e_' + mag + 'mag'], 0.05)
             )
+    print('Measured photometry: ')
+    for quantity, distro in measured_photometry.items():
+        print('\t%s: %s' % (quantity, repr(distro.args)))
 
     interpolator = CMDPhotometryInterpolator(
         os.path.join(
@@ -397,8 +444,10 @@ def main():
 
     constraint = ColorMagnitudeConstraint([interpolator],
                                           measured_photometry,
+                                          11.23,
                                           'color_magnitude_constraints.pkl')
 
+    plot_joint_pdf(constraint)
     plot_m1_cdf(constraint)
     plot_m2_cdf(constraint)
 
