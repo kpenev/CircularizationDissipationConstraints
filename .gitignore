@@ -5,6 +5,7 @@
 *.pdf
 *.png
 *.bkp
+*.pkl
 
 # Vim lock files.
 .*.swp
