@@ -5,10 +5,10 @@
 from multiprocessing import Pool, set_start_method
 import os.path
 from pickle import Pickler, Unpickler
+from functools import partial
 import logging
-import sys
 
-from matplotlib import pyplot, cm
+from matplotlib import pyplot#, cm
 from scipy import integrate, stats, optimize
 import numpy
 
@@ -17,14 +17,12 @@ from planetary_system_io import read_cds_pipe_table
 #pylint: disable=import-error
 from cmd_utils import CMDPhotometryInterpolator
 from command_line_utilities import data_dir
+from photometric_secondary_constraint import PhotometricSecondaryConstraint
 #pylint: enable=import-error
-
-def _identity(x):
-    return x
 
 #Simplifying decreases readability
 #pylint: disable=too-many-instance-attributes
-class ColorMagnitudeConstraint:
+class PhotometricConstraint:
     """Constraint on component masses from observed color & magnitude."""
 
     _logger = logging.getLogger(__name__)
@@ -132,7 +130,7 @@ class ColorMagnitudeConstraint:
                     section, nobjects = unpickler.load()
                     assert isinstance(section, str)
                     assert isinstance(nobjects, int)
-                    if section == 'ColorMagnitudeConstraint':
+                    if section == 'PhotometricConstraint':
                         assert nobjects == 5
                         isochrone_fnames = unpickler.load()
                         measured_photometry = unpickler.load()
@@ -172,7 +170,7 @@ class ColorMagnitudeConstraint:
 
         with open(pickle_fname, 'ab') as pickle_file:
             pickler = Pickler(pickle_file)
-            pickler.dump(('ColorMagnitudeConstraint', 5))
+            pickler.dump(('PhotometricConstraint', 5))
             pickler.dump(
                 tuple(interp.isochrone_fname
                       for interp in self._photometry_interpolators)
@@ -229,9 +227,10 @@ class ColorMagnitudeConstraint:
             self._add_to_pickle_file(pickle_fname)
 
         self._norm = self._cumulative_m1_likelihood(self.mass_range[1])[0]
+        self._secondary_norm = None
         print('Norm: ' + repr(self._norm))
 
-    def joint_pdf(self, primary_mass, secondary_mass):
+    def pdf(self, primary_mass, secondary_mass):
         """The joint PDF of component masses given observed colors and mags."""
 
         if(
@@ -242,10 +241,29 @@ class ColorMagnitudeConstraint:
                 primary_mass > self.mass_range[1]
         ):
             return 0.0
-        return self._joint_likelihood(
-            secondary_mass,
-            primary_mass
-        ) / self._norm
+        return (
+            self._joint_likelihood(secondary_mass, primary_mass)
+            /
+            self._norm
+        )
+
+    def logpdf(self, primary_mass, secondary_mass):
+        """Natural log of the joint PDF."""
+
+        if(
+                secondary_mass > primary_mass
+                or
+                secondary_mass < self.mass_range[0]
+                or
+                primary_mass > self.mass_range[1]
+        ):
+            return -numpy.inf
+        return (
+            self._joint_likelihood(secondary_mass, primary_mass, True)
+            -
+            numpy.log(self._norm)
+        )
+
 
     def primary_mass_pdf(self, primary_mass):
         """The PDF(m1) marginalized over m2."""
@@ -274,34 +292,11 @@ class ColorMagnitudeConstraint:
 
         return optimize.root_scalar(equation, bracket=self.mass_range).root
 
-    def secondary_mass_cdf(self, primary_mass, secondary_mass):
-        """CDF(m2|m1)."""
+    def get_conditional_secondary_mass_distribution(self, primary_mass):
+        """Return scipy style RV for the secondary mass given primary mass."""
 
-        if secondary_mass >= primary_mass:
-            return 1.0
-        numerator = integrate.quad(self._joint_likelihood,
-                                   self.mass_range[0],
-                                   secondary_mass,
-                                   args=(primary_mass,),
-                                   points=self._quad_points,
-                                   limit=200,
-                                   **self._integration_config)
-        denominator = integrate.quad(self._joint_likelihood,
-                                     self.mass_range[0],
-                                     primary_mass,
-                                     args=(primary_mass,),
-                                     points=self._quad_points,
-                                     limit=200,
-                                     **self._integration_config)
-        if denominator[0] == 0:
-            self._logger.warning('Undefined CDF(m2 = %s | m1 = %s) = %s / %s',
-                                 repr(secondary_mass),
-                                 repr(primary_mass),
-                                 repr(numerator),
-                                 repr(denominator))
-            return numpy.nan
+        return PhotometricSecondaryConstraint(self, primary_mass)
 
-        return numerator[0] / denominator[0]
 #pylint: enable=too-many-instance-attributes
 
 
@@ -341,7 +336,7 @@ def plot_joint_pdf(constraint):
 
     with Pool(4) as workers:
         plot_z = numpy.array(
-            workers.starmap(constraint.joint_pdf,
+            workers.starmap(constraint.pdf,
                             zip(plot_x.flatten(), plot_y.flatten()))
         ).reshape(plot_x.shape)
     print('Plot z: ' + repr(plot_z))
@@ -359,46 +354,50 @@ def plot_joint_pdf(constraint):
 #                        edgecolor='none')
     pyplot.show()
 
+def calculate_cdf_column(constraint, secondary_masses, primary_mass):
+    """Calculane the values of the CDF at all m2 for fixed m1."""
+
+    m2_distro = constraint.get_conditional_secondary_mass_distribution(
+        primary_mass
+    )
+    return m2_distro.cdf(secondary_masses)
+
 def plot_m2_cdf(constraint):
     """Display a 3-D plot of CDF(m2|m1)."""
 
+    secondary_masses = numpy.linspace(constraint.mass_range[0],
+                                      constraint.mass_range[1],
+                                      3000)
+
     axis = pyplot.gca(projection='3d')
-    plot_x = numpy.vectorize(
+    primary_masses = numpy.vectorize(
         constraint.primary_mass_ppf
     )(
         numpy.linspace(1e-5, 1.0 - 1e-5, 300)
     )
-    print('Plot x: ' + repr(plot_x))
-    plot_x, plot_y = numpy.meshgrid(
-        plot_x,
-        numpy.linspace(constraint.mass_range[0],
-                       constraint.mass_range[1],
-                       30)
-    )
+
     with Pool(4) as workers:
-        plot_z = numpy.array(
-            workers.starmap(constraint.secondary_mass_cdf,
-                            zip(plot_x.flatten(), plot_y.flatten()))
-        ).reshape(plot_x.shape)
-    print('Plot z: ' + repr(plot_z))
+        plot_z = numpy.stack(
+            workers.map(
+                partial(calculate_cdf_column, constraint, secondary_masses),
+                primary_masses
+            )
+        )
+
+    plot_x, plot_y = numpy.meshgrid(secondary_masses, primary_masses)
 
     axis = pyplot.gca(projection='3d')
     axis.plot_wireframe(plot_x,
                         plot_y,
                         plot_z,
-                        color='black')
-                        #False positive
-                        #pylint: disable=no-member
-#                        cmap=cm.coolwarm,
-                        #pylint: enable=no-member
-#                        linewidth=0,
-#                        antialiased=False)
+                        color='black',
+                        rstride=1,
+                        cstride=1,
+                        linewidth=0.1)
     pyplot.show()
 
 def main():
     """Avoid polluting global namespace."""
-
-#    numpy.set_printoptions(threshold=sys.maxsize)
 
     set_start_method('forkserver')
     logging.basicConfig(level=logging.DEBUG)
@@ -410,12 +409,12 @@ def main():
         )
     )
 
-    ngc188_single_lined_binaries = read_cds_pipe_table(
-        os.path.join(
-            data_dir,
-            'Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
-        )
-    )
+#    ngc188_single_lined_binaries = read_cds_pipe_table(
+#        os.path.join(
+#            data_dir,
+#            'Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
+#        )
+#    )
 
 
     selected_photometry = ngc188_photometry[ngc188_photometry['PKM'] == 4080][0]
@@ -442,10 +441,10 @@ def main():
         )
     )
 
-    constraint = ColorMagnitudeConstraint([interpolator],
-                                          measured_photometry,
-                                          11.23,
-                                          'color_magnitude_constraints.pkl')
+    constraint = PhotometricConstraint([interpolator],
+                                       measured_photometry,
+                                       11.23,
+                                       'photometric_constraints.pkl')
 
     plot_joint_pdf(constraint)
     plot_m1_cdf(constraint)

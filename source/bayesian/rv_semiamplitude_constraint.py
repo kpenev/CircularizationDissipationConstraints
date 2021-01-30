@@ -582,9 +582,9 @@ class RVSemiAmplitudeConstraint:
 
             orbital_period(astropy quantity w/ units):    The orbital period.
 
-            secondary_mass_prior(rv_continuous):    The conditional distribution
-                of the secondary mass in solar masses based on constraints other
-                than the radial velocity semi-amplitude (e.g. photometry).
+            secondary_mass_prior:    The conditional distribution of the
+                secondary mass in solar masses based on constraints other than
+                the radial velocity semi-amplitude (e.g. photometry).
         """
 
         self._fixed['primary_mass'] = primary_mass
