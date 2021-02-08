@@ -11,6 +11,13 @@ import emcee
 import sys
 from scipy.optimize import curve_fit
 from scipy.stats import rice
+from scipy.special import i0
+from scipy.special import i1
+from scipy.optimize import fsolve
+from scipy.optimize import root_scalar
+from scipy.optimize import newton
+
+
 
 sys.path.append('/home/mmmahmud/poet/PythonPackage')
 sys.path.append('../scripts')
@@ -32,60 +39,119 @@ from reproduce_system import *
 
 
 class SuperEccentricityDistribution(metaclass=ABCMeta):
-    def __init__(self, mean_e_now, e_now_stdev, mean_e_env, e_env_stdev):
+    def __init__(self,
+                 mean_e_now,
+                 e_now_upper_uncertainty,
+                 e_now_lower_uncertainty,
+                 mean_e_env,
+                 percentile_for_e_now_upper_uncertainty = 0.84,
+                 percentile_for_e_now_lower_uncertainty = 0.16,
+                 e_env_upper_uncertainty=0,
+                 e_env_lower_uncertainty=0
+                 ):
         self.mean_e_now = mean_e_now
-        self.e_now_stdev = e_now_stdev
-        self.mean_w = 0 # Here, w = angle of periastron
-        self.w_upper_uncertainty = 0
-        self.w_lower_uncertainty = 0
-        self.mean_e_sin_w = 0 #Here e is for eccentricity
-        self.e_sin_w_stdev =0
-        self.mean_e_cos_w = 0
-        self.e_cos_w_stdev = 0
+        self.e_now_upper_uncertainty = e_now_upper_uncertainty
+        self.e_now_lower_uncertainty = e_now_lower_uncertainty
+        self.percentile_for_e_now_upper_uncertainty = percentile_for_e_now_upper_uncertainty
+        self.percentile_for_e_now_lower_uncertainty = percentile_for_e_now_lower_uncertainty
         self.mean_e_env = mean_e_env
-        self.e_env_stdev = e_env_stdev
+        self.e_env_upper_uncertainty = e_env_upper_uncertainty
+        self.e_env_lower_uncertainty = e_env_lower_uncertainty
+
+        self.e_env_upper_uncertainty = e_now_upper_uncertainty
+        self.e_env_lower_uncertainty = e_now_lower_uncertainty
+        self.Rice_parameter_b = None
+
 
     @abstractmethod
     def distribution_of_present_eccentricity(self, e_now):
         pass
 
     @abstractmethod
-    def distribution_of_envelop_eccentricity(self, e_env):
+    def distribution_of_envelope_eccentricity(self, e_env):
         pass
 
 
 class EccentricityDistribution(SuperEccentricityDistribution):
-    def distribution_of_present_eccentricity(self, e_now):
-        if self.e_now_stdev == 0:
+    def distribution_of_present_eccentricity_old(self, e_now):
+        e_now_stdev = (self.e_now_upper_uncertainty-self.e_now_lower_uncertainty)/2
+        if e_now_stdev == 0:
             if e_now == self.mean_e_now:
                 return math.inf
             else:
                 return 0
-        return math.exp(-0.5 * ((e_now - self.mean_e_now) / self.e_now_stdev) ** 2) / self.e_now_stdev / math.sqrt(
+        return math.exp(-0.5 * ((e_now - self.mean_e_now) / e_now_stdev) ** 2) / e_now_stdev / math.sqrt(
             2 * math.pi)
 
-    def distribution_of_present_eccentricity_new(self, e_now):
-        integrand = lambda w: self.distribution_of_e_sin_w(e_now * math.sin(w)) * self.distribution_of_e_cos_w(e_now * math.cos(w))
-        value = nquad(integrand, [[0, 2 * math.pi]])
+    def laguerre_polynomial_of_degree_half(self,x):
+        return (math.exp(x/2))*((1-x)*i0(-x/2)-x*i1(-x/2))
 
-        return value
+    def derivative_of_laguerre_polynomial_of_degree_half(self,x):
+        return  -0.5 * math.exp(x/2)*(i0(-x/2)+i1(-x/2))
 
-    def distribution_of_e_sin_w(self, s):
-        return math.exp(-0.5 * ((s - self.mean_e_sin_w) / self.e_sin_w_stdev) ** 2) / self.e_sin_w_stdev / math.sqrt(
-            2 * math.pi)
+    def percent_point_function_for_Rice_distribution(self, percentile, b, s):
+        print('ppf of rice = ', rice.ppf(percentile, b, scale = s))
+        return rice.ppf(percentile, b, scale = s)
 
-    def distribution_of_e_cos_w(self, c):
-        return math.exp(-0.5 * ((c - self.mean_e_cos_w) / self.e_cos_w_stdev) ** 2) / self.e_cos_w_stdev / math.sqrt(
-            2 * math.pi)
+    def mean_of_Rice_distribution(self, b, s):
+        print('mean of rice distribution = ', s * math.sqrt(math.pi/2)*self.laguerre_polynomial_of_degree_half(-(b**2)/2))
+        return s * math.sqrt(math.pi/2)*self.laguerre_polynomial_of_degree_half(-(b**2)/2)
+
+    def derivative_of_mean_of_Rice_distribution(self, b):
+        return math.sqrt(math.pi/2)*self.derivative_of_laguerre_polynomial_of_degree_half(-(b**2)/2)
+
+    def mean_of_Rice_distribution_minus_mean_e_now(self, b, s):
+        #print('d ',self.mean_of_Rice_distribution(b, s)-self.mean_e_now )
+        return self.mean_of_Rice_distribution(b, s)-self.mean_e_now
+
+    def solve_for_b(self):
+        #sol = root_scalar(self.mean_of_Rice_distribution_minus_mean_e_now, x0=0.8, fprime=self.derivative_of_mean_of_Rice_distribution, method='newton')
+        #self.Rice_parameter_b = sol.root
+        #print('vfsdfsd   ', sol.iterations, sol.function_calls)
+
+        #root = newton(self.mean_of_Rice_distribution_minus_mean_e_now, 0.1, fprime=self.derivative_of_mean_of_Rice_distribution)
+
+        return
 
 
-    def distribution_of_envelop_eccentricity(self, e_env):
-        if self.e_env_stdev == 0:
+
+    def equations_to_be_solved_for_Rice_distribution_parameters(self, x):
+        #print('ju')
+        #return [self.percent_point_function_for_Rice_distribution(self.percentile_for_e_now_lower_uncertainty, self.Rice_parameter_b, x[0], x[1])-(self.mean_e_now + self.e_now_lower_uncertainty),
+                #self.percent_point_function_for_Rice_distribution(self.percentile_for_e_now_upper_uncertainty, self.Rice_parameter_b, x[0], x[1])-(self.mean_e_now + self.e_now_upper_uncertainty)]
+        #
+        #self.percent_point_function_for_Rice_distribution(self.percentile_for_e_now_lower_uncertainty, x[0], x[1]) - (self.mean_e_now + self.e_now_lower_uncertainty)
+        return [self.mean_of_Rice_distribution(x[0], x[1])-self.mean_e_now,
+                self.percent_point_function_for_Rice_distribution(self.percentile_for_e_now_upper_uncertainty, x[0], x[1]) - (self.mean_e_now + self.e_now_upper_uncertainty)]
+
+
+
+
+
+
+
+
+
+    def root_for_Rice_parameters(self):
+        #self.Rice_parameter_b = self.solve_for_b()
+        root = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, [1,1])
+        return root
+
+    def distribution_of_present_eccentricity(self, e_now):
+        root = self.root_for_Rice_parameters()
+        print('rice parameters ', root)
+        print('SSSSSSSSSSSS Rice Distribution probability of eccentricity_now = ', rice.pdf(e_now, root[0], scale = root[1]) )
+        return rice.pdf(e_now, root[0], scale = root[1])
+
+
+    def distribution_of_envelope_eccentricity(self, e_env):
+        e_env_stdev = (self.e_env_upper_uncertainty-self.e_env_lower_uncertainty)/2
+        if e_env_stdev == 0:
             if e_env == self.mean_e_env:
                 return math.inf
             else:
                 return 0
-        return math.exp(-0.5 * ((e_env - self.mean_e_env) / self.e_env_stdev) ** 2) / self.e_env_stdev / math.sqrt(
+        return math.exp(-0.5 * ((e_env - self.mean_e_env) / e_env_stdev) ** 2) / e_env_stdev / math.sqrt(
             2 * math.pi)
 
 
@@ -102,8 +168,8 @@ class EccentricityDistribution(SuperEccentricityDistribution):
 
             return value
         # For the middle part of the eccentricity vs. log(orbital period) graph where we have to find the envelop.
-        return nquad(lambda e_now, e_envelop: self.distribution_of_present_eccentricity(
-            e_now) * self.distribution_of_envelop_eccentricity(e_envelop) / (e_envelop - e_now),
+        return nquad(lambda e_now, e_envelope: self.distribution_of_present_eccentricity(
+            e_now) * self.distribution_of_envelope_eccentricity(e_envelope) / (e_envelope - e_now),
                      [self.bounds_e_now(e), self.bounds_e_env(e)])
 
     def bounds_e_now(self, e):
@@ -160,12 +226,11 @@ class BayesianAnalysis:
         self.file_name = file_name
         self.serialized_directory = serialized_directory
 
-        eccentricity_expansion_fname = self.file_name
         orbital_evolution_library.read_eccentricity_expansion_coefficients(
-            eccentricity_expansion_fname
+            file_name
         )
-        serialized_dir = self.serialized_directory
-        manager = StellarEvolutionManager(serialized_dir)
+
+        manager = StellarEvolutionManager(serialized_directory)
 
         self.interpolator = manager.get_interpolator_by_name('default')
 
@@ -202,6 +267,7 @@ class BayesianAnalysis:
         self.eccentricity_now = readPlanet.pl_orbeccen
         self.eccentricity_now_upper_uncertainty = readPlanet.pl_orbeccenerr1
         self.eccentricity_now_lower_uncertainty = readPlanet.pl_orbeccenerr2
+        self.eccentricity_now_limit_flag = readPlanet.pl_orbeccenlim
         self.obliquity = readPlanet.pl_orbincl  # degrees
         self.obliquity_upper_uncertainty = readPlanet.pl_orbinclerr1
         self.obliquity_lower_uncertainty = readPlanet.pl_orbinclerr2
@@ -209,50 +275,16 @@ class BayesianAnalysis:
         self.vsini_upper_uncertainty = readPlanet.st_vsinierr1
         self.vsini_lower_uncertainty = readPlanet.st_vsinierr2
 
-        self.envelop_eccentricity_function = self.workout_envelop_eccentricity(nsegments=10)  # nsegments is chosen in
+
+        self.envelope_eccentricity_function = self.workout_envelope_eccentricity(nsegments=10)  # nsegments is chosen in
         # such a way that we get a clear eccentricity vs log(orbital period) graph, apparently free of noise.
 
         self.probability_density_distribution_of_eccentricity = None
 
         self.position_of_binary_system = -1  # null value
 
-    def Gaussian_distribution(self, x, mean, standard_deviation):
-        return math.exp(-0.5 * ((x - mean) / standard_deviation) ** 2) / standard_deviation / math.sqrt(2 * math.pi)
 
-    def pick_a_value_from_the_Gaussian_distribution(self, mean, standard_deviation):
 
-        y = random.uniform(0, 1)
-        x = math.sqrt(-2 * math.log(y * standard_deviation * math.sqrt(2 * math.pi), math.e)) * standard_deviation
-        another_random = random.uniform(0, 1)
-        if another_random > 0.5:
-            return x + mean
-        else:
-            return -x + mean
-
-    def product(self, a):
-        s = 1
-        for i in range(0, len(a)):
-            s = s * a[i]
-        return s
-
-    def pick_a_tuple_from_the_multi_variable_Gaussian_distribution_old(self, mean, standard_deviation):
-        y = random.uniform(0, 1)
-        r = math.sqrt(
-            -2 * math.log(y * self.product(standard_deviation) * math.pow(2 * math.pi, len(mean) / 2), math.e))
-        sample = []
-        for i in range(0, len(mean) - 1):
-            x = random.uniform(-r, r)
-            sample = sample + [x * standard_deviation[i] + mean[i]]
-            r = math.sqrt(r ** 2 - x ** 2)
-        another_random = random.uniform(0, 1)
-        if another_random < 0.5:
-            x = -r
-
-        else:
-            x = +r
-        sample = sample + [x * standard_deviation[len(mean) - 1] + mean[len(mean) - 1]]
-
-        return sample
 
     def pick_a_tuple_from_the_multi_variable_Gaussian_distribution(self, mean, standard_deviation):
         n_cross_n_dimensional_array_of_standard_deviations = np.diag(
@@ -262,14 +294,14 @@ class BayesianAnalysis:
 
         return temp
 
-    def probability_of_x_given_y(self, x, y, y_standard_deviation):
-        return self.Gaussian_distribution(x, mean=y, standard_deviation=y_standard_deviation)
-
-    def workout_envelop_eccentricity(self, nsegments=10):
-
-        x = []
-        y = []
-        z = []
+    def workout_envelope_eccentricity(self,
+                                     nsegments=10,
+                                     maximum_number_of_data_points = 5000,
+                                     threshold_value_of_envelope_eccentricity = 0.05,
+                                     largest_acceptable_value_of_envelope_eccentricity = 0.5):
+        x = [] #Will store 10 based log of orbital period
+        y = [] #Will store eccentricity
+        z = [] #Will store planet's name
         j = 0
         for i in range(0, len(self.orbital_period)):
             if not (math.isnan(self.orbital_period[i])
@@ -282,7 +314,7 @@ class BayesianAnalysis:
                     y = y + [self.eccentricity_now[i]]
                     z = z +  [self.planet_name[i]]
                     print('planet name = ', self.planet_name[i], ', period = ', self.orbital_period[i], ', log(period) = ', math.log(self.orbital_period[i], 10), ', e_now = ',self.eccentricity_now[i])
-            if j > 5000:
+            if j > maximum_number_of_data_points:
                 break
 
         # Sorting
@@ -299,7 +331,7 @@ class BayesianAnalysis:
                     y[i] = temp2
                     z[i] = temp3
 
-        step = (x[len(x) - 1] - x[0]) / nsegments
+        step = (x[-1] - x[0]) / nsegments
 
         # Figuring out the maximum value of eccentricity in different intervals of log(orbital period)
         i = 0
@@ -323,62 +355,67 @@ class BayesianAnalysis:
                 # u = u + [x[i]] #We are assuming the maximum v occurs at the left end of u-interval. We are overestimating the envelop-eccentricity by doing so
                 i = j
 
-        # Figuring out the value of log(orbital period) upto which envelop eccentricity is zero
+        # Figuring out the value of log(orbital period) upto which envelop eccentricity is close to zero, i.e. less than 0.05
         i = 0
-        while u[i] < 0:
+        #while u[i] < 0:
+        while v[i] < threshold_value_of_envelope_eccentricity:
             i = i + 1
         i = i - 1
 
-        # Figuring out the critical value of log(orbital period) afther which envelop eccentricity > 0.5
-        # We are assuming that there is no envelop when envelop eccentricity excedes 0.5
+        # Figuring out the critical value of log(orbital period) after which envelop eccentricity > 0.5
+        # We are assuming that there is no envelop when envelop eccentricity exceeds 0.5
         j = i
-        while u[j] < 0.5:
+
+        while v[j] < largest_acceptable_value_of_envelope_eccentricity:
             j = j + 1
+        j = j+1
 
         # figuring out the equation of envelop curve
-        popt, pcov = curve_fit(self.trial_func_for_envelop_eccentricity, u[i:j], v[i:j])
+        popt, pcov = curve_fit(self.trial_func_for_envelope_eccentricity, u[i:j], v[i:j])
         xdata = np.linspace(u[i], u[j - 1], 50)
         plt.plot(x, y, 'x')
-        plt.plot(xdata, self.trial_func_for_envelop_eccentricity(xdata, *popt))
+        plt.plot(xdata, self.trial_func_for_envelope_eccentricity(xdata, *popt))
         # naming the x axis
         plt.xlabel('log(Period)')
         # naming the y axis
-        plt.ylabel('Present Envelop Eccentricity')
+        plt.ylabel('Present Envelope Eccentricity')
         # giving a title to my graph
-        plt.title('Present Envelop Eccentricity vs log(Period)')
+        plt.title('Present Envelope Eccentricity vs log(Period)')
         # function to show the plot
-        plt.plot(u, v, 'o', label="Envelop Eccentricities vs. log(Periods)")
+        plt.plot(u, v, 'o', label="Envelope Eccentricities vs. log(Periods)")
         plt.show()
 
-        def envelop_eccentricity_function(orbital_period):
-            if math.log(orbital_period, 10) < 0:
-                return 0
-            envelop_eccentricity = self.trial_func_for_envelop_eccentricity(math.log(orbital_period, 10), *popt)
-            if envelop_eccentricity > 0.5:
-                return -1  # when the returned value is -1 then it is realized that there is no envelop eccentricity
-            return envelop_eccentricity
+        def envelope_eccentricity_function(orbital_period):
+            if math.log(orbital_period, 10) < u[i]:
+                return threshold_value_of_envelope_eccentricity
+            envelope_eccentricity = self.trial_func_for_envelope_eccentricity(math.log(orbital_period, 10), *popt)
+            if envelope_eccentricity > largest_acceptable_value_of_envelope_eccentricity:
+                return -1  # when the returned value is -1 then it is realized that there is no envelope eccentricity
+            return envelope_eccentricity
 
-        return envelop_eccentricity_function
+        return envelope_eccentricity_function
 
-    def trial_func_for_envelop_eccentricity(self, x, a, b, c):
+    def trial_func_for_envelope_eccentricity(self, x, a, b, c):
 
         return a * x ** 2 + b * x + c
 
     def construct_probability_density_distribution_of_eccentricity(self,
                                                                    mean_e_now,
-                                                                   e_now_stdev,
+                                                                   e_now_upper_uncertainty,
+                                                                   e_now_lower_uncertainty,
                                                                    orbital_period):
-        mean_e_env = self.envelop_eccentricity_function(orbital_period=orbital_period)
-        e_env_stdev = e_now_stdev  # more advanced method is still need to be developed to workout e_env_stdev
 
-        b = EccentricityDistribution(mean_e_now, e_now_stdev, mean_e_env, e_env_stdev)
+        mean_e_env = self.envelope_eccentricity_function(orbital_period=orbital_period)
+
+        b = EccentricityDistribution(mean_e_now, e_now_upper_uncertainty, e_now_lower_uncertainty, mean_e_env)
 
         e_env_exists = True
 
         if mean_e_env == -1:
-            print('There is no envelop.')
+            print('There is no envelope.')
             e_env_exists = False
         if mean_e_env == 0:
+            print('There is no envelope')
             e_env_exists = False
 
         def f(e):
@@ -429,13 +466,13 @@ class BayesianAnalysis:
 
 
         b = find_evolution(system=a,
-                           interpolator=interpolator,
+                           interpolator=self.interpolator,
                            dissipation=dissipation,
                            max_age=age * u.Gyr,
                            initial_eccentricity=initial_eccentricity,
                            initial_obliquity=0.0,
                            disk_period=None,
-                           disk_dissipation_age=2e-3 * units.Gyr,
+                           disk_dissipation_age=2e-3 * u.Gyr,
                            primary_wind_strength=0.17,
                            primary_wind_saturation=2.78,
                            primary_core_envelope_coupling_timescale=0.05,
@@ -458,7 +495,11 @@ class BayesianAnalysis:
 
         #       print(repr(dir(b)))
         if  calculated_eccentricity_now >= 0 and calculated_eccentricity_now <=1:
+            print('QQQQQQQQ calculated eccentricity now = ', calculated_eccentricity_now)
             probability_density_of_eccentricity_now = self.probability_density_distribution_of_eccentricity(calculated_eccentricity_now)[0]
+
+            print('********************* probability density ', probability_density_of_eccentricity_now)
+            print('sddsfdsfd priors ', priors)
 
             probability_density = probability_density_of_eccentricity_now * priors
             if probability_density == 0:
@@ -493,10 +534,11 @@ class BayesianAnalysis:
 
         return priors
 
-    def create_initial_theta_and_probability_density_distribution_of_eccentricity(self, j,
+    def create_initial_theta_and_probability_density_distribution_of_eccentricity(self,
+                                                                                  index_of_the_binary_system = 15,
                                                                                   argument_of_phase_lag_function=6.5):
 
-        if j > len(self.planet_name) - 1 or j < 0: return [-5]
+        if index_of_the_binary_system > len(self.planet_name) - 1 or index_of_the_binary_system < 0: return [-5]
 
         k = -1
 
@@ -533,7 +575,7 @@ class BayesianAnalysis:
                 if self.orbital_period[i] <= 10 and (self.primary_mass[i] > 0.4 and self.primary_mass[i] < 1.2) and (
                         self.metallicity[i] > -1.014 and self.metallicity[i] < 0.537):
                     k = k + 1
-                    if k == j:
+                    if k == index_of_the_binary_system:
                         theta0 = [self.primary_mass[i],
                                   self.secondary_mass[i],
                                   self.secondary_radius[i],
@@ -547,8 +589,8 @@ class BayesianAnalysis:
 
                         self.probability_density_distribution_of_eccentricity = self.construct_probability_density_distribution_of_eccentricity(
                             mean_e_now=self.eccentricity_now[i],
-                            e_now_stdev=(-self.eccentricity_now_lower_uncertainty[i] +
-                                         self.eccentricity_now_upper_uncertainty[i]) / 2,
+                            e_now_upper_uncertainty = self.eccentricity_now_upper_uncertainty[i],
+                            e_now_lower_uncertainty = self.eccentricity_now_lower_uncertainty[i],
                             orbital_period=self.orbital_period[i])
                         self.position_of_binary_system = i
                         return theta0
@@ -567,13 +609,11 @@ class BayesianAnalysis:
 
         return walker
 
-    def MCMC(self,
-             argument_of_phase_lag_function=6.5,
-             upper_uncertainty_associated_with_argument_of_phase_lag_function=1,
-             lower_uncertainty_associated_with_argument_of_phase_lag_function=-1):
+    def print_binary_systems_whose_probability_density_of_eccentricity_can_be_figured_out(self,
+                                                                                          argument_of_phase_lag_function=6.5,):
         k = 0
         for j in range(0, len(self.orbital_period) - 1):
-            theta0 = self.create_initial_theta_and_probability_density_distribution_of_eccentricity(j)
+            theta0 = self.create_initial_theta_and_probability_density_distribution_of_eccentricity(j, argument_of_phase_lag_function)
 
             if not theta0[0] == -5:
                 print('______________________________')
@@ -583,11 +623,21 @@ class BayesianAnalysis:
                 print('probability_density_distribution_of_eccentricity(0.2) = ',
                       self.probability_density_distribution_of_eccentricity(0.2))
 
+        return
+
+    def MCMC(self,
+             index_of_the_binary_system=15,
+             argument_of_phase_lag_function=6.5,
+             upper_uncertainty_associated_with_argument_of_phase_lag_function=1,
+             lower_uncertainty_associated_with_argument_of_phase_lag_function=-1):
+
+
         theta0 = self.create_initial_theta_and_probability_density_distribution_of_eccentricity(
-            j=15)  # I am choosing j=20
+            index_of_the_binary_system=index_of_the_binary_system,
+            argument_of_phase_lag_function=argument_of_phase_lag_function)
 
         mean = theta0
-        print('theta0 = ', theta0, ' for k = ', 15)
+        print('theta0 = ', theta0, ' for the label of binary system = ', index_of_the_binary_system)
         standard_deviation = [(self.primary_mass_upper_uncertainty[self.position_of_binary_system] -
                                self.primary_mass_lower_uncertainty[self.position_of_binary_system]) / 2,
                               (self.secondary_mass_upper_uncertainty[self.position_of_binary_system] -
@@ -602,10 +652,11 @@ class BayesianAnalysis:
                                self.obliquity_lower_uncertainty[self.position_of_binary_system]) / 2,
                               (self.stellar_age_upper_uncertainty[self.position_of_binary_system] -
                                self.stellar_age_lower_uncertainty[self.position_of_binary_system]) / 2,
+                              (self.eccentricity_now_upper_uncertainty[self.position_of_binary_system]-
+                               self.eccentricity_now_lower_uncertainty[self.position_of_binary_system])/2,
                               (self.vsini_upper_uncertainty[self.position_of_binary_system] -
                                self.vsini_lower_uncertainty[self.position_of_binary_system]) / 2,
-                              (
-                                          upper_uncertainty_associated_with_argument_of_phase_lag_function - lower_uncertainty_associated_with_argument_of_phase_lag_function) / 2]
+                              (upper_uncertainty_associated_with_argument_of_phase_lag_function - lower_uncertainty_associated_with_argument_of_phase_lag_function) / 2]
 
         nwalker = 32
         ndim = 9
@@ -643,20 +694,20 @@ class BayesianAnalysis:
                 print('probability_density_distribution_of_eccentricity(0.2) = ',
                       self.probability_density_distribution_of_eccentricity(0.2))
 
-        theta0 = self.create_initial_theta_and_probability_density_distribution_of_eccentricity(j=10)  # I am choosing j=20
+        theta0 = self.create_initial_theta_and_probability_density_distribution_of_eccentricity(index_of_the_binary_system=15)  # I am choosing index = 15
+        theta0[8] = 6.5
         prob = []
         Qpl = []
-        theta0[8]=6.5
         print('log_prob for Qpl = 6.5,', self.log_prob(theta0))
-        for i in range(1, 10):
+        for i in range(1,9):
             theta0[8] = i*1
             Qpl = Qpl + [i*1]
             prob = prob + [self.log_prob(theta0)]
-            print('>>>>>>>>>>>>>>>>>>', i)
+            print('>>>>>>>>>>>>>>>>>>', i, 'Qpl ', Qpl, 'prob ', prob)
 
 
-   #     print('Qpl = ', Qpl)
-  #      print('prob = ', prob)
+        print('Qpl = ', Qpl)
+        print('prob = ', prob)
 
         plt.plot(Qpl, prob, label="Prob vs. Qpl")
 
@@ -724,7 +775,7 @@ class BayesianAnalysis:
                                orbital_period[i] * u.d,
                                obliquity[i] * u.deg,
                                stellar_age[i] * u.Gyr,
-                               0.07 * u.dimensionless_unscaled,
+                               eccentricity[i] * u.dimensionless_unscaled,
                                vsini[i] * u.kilometer / u.second)
 
                     a.printing()
@@ -768,7 +819,7 @@ class BayesianAnalysis:
 
                     y = b.orbital_period[init:final]
                     z = b.eccentricity[init:final]
-                    x = []
+                    #x = []
                     #for i in range(init, len(y)):
                     #    x = x + [math.log(b.age[i])]
 
@@ -805,10 +856,12 @@ class BayesianAnalysis:
 
                     # function to show the plot
                     plt.show()
-                    print('age ',x)
-                    print('eccentricity ',z)
-                    print('orbital period ', y)
-                    print('final age = ', final_age)
+                    print('final age in find_evolution = ',x[-1])
+                    print('present eccentricity according to find_evolution =  ',z[-1])
+                    print('present orbital period according to find_evolution = ', y[-1])
+                    print('actual final age = ', final_age)
+                    print('actual present eccentricity = ', eccentricity[i])
+                    print('actual orbital period = ', orbital_period[i])
 
                     evolutionary_data = evolutionary_data + [b]
                     print(repr(dir(b)))
@@ -818,54 +871,81 @@ class BayesianAnalysis:
 
 
 if __name__ == '__main__':
-    fig, ax = plt.subplots(1, 1)
-    print(fig)
-    print(ax)
+    #print(4)
+    test = EccentricityDistribution(mean_e_now=0.5,
+                                    e_now_upper_uncertainty=0.1,
+                                    e_now_lower_uncertainty=-0.1,
+                                    mean_e_env=0.3,
+                                    percentile_for_e_now_upper_uncertainty=0.84,
+                                    percentile_for_e_now_lower_uncertainty=0.16)
 
-    b = 0.775
-    mean, var, skew, kurt = rice.stats(b, moments='mvsk')
-    print('mean =', mean)
-    print('var =', var)
-    print('skew =', skew)
-    print('kurt =', kurt)
-    x = np.linspace(rice.ppf(0.01, b),
-                    rice.ppf(0.99, b), 100)
-    ax.plot(x, rice.pdf(x, b),'r-', lw=5, alpha=0.6, label='rice pdf')
-    rv = rice(b)
-    ax.plot(x, rv.pdf(x), 'k-', lw=2, label='frozen pdf')
-    vals = rice.ppf([0.001, 0.5, 0.999], b)
-    np.allclose([0.001, 0.5, 0.999], rice.cdf(vals, b))
-    r = rice.rvs(b, size=1000)
-    ax.hist(r, density=True, histtype='stepfilled', alpha=0.2)
-    ax.legend(loc='best', frameon=False)
-    plt.show()
+    #print('Testing Laguerre polynomial of degree half = ', test.laguerre_polynomial_of_degree_half(0.7) )
+    #print('Testing Rice distribution = ', test.mean_of_Rice_distribution(0.2))
+    #print('ppf of rice distribution = ', test.percent_point_function_for_Rice_distribution(percentile = 0.16, b=0.5, local=0.1, scale=2))
+    #print('mean of rice distribution minus mean e_now = ', test.mean_of_Rice_distribution_minus_mean_e_now(0.2))
+    #print('solve for b ', test.solve_for_b())
+
+    print(test.root_for_Rice_parameters())
 
 
-    #   test = BayesianAnalysis()
-    eccentricity_expansion_fname = b"/home/mmmahmud/poet/scripts/eccentricity_expansion_coef.txt"
-    orbital_evolution_library.read_eccentricity_expansion_coefficients(
-        eccentricity_expansion_fname
-    )
-    serialized_dir = '/home/mmmahmud/poet/stellar_evolution_interpolators'
- #   manager = StellarEvolutionManager(serialized_dir)
+    #print('Testing rice distribution: Starts')
+    #fig, ax = plt.subplots(1, 1)
+    #print(ax)
 
-#    interpolator = manager.get_interpolator_by_name('default')
+    #b = 0.5
+    #mean, var, skew, kurt = rice.stats(b, moments='mvsk')
+    #print('mean =', mean)
+    #print('var =', var)
+    #print('skew =', skew)
+    #print('kurt =', kurt)
+    #x = np.linspace(rice.ppf(0.01, b),
+                    #rice.ppf(0.99, b), 100)
+    #print('ppf .99 is ', rice.ppf(.99, b))
+    #print('x = ', x)
+    #ax.plot(x, rice.pdf(x, b),'r-', lw=5, alpha=0.6, label='rice pdf')
+    #rv = rice(b)
+    #print('rv ', rv)
+    #ax.plot(x, rv.pdf(x), 'k-', lw=2, label='frozen pdf')
+    #vals = rice.ppf([0.001, 0.5, 0.999], b)
+    #np.allclose([0.001, 0.5, 0.999], rice.cdf(vals, b))
+    #r = rice.rvs(b, size=1000)
+    #ax.hist(r, density=True, histtype='stepfilled', alpha=0.2)
+    #ax.legend(loc='best', frameon=False)
+    #plt.show()
+    #print('End')
 
-#    evolutionary_data = test.test_Nasa_Exoplanet_data(interpolator=(interpolator, interpolator))
+    #Testing evolution of binary systems using test_Nasa_exoplanet_data
+    #print('_____________________________________________________________________________')
+    #print('Testing evolution of binary systems using test_Nasa_exoplanet_data.txt: Start')
+    #test = BayesianAnalysis()
+    #eccentricity_expansion_fname = b"/home/mmmahmud/poet/scripts/eccentricity_expansion_coef.txt"
+    #orbital_evolution_library.read_eccentricity_expansion_coefficients(
+        #eccentricity_expansion_fname
+    #)
+    #serialized_dir = '/home/mmmahmud/poet/stellar_evolution_interpolators'
+    #manager = StellarEvolutionManager(serialized_dir)
 
-    print('end')
+    #interpolator = manager.get_interpolator_by_name('default')
 
+    #evolutionary_data = test.test_Nasa_Exoplanet_data(interpolator=(interpolator, interpolator))
+
+    #print('End')
+    #print('_____________________________________________________________________________')
+
+    #Testing testing_log_prob, MCMC and other methods
+
+    #print('Testing testing_log_prob, MCMC and other methods: Start')
+    #test = BayesianAnalysis()
 
     #test.testing_log_prob()
     #test.MCMC()
 
     #    b = EccentricityDistribution(mean_e_now=0.2, e_now_stdev=0.5, mean_e_env=0.8, e_env_stdev=0.5)
-    #    print('The value of b is quad = ', b.distribution_of_eccentricity_by_quad(e=0.6))
     #    print('The value of b is nquad = ', b.distribution_of_eccentricity_by_nquad(e=0.6))
 
     #   test = BayesianAnalysis()
     #   test.MCMC()
-    #   print('envelop eccentricity = ',test.workout_envelop_eccentricity(planet_orbital_period=0.5))
+    #   print('envelope eccentricity = ',test.workout_envelope_eccentricity(planet_orbital_period=0.5))
     #   f = test.construct_probability_density_distribution_of_eccentricity(mean_e_now=0.2, e_now_stdev=0.5, orbital_period=5.6)
     #    print('f(.3) = ', f( e=0.3))
 
