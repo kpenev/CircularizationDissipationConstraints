@@ -1,6 +1,7 @@
 """Define base class for transforming the unit cube to evolution parameters."""
 
 from abc import ABCMeta, abstractmethod
+import logging
 
 import numpy
 
@@ -21,6 +22,8 @@ class PriorTransformBase(metaclass=ABCMeta):
             the distribution is None, the parameter is assumed to follow
             uniform(0, 1) distribution with the specified units.
     """
+
+    _logger = logging.getLogger(__name__)
 
     _priors_order = ['dissipation', 'evolution', 'system']
 
@@ -92,7 +95,7 @@ class PriorTransformBase(metaclass=ABCMeta):
             independent_parameter_distributions:    See same name attribute.
 
             model_parameter_order([2-tuples]):    The full list of model
-                parameter names and their corresponding units units the
+                parameter names and their corresponding units the
                 transformation must produce.
 
         Returns:
@@ -151,6 +154,16 @@ class PriorTransformBase(metaclass=ABCMeta):
                         %
                         repr(param_name)
                     )
+
+        self._logger.debug(
+            'Prior transform: U(%s) -> Parameters:\n\t%s',
+            repr(unit_cube_values),
+            '\n\t'.join(
+                '%s: %s' % (param, repr(value))
+                for (param, _), value in zip(self.parameter_order,
+                                             transformed_values)
+            )
+        )
 
         return transformed_values
 #pylint: enable=too-few-public-methods

@@ -16,7 +16,11 @@ from feh_conditional_likelihood_base import FeHConditionalLikelihoodBase
 
 from star_sampler import StarSampler
 from gaussian_likelihood import GaussianLikelihood
-from config_util import add_star_sampler_config_args, parse_quantity_with_errors
+from config_util import add_star_sampler_config_args
+#False positive
+#pylint: disable=import-error
+from bayesian.parse_command_line import parse_quantity_with_errors
+#pylint: enable=import-error
 
 def parse_configuration():
     """Return the configuration to use per the command line."""
