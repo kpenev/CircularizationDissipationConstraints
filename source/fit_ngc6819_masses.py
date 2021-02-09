@@ -6,7 +6,7 @@ import os.path
 
 import pandas
 
-from cmd_photometry_interpolator import CMDPhotometryInterpolator
+from cmd_utils import CMDPhotometryInterpolator
 from mass_fitting import fit_binary_masses
 from command_line_utilities import data_dir
 

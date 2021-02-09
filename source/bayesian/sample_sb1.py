@@ -7,19 +7,19 @@ from collections import namedtuple
 from astropy import units
 import numpy
 import scipy.stats
-from configargparse import ArgumentParser, DefaultsFormatter
 
 from stellar_evolution.manager import StellarEvolutionManager
 from orbital_evolution.transformations import phase_lag
 from split_normal_distribution import split_normal
 
 from eccentricity_pdf import EccentricityPDF
-from prior_transform_sb1 import PriorTransformSB1
+from prior_transform_cluster_sb1 import PriorTransformClusterSB1
 from log_likelihood_base import LogLikelihoodBase
 from stellar_param_sampling import\
     StarSampler,\
     add_star_sampler_config_args,\
     POETInterpLikelihood
+from parse_command_line import parse_command_line
 
 class LogLikelihoodConstQ(LogLikelihoodBase):
     """SB1 binary log-likelihood assuming Q*'=const and same for both stars."""
@@ -75,18 +75,6 @@ SystemData = namedtuple(
     ]
 )
 
-def parse_config():
-    """Parse the configuration for sampling."""
-
-    parser = ArgumentParser(
-        description=__doc__,
-        default_config_files=[],
-        formatter_class=DefaultsFormatter,
-        ignore_unknown_config_file_keys=False
-    )
-    add_star_sampler_config_args(parser)
-
-    return parser.parse_args()
 
 def get_system_data():
     """Return the system to sample (HATS-18 + vB62)."""
@@ -142,4 +130,13 @@ def main(config):
     )
 
 if __name__ == '__main__':
-    main(parse_config())
+    main(
+        parse_command_line(
+            'Perform Bayesian sampling of a single SB1 binary system.',
+            'sb1_sampling.cfg',
+            dissipation=True,
+            cluster=True,
+            primary_properties=('feh', 'logg', 'Teff', 'rho'),
+            choose_binary=True
+        )
+    )

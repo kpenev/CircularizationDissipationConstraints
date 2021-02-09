@@ -1,13 +1,11 @@
 """Useful functions for confiuring the stellar parameter sampling."""
 
-from collections import namedtuple
 import os.path
 
-from split_normal_distribution import split_normal
-
-from .star_sampler import StarSampler
-
-RandomQuantity = namedtuple('RandomQuantity', ['distribution', 'units'])
+#False positive
+#pylint: disable=import-error
+from star_sampler import StarSampler
+#pylint: enable=import-error
 
 def add_star_sampler_config_args(parser):
     """Add arguments to parser specifying the sampler configuration."""
@@ -139,20 +137,4 @@ def add_star_sampler_config_args(parser):
         type=int,
         default=300,
         help='The resoution to use for debugging plots.'
-    )
-
-def parse_quantity_with_errors(value_str, units=None):
-    """Parse a string like 5.0 +- 1.3 or 5.0 +0.2 -0.8 (space optional)."""
-
-    value_str, error_str = value_str.rsplit('+', 1)
-    plus_error_str, minus_error_str = error_str.rsplit('-', 1)
-
-    distribution = split_normal.freeze_error_bar(
-        mode=float(value_str),
-        abs_plus_error=float(plus_error_str or minus_error_str),
-        abs_minus_error=float(minus_error_str)
-    )
-    return (
-        distribution if units is None
-        else RandomQuantity(distribution, units)
     )

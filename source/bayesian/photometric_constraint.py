@@ -228,7 +228,6 @@ class PhotometricConstraint:
 
         self._norm = self._cumulative_m1_likelihood(self.mass_range[1])[0]
         self._secondary_norm = None
-        print('Norm: ' + repr(self._norm))
 
     def pdf(self, primary_mass, secondary_mass):
         """The joint PDF of component masses given observed colors and mags."""
