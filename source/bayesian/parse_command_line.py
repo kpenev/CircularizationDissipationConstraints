@@ -1,16 +1,16 @@
 """Common command line parsing for bayeasian analysis."""
 
 from collections import namedtuple
+import os.path
 
+import numpy
 from configargparse import ArgumentParser, DefaultsFormatter
-from astropy import units
 
 from split_normal_distribution import split_normal
+from planetary_system_io import read_cds_pipe_table
 
-from io_utilities import\
-    read_geller_et_al_2009_binaries,\
-    read_milliman_et_al_2014_binaries,\
-    format_hyades_praesepe_binaries
+import update_search_paths
+from command_line_utilities import data_dir
 #False positive (hanhdled in __init__.py).
 #pylint: disable=import-error
 import praesepe_binaries
@@ -164,36 +164,47 @@ def add_primary_args(parser, properties):
 def add_binary_selection_args(parser):
     """Add an argument to parses to choose a binary system to process."""
 
-    binaries = {
-        'NGC188': read_geller_et_al_2009_binaries(),
-        'NGC6819': read_milliman_et_al_2014_binaries(),
-        'Praesepe/Hyades': (
-            format_hyades_praesepe_binaries(
-                praesepe_binaries.read_systems(),
-                #False positive
-                #pylint: disable=no-member
-                age=670.0 * units.Myr,
-                #pylint: enable=no-member
-                feh=0.156,
-                resolve_secondary_mass_range='mean'
+    binaries = dict()
+    binaries['NGC188'] = numpy.concatenate((
+        read_cds_pipe_table(
+            os.path.join(
+                data_dir,
+                'Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
             )
-            +
-            format_hyades_praesepe_binaries(
-                hyades_binaries.systems,
-                #False positive
-                #pylint: disable=no-member
-                age=635.0 * units.Myr,
-                #pylint: enable=no-member
-                feh=0.146,
-                resolve_secondary_mass_range='mean'
+        )['PKM'],
+        read_cds_pipe_table(
+            os.path.join(
+                data_dir,
+                'Geller_et_al_2009_WIYN_double_lined_orbits.tsv'
             )
-        )
-    }
+        )['PKM']
+    ))
+
+    binaries['NGC6819'] = numpy.concatenate((
+        read_cds_pipe_table(
+            os.path.join(
+                data_dir,
+                'Milliman_et_al_2014_WIYN_single_lined_orbits.tsv'
+            )
+        )['WOCS'],
+        read_cds_pipe_table(
+            os.path.join(
+                data_dir,
+                'Milliman_et_al_2014_WIYN_double_lined_orbits.tsv'
+            )
+        )['WOCS']
+    ))
+
+    binaries['Praesepe/Hyades'] = numpy.array(
+        [system['ID'] for system in praesepe_binaries.read_systems()]
+        +
+        [system['ID'] for system in hyades_binaries.systems]
+    )
     parser.add_argument(
-        '--system',
+        'system',
         choices=list(
-            system.hostname
-            for cluster_systems in binaries.values()
+            cluster_name + '_' + str(system)
+            for cluster_name, cluster_systems in binaries.items()
             for system in cluster_systems
         ),
         help='Select the system to analyze.'
