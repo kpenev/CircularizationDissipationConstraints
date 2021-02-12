@@ -67,7 +67,7 @@ class EvolutionParameters:
             dissipation=dissipation_parameters,
             evolution=[
                 ('disk_dissipation_age', units.Gyr),
-                ('disk_period', units.day),
+                ('primary_disk_lock_period', units.day),
                 ('primary_wind_strength', units.dimensionless_unscaled),
                 ('prinmary_wind_saturation', units.dimensionless_unscaled),
                 ('primary_core_envelope_coupling_timescale', units.Gyr)
@@ -84,7 +84,7 @@ class EvolutionParameters:
         if secondary_is_star:
             self.parameter_names_units['evolution'].extend(
                 [
-                    ('secondary_disk_period', units.day),
+                    ('secondary_disk_lock_period', units.day),
                     ('secondary_wind_strength', units.dimensionless_unscaled),
                     ('secondary_wind_saturation', units.dimensionless_unscaled),
                     ('secondary_core_envelope_coupling_timescale', units.Gyr)
