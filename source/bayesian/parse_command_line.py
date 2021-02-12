@@ -9,7 +9,6 @@ from configargparse import ArgumentParser, DefaultsFormatter
 from split_normal_distribution import split_normal
 from planetary_system_io import read_cds_pipe_table
 
-import update_search_paths
 from command_line_utilities import data_dir
 #False positive (hanhdled in __init__.py).
 #pylint: disable=import-error
@@ -51,6 +50,7 @@ def add_dissipation_args(parser):
         '--lgQ-min-range',
         nargs=2,
         type=float,
+        default=5.0,
         help='The range to use for the uniform prior in the log10(`Qmin`) '
         'parameter.'
     )
@@ -112,6 +112,61 @@ def add_cluster_args(parser):
         help='The measured [Fe/H] for the cluster as well as its estimated '
         'standard deviation(s), possibly asymmetric.'
     )
+
+
+def add_stellar_spindown_args(parser, num_stars):
+    """Add arguments to the parser to define priors for the spindown params."""
+
+    assert num_stars in [1, 2]
+
+    spin = parser.add_argument_group(
+        title='Stellar spin evolution parameters',
+        description='Arguments to specify the priors to assume for the '
+        'parameters controlling the spin evolution of isolated stars. '
+        'Specifying a the same value for upper and lower bound of any option '
+        'results in a fixed value assumed for the corresponding parameter.'
+    )
+    spin.add_argument(
+        '--disk-dissipation-age',
+        type=float,
+        nargs=2,
+        default=(5.0, 5.0),
+        help='The prior distribution to assume for the disk dissipation age is '
+        'uniform within the given range in Myrs.'
+    )
+    for component, _ in zip(['primary', 'secondary'], range(num_stars)):
+        spin.add_argument(
+            '--%s-disk-lock-period' % component,
+            type=float,
+            nargs=2,
+            default=(5.0, 5.0),
+            help='The prior distribution to assume for the period (in days) to '
+            'which the surface spin of stars is locked until the disk dissipates.'
+        )
+        spin.add_argument(
+            '--%s-wind-strength' % component,
+            type=float,
+            nargs=2,
+            default=(0.17, 0.17),
+            help='The strength factor of the rate at which stars lose angular '
+            'momentum to magnetically launched wind.'
+        )
+        spin.add_argument(
+            '--%s-wind-saturation' % component,
+            type=float,
+            nargs=2,
+            default=(2.45, 2.45),
+            help='The frequency, in rad/day, above which the scaling of angular '
+            'momentum loss with spin changes from cubic to linear.'
+        )
+        spin.add_argument(
+            '--%s-core-envelope-coupling-timescale' % component,
+            type=float,
+            nargs=2,
+            default=(10.0, 10.0),
+            help='The timescale, in Myrs, on which the core and the envelope '
+            'converge toward solid body rotation.'
+        )
 
 
 def add_primary_args(parser, properties):
@@ -216,7 +271,8 @@ def parse_command_line(description,
                        dissipation=False,
                        cluster=False,
                        primary_properties=(),
-                       choose_binary=False):
+                       choose_binary=False,
+                       spindown=0):
     """
     Parse the command line for a Bayesian run.
 
@@ -239,6 +295,9 @@ def parse_command_line(description,
         choose_binary(bool):    Whether to add argument for selecting a
             particular binary by name.
 
+        spindown(int):    For how many components should spindown parameters be
+            added (0, 1, or 2).
+
     Returns:
         argparse.Namespace:
             The parsed command line options.
@@ -256,6 +315,8 @@ def parse_command_line(description,
         add_cluster_args(parser)
     if primary_properties:
         add_primary_args(parser, primary_properties)
+    if spindown:
+        add_stellar_spindown_args(parser, spindown)
     if choose_binary:
         add_binary_selection_args(parser)
     return parser.parse_args()
