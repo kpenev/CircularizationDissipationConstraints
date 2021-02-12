@@ -294,7 +294,8 @@ def read_geller_et_al_2009_binaries(
                 data_dir,
                 'Geller_et_al_2009_WIYN_physical_parameters.tsv'
             )
-        )
+        ),
+        raw_data=False
 ):
     """Read Geller et al 2009 NGC 188 binaries in format like that of exopl."""
 
@@ -322,6 +323,13 @@ def read_geller_et_al_2009_binaries(
     ngc188_age = get_quantity(6.3, 0.2, 0.2, 'Gyr')
     ngc188_feh = get_quantity(0.21, 0.03, 0.03, '')
 
+    if raw_data:
+        return (
+            single_lined_data,
+            double_lined_data,
+            ngc188_age,
+            ngc188_feh
+        )
     return create_binary_star_systems(single_lined_data,
                                       double_lined_data,
                                       ngc188_age,

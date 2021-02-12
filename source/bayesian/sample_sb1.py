@@ -3,6 +3,8 @@
 """Use dynesty to sample SB1 binary star system."""
 
 from collections import namedtuple
+import logging
+import traceback
 
 from astropy import units
 import numpy
@@ -12,13 +14,21 @@ from stellar_evolution.manager import StellarEvolutionManager
 from orbital_evolution.transformations import phase_lag
 from split_normal_distribution import split_normal
 
+#Fixed module search paths, not intended to provide anything.
+#pylint: disable=unused-import
+import update_search_paths
+from io_utilities import read_geller_et_al_2009_binaries
+#pylint: enable=unused-import
 from eccentricity_pdf import EccentricityPDF
 from prior_transform_cluster_sb1 import PriorTransformClusterSB1
+#False positive
+#pylint: disable=import-error
 from log_likelihood_base import LogLikelihoodBase
 from stellar_param_sampling import\
     StarSampler,\
     add_star_sampler_config_args,\
     POETInterpLikelihood
+#pylint: enable=import-error
 from parse_command_line import parse_command_line
 
 class LogLikelihoodConstQ(LogLikelihoodBase):
@@ -76,24 +86,73 @@ SystemData = namedtuple(
 )
 
 
-def get_system_data():
+def get_system_data(config):
     """Return the system to sample (HATS-18 + vB62)."""
 
-    return SystemData(
-        current_eccentricity=scipy.stats.rice(0.233/0.008, scale=0.008),
-        envelope_eccentricity=0.4,
-        feh=scipy.stats.norm(loc=0.28, scale=0.08),
-        logg=scipy.stats.norm(loc=4.436, scale=0.034),
-        Teff=scipy.stats.norm(loc=5600.0, scale=120.0),
-        mean_density=split_normal(mode=1.37,
-                                  abs_plus_error=0.12,
-                                  abs_minus_error=0.23),
-    )
+    if config.system.startswith('NGC188'):
+        sb1_systems, sb2_systems, age, feh = read_geller_et_al_2009_binaries(
+            raw_data=True
+        )
+        selected = sb1_systems['PKM'] == int(config.system[len('NGC188_'):])
+        if not selected.any():
+            raise RuntimeError('No SB1 system matching: ' + repr(config.system))
+        selected = sb1_systems[selected]
+        print(repr(selected.T))
+        print('K: ' + repr(float(selected['K'])))
+
+        return SystemData(
+            current_eccentricity=scipy.stats.rice(0.233/0.008, scale=0.008),
+            envelope_eccentricity=0.4,
+            feh=scipy.stats.norm(loc=0.28, scale=0.08),
+            logg=scipy.stats.norm(loc=4.436, scale=0.034),
+            Teff=scipy.stats.norm(loc=5600.0, scale=120.0),
+            mean_density=split_normal.freeze_error_bar(mode=1.37,
+                                                       abs_plus_error=0.12,
+                                                       abs_minus_error=0.23)
+        )
 
 def main(config):
     """Avoid polluting global namespace."""
 
-    system_data = get_system_data()
+    def get_uniform_parameter(parameter):
+        """
+        Return the entry for parameter in independent_parameter_distributions.
+
+        Args:
+            parameter(str):    The name of the parameter to get the entry for.
+
+        Returns:
+            tuple:
+                The entry in independent_parameter_distributions argument to
+                :meth:`PriorTransformClusterSB1.__init__()` that correctly
+                specifies the given model parameter's prior.
+        """
+
+        param_units = dict(
+            disk_dissipation_age=units.Myr,
+        )
+        for component in ['primary', 'secondary']:
+            param_units[component + '_disk_lock_period'] = units.day
+            param_units[component + '_wind_strength'] = (
+                units.dimensionless_unscaled
+            )
+            param_units[component + '_wind_saturation'] = (
+                units.dimensionless_unscaled
+            )
+            param_units[component + '_core_envelope_coupling_timescale'] = (
+                units.Myr
+            )
+
+        min_value, max_value = getattr(config, parameter)
+        if min_value == max_value:
+            return (parameter, min_value, param_units[parameter])
+
+        return (parameter,
+                scipy.stats.uniform(min_value, max_value),
+                param_units[parameter])
+
+    assert config.lgQ_inertial_boost_range is None
+    system_data = get_system_data(config)
     log_likelihood = LogLikelihoodConstQ(system_data, config)
     config.feh = system_data.feh
     primary_sampler = StarSampler(
@@ -107,36 +166,56 @@ def main(config):
         ),
         config
     )
-    prior_transform = PriorTransformSB1(
+    prior_transform = PriorTransformClusterSB1(
         primary_sampler,
-        independent_parameter_distributions=[
-            ('disk_dissipation_age', 5.0, units.Myr),
-            ('disk_period', 5.0, units.day),
-            ('primary_wind_strength', 0.17, units.dimensionless_unscaled),
-            ('secondary_wind_strength', 0.17, units.dimensionless_unscaled),
-            ('primary_wind_saturation', 2.45, units.dimensionless_unscaled),
-            ('secondary_wind_saturation', 2.45, units.dimensionless_unscaled),
-            ('primary_core_envelope_coupling_timescale', 10.0, units.Myr),
-            ('secondary_core_envelope_coupling_timescale', 10.0, units.Myr),
-            ('orbical_period', 7.0, units.day),
-            ('rv_semi_amplitude', scipy.stats.norm(16.46, 0.16), u.km / u.s),
-            (
-                'cos_inclination',
-                scipy.stats.uniform(-1.0, 2.0),
-                units.dimensionless_unscaled
-            ),
-        ],
+        independent_parameter_distributions=(
+            [
+                get_uniform_parameter(component + '_' + param_name)
+                for component in ['primary', 'secondary']
+                for param_name in ['disk_lock_period',
+                                   'wind_strength',
+                                   'wind_saturation',
+                                   'core_envelope_coupling_timescale']
+            ]
+            +
+            [
+                get_uniform_parameter('disk_dissipation_age'),
+                ('orbical_period', 7.0, units.day),
+                (
+                    'rv_semi_amplitude',
+                    scipy.stats.norm(16.46, 0.16),
+                    units.km / units.s
+                ),
+                (
+                    'cos_inclination',
+                    scipy.stats.uniform(-1.0, 2.0),
+                    units.dimensionless_unscaled
+                ),
+            ]
+        ),
         model_parameter_order=log_likelihood.parameter_order
     )
 
 if __name__ == '__main__':
-    main(
-        parse_command_line(
-            'Perform Bayesian sampling of a single SB1 binary system.',
-            'sb1_sampling.cfg',
-            dissipation=True,
-            cluster=True,
-            primary_properties=('feh', 'logg', 'Teff', 'rho'),
-            choose_binary=True
+    logging.basicConfig(level=logging.DEBUG)
+    try:
+        main(
+            parse_command_line(
+                'Perform Bayesian sampling of a single SB1 binary system.',
+                'sb1_sampling.cfg',
+                dissipation=True,
+                cluster=True,
+                primary_properties=('feh', 'logg', 'Teff', 'rho'),
+                choose_binary=True,
+                spindown=2
+            )
         )
-    )
+    except SystemExit:
+        pass
+    #Meant to simply report exception to log
+    #pylint: disable=bare-except
+    except:
+        logging.critical(traceback.format_exc())
+    #pylint: enable=bare-except
+    else:
+        logging.info('SB1 sampling completed successfully.')
