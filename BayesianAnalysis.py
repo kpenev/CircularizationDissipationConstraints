@@ -13,7 +13,11 @@ from scipy.optimize import curve_fit
 from scipy.stats import rice
 from scipy.special import i0
 from scipy.special import i1
+from scipy.special import erf
 from scipy.optimize import fsolve
+from scipy.optimize import broyden1
+from sympy import *
+
 from scipy.optimize import root_scalar
 from scipy.optimize import newton
 
@@ -121,9 +125,17 @@ class EccentricityDistribution(SuperEccentricityDistribution):
                 #self.percent_point_function_for_Rice_distribution(self.percentile_for_e_now_upper_uncertainty, self.Rice_parameter_b, x[0], x[1])-(self.mean_e_now + self.e_now_upper_uncertainty)]
         #
         #self.percent_point_function_for_Rice_distribution(self.percentile_for_e_now_lower_uncertainty, x[0], x[1]) - (self.mean_e_now + self.e_now_lower_uncertainty)
-        return [self.mean_of_Rice_distribution(x[0], x[1])-self.mean_e_now,
-                self.percent_point_function_for_Rice_distribution(self.percentile_for_e_now_upper_uncertainty, x[0], x[1]) - (self.mean_e_now + self.e_now_upper_uncertainty)]
+        #return [self.mean_of_Rice_distribution(x[0], x[1])-self.mean_e_now,
+                #self.percent_point_function_for_Rice_distribution(self.percentile_for_e_now_upper_uncertainty, x[0], x[1]) - (self.mean_e_now + self.e_now_upper_uncertainty)]
+        print('eccentricity upper limit = ', (self.mean_e_now + self.e_now_upper_uncertainty))
+        print('eccentricity lower limit = ', (self.mean_e_now + self.e_now_lower_uncertainty))
+        print('b = ', x[0])
+        print('s = ', x[1])
+        return [rice.cdf((self.mean_e_now+self.e_now_upper_uncertainty),x[0], x[1]) - erf(1),
+                rice.cdf((self.mean_e_now+self.e_now_lower_uncertainty),x[0], x[1]) - (1-erf(1))]
 
+
+    
 
 
 
@@ -134,7 +146,13 @@ class EccentricityDistribution(SuperEccentricityDistribution):
 
     def root_for_Rice_parameters(self):
         #self.Rice_parameter_b = self.solve_for_b()
-        root = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, [1,1])
+        root = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, [0.5, 0.1])
+        #root = broyden1(self.equations_to_be_solved_for_Rice_distribution_parameters, (1,1))
+        #b = Symbol('b')
+        #s = Symbol('s')
+        #x = [b,s]
+        #p, q = nsolve(self.equations_to_be_solved_for_Rice_distribution_parameters(x), [b, s], [0.5, 0.1])
+        #root = [p, q]
         return root
 
     def distribution_of_present_eccentricity(self, e_now):
