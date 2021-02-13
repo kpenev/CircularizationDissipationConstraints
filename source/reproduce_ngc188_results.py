@@ -9,8 +9,7 @@ from matplotlib import pyplot
 import scipy
 
 from planetary_system_io import read_cds_pipe_table
-from cmd_photometry_interpolator import CMDPhotometryInterpolator
-from cmd_usno_photometry_interpolator import CMDUSNOPhotometryInterpolator
+from cmd_utils import CMDPhotometryInterpolator, CMDUSNOPhotometryInterpolator
 from mass_fitting import fit_binary_masses
 from command_line_utilities import data_dir
 
@@ -20,11 +19,11 @@ def fit_all_binaries(interpolator,
                      ngc188_double_lined_orbits,
                      ngc188_params,
                      distance_modulus=11.23,
-                     observed_phot_template='%(filchar)cmag'):
+                     observed_phot_template='%(filter)smag'):
     """Fit and report all binaries in NGC188 along with literature masses."""
 
     min_mag_difference_filchar = (
-        'V' if 'V' in interpolator.filchars else 'g'
+        'V' if 'V' in interpolator.available_filters else 'g'
     )
     for is_double_lined, orbital_parameters in [
             (False, ngc188_single_lined_orbits),
@@ -78,11 +77,15 @@ def fit_all_binaries(interpolator,
             primary_m, secondary_m = result.x
             mag_diff = (
                 interpolator(secondary_m)[
-                    interpolator.filchars.index(min_mag_difference_filchar)
+                    interpolator.available_filters.index(
+                        min_mag_difference_filchar
+                    )
                 ]
                 -
                 interpolator(primary_m)[
-                    interpolator.filchars.index(min_mag_difference_filchar)
+                    interpolator.available_filters.index(
+                        min_mag_difference_filchar
+                    )
                 ]
             )
 
@@ -117,9 +120,9 @@ def fit_all_binaries(interpolator,
                     ('v' if result.success else '*'),
                     binary['PKM'],
                     repr(primary_m),
-                    answer['l_M1'][0].decode() + repr(answer['M1'][0]),
+                    answer['l_M1'][0] + repr(answer['M1'][0]),
                     repr(secondary_m),
-                    answer['l_M2'][0].decode() + repr(answer['M2'][0]),
+                    answer['l_M2'][0] + repr(answer['M2'][0]),
                     repr(mag_diff)
                 )
                 +
@@ -133,7 +136,7 @@ def plot_bad_binaries(interpolator,
                       *,
                       bad_binaries_fname='bad_binaries.txt',
                       distance_modulus=11.23,
-                      observed_phot_template='%(filchar)cmag'):
+                      observed_phot_template='%(filter)smag'):
     """Plot the fitting of binaries listed in the bad_binaries_fname."""
 
     def plot_fitting(binary_id, fit_m1, fit_m2):
@@ -144,11 +147,11 @@ def plot_bad_binaries(interpolator,
         except ValueError:
             cluster_members = ngc188_photometry[ngc188_photometry['Mm'] > 0.5]
         observed_photometry = scipy.array([
-            cluster_members[observed_phot_template % dict(filchar=filchar)]
-            for filchar in interpolator.filchars[:5]
+            cluster_members[observed_phot_template % dict(filter=filter_name)]
+            for filter_name in interpolator.available_filters[1:6]
         ])
         interp_masses = interpolator.data[0]['Mini']
-        predicted_photometry = interpolator(interp_masses)
+        predicted_photometry = interpolator(interp_masses)[1:]
 
         literature_params = ngc188_params[ngc188_params['PKM'] == binary_id]
 
@@ -156,8 +159,8 @@ def plot_bad_binaries(interpolator,
             ngc188_photometry['PKM'] == binary_id
         ]
         binary_photometry = [
-            binary_photometry[observed_phot_template % dict(filchar=filchar)]
-            for filchar in interpolator.filchars[:5]
+            binary_photometry[observed_phot_template % dict(filter=filter_name)]
+            for filter_name in interpolator.available_filters[1:6]
         ]
 
         fit_photometry = (interpolator.get_binary_magnitudes(fit_m1, fit_m2)
@@ -168,9 +171,9 @@ def plot_bad_binaries(interpolator,
                                                literature_params['M2'])
             +
             distance_modulus
-        )
+        )[1:]
         fit_individual_photometry = (
-            interpolator(scipy.array([fit_m1, fit_m2]))
+            interpolator(scipy.array([fit_m1, fit_m2]))[1:]
             +
             distance_modulus
         )
@@ -205,9 +208,15 @@ def plot_bad_binaries(interpolator,
                     linewidth=3,
                     zorder=10
                 )
-                pyplot.xlabel('%s - %s [mag]' % (interpolator.filchars[left],
-                                                 interpolator.filchars[right]))
-                pyplot.ylabel('-%c [mag]' % interpolator.filchars[2])
+                pyplot.xlabel(
+                    '%s - %s [mag]'
+                    %
+                    (
+                        interpolator.available_filters[left],
+                        interpolator.available_filters[right]
+                    )
+                )
+                pyplot.ylabel('-%c [mag]' % interpolator.available_filters[3])
 
                 pyplot.plot(
                     [binary_photometry[left] - binary_photometry[right]],
@@ -375,8 +384,8 @@ def main():
 
     for filter_set in ['UBVRIJHK', 'usno']:
         observed_phot_template = (
-            "%(filchar)c'mag" if filter_set == 'usno'
-            else "%(filchar)cmag"
+            "%(filter)s'mag" if filter_set == 'usno'
+            else "%(filter)smag"
         )
         fit_all_binaries(interpolator[filter_set],
                          ngc188_photometry[filter_set],

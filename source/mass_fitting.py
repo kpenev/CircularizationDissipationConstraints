@@ -8,8 +8,8 @@ import scipy.integrate
 def fit_single_mass(photometry_interp,
                     photometry,
                     *,
-                    magnitude_template="%(filchar)c'mag",
-                    magnitude_error_template="e_%(filchar)c'mag",
+                    magnitude_template="%(filter)s'mag",
+                    magnitude_error_template="e_%(filter)s'mag",
                     color_template=None,
                     color_error_template=None):
     """
@@ -24,18 +24,18 @@ def fit_single_mass(photometry_interp,
             key <-> error correspondence is specified by the template
             arguments.
 
-        magnitude_template(str):    A %(filchar)c-substitution template that
+        magnitude_template(str):    A %(filter)s-substitution template that
             should expand to the key giving a particular magnitude measured
             nominal value.
 
-        magnitude_error_template(str):    A %(filchar)c-substitution template
+        magnitude_error_template(str):    A %(filter)s-substitution template
             that should expand to the key giving a particular magnitude error.
 
-        color_template(None or str):    If None, individual magnitudes are fit. If
-            not None, it is assumed that ``photometry`` contains color
+        color_template(None or str):    If None, individual magnitudes are fit.
+            If not None, it is assumed that ``photometry`` contains color
             information (not just magnitudes), so masses are derived by fitting
             color--magnitude digrams. In the latter case, this argument should
-            be contain a %(filchar1)c and %(filchar2)c substitutions, expanding
+            be contain a %(filter1)s and %(filter2)s substitutions, expanding
             to the key in ``photometry`` giving a particular measured color
             nominal value. Colors are always assumed to be magnitude in the
             bluer band minus the magnitude in the redder band.
@@ -48,23 +48,23 @@ def fit_single_mass(photometry_interp,
         assuming gaussian errors.
     """
 
-    def get_magnitude_term(theoretical_value, filchar):
+    def get_magnitude_term(theoretical_value, filter_name):
         """Return the negative log-likelihood for the given filter."""
 
         return (
             (
                 theoretical_value
                 -
-                photometry[magnitude_template % dict(filchar=filchar)]
+                photometry[magnitude_template % dict(filter=filter_name)]
             )
             /
-            photometry[magnitude_error_template % dict(filchar=filchar)]
+            photometry[magnitude_error_template % dict(filter=filter_name)]
         )**2
 
-    def get_color_term(theoretical_value, filchar1, filchar2):
+    def get_color_term(theoretical_value, filter1, filter2):
         """Return the nominal measured color for the two given filters."""
 
-        substitution = dict(filchar1=filchar1, filchar2=filchar2)
+        substitution = dict(filter1=filter1, filter2=filter2)
         return (
             (
                 theoretical_value
@@ -75,24 +75,24 @@ def fit_single_mass(photometry_interp,
             photometry[color_error_template % substitution]
         )**2
 
-    def check_magnitude(filchar):
+    def check_magnitude(filter_name):
         """Return True iff the given magnitude has a measurement & error."""
 
         return (
-            magnitude_template % dict(filchar=filchar) in photometry
+            magnitude_template % dict(filter=filter_name) in photometry
             and
-            magnitude_error_template % dict(filchar=filchar) in photometry
+            magnitude_error_template % dict(filter=filter_name) in photometry
         )
 
-    def check_color(filchar1, filchar2):
+    def check_color(filter1, filter2):
         """Return True iff the given color has a measurement & error."""
 
         return (
-            color_template % dict(filchar1=filchar1,
-                                  filchar2=filchar2) in photometry
+            color_template % dict(filter1=filter1,
+                                  filter2=filter2) in photometry
             and
-            color_error_template % dict(filchar1=filchar1,
-                                        filchar2=filchar2) in photometry
+            color_error_template % dict(filter1=filter1,
+                                        filter2=filter2) in photometry
         )
 
     def get_square_diff(theoretical_magnitudes):
@@ -103,7 +103,7 @@ def fit_single_mass(photometry_interp,
         grid_square_diff = scipy.zeros(theoretical_magnitudes[0].shape,
                                        dtype=float)
         for filter_index, filter_character in enumerate(
-                photometry_interp.filchars
+                photometry_interp.available_filters
         ):
             if check_magnitude(filter_character):
                 grid_square_diff += get_magnitude_term(
@@ -113,21 +113,21 @@ def fit_single_mass(photometry_interp,
 
         if color_template:
             assert color_error_template
-            for index1, filchar1 in enumerate(
-                    photometry_interp.filchars
+            for index1, filter1 in enumerate(
+                    photometry_interp.available_filters
             ):
                 for index2 in range(index1 + 1,
-                                    len(photometry_interp.filchars)):
-                    filchar2 = photometry_interp.filchars[index2]
-                    if check_color(filchar1, filchar2):
+                                    len(photometry_interp.available_filters)):
+                    filter2 = photometry_interp.available_filters[index2]
+                    if check_color(filter1, filter2):
                         grid_square_diff += get_color_term(
                             (
                                 theoretical_magnitudes[index1]
                                 -
                                 theoretical_magnitudes[index2]
                             ),
-                            filchar1,
-                            filchar2
+                            filter1,
+                            filter2
                         )
         return grid_square_diff
 
@@ -290,8 +290,8 @@ def fit_binary_masses(photometry_interp,
                       distance_modulus,
                       *,
                       min_mag_difference=None,
-                      magnitude_template="%(filchar)cmag",
-                      magnitude_error_template="e_%(filchar)cmag",
+                      magnitude_template="%(filter)smag",
+                      magnitude_error_template="e_%(filter)smag",
                       color_template=None,
                       color_error_template=None,
                       **rv_parameters):
@@ -336,45 +336,45 @@ def fit_binary_masses(photometry_interp,
     """
 
     def update_negative_log_likelihood(*,
-                                       filchar,
+                                       filter_name,
                                        predicted,
                                        result,
-                                       rh_filchar=None):
+                                       rh_filter_name=None):
         """
         Add to result the negative log-likelihood for a single magnitude/color.
 
         Args:
-            filchar(1-char string):    The filter to add the negative
-                log-likelihood for (if ``lh_filchar`` is ``None``), or the LH
-                filter of the color difference being added.
+            filter_name(string):    The filter to add the negative
+                log-likelihood for (if ``rh_filter_name`` is ``None``), or the
+                LH filter of the color difference being added.
 
             predicted(array):    The predicted value(s) for the magnitude or
                 color.
 
             result(array):    The array to add the negative log-likelihood to.
 
-            rh_filchar(1-char string or None):    If None the log-likelihood for
+            rh_filter_name(string or None):    If None the log-likelihood for
                 a single magnitude is added, if not None, this is the RH filter
                 defining the color to add the log-likelihood for.
         """
 
         try:
-            if rh_filchar is None:
+            if rh_filter_name is None:
                 observed = photometry[magnitude_template
                                       %
-                                      dict(filchar=filchar)]
+                                      dict(filter=filter_name)]
                 stddev = photometry[magnitude_error_template
                                     %
-                                    dict(filchar=filchar)]
+                                    dict(filter=filter_name)]
             else:
                 observed = photometry[color_template
                                       %
-                                      dict(filchar1=filchar,
-                                           filchar2=rh_filchar)]
+                                      dict(filter1=filter_name,
+                                           filter2=rh_filter_name)]
                 stddev = photometry[color_error_template
                                     %
-                                    dict(filchar1=filchar,
-                                         filchar2=rh_filchar)]
+                                    dict(filter1=filter_name,
+                                         filter2=rh_filter_name)]
         except (KeyError, ValueError):
             return
 
@@ -421,22 +421,22 @@ def fit_binary_masses(photometry_interp,
         )
 
 
-        for filchar_index, (filchar, predicted) in enumerate(
-                zip(photometry_interp.filchars, predicted_photometry)
+        for filter_index, (filter_name, predicted) in enumerate(
+                zip(photometry_interp.available_filters, predicted_photometry)
         ):
-            update_negative_log_likelihood(filchar=filchar,
+            update_negative_log_likelihood(filter_name=filter_name,
                                            predicted=predicted,
                                            result=result)
             if color_template is not None:
                 assert color_error_template is not None
 
-                for rh_filchar, rh_predicted in zip(
-                        photometry_interp.filchars[filchar_index + 1:],
-                        predicted_photometry[filchar_index + 1:]
+                for rh_filter_name, rh_predicted in zip(
+                        photometry_interp.available_filters[filter_index + 1:],
+                        predicted_photometry[filter_index + 1:]
                 ):
                     update_negative_log_likelihood(
-                        filchar=filchar,
-                        rh_filchar=rh_filchar,
+                        filter_name=filter_name,
+                        rh_filter_name=rh_filter_name,
                         predicted=(predicted - rh_predicted),
                         result=result
                     )
@@ -449,11 +449,13 @@ def fit_binary_masses(photometry_interp,
         mag_differences = magnitudes[:, 1] - magnitudes[:, 0]
         defficiencies = [
             (
-                mag_differences[photometry_interp.filchars.index(filchar)]
+                mag_differences[
+                    photometry_interp.available_filters.index(filter_name)
+                ]
                 -
                 min_diff
             )
-            for filchar, min_diff in min_mag_difference.items()
+            for filter_name, min_diff in min_mag_difference.items()
         ]
         return min(defficiencies)
 

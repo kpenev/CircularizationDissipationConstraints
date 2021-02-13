@@ -23,10 +23,14 @@ class CMDUSNOPhotometryInterpolator(CMDPhotometryInterpolator):
 
         super().__init__(isochrone_fname)
 
-        assert self.filchars == 'ugriz'
+        for filchar in 'ugriz':
+            assert filchar in self.available_filters
+
+        usno_indices = [self.available_filters.index(filchar)
+                        for filchar in 'ugriz']
 
         print('Initializing USNO interpolation.')
-        self.grid_mag = sdss_to_usno(self.grid_mag)
+        self.grid_mag = sdss_to_usno(self.grid_mag[usno_indices])
 
     def __call__(self, interp_mass):
         """Estimate UNSO u', g', r', i', z' photometry for given mass(es)."""
