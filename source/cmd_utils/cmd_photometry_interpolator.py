@@ -20,7 +20,7 @@ from cmd_isochrone_interpolator import CMDInterpolator
 
 class CMDPhotometryInterpolator(CMDInterpolator):
     """
-    Interpolate SDSS photometry from CMD isochrones for a single cluster.
+    Interpolate photometry from CMD isochrones for a single cluster.
 
     Attributes:
         age(float):    The age of the isochrones.
@@ -59,7 +59,7 @@ class CMDPhotometryInterpolator(CMDInterpolator):
         print('Available filters: ' + repr(self.available_filters))
 
 
-    def __init__(self, isochrone_fname):
+    def __init__(self, isochrone_fname, distance_modulus):
         """Interpolate within the given isochrone grid."""
 
         super().__init__(isochrone_fname)
@@ -70,6 +70,7 @@ class CMDPhotometryInterpolator(CMDInterpolator):
         self.min_mass = self.data[0]['Mini'][0]
         self.max_mass = self.data[0]['Mini'][-1]
         self.feh = self.data[0]['MH'][0]
+        self.distance_modulus = distance_modulus
         #pylint: enable=no-member
         assert numpy.unique(self.data[0]['logAge']).size == 1
         #False positive
@@ -89,7 +90,11 @@ class CMDPhotometryInterpolator(CMDInterpolator):
 
         return numpy.stack(
             [
-                self.get_interpolated(mag_letter + 'mag', interp_mass, None)
+                (
+                    self.get_interpolated(mag_letter + 'mag', interp_mass, None)
+                    +
+                    self.distance_modulus
+                )
                 for mag_letter in self.available_filters
             ]
         )

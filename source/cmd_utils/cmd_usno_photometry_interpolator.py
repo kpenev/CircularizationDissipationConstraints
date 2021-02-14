@@ -18,10 +18,10 @@ from command_line_utilities import data_dir
 class CMDUSNOPhotometryInterpolator(CMDPhotometryInterpolator):
     """Interpolate SDSS photometry from CMD isochrones for a single cluster."""
 
-    def __init__(self, isochrone_fname):
+    def __init__(self, isochrone_fname, distance_modulus):
         """Interpolate within the given isochrone grid."""
 
-        super().__init__(isochrone_fname)
+        super().__init__(isochrone_fname, distance_modulus)
 
         for filchar in 'ugriz':
             assert filchar in self.available_filters
@@ -59,7 +59,8 @@ if __name__ == '__main__':
                                        cluster_members["i'mag"],
                                        cluster_members["z'mag"]))
     interpolator = CMDUSNOPhotometryInterpolator(
-        os.path.join(data_dir, 'CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat')
+        os.path.join(data_dir, 'CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat'),
+        11.3
     )
     interp_masses = interpolator.data[0]['Mini']
 

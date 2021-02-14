@@ -287,7 +287,6 @@ def double_lined_orbit_log_likelihood(primary_mass,
 
 def fit_binary_masses(photometry_interp,
                       photometry,
-                      distance_modulus,
                       *,
                       min_mag_difference=None,
                       magnitude_template="%(filter)smag",
@@ -303,9 +302,6 @@ def fit_binary_masses(photometry_interp,
             :func:`fit_single_mass`.
 
         photometry:    See same name argument to :func:`fit_single_mass`.
-
-        distance_modulus(float):    The distance modulus to assume for the
-            binary being fit.
 
         min_mag_difference(dict):    Minimal difference in magnitudes between
             primary and secondary to impose on the result. Keys should be
@@ -404,9 +400,7 @@ def fit_binary_masses(photometry_interp,
         """Return -log(likelihood) of the data given stellar masses."""
 
         predicted_photometry = scipy.array(
-            photometry_interp.get_binary_magnitudes(*masses)
-            +
-            distance_modulus,
+            photometry_interp.get_binary_magnitudes(*masses),
             copy=False
         )
 
