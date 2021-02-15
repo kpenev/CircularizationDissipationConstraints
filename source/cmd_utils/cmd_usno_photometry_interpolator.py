@@ -12,8 +12,11 @@ import scipy
 from planetary_system_io import read_cds_pipe_table
 from magnitude_transformations import sdss_to_usno
 
-from cmd_photometry_interpolator import CMDPhotometryInterpolator
 from command_line_utilities import data_dir
+#False positive
+#pylint: disable=import-error
+from cmd_photometry_interpolator import CMDPhotometryInterpolator
+#pylint: enable=import-error
 
 class CMDUSNOPhotometryInterpolator(CMDPhotometryInterpolator):
     """Interpolate SDSS photometry from CMD isochrones for a single cluster."""
@@ -23,14 +26,20 @@ class CMDUSNOPhotometryInterpolator(CMDPhotometryInterpolator):
 
         super().__init__(isochrone_fname, distance_modulus)
 
+        #False positive: parent's __init__ defines it
+        #pylint: disable=access-member-before-definition
         for filchar in 'ugriz':
             assert filchar in self.available_filters
 
-        usno_indices = [self.available_filters.index(filchar)
-                        for filchar in 'ugriz']
+        self.grid_mag = sdss_to_usno(
+            self.grid_mag[
+                [self.available_filters.index(filchar)
+                 for filchar in 'ugriz']
+            ]
+        )
+        #pylint: enable=access-member-before-definition
 
-        print('Initializing USNO interpolation.')
-        self.grid_mag = sdss_to_usno(self.grid_mag[usno_indices])
+        self.available_filters = list('ugriz')
 
     def __call__(self, interp_mass):
         """Estimate UNSO u', g', r', i', z' photometry for given mass(es)."""
@@ -39,13 +48,6 @@ class CMDUSNOPhotometryInterpolator(CMDPhotometryInterpolator):
             super().__call__(
                 scipy.array(interp_mass, copy=False, ndmin=1)
             )
-        )
-
-    def get_binary_magnitudes(self, primary_mass, secondary_mass):
-        """Estimate UNSO u', g', r', i', z' for a binary, given mass(es)."""
-
-        return sdss_to_usno(
-            super().get_binary_magnitudes(primary_mass, secondary_mass)
         )
 
 if __name__ == '__main__':

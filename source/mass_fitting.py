@@ -480,7 +480,7 @@ def fit_binary_masses(photometry_interp,
                 )
             )
         ]
-        print('Best masses: ' + repr(best_masses))
+        print('Starting masses: ' + repr(best_masses))
 
         return best_masses
 

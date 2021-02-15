@@ -6,7 +6,7 @@ import re
 import os.path
 
 from matplotlib import pyplot
-import scipy
+import numpy
 
 from planetary_system_io import read_cds_pipe_table
 from cmd_utils import CMDPhotometryInterpolator, CMDUSNOPhotometryInterpolator
@@ -148,12 +148,19 @@ def plot_bad_binaries(interpolator,
             cluster_members = ngc188_photometry[ngc188_photometry['Memb'] > 0.5]
         except ValueError:
             cluster_members = ngc188_photometry[ngc188_photometry['Mm'] > 0.5]
-        observed_photometry = scipy.array([
+
+        get_mags = 'BV' if 'V' in interpolator.available_filters else 'gr'
+        interp_indices = numpy.array([
+            interpolator.available_filters.index(filchar)
+            for filchar in get_mags
+        ])
+
+        observed_photometry = numpy.array([
             cluster_members[observed_phot_template % dict(filter=filter_name)]
-            for filter_name in interpolator.available_filters[1:6]
+            for filter_name in get_mags
         ])
         interp_masses = interpolator.data[0]['Mini']
-        predicted_photometry = interpolator(interp_masses)[1:]
+        predicted_photometry = interpolator(interp_masses)[interp_indices]
 
         literature_params = ngc188_params[ngc188_params['PKM'] == binary_id]
 
@@ -162,21 +169,33 @@ def plot_bad_binaries(interpolator,
         ]
         binary_photometry = [
             binary_photometry[observed_phot_template % dict(filter=filter_name)]
-            for filter_name in interpolator.available_filters[1:6]
+            for filter_name in get_mags
         ]
 
-        fit_photometry = interpolator.get_binary_magnitudes(fit_m1, fit_m2)[1:]
+        print('Getting Fit binary photometry for PKM %s: m1=%f, m2=%f.'
+              %
+              (repr(binary_id), fit_m1, fit_m2))
+        fit_photometry = interpolator.get_binary_magnitudes(
+            fit_m1,
+            fit_m2
+        )[
+            interp_indices
+        ]
         literature_binary_photometry = (
             interpolator.get_binary_magnitudes(literature_params['M1'],
                                                literature_params['M2'])
-        )[1:]
+        )[
+            interp_indices
+        ]
         fit_individual_photometry = (
-            interpolator(scipy.array([fit_m1, fit_m2]))[1:]
+            interpolator(numpy.array([fit_m1, fit_m2]))[interp_indices]
         )
         literature_individual_photometry = (
-            interpolator(scipy.array([float(literature_params['M1']),
+            interpolator(numpy.array([float(literature_params['M1']),
                                       float(literature_params['M2'])]))
-        )[1:]
+        )[
+            interp_indices
+        ]
 
         print('Fit individual star photometry: '
               +
@@ -187,105 +206,96 @@ def plot_bad_binaries(interpolator,
               repr(literature_individual_photometry))
 
         pyplot.title('Binary ' + repr(binary_id))
-        for left in [1]:#range(5):
-            for right in [2]:#range(left + 1, 5):
-                pyplot.plot(
-                    observed_photometry[left] - observed_photometry[right],
-                    -observed_photometry[2],
-                    'ok',
-                    zorder=0
-                )
-                pyplot.plot(
-                    predicted_photometry[left] - predicted_photometry[right],
-                    -predicted_photometry[2],
-                    '-y',
-                    linewidth=3,
-                    zorder=10
-                )
-                pyplot.xlabel(
-                    '%s - %s [mag]'
-                    %
-                    (
-                        interpolator.available_filters[left],
-                        interpolator.available_filters[right]
-                    )
-                )
-                pyplot.ylabel('-%c [mag]' % interpolator.available_filters[3])
+        pyplot.plot(
+            observed_photometry[0] - observed_photometry[1],
+            -observed_photometry[1],
+            'ok',
+            zorder=0
+        )
+        pyplot.plot(
+            predicted_photometry[0] - predicted_photometry[1],
+            -predicted_photometry[1],
+            '-y',
+            linewidth=3,
+            zorder=10
+        )
+        pyplot.xlabel('%s - %s [mag]' % tuple(get_mags))
+        pyplot.ylabel('-%c [mag]' % get_mags[1])
 
-                pyplot.plot(
-                    [binary_photometry[left] - binary_photometry[right]],
-                    [-binary_photometry[2]],
-                    '+r',
-                    markersize=20,
-                    zorder=100,
-                    markeredgewidth=5,
-                    label='Observed binary photometry'
-                )
-                print(
-                    'Target: '
-                    +
-                    repr((
-                        [binary_photometry[left] - binary_photometry[right]],
-                        [-binary_photometry[2]]
-                    ))
-                )
-                pyplot.plot(
-                    [fit_photometry[left] - fit_photometry[right]],
-                    [-fit_photometry[2]],
-                    'xg',
-                    zorder=20,
-                    markersize=20,
-                    markeredgewidth=5,
-                    label='Best fit binary photometry'
-                )
-                pyplot.plot(
-                    [
-                        literature_binary_photometry[left]
-                        -
-                        literature_binary_photometry[right]
-                    ],
-                    [-literature_binary_photometry[2]],
-                    'xc',
-                    zorder=20,
-                    markersize=20,
-                    markeredgewidth=5,
-                    label='Photometry from literature masses'
-                )
+        pyplot.plot(
+            [binary_photometry[0] - binary_photometry[1]],
+            [-binary_photometry[1]],
+            '+r',
+            markersize=20,
+            zorder=100,
+            markeredgewidth=5,
+            label='Observed binary photometry'
+        )
+        print(
+            'Target: '
+            +
+            repr((
+                [binary_photometry[0] - binary_photometry[1]],
+                [-binary_photometry[1]]
+            ))
+        )
+        pyplot.plot(
+            [fit_photometry[0] - fit_photometry[1]],
+            [-fit_photometry[1]],
+            'xg',
+            zorder=20,
+            markersize=20,
+            markeredgewidth=5,
+            label='Best fit binary photometry'
+        )
+        pyplot.plot(
+            [
+                literature_binary_photometry[0]
+                -
+                literature_binary_photometry[1]
+            ],
+            [-literature_binary_photometry[1]],
+            'xc',
+            zorder=20,
+            markersize=20,
+            markeredgewidth=5,
+            label='Photometry from literature masses'
+        )
 
-                for skip_label, (
-                        fit_single_phot,
-                        literature_single_phot
-                ) in enumerate(
-                            zip(fit_individual_photometry.T,
-                                literature_individual_photometry.T)
-                ):
-                    pyplot.plot(
-                        [fit_single_phot[left] - fit_single_phot[right]],
-                        [-fit_single_phot[2]],
-                        'sg',
-                        zorder=30,
-                        markersize=10,
-                        **(dict() if skip_label
-                           else dict(label='Best fit component phot'))
-                    )
-                    pyplot.plot(
-                        [
-                            literature_single_phot[left]
-                            -
-                            literature_single_phot[right]
-                        ],
-                        [-literature_single_phot[2]],
-                        'oc',
-                        zorder=40,
-                        markersize=10,
-                        **(dict() if skip_label
-                        else dict(label='Component phot for literature mass'))
-                    )
+        for skip_label, (
+                fit_single_phot,
+                literature_single_phot
+        ) in enumerate(
+            zip(fit_individual_photometry.T,
+                literature_individual_photometry.T)
+        ):
+            pyplot.plot(
+                [fit_single_phot[0] - fit_single_phot[1]],
+                [-fit_single_phot[1]],
+                'sg',
+                zorder=30,
+                markersize=10,
+                **(dict() if skip_label
+                   else dict(label='Best fit component phot'))
+            )
+            pyplot.plot(
+                [
+                    literature_single_phot[0]
+                    -
+                    literature_single_phot[1]
+                ],
+                [-literature_single_phot[1]],
+                'oc',
+                zorder=40,
+                markersize=10,
+                **(dict() if skip_label
+                   else dict(label='Component phot for literature mass'))
+            )
 
-                pyplot.ylim(-23, None)
-                pyplot.xlim(0, None)
-                pyplot.figlegend()
-                pyplot.show()
+        pyplot.ylim(-23, None)
+        pyplot.xlim(0, None)
+        pyplot.figlegend()
+        pyplot.show()
     #pylint: enable=too-many-locals
 
     bad_binary_line_rex = re.compile(
@@ -304,7 +314,7 @@ def plot_bad_binaries(interpolator,
 def get_ngc188_usno_photometry():
     """Return a properly formatted field array with USNO filter photometry."""
 
-    match_data = scipy.genfromtxt(
+    match_data = numpy.genfromtxt(
         os.path.join(
             data_dir,
             'Fornal_et_al_cross_Platais_et_al_NGC188_photometry.csv'
@@ -324,7 +334,7 @@ def get_ngc188_usno_photometry():
     result_dtype = [(name, (int if name == 'PKM' else dtype[0]))
                     for name, dtype in photometry.dtype.fields.items()]
 
-    result = scipy.empty(photometry.shape, dtype=result_dtype)
+    result = numpy.empty(photometry.shape, dtype=result_dtype)
     for result_index, phot_entry in enumerate(photometry):
         for colname in photometry.dtype.names:
             if colname == 'PKM':
@@ -414,7 +424,7 @@ def main():
         plot_bad_binaries(interpolator[filter_set],
                           ngc188_photometry[filter_set],
                           ngc188_params,
-                          bad_binaries_fname='all_binary_fits.txt',
+                          bad_binaries_fname='all_binary_fits_new.txt',
                           observed_phot_template=observed_phot_template)
 
 if __name__ == '__main__':

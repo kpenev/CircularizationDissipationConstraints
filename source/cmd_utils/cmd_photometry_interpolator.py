@@ -56,7 +56,6 @@ class CMDPhotometryInterpolator(CMDInterpolator):
         self.available_filters = [col_name[:-3]
                                   for col_name in self.data[0].dtype.names
                                   if col_name.endswith('mag')]
-        print('Available filters: ' + repr(self.available_filters))
 
 
     def __init__(self, isochrone_fname, distance_modulus):
