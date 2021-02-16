@@ -2,7 +2,7 @@
 
 """Functions to fit for single and binary star masses given photometry."""
 
-import scipy
+import numpy
 import scipy.integrate
 
 def fit_single_mass(photometry_interp,
@@ -100,7 +100,7 @@ def fit_single_mass(photometry_interp,
         Return the normalized square difference b/w theory and measurement.
         """
 
-        grid_square_diff = scipy.zeros(theoretical_magnitudes[0].shape,
+        grid_square_diff = numpy.zeros(theoretical_magnitudes[0].shape,
                                        dtype=float)
         for filter_index, filter_character in enumerate(
                 photometry_interp.available_filters
@@ -145,7 +145,7 @@ def fit_single_mass(photometry_interp,
     ]
     return scipy.optimize.minimize_scalar(
         lambda m: get_square_diff(
-            photometry_interp(scipy.full(fill_value=m, shape=1))
+            photometry_interp(numpy.full(fill_value=m, shape=1))
         ),
         bounds=(min_search_mass, max_search_mass),
         method='bounded'
@@ -203,7 +203,7 @@ def mass_function_log_likelihood(primary_mass,
         sigma = observed_mass_function_err[0]
 
     return -(
-        scipy.minimum(
+        numpy.minimum(
             0,
             (
                 predicted_mass_function
@@ -277,7 +277,7 @@ def double_lined_orbit_log_likelihood(primary_mass,
     return (
         mass_ratio_log_likelihood
         -
-        scipy.minimum(
+        numpy.minimum(
             0,
             (primary_mass - observed_projected_primary_mass)**2
             /
@@ -285,7 +285,7 @@ def double_lined_orbit_log_likelihood(primary_mass,
         )
     )
 
-def fit_binary_masses(photometry_interp,
+def fit_binary_masses(photometry_interpolators,
                       photometry,
                       *,
                       min_mag_difference=None,
@@ -298,8 +298,8 @@ def fit_binary_masses(photometry_interp,
     Find the best fit masses for stars in a binary given RV and photometry.
 
     Args:
-        photometry_interp:    See same name argument to
-            :func:`fit_single_mass`.
+        photometry_interpolators:    List of photometry interpolator objects
+            (see `photometry_interp` argument to :func:`fit_single_mass`).
 
         photometry:    See same name argument to :func:`fit_single_mass`.
 
@@ -356,17 +356,17 @@ def fit_binary_masses(photometry_interp,
 
         try:
             if rh_filter_name is None:
-                observed = photometry[magnitude_template
-                                      %
-                                      dict(filter=filter_name)]
+                observed = float(photometry[magnitude_template
+                                            %
+                                            dict(filter=filter_name)])
                 stddev = photometry[magnitude_error_template
                                     %
                                     dict(filter=filter_name)]
             else:
-                observed = photometry[color_template
-                                      %
-                                      dict(filter1=filter_name,
-                                           filter2=rh_filter_name)]
+                observed = float(photometry[color_template
+                                            %
+                                            dict(filter1=filter_name,
+                                                 filter2=rh_filter_name)])
                 stddev = photometry[color_error_template
                                     %
                                     dict(filter1=filter_name,
@@ -377,18 +377,18 @@ def fit_binary_masses(photometry_interp,
         try:
             sigma = float(stddev)
         except TypeError:
-            sigma = stddev[0 if predicted <= observed else 1]
+            sigma = float(stddev[0 if predicted <= observed else 1])
 
         if (
-                not scipy.isfinite(sigma)
+                not numpy.isfinite(sigma)
                 or
-                not scipy.isfinite(observed)
+                not numpy.isfinite(float(observed))
         ):
             return
 
         #False positive
         #pylint: disable=assignment-from-no-return
-        update = scipy.isfinite(predicted)
+        update = numpy.isfinite(predicted)
         #pylint: enable=assignment-from-no-return
         result[update] += (
             observed - predicted[update]
@@ -399,82 +399,126 @@ def fit_binary_masses(photometry_interp,
     def negative_log_likelihood(masses):
         """Return -log(likelihood) of the data given stellar masses."""
 
-        predicted_photometry = scipy.array(
-            photometry_interp.get_binary_magnitudes(*masses),
-            copy=False
-        )
+        result = numpy.zeros(numpy.atleast_1d(masses[0]).shape, dtype=float)
+        if rv_parameters:
+            numpy.array(
+                -(
+                    double_lined_orbit_log_likelihood(*masses, **rv_parameters)
+                    if 'observed_projected_primary_mass' in rv_parameters else
+                    mass_function_log_likelihood(*masses, **rv_parameters)
+                ),
+                copy=False,
+                ndmin=1
+            )
 
-        result = scipy.array(
-            -(
-                double_lined_orbit_log_likelihood(*masses, **rv_parameters)
-                if 'observed_projected_primary_mass' in rv_parameters else
-                mass_function_log_likelihood(*masses, **rv_parameters)
-            ),
-            copy=False,
-            ndmin=1
-        )
+        for photometry_interp in photometry_interpolators:
+            predicted_photometry = numpy.array(
+                photometry_interp.get_binary_magnitudes(*masses),
+                copy=False
+            )
 
 
-        for filter_index, (filter_name, predicted) in enumerate(
-                zip(photometry_interp.available_filters, predicted_photometry)
-        ):
-            update_negative_log_likelihood(filter_name=filter_name,
-                                           predicted=predicted,
-                                           result=result)
-            if color_template is not None:
-                assert color_error_template is not None
+            for filter_index, (filter_name, predicted) in enumerate(
+                    zip(photometry_interp.available_filters,
+                        predicted_photometry)
+            ):
+                update_negative_log_likelihood(filter_name=filter_name,
+                                               predicted=predicted,
+                                               result=result)
+                if color_template is not None:
+                    assert color_error_template is not None
 
-                for rh_filter_name, rh_predicted in zip(
-                        photometry_interp.available_filters[filter_index + 1:],
-                        predicted_photometry[filter_index + 1:]
-                ):
-                    update_negative_log_likelihood(
-                        filter_name=filter_name,
-                        rh_filter_name=rh_filter_name,
-                        predicted=(predicted - rh_predicted),
-                        result=result
-                    )
+                    for rh_filter_name, rh_predicted in zip(
+                            photometry_interp.available_filters[
+                                filter_index + 1
+                                :
+                            ],
+                            predicted_photometry[filter_index + 1:]
+                    ):
+                        update_negative_log_likelihood(
+                            filter_name=filter_name,
+                            rh_filter_name=rh_filter_name,
+                            predicted=(predicted - rh_predicted),
+                            result=result
+                        )
         return result
 
     def mag_difference_constraints(masses):
         """Return the secondary - primary mags for min mag constraints."""
 
-        magnitudes = photometry_interp(masses)
-        mag_differences = magnitudes[:, 1] - magnitudes[:, 0]
-        defficiencies = [
-            (
-                mag_differences[
-                    photometry_interp.available_filters.index(filter_name)
-                ]
-                -
-                min_diff
-            )
-            for filter_name, min_diff in min_mag_difference.items()
-        ]
-        return min(defficiencies)
+        min_defficiency = numpy.inf
 
-    def choose_starting_point():
-        """Return a good starting point for the minimization."""
+        for photometry_interp in photometry_interpolators:
+            magnitudes = photometry_interp(masses)
+            mag_differences = magnitudes[:, 1] - magnitudes[:, 0]
 
-        mass_grid = scipy.meshgrid(
-            photometry_interp.data[0]['Mini'][1:-1],
-            photometry_interp.data[0]['Mini'][1:-1]
+            for filter_name, min_diff in min_mag_difference.items():
+                if filter_name in photometry_interp.available_filters:
+                    min_defficiency = numpy.minimum(
+                        min_defficiency,
+                        (
+                            mag_differences[
+                                photometry_interp.available_filters.index(
+                                    filter_name
+                                )
+                            ]
+                            -
+                            min_diff
+                        )
+                    )
+        return min_defficiency
+
+    def get_mass_grid(resolution=1e-10):
+        """Pick a grid of masses to search for a starting point."""
+
+        min_mass = max(
+            photometry_interp.data[0]['Mini'][1]
+            for photometry_interp in photometry_interpolators
+        )
+        max_mass = min(
+            photometry_interp.data[0]['Mini'][-2]
+            for photometry_interp in photometry_interpolators
         )
 
+        mass_grid = numpy.concatenate([
+            photometry_interp.data[0]['Mini']
+            for photometry_interp in photometry_interpolators
+        ])
+        mass_grid = mass_grid[
+            numpy.logical_and(mass_grid > min_mass, mass_grid < max_mass)
+        ]
+        mass_grid.sort()
 
-        log_likelihood_grid = negative_log_likelihood((
-            mass_grid
-        ))
+        discard_indices = numpy.array([numpy.nan])
+        while discard_indices.size:
+            discard_indices = numpy.nonzero(mass_grid[1:] - mass_grid[:-1]
+                                            <
+                                            resolution)[0] + 1
+            mass_grid[discard_indices - 1] = 0.5 * (
+                mass_grid[discard_indices - 1]
+                +
+                mass_grid[discard_indices]
+            )
+            mass_grid = numpy.delete(mass_grid, discard_indices)
+
+        return mass_grid
+
+    def choose_starting_point(mass_grid):
+        """Return a good starting point for the minimization."""
+
+        mass_grid_2d = numpy.meshgrid(mass_grid, mass_grid)
+
+        log_likelihood_grid = negative_log_likelihood(mass_grid_2d)
 
         if min_mag_difference:
-            grid_constraints = mag_difference_constraints(mass_grid)
-            log_likelihood_grid[grid_constraints < 0] = scipy.inf
+            grid_constraints = mag_difference_constraints(mass_grid_2d)
+            log_likelihood_grid[grid_constraints < 0] = numpy.inf
 
-        best_masses = photometry_interp.data[0]['Mini'][
-            scipy.stack(
+        best_masses = mass_grid[
+            numpy.stack(
                 reversed(
                     sorted(
-                        scipy.unravel_index(scipy.argmin(log_likelihood_grid),
+                        numpy.unravel_index(numpy.argmin(log_likelihood_grid),
                                             log_likelihood_grid.shape)
                     )
                 )
@@ -484,14 +528,14 @@ def fit_binary_masses(photometry_interp,
 
         return best_masses
 
+    mass_grid = get_mass_grid()
+
     return scipy.optimize.minimize(
         fun=negative_log_likelihood,
-        x0=choose_starting_point(),
+        x0=choose_starting_point(mass_grid),
         bounds=scipy.optimize.Bounds(
-            lb=photometry_interp.data[0]['Mini'][0] + 0.01,
-            ub=photometry_interp.data[0]['Mini'][
-                photometry_interp.data[0]['Mini'].size - 1,
-            ] - 0.01,
+            lb=mass_grid[0],
+            ub=mass_grid[-1],
             keep_feasible=True
         ),
         constraints=(

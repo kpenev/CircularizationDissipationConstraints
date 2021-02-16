@@ -7,6 +7,7 @@ import os.path
 
 from matplotlib import pyplot
 import numpy
+import pandas
 
 from planetary_system_io import read_cds_pipe_table
 from cmd_utils import CMDPhotometryInterpolator, CMDUSNOPhotometryInterpolator
@@ -15,7 +16,7 @@ from command_line_utilities import data_dir
 
 #TODO: break up?
 #pylint: disable=too-many-locals
-def fit_all_binaries(interpolator,
+def fit_all_binaries(photometry_interpolators,
                      ngc188_photometry,
                      ngc188_single_lined_orbits,
                      ngc188_double_lined_orbits,
@@ -24,9 +25,7 @@ def fit_all_binaries(interpolator,
                      observed_phot_template='%(filter)smag'):
     """Fit and report all binaries in NGC188 along with literature masses."""
 
-    min_mag_difference_filchar = (
-        'V' if 'V' in interpolator.available_filters else 'g'
-    )
+    min_mag_difference_filchar = 'V'
     fit_results = []
     for is_double_lined, orbital_parameters in [
             (False, ngc188_single_lined_orbits),
@@ -46,12 +45,14 @@ def fit_all_binaries(interpolator,
             if photometry.size == 0:
                 print('No photometry for binary ' + repr(binary['PKM']))
                 continue
-            assert photometry.size == 1
+            print('Photometry for %s: %s'
+                  %
+                  (binary['PKM'], repr(photometry)))
 
             answer = ngc188_params[
                 ngc188_params['PKM'] == binary['PKM']
             ]
-            if not answer:
+            if not answer.size:
                 continue
 
             if is_double_lined:
@@ -68,7 +69,7 @@ def fit_all_binaries(interpolator,
                 )
 
             result = fit_binary_masses(
-                photometry_interp=interpolator,
+                photometry_interpolators=photometry_interpolators,
                 photometry=photometry,
                 min_mag_difference=(None if is_double_lined
                                     else {min_mag_difference_filchar: 2.5}),
@@ -77,19 +78,23 @@ def fit_all_binaries(interpolator,
                 **rv_params
             )
             primary_m, secondary_m = result.x
-            mag_diff = (
-                interpolator(secondary_m)[
-                    interpolator.available_filters.index(
-                        min_mag_difference_filchar
+
+            for interpolator in photometry_interpolators:
+                if min_mag_difference_filchar in interpolator.available_filters:
+                    mag_diff = (
+                        interpolator(secondary_m)[
+                            interpolator.available_filters.index(
+                                min_mag_difference_filchar
+                            )
+                        ]
+                        -
+                        interpolator(primary_m)[
+                            interpolator.available_filters.index(
+                                min_mag_difference_filchar
+                            )
+                        ]
                     )
-                ]
-                -
-                interpolator(primary_m)[
-                    interpolator.available_filters.index(
-                        min_mag_difference_filchar
-                    )
-                ]
-            )
+                    break
 
             if is_double_lined:
                 mass_comparison = (
@@ -339,6 +344,24 @@ def get_ngc188_usno_photometry():
 
     return result
 
+def unprime_usno_column_name(colname):
+    """Return the given column name without "'" if it is a photometry column."""
+
+    if colname[0] in 'ugriz' and colname[2:] == 'mag':
+        return colname[0] + 'mag'
+    elif (
+        colname[0] in 'fe'
+        and
+        colname[1] == '_'
+        and
+        colname[2] in 'ugriz'
+        and
+        colname[4:] == 'mag'
+    ):
+        return colname[:2] + colname[2] + 'mag'
+
+    return colname
+
 def main():
     """Avoid polluting global scope."""
 
@@ -375,6 +398,12 @@ def main():
         ),
         'usno': get_ngc188_usno_photometry()
     }
+
+    ngc188_photometry['usno'].dtype.names = [
+        unprime_usno_column_name(colname)
+        for colname in ngc188_photometry['usno'].dtype.names
+    ]
+
     read_cds_pipe_table(
         os.path.join(
             data_dir,
@@ -400,25 +429,28 @@ def main():
         )
     )
 
-    for filter_set in ['usno']:#['UBVRIJHK', 'usno']:
-        observed_phot_template = (
-            "%(filter)s'mag" if filter_set == 'usno'
-            else "%(filter)smag"
-        )
-        fit_results = fit_all_binaries(
-            interpolator[filter_set],
-            ngc188_photometry[filter_set],
-            ngc188_single_lined_binaries,
-            ngc188_double_lined_binaries,
-            ngc188_params,
-            observed_phot_template=observed_phot_template
-        )
+    merged_photometry = pandas.merge(
+        pandas.DataFrame(ngc188_photometry['UBVRIJHK']),
+        pandas.DataFrame(ngc188_photometry['usno']),
+        on='PKM',
+        how='outer'
+    )
 
+    fit_results = fit_all_binaries(
+        [interpolator['UBVRIJHK'], interpolator['usno']],
+        merged_photometry,
+        ngc188_single_lined_binaries,
+        ngc188_double_lined_binaries,
+        ngc188_params,
+        observed_phot_template='%(filter)smag'
+    )
+
+    for filter_set in ['usno', 'UBVRIJHK']:
         plot_binary_fit(interpolator[filter_set],
                         ngc188_photometry[filter_set],
                         ngc188_params,
                         fit_results,
-                        observed_phot_template=observed_phot_template)
+                        observed_phot_template='%(filter)smag')
 
 if __name__ == '__main__':
     main()
