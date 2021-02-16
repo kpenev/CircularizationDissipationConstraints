@@ -130,7 +130,7 @@ class CMDInterpolator:
             scipy.interpolate.interp1d(
                 section_data['Mini'],
                 section_data[quantity],
-                bounds_error=True,
+                bounds_error=False,
                 assume_sorted=True
             )(
                 initial_mass

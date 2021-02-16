@@ -27,6 +27,7 @@ def fit_all_binaries(interpolator,
     min_mag_difference_filchar = (
         'V' if 'V' in interpolator.available_filters else 'g'
     )
+    fit_results = []
     for is_double_lined, orbital_parameters in [
             (False, ngc188_single_lined_orbits),
             (True, ngc188_double_lined_orbits)
@@ -129,14 +130,17 @@ def fit_all_binaries(interpolator,
                 +
                 mass_comparison
             )
+            fit_results.append((binary['PKM'], primary_m, secondary_m))
+
+    return fit_results
 #pylint: enable=too-many-locals
 
-def plot_bad_binaries(interpolator,
-                      ngc188_photometry,
-                      ngc188_params,
-                      *,
-                      bad_binaries_fname='bad_binaries.txt',
-                      observed_phot_template='%(filter)smag'):
+def plot_binary_fit(interpolator,
+                    ngc188_photometry,
+                    ngc188_params,
+                    fit_results,
+                    *,
+                    observed_phot_template='%(filter)smag'):
     """Plot the fitting of binaries listed in the bad_binaries_fname."""
 
     #TODO: Simplify
@@ -172,9 +176,6 @@ def plot_bad_binaries(interpolator,
             for filter_name in get_mags
         ]
 
-        print('Getting Fit binary photometry for PKM %s: m1=%f, m2=%f.'
-              %
-              (repr(binary_id), fit_m1, fit_m2))
         fit_photometry = interpolator.get_binary_magnitudes(
             fit_m1,
             fit_m2
@@ -298,18 +299,8 @@ def plot_bad_binaries(interpolator,
         pyplot.show()
     #pylint: enable=too-many-locals
 
-    bad_binary_line_rex = re.compile(
-        r'(?P<success>[v*]) Binary (?P<binary_id>[0-9]+) best fit masses: '
-        r'm1=(?P<m1>[0-9.e+-]+) .*, '
-        r'm2=(?P<m2>[0-9.e+-]+) .*'
-    )
-    with open(bad_binaries_fname, 'r') as bad_binary_list:
-        for line in bad_binary_list:
-            parsed = bad_binary_line_rex.match(line)
-            if parsed:
-                plot_fitting(int(parsed['binary_id']),
-                             float(parsed['m1']),
-                             float(parsed['m2']))
+    for binary_fit in fit_results:
+        plot_fitting(*binary_fit)
 
 def get_ngc188_usno_photometry():
     """Return a properly formatted field array with USNO filter photometry."""
@@ -409,23 +400,25 @@ def main():
         )
     )
 
-    for filter_set in ['UBVRIJHK', 'usno']:
+    for filter_set in ['usno']:#['UBVRIJHK', 'usno']:
         observed_phot_template = (
             "%(filter)s'mag" if filter_set == 'usno'
             else "%(filter)smag"
         )
-        fit_all_binaries(interpolator[filter_set],
-                         ngc188_photometry[filter_set],
-                         ngc188_single_lined_binaries,
-                         ngc188_double_lined_binaries,
-                         ngc188_params,
-                         observed_phot_template=observed_phot_template)
+        fit_results = fit_all_binaries(
+            interpolator[filter_set],
+            ngc188_photometry[filter_set],
+            ngc188_single_lined_binaries,
+            ngc188_double_lined_binaries,
+            ngc188_params,
+            observed_phot_template=observed_phot_template
+        )
 
-        plot_bad_binaries(interpolator[filter_set],
-                          ngc188_photometry[filter_set],
-                          ngc188_params,
-                          bad_binaries_fname='all_binary_fits_new.txt',
-                          observed_phot_template=observed_phot_template)
+        plot_binary_fit(interpolator[filter_set],
+                        ngc188_photometry[filter_set],
+                        ngc188_params,
+                        fit_results,
+                        observed_phot_template=observed_phot_template)
 
 if __name__ == '__main__':
     main()
