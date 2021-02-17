@@ -11,17 +11,16 @@ import logging
 from matplotlib import pyplot, cm
 from scipy import integrate, optimize
 import numpy
-import pandas
 
-from planetary_system_io import read_cds_pipe_table
 from mass_fitting import fit_binary_masses
-from reproduce_ngc188_results import\
-    get_ngc188_usno_photometry,\
-    get_photometry_distributions
+from cluster_io import\
+    get_ngc188_photometry,\
+    get_photometry_distributions,\
+    get_ngc188_binaries,\
+    get_ngc188_photometry_interpolators
+
 #False positive (fixed in __init__.py)
 #pylint: disable=import-error
-from cmd_utils import CMDPhotometryInterpolator, CMDUSNOPhotometryInterpolator
-from command_line_utilities import data_dir
 from photometric_secondary_constraint import PhotometricSecondaryConstraint
 #pylint: enable=import-error
 
@@ -519,47 +518,9 @@ def main():
     set_start_method('forkserver')
     logging.basicConfig(level=logging.DEBUG)
 
-    ngc188_photometry = pandas.merge(
-        pandas.DataFrame(
-            read_cds_pipe_table(
-                os.path.join(
-                    data_dir,
-                    'Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
-                )
-            )
-        ),
-        pandas.DataFrame(get_ngc188_usno_photometry()),
-        on='PKM',
-        how='outer'
-    )
+    ngc188_photometry = get_ngc188_photometry()
 
-    ngc188_single_lined_binaries = pandas.merge(
-        pandas.DataFrame(
-            read_cds_pipe_table(
-                os.path.join(
-                    data_dir,
-                    'Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
-                )
-            )
-        ),
-        pandas.DataFrame(
-            read_cds_pipe_table(
-                os.path.join(
-                    data_dir,
-                    'Geller_et_al_2009_WIYN_physical_parameters.tsv'
-                )
-            )
-        ),
-        on='PKM',
-        how='outer'
-    )
-
-#    ngc188_double_lined_binaries = read_cds_pipe_table(
-#        os.path.join(
-#            data_dir,
-#            'Geller_et_al_2009_WIYN_double_lined_orbits.tsv'
-#        )
-#    )
+    ngc188_single_lined_binaries, _ = get_ngc188_binaries()
 
     selected_photometry = get_photometry_distributions(
         ngc188_photometry[ngc188_photometry['PKM'] == 3732],
@@ -573,27 +534,14 @@ def main():
     for mag_col, distribution in selected_photometry.items():
         print('\t%s: %s' % (mag_col, repr(distribution.kwds)))
 
-    interpolators = [
-        CMDPhotometryInterpolator(
-            os.path.join(
-                data_dir,
-                'CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_UBVRIJHK.dat'
-            ),
-            11.23
-        ),
-        CMDUSNOPhotometryInterpolator(
-            os.path.join(
-                data_dir,
-                'CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat'
-            ),
-            11.3
-        )
-    ]
+    interpolators = get_ngc188_photometry_interpolators()
 
-    constraint = PhotometricConstraint(interpolators,
-                                       selected_photometry,
-                                       'photometric_constraints.pkl',
-                                       min_magnitude_difference=dict(V=2.5))
+    constraint = PhotometricConstraint(
+        [interpolators['UBVRIJHK'], interpolators['usno']],
+        selected_photometry,
+        'photometric_constraints.pkl',
+        min_magnitude_difference=dict(V=2.5)
+    )
 
     plot_joint_pdf(
         constraint,

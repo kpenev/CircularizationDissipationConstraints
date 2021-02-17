@@ -2,30 +2,19 @@
 
 """A test of binary stellar mass fitting using NGC188 from literature."""
 
-import re
 import os.path
 
 from matplotlib import pyplot
 import numpy
 import pandas
-from scipy import stats
 
 from planetary_system_io import read_cds_pipe_table
-from cmd_utils import CMDPhotometryInterpolator, CMDUSNOPhotometryInterpolator
+from cluster_io import\
+    get_ngc188_usno_photometry,\
+    get_photometry_distributions,\
+    get_ngc188_photometry_interpolators
 from mass_fitting import fit_binary_masses
 from command_line_utilities import data_dir
-
-def get_photometry_distributions(photometry, min_stddev):
-    """Return dictionary of all available photometry as normal distributions."""
-
-    result = dict()
-    for column, data in photometry.items():
-        if column[1:] == 'mag' and numpy.isfinite(float(data)):
-            result[column[0]] = stats.norm(
-                loc=float(data),
-                scale=max(float(photometry['e_' + column]), min_stddev)
-            )
-    return result
 
 #TODO: break up?
 #pylint: disable=too-many-locals
@@ -316,91 +305,10 @@ def plot_binary_fit(interpolator,
     for binary_fit in fit_results:
         plot_fitting(*binary_fit)
 
-def get_ngc188_usno_photometry():
-    """Return a properly formatted field array with USNO filter photometry."""
-
-    match_data = numpy.genfromtxt(
-        os.path.join(
-            data_dir,
-            'Fornal_et_al_cross_Platais_et_al_NGC188_photometry.csv'
-        ),
-        names=True,
-        dtype=None,
-        delimiter=',',
-        deletechars='',
-        encoding=None
-    )
-    photometry = read_cds_pipe_table(
-        os.path.join(
-            data_dir,
-            'Fornal_et_al_2006_NGC188_photometry.tsv'
-        )
-    )
-
-    result_dtype = [(name, (int if name == 'PKM' else dtype[0]))
-                    for name, dtype in photometry.dtype.fields.items()]
-
-    result = numpy.empty(photometry.shape, dtype=result_dtype)
-    for result_index, phot_entry in enumerate(photometry):
-        for colname in photometry.dtype.names:
-            if colname == 'PKM':
-                matched = (match_data['FTS'] == phot_entry['FTS'])
-                if matched.any():
-                    result[result_index][colname] = match_data['PKM_1'][
-                        matched
-                    ][0]
-            else:
-                result[result_index][colname] = phot_entry[colname]
-
-    result.dtype.names = [unprime_usno_column_name(colname)
-                          for colname in result.dtype.names]
-
-    return result
-
-def unprime_usno_column_name(colname):
-    """Return the given column name without "'" if it is a photometry column."""
-
-    if colname[0] in 'ugriz' and colname[2:] == 'mag':
-        return colname[0] + 'mag'
-    elif (
-        colname[0] in 'fe'
-        and
-        colname[1] == '_'
-        and
-        colname[2] in 'ugriz'
-        and
-        colname[4:] == 'mag'
-    ):
-        return colname[:2] + colname[2] + 'mag'
-
-    return colname
-
 def main():
     """Avoid polluting global scope."""
 
-    interpolator = {
-        'UBVRIJHK': CMDPhotometryInterpolator(
-            os.path.join(
-                data_dir,
-                'CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_UBVRIJHK.dat'
-            ),
-            11.23
-        ),
-        'sdss': CMDPhotometryInterpolator(
-            os.path.join(
-                data_dir,
-                'CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_ugriz.dat'
-            ),
-            11.23
-        ),
-        'usno': CMDUSNOPhotometryInterpolator(
-            os.path.join(
-                data_dir,
-                'CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat'
-            ),
-            11.3
-        )
-    }
+    interpolator = get_ngc188_photometry_interpolators()
 
     ngc188_photometry = {
         'UBVRIJHK': read_cds_pipe_table(
