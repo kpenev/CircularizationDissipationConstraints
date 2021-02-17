@@ -25,7 +25,6 @@ from command_line_utilities import data_dir
 from photometric_secondary_constraint import PhotometricSecondaryConstraint
 #pylint: enable=import-error
 
-#TODO: add minimum magnitude difference handling for SB1.
 #Simplifying decreases readability
 #pylint: disable=too-many-instance-attributes
 class PhotometricConstraint:
@@ -33,14 +32,38 @@ class PhotometricConstraint:
 
     _logger = logging.getLogger(__name__)
 
-    def _joint_likelihood(self, secondary_mass, primary_mass, return_log=False):
-        """The likelihood of the observed colors and magnitudes given masses."""
+    def _check_constraints(self, primary_mass, secondary_mass):
+        """Return True iff the given masses are allowed."""
 
         if (
                 min(primary_mass, secondary_mass) < self.mass_range[0]
                 or
                 max(primary_mass, secondary_mass) > self.mass_range[1]
         ):
+            return False
+
+        for (
+                interpolator_index,
+                filter_index,
+                min_difference
+        ) in self._min_magnitude_difference:
+            primary_mag, secondary_mag = self._photometry_interpolators[
+                interpolator_index
+            ](
+                numpy.array([primary_mass, secondary_mass])
+            )[
+                filter_index
+            ]
+            if secondary_mag - primary_mag < min_difference:
+                return False
+
+        return True
+
+
+    def _joint_likelihood(self, secondary_mass, primary_mass, return_log=False):
+        """The likelihood of the observed colors and magnitudes given masses."""
+
+        if not self._check_constraints(primary_mass, secondary_mass):
             return -numpy.inf if return_log else 0
 
         predicted_photometry = dict()
@@ -69,7 +92,7 @@ class PhotometricConstraint:
                 result *= distribution.pdf(predicted_value)
         return result
 
-    def _prepare_constraint(self):
+    def _prepare_constraint(self, min_magnitude_difference):
         """Prepare the constraint for use with current configuration."""
 
         def integrand(primary_mass, _):
@@ -85,8 +108,12 @@ class PhotometricConstraint:
 
         likelihood_maximization = fit_binary_masses(
             photometry_interpolators=self._photometry_interpolators,
-            photometry=self._measured_photometry
+            photometry=self._measured_photometry,
+            min_mag_difference=min_magnitude_difference
         )
+
+        while not self._check_constraints(*likelihood_maximization.x):
+            likelihood_maximization.x[1] -= 1e-5
 
         assert likelihood_maximization.success
         self._logger.debug(
@@ -137,13 +164,13 @@ class PhotometricConstraint:
                     section, nobjects = unpickler.load()
                     assert isinstance(section, str)
                     assert isinstance(nobjects, int)
-                    if section == 'PhotometricConstraint':
-                        assert nobjects == 5
+                    if section == 'PhotometricConstraint' and nobjects == 6:
                         isochrone_fnames = unpickler.load()
                         distance_moduli = unpickler.load()
+                        min_magnitude_difference = unpickler.load()
                         measured_photometry = unpickler.load()
                         integration_config = unpickler.load()
-                        nobjects -= 4
+                        nobjects -= 5
 
                         if(
                                 tuple(
@@ -155,6 +182,12 @@ class PhotometricConstraint:
                                     interp.distance_modulus
                                     for interp in self._photometry_interpolators
                                 ) == distance_moduli
+                                and
+                                (
+                                    self._min_magnitude_difference
+                                    ==
+                                    min_magnitude_difference
+                                )
                                 and
                                 compare_measured_photometry(measured_photometry)
                                 and
@@ -180,7 +213,7 @@ class PhotometricConstraint:
 
         with open(pickle_fname, 'ab') as pickle_file:
             pickler = Pickler(pickle_file)
-            pickler.dump(('PhotometricConstraint', 5))
+            pickler.dump(('PhotometricConstraint', 6))
             pickler.dump(
                 tuple(interp.isochrone_fname
                       for interp in self._photometry_interpolators)
@@ -190,6 +223,7 @@ class PhotometricConstraint:
                       for interp in self._photometry_interpolators)
             )
 
+            pickler.dump(self._min_magnitude_difference)
             pickler.dump(self._measured_photometry)
             pickler.dump(self._integration_config)
             pickler.dump(self._cumulative_m1_likelihood)
@@ -225,6 +259,7 @@ class PhotometricConstraint:
                  photometry_interpolators,
                  measured_photometry,
                  pickle_fname,
+                 min_magnitude_difference=None,
                  **integration_config):
         """
         Set-up the constraint for a given cluster and system data.
@@ -241,6 +276,11 @@ class PhotometricConstraint:
                 `"B-V"` or `"u'-g'"`) and values should be distributions
                 (instances of `rv_continuous`).
 
+            min_magnitude_difference(dict):    Dictionary indexed by filter name
+                specifying a minimum amount by which the predicted magnitude of
+                the secondary in the given filter must exceed that of the
+                primary.
+
             pickle_fname(str):    The name of a file to save/load the current
                 constraint for fast re-use.
 
@@ -250,6 +290,24 @@ class PhotometricConstraint:
         """
 
         self._photometry_interpolators = photometry_interpolators
+
+        self._min_magnitude_difference = []
+        if min_magnitude_difference is not None:
+            for filter_name, min_difference in min_magnitude_difference.items():
+                for interpolator_index, interpolator in enumerate(
+                        photometry_interpolators
+                ):
+                    if filter_name in interpolator.available_filters:
+                        self._min_magnitude_difference.append(
+                            (
+                                interpolator_index,
+                                interpolator.available_filters.index(
+                                    filter_name
+                                ),
+                                min_difference
+                            )
+                        )
+
         self.mass_range = (-float('inf'), float('inf'))
         for interpolator in photometry_interpolators:
             self.mass_range = (
@@ -266,7 +324,9 @@ class PhotometricConstraint:
 
         self._cumulative_m1_likelihood = self._check_for_pickled(pickle_fname)
         if self._cumulative_m1_likelihood is None:
-            self._cumulative_m1_likelihood = self._prepare_constraint()
+            self._cumulative_m1_likelihood = self._prepare_constraint(
+                min_magnitude_difference
+            )
             self._add_to_pickle_file(pickle_fname)
 
         self._norm = self._cumulative_m1_likelihood(self.mass_range[1])[0]
@@ -369,11 +429,11 @@ def plot_joint_pdf(constraint, literature_masses=None):
     """Display a 3-D plot of the PDF(m1, m2)."""
 
     plot_x, plot_y = numpy.meshgrid(
-        numpy.linspace(0.975,
-                       1.025,
+        numpy.linspace(1.06,
+                       1.12,
                        300),
-        numpy.linspace(0.55,
-                       0.75,
+        numpy.linspace(0.7,
+                       0.85,
                        300)
     )
 
@@ -502,11 +562,11 @@ def main():
 #    )
 
     selected_photometry = get_photometry_distributions(
-        ngc188_photometry[ngc188_photometry['PKM'] == 4585],
+        ngc188_photometry[ngc188_photometry['PKM'] == 3732],
         0.02
     )
     selected_binary = ngc188_single_lined_binaries[
-        ngc188_single_lined_binaries['PKM'] == 4585
+        ngc188_single_lined_binaries['PKM'] == 3732
     ]
 
     print('Selected photometry: ')
@@ -532,11 +592,14 @@ def main():
 
     constraint = PhotometricConstraint(interpolators,
                                        selected_photometry,
-                                       'photometric_constraints.pkl')
+                                       'photometric_constraints.pkl',
+                                       min_magnitude_difference=dict(V=2.5))
 
-#    plot_joint_pdf(constraint,
-#                   (float(selected_binary['M1']), float(selected_binary['M2'])))
-#    plot_m1_cdf(constraint)
+    plot_joint_pdf(
+        constraint,
+        (float(selected_binary['M1']), float(selected_binary['M2']))
+    )
+    plot_m1_cdf(constraint)
     plot_m2_cdf(constraint)
 
 if __name__ == '__main__':
