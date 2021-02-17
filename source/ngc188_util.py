@@ -1,6 +1,10 @@
+#!/usr/bin/env python3
+
 """Utilities for reading cluster data."""
 
 import os.path
+import logging
+from multiprocessing import set_start_method
 
 import pandas
 import numpy
@@ -8,7 +12,16 @@ from scipy import stats
 
 from planetary_system_io import read_cds_pipe_table
 from command_line_utilities import data_dir
-from cmd_utils import CMDPhotometryInterpolator, CMDUSNOPhotometryInterpolator
+from cmd_utils import\
+    CMDPhotometryInterpolator,\
+    CMDUSNOPhotometryInterpolator
+from bayesian.photometric_constraint import\
+    PhotometricConstraint,\
+    plot_joint_pdf,\
+    plot_m1_cdf,\
+    plot_m2_cdf
+
+_logger = logging.getLogger(__name__)
 
 def get_photometry_distributions(photometry, min_stddev=0.0):
     """Return dictionary of all available photometry as normal distributions."""
@@ -99,42 +112,46 @@ def get_ngc188_photometry():
         how='outer'
     )
 
-def get_ngc188_binaries():
-    """Return NGC188 SB1 and SB2 systems as pandas DataFrames."""
-
-    physical_parameters = pandas.DataFrame(
-        read_cds_pipe_table(
+def get_ngc188_binary_data(
+        single_lined_orbits_fname=(
+            os.path.join(
+                data_dir,
+                'Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
+            )
+        ),
+        double_lined_orbits_fname=(
+            os.path.join(
+                data_dir,
+                'Geller_et_al_2009_WIYN_double_lined_orbits.tsv'
+            )
+        ),
+        physical_parameters_fname=(
             os.path.join(
                 data_dir,
                 'Geller_et_al_2009_WIYN_physical_parameters.tsv'
             )
         )
+):
+    """Return NGC188 SB1 and SB2 systems as :class:`pandas.DataFrame`s."""
+
+    physical_parameters = pandas.DataFrame(
+        read_cds_pipe_table(physical_parameters_fname)
     )
 
     return (
         pandas.merge(
-            pandas.DataFrame(
-                read_cds_pipe_table(
-                    os.path.join(
-                        data_dir,
-                        'Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
-                    )
-                )
-            ),
             physical_parameters,
+            pandas.DataFrame(
+                read_cds_pipe_table(single_lined_orbits_fname)
+            ),
             on='PKM',
             how='outer'
         ),
         pandas.merge(
-            pandas.DataFrame(
-                read_cds_pipe_table(
-                    os.path.join(
-                        data_dir,
-                        'Geller_et_al_2009_WIYN_double_lined_orbits.tsv'
-                    )
-                )
-            ),
             physical_parameters,
+            pandas.DataFrame(
+                read_cds_pipe_table(double_lined_orbits_fname)
+            ),
             on='PKM',
             how='outer'
         )
@@ -166,3 +183,63 @@ def get_ngc188_photometry_interpolators():
             11.3
         )
     }
+
+def get_ngc188_photometric_constraint(binary_pkm_id):
+    """Return a fully set-up photometric constraint for an NGC188 binary."""
+
+    photometry = get_ngc188_photometry()
+
+    selected_photometry = get_photometry_distributions(
+        photometry[photometry['PKM'] == binary_pkm_id],
+        0.02
+    )
+
+    _logger.debug(
+        'Selected photometry: ('
+        +
+        ', '.join(['%s: %s +- %s'] * len(selected_photometry)),
+        *sum(
+            (
+                (
+                    mag_col,
+                    repr(distribution.kwds['loc']),
+                    repr(distribution.kwds['scale'])
+                )
+                for mag_col, distribution in selected_photometry.items()
+            ),
+            ()
+        )
+    )
+
+    interpolators = get_ngc188_photometry_interpolators()
+
+    return PhotometricConstraint(
+        [interpolators['UBVRIJHK'], interpolators['usno']],
+        selected_photometry,
+        'photometric_constraints.pkl',
+        min_magnitude_difference=dict(V=2.5)
+    )
+
+def _test_photometric_constraint(binary_pkm_id):
+    """Avoid polluting global namespace."""
+
+    set_start_method('forkserver')
+    logging.basicConfig(level=logging.DEBUG)
+
+    single_lined_binaries, _ = get_ngc188_binary_data()
+
+    selected_binary = single_lined_binaries[
+        single_lined_binaries['PKM'] == binary_pkm_id
+    ]
+
+    constraint = get_ngc188_photometric_constraint(binary_pkm_id)
+
+    plot_joint_pdf(
+        constraint,
+        (float(selected_binary['M1']), float(selected_binary['M2']))
+    )
+    plot_m1_cdf(constraint)
+    plot_m2_cdf(constraint)
+
+if __name__ == '__main__':
+    _test_photometric_constraint(3732)

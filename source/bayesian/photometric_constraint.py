@@ -1,8 +1,6 @@
-#!/usr/bin/env python3
-
 """Interface for working with mass constraints from color-mag measurements."""
 
-from multiprocessing import Pool, set_start_method
+from multiprocessing import Pool
 import os.path
 from pickle import Pickler, Unpickler
 from functools import partial
@@ -13,11 +11,6 @@ from scipy import integrate, optimize
 import numpy
 
 from mass_fitting import fit_binary_masses
-from cluster_io import\
-    get_ngc188_photometry,\
-    get_photometry_distributions,\
-    get_ngc188_binaries,\
-    get_ngc188_photometry_interpolators
 
 #False positive (fixed in __init__.py)
 #pylint: disable=import-error
@@ -409,7 +402,8 @@ def plot_m1_pdf(constraint):
                             constraint.mass_range[1],
                             1000)
     with Pool(4) as workers:
-        plot_z = numpy.array(workers.map(constraint.primary_mass_pdf, plot_x))
+        plot_z = numpy.array(workers.map(constraint.primary_mass_pdf,
+                                         plot_x))
     print('PDF(M1): ' + repr(plot_z))
     pyplot.plot(plot_x, plot_z)
     pyplot.show()
@@ -511,44 +505,3 @@ def plot_m2_cdf(constraint):
                         cstride=1,
                         linewidth=0.1)
     pyplot.show()
-
-def main():
-    """Avoid polluting global namespace."""
-
-    set_start_method('forkserver')
-    logging.basicConfig(level=logging.DEBUG)
-
-    ngc188_photometry = get_ngc188_photometry()
-
-    ngc188_single_lined_binaries, _ = get_ngc188_binaries()
-
-    selected_photometry = get_photometry_distributions(
-        ngc188_photometry[ngc188_photometry['PKM'] == 3732],
-        0.02
-    )
-    selected_binary = ngc188_single_lined_binaries[
-        ngc188_single_lined_binaries['PKM'] == 3732
-    ]
-
-    print('Selected photometry: ')
-    for mag_col, distribution in selected_photometry.items():
-        print('\t%s: %s' % (mag_col, repr(distribution.kwds)))
-
-    interpolators = get_ngc188_photometry_interpolators()
-
-    constraint = PhotometricConstraint(
-        [interpolators['UBVRIJHK'], interpolators['usno']],
-        selected_photometry,
-        'photometric_constraints.pkl',
-        min_magnitude_difference=dict(V=2.5)
-    )
-
-    plot_joint_pdf(
-        constraint,
-        (float(selected_binary['M1']), float(selected_binary['M2']))
-    )
-    plot_m1_cdf(constraint)
-    plot_m2_cdf(constraint)
-
-if __name__ == '__main__':
-    main()

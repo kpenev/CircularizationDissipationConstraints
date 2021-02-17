@@ -1,5 +1,3 @@
-print('In Bayesian __init__.py')
-
 import os.path
 import sys
 
