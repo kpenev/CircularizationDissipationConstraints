@@ -8,18 +8,24 @@ from pickle import Pickler, Unpickler
 from functools import partial
 import logging
 
-from matplotlib import pyplot#, cm
-from scipy import integrate, stats, optimize
+from matplotlib import pyplot, cm
+from scipy import integrate, optimize
 import numpy
+import pandas
 
 from planetary_system_io import read_cds_pipe_table
+from mass_fitting import fit_binary_masses
+from reproduce_ngc188_results import\
+    get_ngc188_usno_photometry,\
+    get_photometry_distributions
 #False positive (fixed in __init__.py)
 #pylint: disable=import-error
-from cmd_utils import CMDPhotometryInterpolator
+from cmd_utils import CMDPhotometryInterpolator, CMDUSNOPhotometryInterpolator
 from command_line_utilities import data_dir
 from photometric_secondary_constraint import PhotometricSecondaryConstraint
 #pylint: enable=import-error
 
+#TODO: add minimum magnitude difference handling for SB1.
 #Simplifying decreases readability
 #pylint: disable=too-many-instance-attributes
 class PhotometricConstraint:
@@ -42,8 +48,8 @@ class PhotometricConstraint:
             predicted_photometry.update(
                 zip(
                     interpolator.available_filters,
-                    interpolator.get_binary_magnitudes(primary_mass,
-                                                       secondary_mass)
+                    interpolator.get_binary_magnitudes(float(primary_mass),
+                                                       float(secondary_mass))
                 )
             )
 
@@ -55,9 +61,7 @@ class PhotometricConstraint:
                                    -
                                    predicted_photometry[mag2])
             else:
-                predicted_value = (predicted_photometry[quantity.strip()]
-                                   +
-                                   self._distance_modulus)
+                predicted_value = predicted_photometry[quantity.strip()]
 
             if return_log:
                 result += distribution.logpdf(predicted_value)
@@ -79,17 +83,19 @@ class PhotometricConstraint:
                                   limit=200,
                                   **self._integration_config)[0]
 
-        bounds = (self.mass_range[0] + 0.001, self.mass_range[1] - 0.001)
-        minimization = optimize.minimize(
-            lambda masses: -self._joint_likelihood(*masses, return_log=True),
-            numpy.full((2,), 0.5 * (self.mass_range[0] + self.mass_range[1])),
-            bounds=(bounds, bounds)
+        likelihood_maximization = fit_binary_masses(
+            photometry_interpolators=self._photometry_interpolators,
+            photometry=self._measured_photometry
         )
-        assert minimization.success
-        self._logger.debug('Maximum log-likelihood(m1=%s, m2=%s): %s',
-                           repr(minimization.x[0]),
-                           repr(minimization.x[1]),
-                           repr(-minimization.fun))
+
+        assert likelihood_maximization.success
+        self._logger.debug(
+            'Maximum log-likelihood(m1=%s, m2=%s) = %s',
+            repr(likelihood_maximization.x[0]),
+            repr(likelihood_maximization.x[1]),
+            repr(self._joint_likelihood(likelihood_maximization.x[1],
+                                        likelihood_maximization.x[0]))
+        )
 
         result = integrate.solve_ivp(
             integrand,
@@ -98,7 +104,8 @@ class PhotometricConstraint:
             dense_output=True,
             max_step=1e-2,
             rtol=1e-6,
-            atol=1e-9 * numpy.exp(-minimization.fun),
+            atol=1e-9 * self._joint_likelihood(likelihood_maximization.x[1],
+                                               likelihood_maximization.x[0]),
             method='LSODA'
         )
         assert result.success
@@ -133,8 +140,8 @@ class PhotometricConstraint:
                     if section == 'PhotometricConstraint':
                         assert nobjects == 5
                         isochrone_fnames = unpickler.load()
+                        distance_moduli = unpickler.load()
                         measured_photometry = unpickler.load()
-                        distance_modulus = unpickler.load()
                         integration_config = unpickler.load()
                         nobjects -= 4
 
@@ -144,9 +151,12 @@ class PhotometricConstraint:
                                     for interp in self._photometry_interpolators
                                 ) == isochrone_fnames
                                 and
-                                compare_measured_photometry(measured_photometry)
+                                tuple(
+                                    interp.distance_modulus
+                                    for interp in self._photometry_interpolators
+                                ) == distance_moduli
                                 and
-                                self._distance_modulus == distance_modulus
+                                compare_measured_photometry(measured_photometry)
                                 and
                                 self._integration_config == integration_config
                         ):
@@ -175,15 +185,45 @@ class PhotometricConstraint:
                 tuple(interp.isochrone_fname
                       for interp in self._photometry_interpolators)
             )
+            pickler.dump(
+                tuple(interp.distance_modulus
+                      for interp in self._photometry_interpolators)
+            )
+
             pickler.dump(self._measured_photometry)
-            pickler.dump(self._distance_modulus)
             pickler.dump(self._integration_config)
             pickler.dump(self._cumulative_m1_likelihood)
+
+    def _show_joint_likelihood_plot(self):
+        """Display a plot of the joint likelihood."""
+
+        plot_x, plot_y = numpy.meshgrid(
+            numpy.linspace(0.9,
+                           1.1,
+                           100),
+            numpy.linspace(0.50,
+                           0.70,
+                           100)
+        )
+        with Pool(4) as workers:
+            plot_z = numpy.array(
+                workers.starmap(self._joint_likelihood,
+                                zip(plot_x.flatten(), plot_y.flatten()))
+            ).reshape(plot_x.shape)
+
+        pyplot.pcolormesh(plot_x,
+                          plot_y,
+                          plot_z,
+                          #False positive
+                          #pylint: disable=no-member
+                          cmap=cm.coolwarm)
+                          #pylint: enable=no-member
+        pyplot.colorbar()
+        pyplot.show()
 
     def __init__(self,
                  photometry_interpolators,
                  measured_photometry,
-                 distance_modulus,
                  pickle_fname,
                  **integration_config):
         """
@@ -217,10 +257,13 @@ class PhotometricConstraint:
                 min(self.mass_range[1], interpolator.max_mass)
             )
 
+
         self._integration_config = integration_config
         self._quad_points = numpy.linspace(*self.mass_range, 30)
         self._measured_photometry = measured_photometry
-        self._distance_modulus = distance_modulus
+
+#        self._show_joint_likelihood_plot()
+
         self._cumulative_m1_likelihood = self._check_for_pickled(pickle_fname)
         if self._cumulative_m1_likelihood is None:
             self._cumulative_m1_likelihood = self._prepare_constraint()
@@ -257,11 +300,12 @@ class PhotometricConstraint:
                 primary_mass > self.mass_range[1]
         ):
             return -numpy.inf
-        return (
+        result = (
             self._joint_likelihood(secondary_mass, primary_mass, True)
             -
             numpy.log(self._norm)
         )
+        return result
 
 
     def primary_mass_pdf(self, primary_mass):
@@ -321,15 +365,15 @@ def plot_m1_cdf(constraint):
     pyplot.plot(plot_x, plot_z)
     pyplot.show()
 
-def plot_joint_pdf(constraint):
+def plot_joint_pdf(constraint, literature_masses=None):
     """Display a 3-D plot of the PDF(m1, m2)."""
 
     plot_x, plot_y = numpy.meshgrid(
-        numpy.linspace(1.00,
-                       1.05,
+        numpy.linspace(0.975,
+                       1.025,
                        300),
-        numpy.linspace(0.6,
-                       0.8,
+        numpy.linspace(0.55,
+                       0.75,
                        300)
     )
 
@@ -340,17 +384,31 @@ def plot_joint_pdf(constraint):
         ).reshape(plot_x.shape)
     print('Plot z: ' + repr(plot_z))
 
-    axis = pyplot.gca(projection='3d')
-    axis.plot_wireframe(plot_x,
-                        plot_y,
-                        plot_z,
-                        color='black')
-                        #False positive
-                        #pylint: disable=no-member
-#                        cmap=cm.coolwarm,
-                        #pylint: enable=no-member
-#                        linewidth=0,
-#                        edgecolor='none')
+    if literature_masses is None:
+        axis = pyplot.gca(projection='3d')
+        axis.plot_wireframe(plot_x,
+                            plot_y,
+                            plot_z,
+                            color='black')
+                            #False positive
+                            #pylint: disable=no-member
+#                            cmap=cm.coolwarm,
+                            #pylint: enable=no-member
+#                            linewidth=0,
+#                            edgecolor='none')
+    else:
+        pyplot.pcolormesh(plot_x,
+                          plot_y,
+                          plot_z,
+                          #False positive
+                          #pylint: disable=no-member
+                          cmap=cm.coolwarm)
+                          #pylint: enable=no-member
+        pyplot.plot([literature_masses[0]],
+                    [literature_masses[1]],
+                    'xk',
+                    markersize=10,
+                    markeredgewidth=3)
     pyplot.show()
 
 def calculate_cdf_column(constraint, secondary_masses, primary_mass):
@@ -401,52 +459,84 @@ def main():
     set_start_method('forkserver')
     logging.basicConfig(level=logging.DEBUG)
 
-    ngc188_photometry = read_cds_pipe_table(
-        os.path.join(
-            data_dir,
-            'Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
-        )
+    ngc188_photometry = pandas.merge(
+        pandas.DataFrame(
+            read_cds_pipe_table(
+                os.path.join(
+                    data_dir,
+                    'Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
+                )
+            )
+        ),
+        pandas.DataFrame(get_ngc188_usno_photometry()),
+        on='PKM',
+        how='outer'
     )
 
-#    ngc188_single_lined_binaries = read_cds_pipe_table(
+    ngc188_single_lined_binaries = pandas.merge(
+        pandas.DataFrame(
+            read_cds_pipe_table(
+                os.path.join(
+                    data_dir,
+                    'Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
+                )
+            )
+        ),
+        pandas.DataFrame(
+            read_cds_pipe_table(
+                os.path.join(
+                    data_dir,
+                    'Geller_et_al_2009_WIYN_physical_parameters.tsv'
+                )
+            )
+        ),
+        on='PKM',
+        how='outer'
+    )
+
+#    ngc188_double_lined_binaries = read_cds_pipe_table(
 #        os.path.join(
 #            data_dir,
-#            'Geller_et_al_2009_WIYN_single_lined_orbits.tsv'
+#            'Geller_et_al_2009_WIYN_double_lined_orbits.tsv'
 #        )
 #    )
 
-
-    selected_photometry = ngc188_photometry[ngc188_photometry['PKM'] == 4080][0]
-    print(repr(selected_photometry))
-
-    measured_photometry = dict()
-    print('Membership probability: %s'
-          %
-          repr(selected_photometry['Memb']))
-    for mag in 'UBVRI':
-        if numpy.isfinite(selected_photometry[mag + 'mag']):
-            measured_photometry[mag] = stats.norm(
-                selected_photometry[mag + 'mag'],
-                max(selected_photometry['e_' + mag + 'mag'], 0.05)
-            )
-    print('Measured photometry: ')
-    for quantity, distro in measured_photometry.items():
-        print('\t%s: %s' % (quantity, repr(distro.args)))
-
-    interpolator = CMDPhotometryInterpolator(
-        os.path.join(
-            data_dir,
-            'CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_UBVRIJHK.dat'
-        )
+    selected_photometry = get_photometry_distributions(
+        ngc188_photometry[ngc188_photometry['PKM'] == 4585],
+        0.02
     )
+    selected_binary = ngc188_single_lined_binaries[
+        ngc188_single_lined_binaries['PKM'] == 4585
+    ]
 
-    constraint = PhotometricConstraint([interpolator],
-                                       measured_photometry,
-                                       11.23,
+    print('Selected photometry: ')
+    for mag_col, distribution in selected_photometry.items():
+        print('\t%s: %s' % (mag_col, repr(distribution.kwds)))
+
+    interpolators = [
+        CMDPhotometryInterpolator(
+            os.path.join(
+                data_dir,
+                'CMD_7.0Gyr_FeH0dex_isochrone_Av0.2_UBVRIJHK.dat'
+            ),
+            11.23
+        ),
+        CMDUSNOPhotometryInterpolator(
+            os.path.join(
+                data_dir,
+                'CMD_7.5Gyr_FeH0dex_isochrone_Av0.1.dat'
+            ),
+            11.3
+        )
+    ]
+
+    constraint = PhotometricConstraint(interpolators,
+                                       selected_photometry,
                                        'photometric_constraints.pkl')
 
-    plot_joint_pdf(constraint)
-    plot_m1_cdf(constraint)
+#    plot_joint_pdf(constraint,
+#                   (float(selected_binary['M1']), float(selected_binary['M2'])))
+#    plot_m1_cdf(constraint)
     plot_m2_cdf(constraint)
 
 if __name__ == '__main__':
