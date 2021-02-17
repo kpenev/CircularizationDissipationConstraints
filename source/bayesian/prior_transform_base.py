@@ -12,9 +12,9 @@ class PriorTransformBase(metaclass=ABCMeta):
     Base class for transforming the unit cube to evolution parameters.
 
     Attrs:
-        independent_parameter_distributions(3-tuples):     The names,
-            distributions and units of the directly observable parameters we
-            will sample directly from. The distributions must provide the
+        independent_parameter_distributions(iterable of 3-tuples):     The
+            names, distributions and units of the directly observable parameters
+            we will sample directly from. The distributions must provide the
             `scipy.stats.continuous_rv` interface. For parameters for which
             only a fixed values should be assumed, the distribution must be
             specified as a single numeric value convertible to float. Fixed
