@@ -8,10 +8,8 @@ import scipy.integrate
 def fit_single_mass(photometry_interp,
                     photometry,
                     *,
-                    magnitude_template="%(filter)s'mag",
-                    magnitude_error_template="e_%(filter)s'mag",
-                    color_template=None,
-                    color_error_template=None):
+                    magnitude_template="%(filter)s",
+                    color_template=None):
     """
     Fit single star mass for mags/colors with both observed & predicted values.
 
@@ -19,17 +17,15 @@ def fit_single_mass(photometry_interp,
         photometry_interp(CMDPhotometryInterpolator):    Object able to
             predict relevant magnitudes for a given stellar mass or binary.
 
-        photometry(dict):    Magnitudes, colors and their errors measured for
-        the star to fit. The key <-> magnitude, key <-> color, and
-            key <-> error correspondence is specified by the template
-            arguments.
+        photometry(dict):    The measured distributions of magnitudes and colors
+            for the star to fit. The key <-> magnitude, key <-> color
+            correspondence is specified by the template arguments. The values
+            should be distributinos following the `scipy.stats.rv_continuous`
+            interface.
 
         magnitude_template(str):    A %(filter)s-substitution template that
             should expand to the key giving a particular magnitude measured
             nominal value.
-
-        magnitude_error_template(str):    A %(filter)s-substitution template
-            that should expand to the key giving a particular magnitude error.
 
         color_template(None or str):    If None, individual magnitudes are fit.
             If not None, it is assumed that ``photometry`` contains color
@@ -40,9 +36,6 @@ def fit_single_mass(photometry_interp,
             nominal value. Colors are always assumed to be magnitude in the
             bluer band minus the magnitude in the redder band.
 
-        color_error_template(None or str):    The error estimate of
-            ``color_template``.
-
     Returns:
         The stellar mass which best reproduces the given measurements,
         assuming gaussian errors.
@@ -51,49 +44,32 @@ def fit_single_mass(photometry_interp,
     def get_magnitude_term(theoretical_value, filter_name):
         """Return the negative log-likelihood for the given filter."""
 
-        return (
-            (
-                theoretical_value
-                -
-                photometry[magnitude_template % dict(filter=filter_name)]
-            )
-            /
-            photometry[magnitude_error_template % dict(filter=filter_name)]
-        )**2
+        return -photometry[
+            magnitude_template % dict(filter=filter_name)
+        ].logpdf(
+            theoretical_value
+        )
 
     def get_color_term(theoretical_value, filter1, filter2):
         """Return the nominal measured color for the two given filters."""
 
         substitution = dict(filter1=filter1, filter2=filter2)
-        return (
-            (
-                theoretical_value
-                -
-                photometry[color_template % substitution]
-            )
-            /
-            photometry[color_error_template % substitution]
-        )**2
+        return -photometry[
+            color_template % substitution
+        ].logpdf(
+            theoretical_value
+        )
 
     def check_magnitude(filter_name):
         """Return True iff the given magnitude has a measurement & error."""
 
-        return (
-            magnitude_template % dict(filter=filter_name) in photometry
-            and
-            magnitude_error_template % dict(filter=filter_name) in photometry
-        )
+        return magnitude_template % dict(filter=filter_name) in photometry
 
     def check_color(filter1, filter2):
         """Return True iff the given color has a measurement & error."""
 
-        return (
-            color_template % dict(filter1=filter1,
-                                  filter2=filter2) in photometry
-            and
-            color_error_template % dict(filter1=filter1,
-                                        filter2=filter2) in photometry
-        )
+        return color_template % dict(filter1=filter1,
+                                     filter2=filter2) in photometry
 
     def get_square_diff(theoretical_magnitudes):
         """
@@ -112,7 +88,6 @@ def fit_single_mass(photometry_interp,
                 )
 
         if color_template:
-            assert color_error_template
             for index1, filter1 in enumerate(
                     photometry_interp.available_filters
             ):
@@ -289,10 +264,8 @@ def fit_binary_masses(photometry_interpolators,
                       photometry,
                       *,
                       min_mag_difference=None,
-                      magnitude_template="%(filter)smag",
-                      magnitude_error_template="e_%(filter)smag",
+                      magnitude_template="%(filter)s",
                       color_template=None,
-                      color_error_template=None,
                       **rv_parameters):
     r"""
     Find the best fit masses for stars in a binary given RV and photometry.
@@ -356,45 +329,25 @@ def fit_binary_masses(photometry_interpolators,
 
         try:
             if rh_filter_name is None:
-                observed = float(photometry[magnitude_template
-                                            %
-                                            dict(filter=filter_name)])
-                stddev = photometry[magnitude_error_template
-                                    %
-                                    dict(filter=filter_name)]
+                observed = photometry[magnitude_template
+                                      %
+                                      dict(filter=filter_name)]
             else:
-                observed = float(photometry[color_template
-                                            %
-                                            dict(filter1=filter_name,
-                                                 filter2=rh_filter_name)])
-                stddev = photometry[color_error_template
-                                    %
-                                    dict(filter1=filter_name,
-                                         filter2=rh_filter_name)]
+                observed = photometry[color_template
+                                      %
+                                      dict(filter1=filter_name,
+                                           filter2=rh_filter_name)]
         except (KeyError, ValueError):
             return
 
-        try:
-            sigma = float(stddev)
-        except TypeError:
-            sigma = float(stddev[0 if predicted <= observed else 1])
-
-        if (
-                not numpy.isfinite(sigma)
-                or
-                not numpy.isfinite(float(observed))
-        ):
+        if observed is None:
             return
 
         #False positive
         #pylint: disable=assignment-from-no-return
         update = numpy.isfinite(predicted)
         #pylint: enable=assignment-from-no-return
-        result[update] += (
-            observed - predicted[update]
-        )**2 / (
-            2.0 * sigma**2
-        )
+        result[update] -= observed.logpdf(predicted[update])
 
     def negative_log_likelihood(masses):
         """Return -log(likelihood) of the data given stellar masses."""

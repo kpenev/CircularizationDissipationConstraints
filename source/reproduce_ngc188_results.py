@@ -8,11 +8,24 @@ import os.path
 from matplotlib import pyplot
 import numpy
 import pandas
+from scipy import stats
 
 from planetary_system_io import read_cds_pipe_table
 from cmd_utils import CMDPhotometryInterpolator, CMDUSNOPhotometryInterpolator
 from mass_fitting import fit_binary_masses
 from command_line_utilities import data_dir
+
+def get_photometry_distributions(photometry, min_stddev):
+    """Return dictionary of all available photometry as normal distributions."""
+
+    result = dict()
+    for column, data in photometry.items():
+        if column[1:] == 'mag' and numpy.isfinite(float(data)):
+            result[column[0]] = stats.norm(
+                loc=float(data),
+                scale=max(float(photometry['e_' + column]), min_stddev)
+            )
+    return result
 
 #TODO: break up?
 #pylint: disable=too-many-locals
@@ -22,7 +35,7 @@ def fit_all_binaries(photometry_interpolators,
                      ngc188_double_lined_orbits,
                      ngc188_params,
                      *,
-                     observed_phot_template='%(filter)smag'):
+                     observed_phot_template='%(filter)s'):
     """Fit and report all binaries in NGC188 along with literature masses."""
 
     min_mag_difference_filchar = 'V'
@@ -45,9 +58,6 @@ def fit_all_binaries(photometry_interpolators,
             if photometry.size == 0:
                 print('No photometry for binary ' + repr(binary['PKM']))
                 continue
-            print('Photometry for %s: %s'
-                  %
-                  (binary['PKM'], repr(photometry)))
 
             answer = ngc188_params[
                 ngc188_params['PKM'] == binary['PKM']
@@ -70,11 +80,10 @@ def fit_all_binaries(photometry_interpolators,
 
             result = fit_binary_masses(
                 photometry_interpolators=photometry_interpolators,
-                photometry=photometry,
+                photometry=get_photometry_distributions(photometry),
                 min_mag_difference=(None if is_double_lined
                                     else {min_mag_difference_filchar: 2.5}),
                 magnitude_template=observed_phot_template,
-                magnitude_error_template=('e_' + observed_phot_template),
                 **rv_params
             )
             primary_m, secondary_m = result.x
@@ -318,7 +327,8 @@ def get_ngc188_usno_photometry():
         names=True,
         dtype=None,
         delimiter=',',
-        deletechars=''
+        deletechars='',
+        encoding=None
     )
     photometry = read_cds_pipe_table(
         os.path.join(
@@ -341,6 +351,9 @@ def get_ngc188_usno_photometry():
                     ][0]
             else:
                 result[result_index][colname] = phot_entry[colname]
+
+    result.dtype.names = [unprime_usno_column_name(colname)
+                          for colname in result.dtype.names]
 
     return result
 
@@ -399,11 +412,6 @@ def main():
         'usno': get_ngc188_usno_photometry()
     }
 
-    ngc188_photometry['usno'].dtype.names = [
-        unprime_usno_column_name(colname)
-        for colname in ngc188_photometry['usno'].dtype.names
-    ]
-
     read_cds_pipe_table(
         os.path.join(
             data_dir,
@@ -441,8 +449,7 @@ def main():
         merged_photometry,
         ngc188_single_lined_binaries,
         ngc188_double_lined_binaries,
-        ngc188_params,
-        observed_phot_template='%(filter)smag'
+        ngc188_params
     )
 
     for filter_set in ['usno', 'UBVRIJHK']:
