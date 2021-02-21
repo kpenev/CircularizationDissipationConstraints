@@ -2,34 +2,24 @@
 
 """Use dynesty to sample SB1 binary star system."""
 
-from collections import namedtuple
 import logging
 import traceback
 from multiprocessing import set_start_method
 
 from astropy import units
-import numpy
 from scipy import stats
 
 from stellar_evolution.manager import StellarEvolutionManager
-from orbital_evolution.transformations import phase_lag
-from split_normal_distribution import split_normal
+from orbital_evolution.evolve_interface import library as\
+    orbital_evolution_library
 
 #Fixed module search paths, not intended to provide anything.
 #pylint: disable=unused-import
 import update_search_paths
 #pylint: enable=unused-import
 import ngc188_util
-from eccentricity_pdf import EccentricityPDF
-from prior_transform_cluster_sb1 import PriorTransformClusterSB1
-#False positive
-#pylint: disable=import-error
-from log_likelihood_base import LogLikelihoodBase
-from stellar_param_sampling import\
-    StarSampler,\
-    add_star_sampler_config_args,\
-    POETInterpLikelihood
-#pylint: enable=import-error
+from bayesian.prior_transform_cluster_sb1 import PriorTransformClusterSB1
+from bayesian.log_likelihood_sb1 import LogLikelihoodSB1
 from parse_command_line import parse_command_line
 
 def get_independent_priors(config, observed_orbit):
@@ -147,62 +137,51 @@ def get_independent_priors(config, observed_orbit):
 def prepare_sampling(config):
     """Return log-likelihood & prior transform for sampling the selected SB1."""
 
-    if cnofig.system.startswith('NGC188_'):
+    interpolator = StellarEvolutionManager(
+        config.stellar_evolution_interpolator_dir
+    ).get_interpolator_by_name(
+        'default'
+    )
+    orbital_evolution_library.read_eccentricity_expansion_coefficients(
+        config.eccentricity_expansion_coefficients.encode('ascii')
+    )
+
+
+    if config.system.startswith('NGC188_'):
         binary_pkm_id = int(config.system[len('NGC188_'):])
+        binary_orbit = ngc188_util.get_observed_orbit(binary_pkm_id)
+
         photometric_constraint = ngc188_util.get_photometric_constraint(
             binary_pkm_id
         )
-        rvk_constraint = ngc188_util.get_rvk_constraint(binary_pkm_id)
+        rvk_constraint = ngc188_util.get_rvk_constraint(binary_orbit)
+        log_likelihood = LogLikelihoodSB1(
+            rv_semiamplitude_constraint=rvk_constraint,
+            interpolator=interpolator,
+            eccentricity_pdf=ngc188_util.get_final_eccentricity_pdf(
+                binary_orbit,
+                num_parallel_processes=config.num_parallel_processes
+            ),
+            initial_eccentricity=0.5
+        )
 
+        prior_transform = PriorTransformClusterSB1(
+            photometric_mass_constraint=photometric_constraint,
+            rv_semi_amplitude_constraint=rvk_constraint,
+            independent_parameter_distributions=get_independent_priors(
+                config,
+                binary_orbit
+            ),
+            model_parameter_order=log_likelihood.parameter_order
+        )
+
+    return log_likelihood, prior_transform
 
 def main(config):
     """Avoid polluting global namespace."""
 
     assert config.lgQ_inertial_boost_range is None
-    prior_transform = get_prior_transform(config)
-    system_data = get_system_data(config)
-    log_likelihood = LogLikelihoodConstQ(system_data, config)
-    config.feh = system_data.feh
-    primary_sampler = StarSampler(
-        POETInterpLikelihood(
-            logg=system_data.logg,
-            teff=system_data.Teff,
-            rho=system_data.mean_density,
-            rtol=config.time_ode_rtol,
-            atol=config.time_ode_atol,
-            max_step=config.time_ode_max_step
-        ),
-        config
-    )
-    prior_transform = PriorTransformClusterSB1(
-        primary_sampler,
-        independent_parameter_distributions=(
-            [
-                get_uniform_parameter(component + '_' + param_name)
-                for component in ['primary', 'secondary']
-                for param_name in ['disk_lock_period',
-                                   'wind_strength',
-                                   'wind_saturation',
-                                   'core_envelope_coupling_timescale']
-            ]
-            +
-            [
-                get_uniform_parameter('disk_dissipation_age'),
-                ('orbical_period', 7.0, units.day),
-                (
-                    'rv_semi_amplitude',
-                    stats.norm(16.46, 0.16),
-                    units.km / units.s
-                ),
-                (
-                    'cos_inclination',
-                    stats.uniform(-1.0, 2.0),
-                    units.dimensionless_unscaled
-                ),
-            ]
-        ),
-        model_parameter_order=log_likelihood.parameter_order
-    )
+    log_likelihood, prior_transform = prepare_sampling(config)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
