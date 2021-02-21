@@ -327,6 +327,9 @@ class PhotometricConstraint:
     def pdf(self, primary_mass, secondary_mass):
         """The joint PDF of component masses given observed colors and mags."""
 
+        primary_mass = float(primary_mass)
+        secondary_mass = float(secondary_mass)
+
         if(
                 secondary_mass > primary_mass
                 or

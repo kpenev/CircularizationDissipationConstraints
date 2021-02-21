@@ -5,10 +5,13 @@
 import os.path
 import logging
 from multiprocessing import set_start_method
+from time import time
 
+from matplotlib import pyplot
 import pandas
 import numpy
 from scipy import stats
+from astropy import units
 
 from planetary_system_io import read_cds_pipe_table
 from command_line_utilities import data_dir
@@ -20,8 +23,12 @@ from bayesian.photometric_constraint import\
     plot_joint_pdf,\
     plot_m1_cdf,\
     plot_m2_cdf
+from bayesian.rv_semiamplitude_constraint import RVSemiAmplitudeConstraint
 
 _logger = logging.getLogger(__name__)
+
+cluster_age_distribution = stats.norm(7.0, 0.5)
+cluster_feh_distribution = stats.norm(0.21, 0.03)
 
 def get_photometry_distributions(photometry, min_stddev=0.0):
     """Return dictionary of all available photometry as normal distributions."""
@@ -54,7 +61,7 @@ def _unprime_usno_column_name(colname):
 
     return colname
 
-def get_ngc188_usno_photometry():
+def get_usno_photometry():
     """Return a properly formatted field array with USNO filter photometry."""
 
     match_data = numpy.genfromtxt(
@@ -95,7 +102,7 @@ def get_ngc188_usno_photometry():
 
     return result
 
-def get_ngc188_photometry():
+def get_photometry():
     """Return a pandas DataFrame containing NGC188 literature photometry."""
 
     return pandas.merge(
@@ -107,12 +114,12 @@ def get_ngc188_photometry():
                 )
             )
         ),
-        pandas.DataFrame(get_ngc188_usno_photometry()),
+        pandas.DataFrame(get_usno_photometry()),
         on='PKM',
         how='outer'
     )
 
-def get_ngc188_binary_data(
+def get_binary_data(
         single_lined_orbits_fname=(
             os.path.join(
                 data_dir,
@@ -157,7 +164,7 @@ def get_ngc188_binary_data(
         )
     )
 
-def get_ngc188_photometry_interpolators():
+def get_photometry_interpolators():
     """Return a dictionary of interpolators of NGC188 photometry."""
 
     return {
@@ -184,10 +191,27 @@ def get_ngc188_photometry_interpolators():
         )
     }
 
-def get_ngc188_photometric_constraint(binary_pkm_id):
+def get_observed_orbit(binary_pkm_id):
+    """Return pandas.DataFrames containing the orbital parameters of an SB1."""
+
+    single_lined_data, _ = get_binary_data()
+
+    selected = (single_lined_data['PKM'] == binary_pkm_id)
+    if not selected.any():
+        raise RuntimeError(
+            'Only SB1 radial velocity constraints are supported at this time, '
+            'and binary with PKM=%d is not single lined!'
+            %
+            binary_pkm_id
+        )
+    selected = single_lined_data[selected]
+    print('Selected binary data:\n' + repr(selected.T))
+    return selected
+
+def get_photometric_constraint(binary_pkm_id):
     """Return a fully set-up photometric constraint for an NGC188 binary."""
 
-    photometry = get_ngc188_photometry()
+    photometry = get_photometry()
 
     selected_photometry = get_photometry_distributions(
         photometry[photometry['PKM'] == binary_pkm_id],
@@ -211,7 +235,7 @@ def get_ngc188_photometric_constraint(binary_pkm_id):
         )
     )
 
-    interpolators = get_ngc188_photometry_interpolators()
+    interpolators = get_photometry_interpolators()
 
     return PhotometricConstraint(
         [interpolators['UBVRIJHK'], interpolators['usno']],
@@ -220,19 +244,34 @@ def get_ngc188_photometric_constraint(binary_pkm_id):
         min_magnitude_difference=dict(V=2.5)
     )
 
+def get_rvk_constraint(observed_orbit):
+    """Return fully set-up RV semi-amplitude constraint for an NGC188 binary."""
+
+    return RVSemiAmplitudeConstraint(
+        observed_rvk=stats.rice(
+            b=float(observed_orbit['K'])/float(observed_orbit['e_K']),
+            scale=float(observed_orbit['e_K']) * 1000.0
+        ),
+        max_discarded_probabiity=1e-6,
+        interpolation_accuracy=(0, 1e-4),
+        num_parallel_processes=4,
+        pickle_fname='rvk_constraints.pkl',
+        epsabs=0,
+        epsrel=1e-8,
+        limit=200,
+        maxp1=200
+    )
+
 def _test_photometric_constraint(binary_pkm_id):
-    """Avoid polluting global namespace."""
+    """Display plots showing the photometry based constraint."""
 
-    set_start_method('forkserver')
-    logging.basicConfig(level=logging.DEBUG)
-
-    single_lined_binaries, _ = get_ngc188_binary_data()
+    single_lined_binaries, _ = get_binary_data()
 
     selected_binary = single_lined_binaries[
         single_lined_binaries['PKM'] == binary_pkm_id
     ]
 
-    constraint = get_ngc188_photometric_constraint(binary_pkm_id)
+    constraint = get_photometric_constraint(binary_pkm_id)
 
     plot_joint_pdf(
         constraint,
@@ -241,5 +280,114 @@ def _test_photometric_constraint(binary_pkm_id):
     plot_m1_cdf(constraint)
     plot_m2_cdf(constraint)
 
+def _test_rvk_constraint(binary_pkm_id):
+    """Display plots showing the RV based constraint."""
+
+    observed_orbit = get_observed_orbit(binary_pkm_id)
+    rvk_constraint = get_rvk_constraint(observed_orbit)
+    photometric_constraint = get_photometric_constraint(binary_pkm_id)
+
+    single_lined_binaries, _ = get_binary_data()
+
+    selected_binary = single_lined_binaries[
+        single_lined_binaries['PKM'] == binary_pkm_id
+    ]
+
+
+    plots = dict(
+        left=pyplot.subplot(131),
+        middle=pyplot.subplot(132),
+        right=pyplot.subplot(133)
+    )
+    for sub_plot in plots.values():
+        sub_plot.set_xlabel(r'$M_2\ [M_\odot]$')
+    plots['left'].set_title('$PDF(M_2 | M_1, e, P_{orb})$')
+    plots['middle'].set_title(
+        "$f'[K(M_1, M_2, P_{orb}, e)] / f'[K(M_1, M_2, P_{orb}, e=0.5)]$"
+    )
+    plots['right'].set_title('$CDF(M_2 | M_1, e, P_{orb})$')
+
+    primary_mass = photometric_constraint.primary_mass_ppf(0.5) * units.M_sun
+    secondary_mass_photometric_prior = (
+        photometric_constraint.get_conditional_secondary_mass_distribution(
+            primary_mass.to_value(units.M_sun)
+        )
+    )
+    print('Primary mass: ' + repr(primary_mass))
+
+    for eccentricity in numpy.linspace(0.5, 0, 6):
+
+        rvk_constraint.prepare_secondary_sampling(
+            primary_mass=primary_mass,
+            orbital_period=float(selected_binary['Per']) * units.day,
+            eccentricity=eccentricity,
+            secondary_mass_prior=secondary_mass_photometric_prior
+        )
+
+        plot_m2 = numpy.linspace(0.15, 0.9, 300)
+
+        start_time = time()
+        plot_pdf = numpy.fromiter(
+            (
+                rvk_constraint.secondary_mass_pdf(m2)
+                for m2 in  plot_m2 * units.M_sun
+            ),
+            dtype=float
+        )
+        _logger.debug('Calculating %d PDF values took %g minutes.',
+                      plot_pdf.size,
+                      (time() - start_time) / 60.0)
+        start_time = time()
+        plot_cdf = numpy.fromiter(
+            (
+                rvk_constraint.secondary_mass_cdf(m2)
+                for m2 in plot_m2 * units.M_sun
+            ),
+            dtype=float
+        )
+        _logger.debug('Calculating %d CDF values took %g minutes.',
+                      plot_cdf.size,
+                      (time() - start_time) / 60.0)
+        start_time = time()
+        plot_fk_ratio = numpy.fromiter(
+            (
+                rvk_constraint.rv_semi_amplitude_pdf(
+                    rvk_constraint.rv_semi_amplitude(
+                        primary_mass=primary_mass,
+                        secondary_mass=secondary_mass,
+                        eccentricity=eccentricity
+                    )
+                )
+                /
+                rvk_constraint.rv_semi_amplitude_pdf(
+                    rvk_constraint.rv_semi_amplitude(
+                        primary_mass=primary_mass,
+                        secondary_mass=secondary_mass,
+                        eccentricity=0.5
+                    )
+                )
+                for secondary_mass in plot_m2 * units.M_sun
+            ),
+            dtype=float
+        )
+        _logger.debug('Calculating %d f\'(K) ratios took %g minutes.',
+                      plot_fk_ratio.size,
+                      (time() - start_time) / 60.0)
+
+        print('e=' + repr(eccentricity))
+
+        plots['left'].plot(plot_m2,
+                           plot_pdf,
+                           label='e = ' + str(eccentricity))
+        plots['middle'].semilogy(plot_m2,
+                                 plot_fk_ratio,
+                                 label='e = ' + str(eccentricity))
+        plots['right'].plot(plot_m2,
+                            plot_cdf)
+    plots['middle'].set_ylim((0.1, 10.0))
+    pyplot.show()
+
 if __name__ == '__main__':
-    _test_photometric_constraint(3732)
+    set_start_method('forkserver')
+    logging.basicConfig(level=logging.DEBUG)
+    _test_rvk_constraint(3732)

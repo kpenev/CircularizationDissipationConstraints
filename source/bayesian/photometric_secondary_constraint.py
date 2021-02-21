@@ -19,7 +19,7 @@ class PhotometricSecondaryConstraint(rv_continuous):
         """PDF(m2 | m1)."""
 
         return (
-            self._joint_constraint(self._primary_mass, secondary_mass)
+            self._joint_constraint.pdf(self._primary_mass, secondary_mass)
             /
             self._norm
         )
@@ -28,7 +28,7 @@ class PhotometricSecondaryConstraint(rv_continuous):
         """Natural log of PDF(m2 | m1)."""
 
         return (
-            self._joint_constraint(self._primary_mass, secondary_mass)
+            self._joint_constraint.logpdf(self._primary_mass, secondary_mass)
             -
             numpy.log(self._norm)
         )

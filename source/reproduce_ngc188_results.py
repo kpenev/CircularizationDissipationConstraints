@@ -9,10 +9,7 @@ import numpy
 import pandas
 
 from planetary_system_io import read_cds_pipe_table
-from cluster_io import\
-    get_ngc188_usno_photometry,\
-    get_photometry_distributions,\
-    get_ngc188_photometry_interpolators
+from bayesian import ngc188_util
 from mass_fitting import fit_binary_masses
 from command_line_utilities import data_dir
 
@@ -69,7 +66,7 @@ def fit_all_binaries(photometry_interpolators,
 
             result = fit_binary_masses(
                 photometry_interpolators=photometry_interpolators,
-                photometry=get_photometry_distributions(photometry),
+                photometry=ngc188_util.get_photometry_distributions(photometry),
                 min_mag_difference=(None if is_double_lined
                                     else {min_mag_difference_filchar: 2.5}),
                 magnitude_template=observed_phot_template,
@@ -308,7 +305,7 @@ def plot_binary_fit(interpolator,
 def main():
     """Avoid polluting global scope."""
 
-    interpolator = get_ngc188_photometry_interpolators()
+    interpolator = ngc188_util.get_photometry_interpolators()
 
     ngc188_photometry = {
         'UBVRIJHK': read_cds_pipe_table(
@@ -317,7 +314,7 @@ def main():
                 'Stetson_et_al_04_NGC188_UBVRI_photometry.tsv'
             )
         ),
-        'usno': get_ngc188_usno_photometry()
+        'usno': ngc188_util.get_usno_photometry()
     }
 
     read_cds_pipe_table(

@@ -1,13 +1,11 @@
 """Define prior transformations for SB1 and exoplanet systems."""
 
-from astropy.units import dimensionless_unscaled as dimensionless
-from abc import abstractmethod
+from astropy import units
 
-from prior_transform_base import PriorTransformBase
-from binary_utils import calculate_secondary_mass
+from bayesian.prior_transform_base import PriorTransformBase
 
-import numpy
-
+#Intended to function as callable no need for more public methods
+#pylint: disable=too-few-public-methods
 class PriorTransformClusterSB1(PriorTransformBase):
     """Prior transfromations for SB1 binary star and exoplanet systems."""
 
@@ -17,19 +15,28 @@ class PriorTransformClusterSB1(PriorTransformBase):
         primary_mass = self._photometric_mass_constraint.primary_mass_ppf(
             next(unit_cube_iter)
         )
-        secondary_mass = (
-            self._photometric_mass_constraint
-        ).get_conditional_secondary_mass_distribution(
-            primary_mass
-        ).ppf(
-            next(unit_cube_iter)
-        )
         model_parameters['primary_mass'] = primary_mass * units.M_sun
-        model_parameters['secondary_mass'] = secondary_mass * units.M_sun
+
+        self._rv_semiamplitude_constraint.prepare_secondary_sampling(
+            primary_mass=model_parameters['primary_mass'],
+            eccentricity=model_parameters['eccentricity'],
+            orbital_period=model_parameters['orbital_period'],
+            secondary_mass_prior=(
+                self._photometric_mass_constraint
+            ).get_conditional_secondary_mass_distribution(
+                primary_mass
+            )
+        )
+
+        model_parameters['secondary_mass'] = (
+            self._rv_semiamplitude_constraint
+        ).secondary_mass_ppf(
+            next(unit_cube_iter)
+        ) * units.M_sun
 
     def __init__(self,
                  photometric_mass_constraint,
-                 rv_semi_amplitude_distribution,
+                 rv_semi_amplitude_constraint,
                  **kwargs):
         """
         Create a transform using the given sampler for primary star properties.
@@ -39,7 +46,7 @@ class PriorTransformClusterSB1(PriorTransformBase):
                 constraint on the component masses based on photometric
                 measurements.
 
-            rv_semi_amplitude_distribution(MarginalizedRVKDistribution):
+            rv_semi_amplitude_constraint(RVSemiAmplitudeConstraint):
                 Interface to the RV semi-amplitude distribution marginalized
                 over inclination.
 
@@ -51,7 +58,5 @@ class PriorTransformClusterSB1(PriorTransformBase):
 
         super().__init__(**kwargs)
         self._photometric_mass_constraint = photometric_mass_constraint
-        self._rv_semiamplitude_distribution = rv_semi_amplitude_distribution
-
-def main(config):
-    """Avoid polluting global namespace."""
+        self._rv_semiamplitude_constraint = rv_semi_amplitude_constraint
+#pylint: enable=too-few-public-methods

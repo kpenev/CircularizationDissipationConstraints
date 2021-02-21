@@ -47,7 +47,7 @@ def add_dissipation_args(parser):
         'and usually < 1 in the inertial mode range.'
     )
     dissipation.add_argument(
-        '--lgQ-min-range',
+        '--lgQ-min',
         nargs=2,
         type=float,
         default=5.0,
@@ -55,7 +55,7 @@ def add_dissipation_args(parser):
         'parameter.'
     )
     dissipation.add_argument(
-        '--lgQ-break-period-range',
+        '--lgQ-break-period',
         nargs=2,
         type=float,
         default=None,
@@ -64,7 +64,7 @@ def add_dissipation_args(parser):
         'period, hence the `--lgQ-powerlaw-range` argument is ignored.'
     )
     dissipation.add_argument(
-        '--lgQ-powerlaw-range',
+        '--lgQ-powerlaw',
         nargs=2,
         type=float,
         default=None,
@@ -74,7 +74,7 @@ def add_dissipation_args(parser):
         '`--lgQ-break-period-range` argument is ignored.'
     )
     dissipation.add_argument(
-        '--lgQ-inertial-boost-range',
+        '--lgQ-inertial-boost',
         nargs=2,
         type=float,
         default=None,
@@ -103,12 +103,14 @@ def add_cluster_args(parser):
     cluster.add_argument(
         '--cluster-age',
         type=parse_quantity_with_errors,
+        default=None,
         help='The age of the cluster, as well as its estimated '
         'standard deviation(s), possibly asymmetric.'
     )
     cluster.add_argument(
         '--cluster-feh',
         type=parse_quantity_with_errors,
+        default=None,
         help='The measured [Fe/H] for the cluster as well as its estimated '
         'standard deviation(s), possibly asymmetric.'
     )

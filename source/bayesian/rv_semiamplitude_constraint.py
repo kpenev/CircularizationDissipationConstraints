@@ -17,6 +17,7 @@ import numpy
 
 from binary_utils import calculate_secondary_mass
 
+#TODO: allow stopping once CDF error falls below some value (small grid step)
 class RVSemiAmplitudeConstraint:
     """Secondary mass constraint from observed RV semi-amplitude."""
 
@@ -98,6 +99,7 @@ class RVSemiAmplitudeConstraint:
         split = min(self._observed_rvk.isf(1e-6) / max_rv_semiamplitude, 1.0)
         if integrand is None:
             integrand = self._pdf_integrand
+
             split = numpy.sqrt(1.0 - numpy.square(split))
             points = numpy.sqrt(1.0 - numpy.square(points))
 
@@ -212,8 +214,29 @@ class RVSemiAmplitudeConstraint:
         )
         result = 2 * numpy.nonzero(differences > max_differences)[0] + 1
 
-        if result.size > 0:
-            plot_slice = slice(result.min(), result.max() + 1)
+        if 0 < result.size < 10:
+            bad_interpolated_pdf = interpolation(semi_amplitude_grid[result])
+            #As lazy as can be
+            #pylint: disable=logging-not-lazy
+            self._logger.debug(
+                (
+                    'Excessive differences at:'
+                    +
+                    '\n\tK=%s, %s vs %s (diff=%s +- %s)' * result.size
+                ),
+                sum(
+                    zip(semi_amplitude_grid[result],
+                        bad_interpolated_pdf,
+                        bad_interpolated_pdf - pdf_values[result, 0],
+                        pdf_values[result, 1]),
+                    ()
+                )
+            )
+            #pylint: enable=logging-not-lazy
+
+
+        if result.size > 0 and False:
+            plot_slice = slice(max(result.min() - 1, 0), result.max() + 1)
             pyplot.errorbar(semi_amplitude_grid[plot_slice],
                             pdf_values[plot_slice, 0],
                             pdf_values[plot_slice, 1],
@@ -443,6 +466,7 @@ class RVSemiAmplitudeConstraint:
             observed_rvk.ppf(max_discarded_probabiity),
             upper_bound_solution.root
         )
+        print('Support: '+ repr(self._support))
 
         self._rv_semiamplitude_pdf_interp = self._check_for_pickled(
             pickle_fname

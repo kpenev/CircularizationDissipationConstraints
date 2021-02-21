@@ -8,8 +8,10 @@ from types import SimpleNamespace
 import numpy
 
 from reproduce_system import find_evolution
-from evolution_parameters import EvolutionParameters
+from bayesian.evolution_parameters import EvolutionParameters
 
+#Intended to function as callable no need for more public methods
+#pylint: disable=too-few-public-methods
 class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
     """
     Base class for log of the likelihood function to sample from.
@@ -88,6 +90,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         self.interpolator = interpolator
         self.eccentricity_pdf = eccentricity_pdf
         self.initial_eccentricity = initial_eccentricity
+        self.final_eccentricity = None
 
         self.secondary_is_star = secondary_is_star
         super().__init__(secondary_is_star=secondary_is_star,
@@ -139,23 +142,24 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                               rtol=1e-10,
                               atol=1e-10):
 
-                final_eccentricity = evolution.eccentricity[-1]
+                self.final_eccentricity = evolution.eccentricity[-1]
                 #pylint: enable=no-member
 
                 self._logger.info(
                     'Successful evolution found: ef = %g',
-                    final_eccentricity
+                    self.final_eccentricity
                 )
 
-                return numpy.log(self.eccentricity_pdf(final_eccentricity))
+                return numpy.log(self.eccentricity_pdf(self.final_eccentricity))
 
             self._logger.error(
                 'Evolution terminated prematurely at t=%g (< %g) with ef = %g',
                 evolution.age[-1],
                 expected_final_age,
-                final_eccentricity
+                self.final_eccentricity
             )
 
             return -numpy.inf
         finally:
             self._logger.revert_context()
+#pylint: enable=too-few-public-methods
