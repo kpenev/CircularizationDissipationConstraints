@@ -18,12 +18,15 @@ from command_line_utilities import data_dir
 from cmd_utils import\
     CMDPhotometryInterpolator,\
     CMDUSNOPhotometryInterpolator
+from process_e_Q_grid import LinearEccentricityEnvelope
 from bayesian.photometric_constraint import\
     PhotometricConstraint,\
     plot_joint_pdf,\
     plot_m1_cdf,\
     plot_m2_cdf
 from bayesian.rv_semiamplitude_constraint import RVSemiAmplitudeConstraint
+from bayesian.eccentricity_pdf import EccentricityPDF
+
 
 _logger = logging.getLogger(__name__)
 
@@ -249,7 +252,7 @@ def get_rvk_constraint(observed_orbit):
 
     return RVSemiAmplitudeConstraint(
         observed_rvk=stats.rice(
-            b=float(observed_orbit['K'])/float(observed_orbit['e_K']),
+            b=float(observed_orbit['K']) / float(observed_orbit['e_K']),
             scale=float(observed_orbit['e_K']) * 1000.0
         ),
         max_discarded_probabiity=1e-6,
@@ -260,6 +263,25 @@ def get_rvk_constraint(observed_orbit):
         epsrel=1e-8,
         limit=200,
         maxp1=200
+    )
+
+def get_final_eccentricity_pdf(observed_orbit, num_parallel_processes):
+    """Return :class:`EccentricityPDF` instance set-up per an NGC188 binary."""
+
+    eccentricity_envelope = LinearEccentricityEnvelope(min_period=3.0,
+                                                       max_period=20.0,
+                                                       max_eccentricity=0.6)
+
+    return EccentricityPDF(
+        observed_eccentricity=stats.rice(
+            b=float(observed_orbit['e']) / float(observed_orbit['e_e']),
+            scale=float(observed_orbit['e_e'])
+        ),
+        envelope_eccentricity=eccentricity_envelope(
+            float(observed_orbit['Per'])
+        ),
+        pickle_fname='ngc188_sampling.pkl',
+        num_parallel_processes=num_parallel_processes
     )
 
 def _test_photometric_constraint(binary_pkm_id):
