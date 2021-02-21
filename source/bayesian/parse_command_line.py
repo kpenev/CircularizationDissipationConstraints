@@ -311,6 +311,30 @@ def parse_command_line(description,
         formatter_class=DefaultsFormatter,
         ignore_unknown_config_file_keys=True
     )
+    parser.add_argument(
+        '--stellar-evolution-interpolator-dir', '--interpolator-dir',
+        default=(
+            os.path.expanduser(
+                '~/projects/git/poet/stellar_evolution_interpolators'
+            )
+        ),
+        help='The directory to read stellar evolution interpolator from.'
+    )
+    parser.add_argument(
+        '--eccentricity-expansion-coefficients', '--e-coef',
+        default=os.path.expanduser(
+            '~/projects/git/poet/eccentricity_expansion_coef_O200.txt'
+        ),
+        help='The file to read eccentricity expansion coefficients from.'
+    )
+    parser.add_argument(
+        '--num-parallel-processes',
+        type=int,
+        default=4,
+        help='How many multiprocessing processes to use when parallel '
+        'processing is available.'
+    )
+
     if dissipation:
         add_dissipation_args(parser)
     if cluster:
