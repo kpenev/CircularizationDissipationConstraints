@@ -21,6 +21,10 @@ class PriorTransformBase(metaclass=ABCMeta):
             value parameters do not consume unit cube entries. Finally, if
             the distribution is None, the parameter is assumed to follow
             uniform(0, 1) distribution with the specified units.
+
+        parameter_order:    The full list of model parameter names and their
+            corresponding units the transformation must produce in the order in
+            which they will appear in the output array.
     """
 
     _logger = logging.getLogger(__name__)
@@ -94,9 +98,7 @@ class PriorTransformBase(metaclass=ABCMeta):
         Args:
             independent_parameter_distributions:    See same name attribute.
 
-            model_parameter_order([2-tuples]):    The full list of model
-                parameter names and their corresponding units the
-                transformation must produce.
+            model_parameter_order([2-tuples]):    See :attr:`parameter_order`.
 
         Returns:
             None
