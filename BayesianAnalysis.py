@@ -19,6 +19,7 @@ from scipy.optimize import root
 from scipy.optimize import broyden1
 from sympy import *
 
+
 from scipy.optimize import root_scalar
 from scipy.optimize import newton
 
