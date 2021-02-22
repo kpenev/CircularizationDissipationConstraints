@@ -49,8 +49,8 @@ class SuperEccentricityDistribution(metaclass=ABCMeta):
                  e_now_upper_uncertainty,
                  e_now_lower_uncertainty,
                  mean_e_env,
-                 percentile_for_e_now_upper_uncertainty = 0.84,
-                 percentile_for_e_now_lower_uncertainty = 0.16,
+                 percentile_for_e_now_upper_uncertainty = 0.5*(1+erf(1/math.sqrt(2))),
+                 percentile_for_e_now_lower_uncertainty = 1-0.5*(1+erf(1/math.sqrt(2))),
                  e_env_upper_uncertainty=0,
                  e_env_lower_uncertainty=0
                  ):
@@ -59,13 +59,17 @@ class SuperEccentricityDistribution(metaclass=ABCMeta):
         self.e_now_lower_uncertainty = e_now_lower_uncertainty
         self.percentile_for_e_now_upper_uncertainty = percentile_for_e_now_upper_uncertainty
         self.percentile_for_e_now_lower_uncertainty = percentile_for_e_now_lower_uncertainty
+
+        self.distribution_of_present_eccentricity = None
+
+
+
         self.mean_e_env = mean_e_env
         self.e_env_upper_uncertainty = e_env_upper_uncertainty
         self.e_env_lower_uncertainty = e_env_lower_uncertainty
 
-        self.e_env_upper_uncertainty = e_now_upper_uncertainty #This should be modified
-        self.e_env_lower_uncertainty = e_now_lower_uncertainty #This should be modified
-        self.Rice_parameter_b = None
+        #self.e_env_upper_uncertainty = e_now_upper_uncertainty #This should be modified
+        #self.e_env_lower_uncertainty = e_now_lower_uncertainty #This should be modified
 
 
     @abstractmethod
@@ -78,6 +82,8 @@ class SuperEccentricityDistribution(metaclass=ABCMeta):
 
 
 class EccentricityDistribution(SuperEccentricityDistribution):
+
+
     def distribution_of_present_eccentricity_old(self, e_now):
         e_now_stdev = (self.e_now_upper_uncertainty-self.e_now_lower_uncertainty)/2
         if e_now_stdev == 0:
@@ -88,87 +94,27 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         return math.exp(-0.5 * ((e_now - self.mean_e_now) / e_now_stdev) ** 2) / e_now_stdev / math.sqrt(
             2 * math.pi)
 
-    def laguerre_polynomial_of_degree_half(self,x):
-        return (math.exp(x/2))*((1-x)*i0(-x/2)-x*i1(-x/2))
-
-    def derivative_of_laguerre_polynomial_of_degree_half(self,x):
-        return  -0.5 * math.exp(x/2)*(i0(-x/2)+i1(-x/2))
-
-    def percent_point_function_for_Rice_distribution(self, percentile, b, s):
-        print('ppf of rice = ', rice.ppf(percentile, b, scale = s))
-        return rice.ppf(percentile, b, scale = s)
-
-    def mean_of_Rice_distribution(self, b, s):
-        print('mean of rice distribution = ', s * math.sqrt(math.pi/2)*self.laguerre_polynomial_of_degree_half(-(b**2)/2))
-        return s * math.sqrt(math.pi/2)*self.laguerre_polynomial_of_degree_half(-(b**2)/2)
-
-    def derivative_of_mean_of_Rice_distribution(self, b):
-        return math.sqrt(math.pi/2)*self.derivative_of_laguerre_polynomial_of_degree_half(-(b**2)/2)
-
-    def mean_of_Rice_distribution_minus_mean_e_now(self, b, s):
-        #print('d ',self.mean_of_Rice_distribution(b, s)-self.mean_e_now )
-        return self.mean_of_Rice_distribution(b, s)-self.mean_e_now
-
-    def solve_for_b(self):
-        #sol = root_scalar(self.mean_of_Rice_distribution_minus_mean_e_now, x0=0.8, fprime=self.derivative_of_mean_of_Rice_distribution, method='newton')
-        #self.Rice_parameter_b = sol.root
-        #print('vfsdfsd   ', sol.iterations, sol.function_calls)
-
-        #root = newton(self.mean_of_Rice_distribution_minus_mean_e_now, 0.1, fprime=self.derivative_of_mean_of_Rice_distribution)
-
-        return
-
-
+    def phi(self, z):
+        return 0.5 * (1 + erf(z / math.sqrt(2)))
 
     def equations_to_be_solved_for_Rice_distribution_parameters(self, x):
-        #print('ju')
-        #return [self.percent_point_function_for_Rice_distribution(self.percentile_for_e_now_lower_uncertainty, self.Rice_parameter_b, x[0], x[1])-(self.mean_e_now + self.e_now_lower_uncertainty),
-                #self.percent_point_function_for_Rice_distribution(self.percentile_for_e_now_upper_uncertainty, self.Rice_parameter_b, x[0], x[1])-(self.mean_e_now + self.e_now_upper_uncertainty)]
-        #
-        #self.percent_point_function_for_Rice_distribution(self.percentile_for_e_now_lower_uncertainty, x[0], x[1]) - (self.mean_e_now + self.e_now_lower_uncertainty)
-        #return [self.mean_of_Rice_distribution(x[0], x[1])-self.mean_e_now,
-                #self.percent_point_function_for_Rice_distribution(self.percentile_for_e_now_upper_uncertainty, x[0], x[1]) - (self.mean_e_now + self.e_now_upper_uncertainty)]
-        print('eccentricity upper limit = ', (self.mean_e_now + self.e_now_upper_uncertainty))
-        print('eccentricity lower limit = ', (self.mean_e_now + self.e_now_lower_uncertainty))
-        print('b = ', x[0])
-        print('s = ', x[1])
-        print('erf ', erf(1))
-        print('cdf for upper uncertainty ', rice.cdf((self.mean_e_now+self.e_now_upper_uncertainty),x[0], scale = x[1]))
-        print('cdf for lower uncertainty ', rice.cdf((self.mean_e_now+self.e_now_lower_uncertainty),x[0], scale = x[1]))
-        return [rice.cdf((self.mean_e_now+self.e_now_upper_uncertainty), x[0], scale= x[1]) - erf(1),
-                rice.cdf((self.mean_e_now+self.e_now_lower_uncertainty), x[0], scale = x[1]) - (1-erf(1))]
+        return [rice.cdf((self.mean_e_now+self.e_now_upper_uncertainty), x[0], scale = x[1]) - self.percentile_for_e_now_upper_uncertainty,
+                rice.cdf((self.mean_e_now+self.e_now_lower_uncertainty), x[0], scale = x[1]) - self.percentile_for_e_now_lower_uncertainty]
 
-    def diff_of_rice_cdf_wrt_b(self, x, param):
-        b = param[0]
-        s = param[1]
-
-                
-        return
-
-
-    def jacobian_of_the_functions_to_solve_Rice_distribution_parameters(self, x):
-
-        return
 
     def root_for_Rice_parameters(self):
-        #self.Rice_parameter_b = self.solve_for_b()
         root = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, [5, 0.1])
-        #root = broyden1(self.equations_to_be_solved_for_Rice_distribution_parameters, (1,1))
-        #b = Symbol('b')
-        #s = Symbol('s')
-        #x = [b,s]
-        #p, q = nsolve(self.equations_to_be_solved_for_Rice_distribution_parameters(x), [b, s], [0.5, 0.1])
-        #root = [p, q]
-
-        #root = scipy.optimize.root(self.equations_to_be_solved_for_Rice_distribution_parameters, [0.5, 0.8], method='hybr')
-
         return root
 
-    def distribution_of_present_eccentricity(self, e_now):
+    def create_distribution_of_present_eccentricity(self):
         root = self.root_for_Rice_parameters()
-        print('rice parameters ', root)
-        print('SSSSSSSSSSSS Rice Distribution probability of eccentricity_now = ', rice.pdf(e_now, root[0], scale = root[1]) )
-        return rice.pdf(e_now, root[0], scale = root[1])
+        def distribution_of_present_eccentricity(e_now):
+            return rice.pdf(e_now, root[0], scale = root[1])
+        self.distribution_of_present_eccentricity = distribution_of_present_eccentricity
+        return distribution_of_present_eccentricity
+
+    def distribution_of_present_eccentricity(self, e_now):
+        return self.distribution_of_present_eccentricity(e_now)
 
 
     def distribution_of_envelope_eccentricity(self, e_env):
@@ -903,8 +849,8 @@ if __name__ == '__main__':
                                     e_now_upper_uncertainty=0.1,
                                     e_now_lower_uncertainty=-0.1,
                                     mean_e_env=0.3,
-                                    percentile_for_e_now_upper_uncertainty=0.84,
-                                    percentile_for_e_now_lower_uncertainty=0.16)
+                                    percentile_for_e_now_upper_uncertainty=erf(1),
+                                    percentile_for_e_now_lower_uncertainty=(1-erf(1)))
 
     #print('Testing Laguerre polynomial of degree half = ', test.laguerre_polynomial_of_degree_half(0.7) )
     #print('Testing Rice distribution = ', test.mean_of_Rice_distribution(0.2))
@@ -913,6 +859,9 @@ if __name__ == '__main__':
     #print('solve for b ', test.solve_for_b())
 
     print(test.root_for_Rice_parameters())
+    a = test.create_distribution_of_present_eccentricity()
+    print('a ', a(0.2))
+    print('distribution of present eccentricity = ',test.distribution_of_present_eccentricity(0.2))
 
 
     #print('Testing rice distribution: Starts')
