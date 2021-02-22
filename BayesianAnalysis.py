@@ -101,9 +101,30 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         return [rice.cdf((self.mean_e_now+self.e_now_upper_uncertainty), x[0], scale = x[1]) - self.percentile_for_e_now_upper_uncertainty,
                 rice.cdf((self.mean_e_now+self.e_now_lower_uncertainty), x[0], scale = x[1]) - self.percentile_for_e_now_lower_uncertainty]
 
+    def laguerre_polynomial_of_degree_half(self, x):
+        return (math.exp(x/2))*((1-x)*i0(-x/2)-x*i1(-x/2))
+
+    def derivative_of_laguerre_polynomial_of_degree_half(self, x):
+        return -0.5*math.exp(-x/2)*(i0(-x/2)+i1(-x/2))
+
+
+
 
     def root_for_Rice_parameters(self):
-        root = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, [5, 0.1])
+        estimated_s = self.e_now_upper_uncertainty
+        def func(b):
+            return math.sqrt(math.pi/2) * self.laguerre_polynomial_of_degree_half(-0.5*b*b)-self.mean_e_now/estimated_s
+        print('check ', func(80))
+        def func_prime(b):
+            return math.sqrt(math.pi/2) * self.derivative_of_laguerre_polynomial_of_degree_half(-0.5*b*b)*(-b)
+
+        print('check 2 = ', func_prime(52))
+        estimated_b = fsolve(func,
+                             self.mean_e_now/estimated_s,
+                             fprime = func_prime)
+
+        root = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, [estimated_b[0], estimated_s])
+        #root = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, [0.8/0.01, 0.01])
         return root
 
     def create_distribution_of_present_eccentricity(self):
@@ -845,12 +866,10 @@ class BayesianAnalysis:
 
 if __name__ == '__main__':
     #print(4)
-    test = EccentricityDistribution(mean_e_now=0.5,
-                                    e_now_upper_uncertainty=0.1,
-                                    e_now_lower_uncertainty=-0.1,
-                                    mean_e_env=0.3,
-                                    percentile_for_e_now_upper_uncertainty=erf(1),
-                                    percentile_for_e_now_lower_uncertainty=(1-erf(1)))
+    test = EccentricityDistribution(mean_e_now=0.8,
+                                    e_now_upper_uncertainty=0.01,
+                                    e_now_lower_uncertainty=-0.01,
+                                    mean_e_env=0.3)
 
     #print('Testing Laguerre polynomial of degree half = ', test.laguerre_polynomial_of_degree_half(0.7) )
     #print('Testing Rice distribution = ', test.mean_of_Rice_distribution(0.2))
@@ -860,8 +879,8 @@ if __name__ == '__main__':
 
     print(test.root_for_Rice_parameters())
     a = test.create_distribution_of_present_eccentricity()
-    print('a ', a(0.2))
-    print('distribution of present eccentricity = ',test.distribution_of_present_eccentricity(0.2))
+    print('a ', a(0.79))
+    print('distribution of present eccentricity = ',test.distribution_of_present_eccentricity(0.79))
 
 
     #print('Testing rice distribution: Starts')
