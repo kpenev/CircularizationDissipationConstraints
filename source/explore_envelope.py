@@ -55,7 +55,7 @@ def parse_configuration():
         '--eccentricity-grid', '--e-grid',
         nargs=3,
         action=ParseGrid,
-        default=numpy.linspace(0, 0.5, 6),
+        default=numpy.linspace(0.4, 0.5, 2),
         metavar=('MIN_ECC', 'MAX_ECC', 'NUM_ECC'),
         help='The eccentricies for which to calculate evolutions. The arguments'
         'are the same as numpy.linspace.'
@@ -63,7 +63,7 @@ def parse_configuration():
     parser.add_argument(
         '--orbital-period-grid', '--porb-grid',
         nargs=3,
-        default=numpy.linspace(3.0, 20.0, 35),
+        default=numpy.linspace(3.0, 20.0, 70),
         action=ParseGrid,
         metavar=('MIN_PER', 'MAX_PER', 'NUM_PER'),
         help='The orbital periods for which to calculate evolutions. The '
@@ -72,7 +72,7 @@ def parse_configuration():
     parser.add_argument(
         '--plot-ages',
         nargs=3,
-        default=numpy.linspace(0.1, 10.0, 100),
+        default=numpy.linspace(0.1, 10.0, 1000),
         action=ParseGrid,
         metavar=('MIN_AGE', 'MAX_AGE', 'NUM_AGES'),
         help='The ages at which to plot the eccentricity envelope. The '
