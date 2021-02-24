@@ -85,16 +85,6 @@ class SuperEccentricityDistribution(metaclass=ABCMeta):
 class EccentricityDistribution(SuperEccentricityDistribution):
 
 
-    def distribution_of_present_eccentricity_old(self, e_now):
-        e_now_stdev = (self.e_now_upper_uncertainty-self.e_now_lower_uncertainty)/2
-        if e_now_stdev == 0:
-            if e_now == self.mean_e_now:
-                return math.inf
-            else:
-                return 0
-        return math.exp(-0.5 * ((e_now - self.mean_e_now) / e_now_stdev) ** 2) / e_now_stdev / math.sqrt(
-            2 * math.pi)
-
     def phi(self, z):
         return 0.5 * (1 + erf(z / math.sqrt(2)))
 
@@ -102,30 +92,11 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         return [rice.cdf((self.mean_e_now+self.e_now_upper_uncertainty), x[0], scale = x[1]) - self.percentile_for_e_now_upper_uncertainty,
                 rice.cdf((self.mean_e_now+self.e_now_lower_uncertainty), x[0], scale = x[1]) - self.percentile_for_e_now_lower_uncertainty]
 
-    def laguerre_polynomial_of_degree_half(self, x):
-        return (math.exp(x/2))*((1-x)*i0(-x/2)-x*i1(-x/2))
-
-    def derivative_of_laguerre_polynomial_of_degree_half(self, x):
-        return -0.5*math.exp(-x/2)*(i0(-x/2)+i1(-x/2))
-
-
-
-
     def root_for_Rice_parameters(self):
         estimated_s = self.e_now_upper_uncertainty
-        def func(b):
-            return math.sqrt(math.pi/2) * self.laguerre_polynomial_of_degree_half(-0.5*b*b)-self.mean_e_now/estimated_s
-        print('check ', func(80))
-        def func_prime(b):
-            return math.sqrt(math.pi/2) * self.derivative_of_laguerre_polynomial_of_degree_half(-0.5*b*b)*(-b)
+        estimated_b = self.mean_e_now/self.e_now_upper_uncertainty
 
-        print('check 2 = ', func_prime(52))
-        estimated_b = fsolve(func,
-                             self.mean_e_now/estimated_s,
-                             fprime = func_prime)
-
-        root = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, [estimated_b[0], estimated_s])
-        #root = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, [0.8/0.01, 0.01])
+        root = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, [estimated_b, estimated_s])
         return root
 
     def create_distribution_of_present_eccentricity(self):
@@ -163,6 +134,13 @@ class EccentricityDistribution(SuperEccentricityDistribution):
 
             return value
         # For the middle part of the eccentricity vs. log(orbital period) graph where we have to find the envelop.
+
+        if (self.e_env_upper_uncertainty==0 or self.e_env_lower_uncertainty==0):
+            if (e<self.mean_e_env and self.mean_e_env<1):
+                w = lambda e_now: self.distribution_of_present_eccentricity(e_now) / (self.mean_e_env - e_now)
+                return nquad(w, [[0, e]])
+            return 0
+
         return nquad(lambda e_now, e_envelope: self.distribution_of_present_eccentricity(
             e_now) * self.distribution_of_envelope_eccentricity(e_envelope) / (e_envelope - e_now),
                      [self.bounds_e_now(e), self.bounds_e_env(e)])
