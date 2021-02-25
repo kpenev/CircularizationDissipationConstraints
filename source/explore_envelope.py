@@ -141,6 +141,21 @@ class EvolveScenario:
                         current_config[var_name]).all()
                 del pickled_config[var_name]
                 del current_config[var_name]
+            assert (
+                current_config['max_evolution_runtime']
+                <
+                pickled_config['max_evolution_runtime']
+                or
+                pickled_config['max_evolution_runtime'] == 0
+            )
+            for var_name in ['number_parallel_processes',
+                             'stellar_evolution',
+                             'progress_pickle_fname',
+                             'max_evolution_runtime']:
+                del pickled_config[var_name]
+                del current_config[var_name]
+            print('Current config: ' + repr(current_config))
+            print('Pickled config: ' + repr(pickled_config))
             assert pickled_config == current_config
 
             try:
