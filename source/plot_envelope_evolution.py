@@ -12,6 +12,9 @@ from configargparse import\
     DefaultsFormatter
 import numpy
 
+from orbital_evolution.transformations import lgQ
+from orbital_evolution.command_line_util import get_phase_lag_config
+
 def parse_configuration():
     """Return the configurations of how to create the plots."""
 
@@ -58,8 +61,12 @@ def parse_configuration():
     parser.add_argument(
         '--label', '-l',
         default=None,
-        help='A %%-substitution pattern involving configuration entries from '
-        'the pickles to use as the label to display for each set of points.'
+        help='A %%-substitution pattern to use as the label to display for each'
+        ' set of points. The allowed substitutions are all configuration '
+        'entries from the pickles as well as `%(lgQprimary)s`" and '
+        '`%(lgQsecondary)s` which get replated with expressions of the '
+        'currently setup dissipation with all its dependencies, excluding '
+        'surrounding `$`.'
     )
 
     return parser.parse_args()
@@ -92,14 +99,6 @@ def unpickle_data(pickle_fname):
                 )
                 evolution = pickle.load(pickle_file)
                 num_steps = evolution.age.size
-                print(
-                    'Comparing:\n%s\nto\n%s'
-                    %
-                    (
-                        repr(pickled_config.plot_ages[:num_steps]),
-                        repr(evolution.age)
-                    )
-                )
                 if not (
                         numpy.abs(pickled_config.plot_ages[:num_steps]
                                   -
@@ -124,6 +123,34 @@ def unpickle_data(pickle_fname):
             eccentricity_evolutions
         )
     )
+
+def get_label_substitutions(system_config):
+    """Return dictionary of everything that can be included in plot labels."""
+
+    result = vars(system_config)
+    for component in ['primary', 'secondary']:
+        dissipation = get_phase_lag_config(system_config,
+                                           component == 'primary')
+        entry = '%g' % lgQ(dissipation['reference_phase_lag'])
+        if dissipation['tidal_frequency_breaks'] is not None:
+            entry += ' + piecewise('
+            for powerlaw_above, frequency in reversed(
+                    zip(dissipation['tidal_frequency_powers'][1:],
+                        dissipation['tidal_frequency_breaks'])
+            ):
+                entry += (r'%g \leftarrow \P{tide} = %g d\rightarrow '
+                          %
+                          (-powerlaw_above, 2.0 * pi / frequency))
+            entry += '%g)' % dissipation['tidal_frequency_powers'][0]
+
+        if dissipation['inertial_mode_enhancement'] != 1:
+            entry += (r' - %g\ \mathrm{if inertial}'
+                      %
+                      numpy.log10(dissipation['inertial_mode_enhancement']))
+
+        result['lgQ' + component] = entry
+
+    return result
 
 def create_movie(frame_pattern, movie_fname):
     """Stitch the generated frames into a movie."""
@@ -161,7 +188,9 @@ if __name__ == '__main__':
             plot_config = dict(markeredgecolor=color,
                                markerfacecolor=color)
             if config.label is not None:
-                plot_config['label'] = config.label % vars(system_config)
+                plot_config['label'] = config.label % get_label_substitutions(
+                    system_config
+                )
             pyplot.plot(periods[frame].flatten(),
                         eccentricities[frame].flatten(),
                         'o',
