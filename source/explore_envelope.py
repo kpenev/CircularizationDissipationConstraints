@@ -143,7 +143,7 @@ class EvolveScenario:
                 del current_config[var_name]
             assert (
                 current_config['max_evolution_runtime']
-                <
+                <=
                 pickled_config['max_evolution_runtime']
                 or
                 pickled_config['max_evolution_runtime'] == 0
