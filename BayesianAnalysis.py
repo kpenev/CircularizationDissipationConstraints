@@ -63,14 +63,9 @@ class SuperEccentricityDistribution(metaclass=ABCMeta):
 
         self.distribution_of_present_eccentricity = None
 
-
-
         self.mean_e_env = mean_e_env
         self.e_env_upper_uncertainty = e_env_upper_uncertainty
         self.e_env_lower_uncertainty = e_env_lower_uncertainty
-
-        #self.e_env_upper_uncertainty = e_now_upper_uncertainty #This should be modified
-        #self.e_env_lower_uncertainty = e_now_lower_uncertainty #This should be modified
 
 
     @abstractmethod
@@ -84,7 +79,6 @@ class SuperEccentricityDistribution(metaclass=ABCMeta):
 
 class EccentricityDistribution(SuperEccentricityDistribution):
 
-
     def phi(self, z):
         return 0.5 * (1 + erf(z / math.sqrt(2)))
 
@@ -95,7 +89,6 @@ class EccentricityDistribution(SuperEccentricityDistribution):
     def root_for_Rice_parameters(self):
         estimated_s = self.e_now_upper_uncertainty
         estimated_b = self.mean_e_now/self.e_now_upper_uncertainty
-
         root = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, [estimated_b, estimated_s])
         return root
 
@@ -108,7 +101,6 @@ class EccentricityDistribution(SuperEccentricityDistribution):
 
     def distribution_of_present_eccentricity(self, e_now):
         return self.distribution_of_present_eccentricity(e_now)
-
 
     def distribution_of_envelope_eccentricity(self, e_env):
         e_env_stdev = (self.e_env_upper_uncertainty-self.e_env_lower_uncertainty)/2
@@ -131,19 +123,21 @@ class EccentricityDistribution(SuperEccentricityDistribution):
             # For the right part of the eccentricity vs. log(orbital period) graph where eccentricity excedes 0.5:
             w = lambda e_now: self.distribution_of_present_eccentricity(e_now) / (1 - e_now)
             value = nquad(w, [[0, e]])
+            return value[0]
 
-            return value
         # For the middle part of the eccentricity vs. log(orbital period) graph where we have to find the envelop.
-
         if (self.e_env_upper_uncertainty==0 or self.e_env_lower_uncertainty==0):
             if (e<self.mean_e_env and self.mean_e_env<1):
                 w = lambda e_now: self.distribution_of_present_eccentricity(e_now) / (self.mean_e_env - e_now)
-                return nquad(w, [[0, e]])
+                value = nquad(w, [[0, e]])
+                return value[0]
             return 0
 
-        return nquad(lambda e_now, e_envelope: self.distribution_of_present_eccentricity(
+        value = nquad(lambda e_now, e_envelope: self.distribution_of_present_eccentricity(
             e_now) * self.distribution_of_envelope_eccentricity(e_envelope) / (e_envelope - e_now),
                      [self.bounds_e_now(e), self.bounds_e_env(e)])
+
+        return value[0]
 
     def bounds_e_now(self, e):
         return [0, e]
@@ -468,11 +462,11 @@ class BayesianAnalysis:
 
         #       print(repr(dir(b)))
         if  calculated_eccentricity_now >= 0 and calculated_eccentricity_now <=1:
-            print('QQQQQQQQ calculated eccentricity now = ', calculated_eccentricity_now)
+            print('calculated eccentricity now = ', calculated_eccentricity_now)
             probability_density_of_eccentricity_now = self.probability_density_distribution_of_eccentricity(calculated_eccentricity_now)[0]
 
-            print('********************* probability density ', probability_density_of_eccentricity_now)
-            print('sddsfdsfd priors ', priors)
+            print('probability density ', probability_density_of_eccentricity_now)
+            print('priors ', priors)
 
             probability_density = probability_density_of_eccentricity_now * priors
             if probability_density == 0:
@@ -761,7 +755,7 @@ class BayesianAnalysis:
                             spin_frequency_breaks=None,
                             tidal_frequency_powers=numpy.array([0.0]),
                             spin_frequency_powers=numpy.array([0.0]),
-                            reference_phase_lag=phase_lag(8)
+                            reference_phase_lag=phase_lag(5)
                         )
                     )
                     final_age = stellar_age[i]
@@ -850,16 +844,13 @@ if __name__ == '__main__':
                                     e_now_lower_uncertainty=-0.01,
                                     mean_e_env=0.3)
 
-    #print('Testing Laguerre polynomial of degree half = ', test.laguerre_polynomial_of_degree_half(0.7) )
-    #print('Testing Rice distribution = ', test.mean_of_Rice_distribution(0.2))
-    #print('ppf of rice distribution = ', test.percent_point_function_for_Rice_distribution(percentile = 0.16, b=0.5, local=0.1, scale=2))
-    #print('mean of rice distribution minus mean e_now = ', test.mean_of_Rice_distribution_minus_mean_e_now(0.2))
-    #print('solve for b ', test.solve_for_b())
 
-    print(test.root_for_Rice_parameters())
+
+    print('roots for Rice parameters are:',test.root_for_Rice_parameters())
     a = test.create_distribution_of_present_eccentricity()
-    print('a ', a(0.79))
-    print('distribution of present eccentricity = ',test.distribution_of_present_eccentricity(0.79))
+    print('probability of present eccentricity is 0.8 = ',test.distribution_of_present_eccentricity(0.78))
+    print('probability density of eccentricity = ', 0.78, 'is ',test.distribution_of_eccentricity_by_nquad(0.79))
+    print('probability density of eccentricity = ', 0.6, 'is', test.distribution_of_eccentricity_by_nquad(0.6))
 
 
     #print('Testing rice distribution: Starts')
@@ -908,11 +899,11 @@ if __name__ == '__main__':
 
     #Testing testing_log_prob, MCMC and other methods
 
-    #print('Testing testing_log_prob, MCMC and other methods: Start')
-    #test = BayesianAnalysis()
+    print('Testing testing_log_prob, MCMC and other methods: Start')
+    test = BayesianAnalysis()
 
-    #test.testing_log_prob()
-    #test.MCMC()
+    test.testing_log_prob()
+    test.MCMC()
 
     #    b = EccentricityDistribution(mean_e_now=0.2, e_now_stdev=0.5, mean_e_env=0.8, e_env_stdev=0.5)
     #    print('The value of b is nquad = ', b.distribution_of_eccentricity_by_nquad(e=0.6))
