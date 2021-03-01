@@ -41,19 +41,26 @@ def parse_configuration():
         'witha defferent color.'
     )
     parser.add_argument(
+        '--show-interpolation',
+        action='store_true',
+        help='If passed, the movie showing the eccentricity envelope evolution '
+        'includes lines showing the interpolation of the envelope vs period.'
+    )
+    parser.add_argument(
         '--frame-fname-pattern',
         default='eccentricity_envelope_frames/frame%05d.jpg',
         help='A %%-substitution pattern to generate filenames for output '
         'frames.'
     )
     parser.add_argument(
-        '--movie-fname',
-        default='eccentricity_envelope_evolution.mp4',
-        help='A filename to save the movie as. If empty sting, no movie is '
-        'created just tho individual frames which are then always preserved.'
+        '--envelope-movie-fname',
+        default=None,
+        help='Create a movie showing the evolution of the period-eccentricity '
+        'enveloqe with the given filename. If empty sting, no movie is created '
+        'just the individual frames which are then always preserved.'
     )
     parser.add_argument(
-        '--keep-frames',
+        '--keep-envelope-frames',
         action='store_true',
         help='If this argument is passed, the frames that were generated when '
         'creating the movie are not deleted at the end. Note that if '
@@ -61,16 +68,30 @@ def parse_configuration():
         'automatically deleted!'
     )
     parser.add_argument(
+        '--circularization-period-plot',
+        default=None,
+        help='Create a plot of the circularization cut-off period as a '
+        'function of age with the given filename.'
+    )
+    parser.add_argument(
+        '--circularization-threshold',
+        type=float,
+        default=0.1,
+        help='The eccentricity threshold value uesd to determine the '
+        'circularization cut-off period.'
+    )
+    parser.add_argument(
         '--label', '-l',
         default=None,
         help='A %%-substitution pattern to use as the label to display for each'
-        ' set of points. The allowed substitutions are all configuration '
-        'entries from the pickles as well as `%%(lgQprimary)s`" and '
-        '`%%(lgQsecondary)s` which get replated with expressions of the '
-        'currently setup dissipation with all its dependencies, excluding '
-        'surrounding `$`.'
+        ' set of points. All configuration entries are allowed as '
+        'substitutions. Further, `%%(lgQprimary)s`" and `%%(lgQsecondary)s` can'
+        ' be used, which get replated with expressions of the currently setup '
+        'dissipation with all its dependencies, excluding surrounding `$`. '
+        'Finally, for circularization period plots only, the label can include '
+        '`%%(e0)f` which gets replaced by the initial eccentiricty a particular'
+        ' envelope is based on.'
     )
-
     return parser.parse_args()
 
 def unpickle_data(pickle_fname):
@@ -140,9 +161,9 @@ def get_label_substitutions(system_config):
                     reversed(dissipation['tidal_frequency_powers'][1:]),
                     reversed(dissipation['tidal_frequency_breaks'])
             ):
-                entry += (r'%g \leftarrow \P{tide} = %g d\rightarrow '
+                entry += (r'%g \leftarrow P_{tide} = %g d\rightarrow '
                           %
-                          (-powerlaw_above, 2.0 * numpy.pi / frequency))
+                          (0.0 - powerlaw_above, 2.0 * numpy.pi / frequency))
             entry += '%g)' % dissipation['tidal_frequency_powers'][0]
 
         if dissipation['inertial_mode_enhancement'] != 1:
@@ -167,9 +188,14 @@ def interpolate_envelope(data, eccentricity_index, age_index):
     )
     interp_x = interp_x[good_data]
     interp_y = interp_y[good_data]
-    return UnivariateSpline(interp_x,
-                            interp_y,
-                            s=1e-6 * interp_y.size)
+    sorting_indices = numpy.argsort(interp_x)
+    interp_x = interp_x[sorting_indices]
+    interp_y = interp_y[sorting_indices]
+    result = UnivariateSpline(interp_x,
+                              interp_y,
+                              s=1e-6 * interp_y.size)
+    result.support = interp_x[0], interp_x[-1]
+    return result
 
 def find_circularization_period(data, threshold):
     """
@@ -198,15 +224,19 @@ def find_circularization_period(data, threshold):
     for eccentricity_index in range(config.eccentricity_grid.size):
         for age_index in range(config.plot_ages.size):
             envelope = interpolate_envelope(data, eccentricity_index, age_index)
-            result[eccentricity_index, age_index] = root_scalar(
-                #pylint: disable=cell-var-from-loop
-                lambda x: envelope(x) - threshold,
-                #pylint: enable=cell-var-from-loop
-                bracket=(config.orbital_period_grid[0],
-                         config.orbital_period_grid[-1]),
-                fprime=envelope.derivative(),
-                fprime2=envelope.derivative(2)
-            )
+            try:
+                root_find_result = root_scalar(
+                    #pylint: disable=cell-var-from-loop
+                    lambda x: envelope(x) - threshold,
+                    #pylint: enable=cell-var-from-loop
+                    bracket=envelope.support,
+                    fprime=envelope.derivative(),
+                    fprime2=envelope.derivative(2)
+                )
+                assert root_find_result.converged
+                result[eccentricity_index, age_index] = root_find_result.root
+            except ValueError:
+                pass
 
     return result
 
@@ -219,7 +249,7 @@ def create_movie(frame_pattern, movie_fname):
           '-i', frame_pattern,
           movie_fname])
 
-def plot_frame(frame, data, label, show_interpolation=True):
+def plot_frame(frame, data, label, show_interpolation):
     """Setup a plot to save as a single frame of the circularization movie."""
 
     plot_colors = ['#e41a1c',
@@ -231,24 +261,24 @@ def plot_frame(frame, data, label, show_interpolation=True):
     xmax = ymax = -numpy.inf
     for color_index, single_run_data in enumerate(data):
 
-        system_config, _ = single_run_data
+        scenario_config, _ = single_run_data
         color = plot_colors[color_index % len(plot_colors)]
         plot_config = dict(markeredgecolor=color,
                            markerfacecolor=color)
         if label is not None:
             plot_config['label'] = label % get_label_substitutions(
-                system_config
+                scenario_config
             )
         pyplot.plot(single_run_data[1][0][frame].flatten(),
                     single_run_data[1][1][frame].flatten(),
                     'o',
                     **plot_config)
-        xmax = max(system_config.orbital_period_grid[-1], xmax)
-        ymax = max(system_config.eccentricity_grid[-1], ymax)
+        xmax = max(scenario_config.orbital_period_grid[-1], xmax)
+        ymax = max(scenario_config.eccentricity_grid[-1], ymax)
         if show_interpolation:
             eval_x = numpy.linspace(0, xmax, 1000)
             for eccentricity_index in range(
-                    system_config.eccentricity_grid.size
+                    scenario_config.eccentricity_grid.size
             ):
                 pyplot.plot(
                     eval_x,
@@ -270,27 +300,56 @@ def main(config):
     data = [unpickle_data(evolution_pickle)
             for evolution_pickle in config.evolution_pickles]
     plot_ages = data[0][0].plot_ages
-    for system_config, _ in data:
-        assert (system_config.plot_ages == plot_ages).all()
+    for scenario_config, _ in data:
+        assert (scenario_config.plot_ages == plot_ages).all()
 
-    for frame, age in enumerate(plot_ages):
 
-        plot_frame(frame, data, config.label)
-        pyplot.title('Age = %.3f' % age)
+    if config.frame_fname_pattern:
+        for frame, age in enumerate(plot_ages):
+            plot_frame(frame, data, config.label, config.show_interpolation)
+            pyplot.title('Age = %.3f' % age)
 
-        outfname = config.frame_fname_pattern % frame
-        outdir = path.dirname(outfname)
-        if outdir and not path.exists(outdir):
-            makedirs(outdir)
-        pyplot.savefig(outfname)
+            outfname = config.frame_fname_pattern % frame
+            outdir = path.dirname(outfname)
+            if outdir and not path.exists(outdir):
+                makedirs(outdir)
+            pyplot.savefig(outfname)
+            pyplot.cla()
+            frame_fnames.append(outfname)
+
+        if config.envelope_movie_fname:
+            create_movie(config.frame_fname_pattern,
+                         config.envelope_movie_fname)
+            if not config.keep_envelope_frames:
+                for oufname in frame_fnames:
+                    remove(oufname)
+
+    if config.circularization_period_plot:
+        plot_config = dict(linestyle='-')
+        for scenario_data in data:
+            circularization_period = find_circularization_period(
+                scenario_data,
+                config.circularization_threshold
+            )
+            for eccentricity_index, initial_eccentricity in enumerate(
+                    scenario_data[0].eccentricity_grid
+            ):
+                if config.label is not None:
+                    plot_config['label'] = config.label % dict(
+                        get_label_substitutions(
+                            scenario_data[0]
+                        ),
+                        e0=initial_eccentricity
+                    )
+
+                pyplot.plot(
+                    scenario_data[0].plot_ages,
+                    circularization_period[eccentricity_index],
+                    **plot_config
+                )
+        pyplot.legend(loc=2)
+        pyplot.savefig(config.circularization_period_plot)
         pyplot.cla()
-        frame_fnames.append(outfname)
-
-    if config.movie_fname:
-        create_movie(config.frame_fname_pattern, config.movie_fname)
-        if not config.keep_frames:
-            for oufname in frame_fnames:
-                remove(oufname)
 
 if __name__ == '__main__':
     main(parse_configuration())
