@@ -143,7 +143,8 @@ def add_stellar_spindown_args(parser, num_stars):
             nargs=2,
             default=(5.0, 5.0),
             help='The prior distribution to assume for the period (in days) to '
-            'which the surface spin of stars is locked until the disk dissipates.'
+            'which the surface spin of stars is locked until the disk '
+            'dissipates.'
         )
         spin.add_argument(
             '--%s-wind-strength' % component,
@@ -158,8 +159,8 @@ def add_stellar_spindown_args(parser, num_stars):
             type=float,
             nargs=2,
             default=(2.45, 2.45),
-            help='The frequency, in rad/day, above which the scaling of angular '
-            'momentum loss with spin changes from cubic to linear.'
+            help='The frequency, in rad/day, above which the scaling of angular'
+            ' momentum loss with spin changes from cubic to linear.'
         )
         spin.add_argument(
             '--%s-core-envelope-coupling-timescale' % component,

@@ -2,6 +2,7 @@
 
 from abc import ABCMeta, abstractmethod
 import logging
+import itertools
 
 import numpy
 
@@ -31,7 +32,9 @@ class PriorTransformBase(metaclass=ABCMeta):
 
     _priors_order = ['dissipation', 'evolution', 'system']
 
-    def _fill_independent_parameters(self, unit_cube_iter, model_parameters):
+    def _fill_independent_parameters(self,
+                                     unit_cube_iter,
+                                     model_parameters):
         """
         Consume unit-cube values to fill independently distributed parameters.
 
@@ -41,6 +44,9 @@ class PriorTransformBase(metaclass=ABCMeta):
 
             model_parameters(dict):    Updated with the values (and units) of
                 the independent model parameters corresponding to the unit cube.
+                If None, just advances the unit cube iterator without any
+                calculations. The latter is used to count the number of free
+                parameters required.
 
         Returns:
             None
@@ -54,11 +60,19 @@ class PriorTransformBase(metaclass=ABCMeta):
             self.independent_parameter_distributions
         ):
             if distribution is None:
-                model_parameters[name] = next(unit_cube_iter) * param_units
+                if model_parameters is None:
+                    next(unit_cube_iter)
+                else:
+                    model_parameters[name] = next(unit_cube_iter) * param_units
             elif hasattr(distribution, 'ppf'):
-                model_parameters[name] = (distribution.ppf(next(unit_cube_iter))
-                                          *
-                                          param_units)
+                if model_parameters is None:
+                    next(unit_cube_iter)
+                else:
+                    model_parameters[name] = (
+                        distribution.ppf(next(unit_cube_iter))
+                        *
+                        param_units
+                    )
             else:
                 try:
                     model_parameters[name] = float(distribution) * param_units
@@ -71,7 +85,9 @@ class PriorTransformBase(metaclass=ABCMeta):
                     )
 
     @abstractmethod
-    def _fill_coupled_parameters(self, unit_cube_iter, model_parameters):
+    def _fill_coupled_parameters(self,
+                                 unit_cube_iter,
+                                 model_parameters):
         """
         Update input with parameters not distributed independntly of all others.
 
@@ -168,4 +184,13 @@ class PriorTransformBase(metaclass=ABCMeta):
         )
 
         return transformed_values
+
+    def count_sampled_parameters(self):
+        """Count the random variates required by the defined transform."""
+
+        counter = itertools.count()
+        self._fill_independent_parameters(counter, None)
+        self._fill_coupled_parameters(counter, None)
+        return next(counter)
+
 #pylint: enable=too-few-public-methods

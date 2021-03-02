@@ -809,7 +809,10 @@ class StarSampler:
             open(self.config.star_sampler_pickle_fname, 'wb').close()
             return False
         try:
-            with open(self.config.star_sampler_pickle_fname, 'rb') as pickle_file:
+            with open(
+                    self.config.star_sampler_pickle_fname,
+                    'rb'
+            ) as pickle_file:
                 unpickler = Unpickler(pickle_file)
                 while True:
                     section, nobjects = unpickler.load()

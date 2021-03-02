@@ -9,8 +9,15 @@ from bayesian.prior_transform_base import PriorTransformBase
 class PriorTransformClusterSB1(PriorTransformBase):
     """Prior transfromations for SB1 binary star and exoplanet systems."""
 
-    def _fill_coupled_parameters(self, unit_cube_iter, model_parameters):
+    def _fill_coupled_parameters(self,
+                                 unit_cube_iter,
+                                 model_parameters):
         """Fills [Fe/H], current system age, and primary mass."""
+
+        if model_parameters is None:
+            next(unit_cube_iter)
+            next(unit_cube_iter)
+            return
 
         primary_mass = self._photometric_mass_constraint.primary_mass_ppf(
             next(unit_cube_iter)

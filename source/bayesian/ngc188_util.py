@@ -25,7 +25,7 @@ from bayesian.photometric_constraint import\
     plot_m1_cdf,\
     plot_m2_cdf
 from bayesian.rv_semiamplitude_constraint import RVSemiAmplitudeConstraint
-from bayesian.eccentricity_pdf import EccentricityPDF
+from bayesian.eccentricity_likelihood import EccentricityLikelihood
 
 
 _logger = logging.getLogger(__name__)
@@ -265,23 +265,21 @@ def get_rvk_constraint(observed_orbit):
         maxp1=200
     )
 
-def get_final_eccentricity_pdf(observed_orbit, num_parallel_processes):
-    """Return :class:`EccentricityPDF` instance set-up per an NGC188 binary."""
+def get_final_eccentricity_likelihood(observed_orbit):
+    """Return :class:`EccentricityLikelihood` instance per the given orbit."""
 
     eccentricity_envelope = LinearEccentricityEnvelope(min_period=3.0,
                                                        max_period=20.0,
                                                        max_eccentricity=0.6)
 
-    return EccentricityPDF(
+    return EccentricityLikelihood(
         observed_eccentricity=stats.rice(
             b=float(observed_orbit['e']) / float(observed_orbit['e_e']),
             scale=float(observed_orbit['e_e'])
         ),
         envelope_eccentricity=eccentricity_envelope(
             float(observed_orbit['Per'])
-        ),
-        pickle_fname='ngc188_sampling.pkl',
-        num_parallel_processes=num_parallel_processes
+        )
     )
 
 def _test_photometric_constraint(binary_pkm_id):
@@ -302,6 +300,8 @@ def _test_photometric_constraint(binary_pkm_id):
     plot_m1_cdf(constraint)
     plot_m2_cdf(constraint)
 
+#TODO: split up
+#pylint: disable=too-many-locals
 def _test_rvk_constraint(binary_pkm_id):
     """Display plots showing the RV based constraint."""
 
@@ -408,6 +408,7 @@ def _test_rvk_constraint(binary_pkm_id):
                             plot_cdf)
     plots['middle'].set_ylim((0.1, 10.0))
     pyplot.show()
+#pylint: enable=too-many-locals
 
 if __name__ == '__main__':
     set_start_method('forkserver')

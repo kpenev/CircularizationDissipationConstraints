@@ -23,8 +23,8 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         interpolator:    Stellar evolution interpolator to use in orbital
             evolution calculations.
 
-        eccentricity_pdf(callable):    The probability density for the final
-            eccentricity.
+        eccentricity_likelihood(callable):    The likelihood functionof the
+            final eccentricity.
 
         initial_eccentricity(float):    The "high" initial eccentricity the
             evolution will always start with.
@@ -62,7 +62,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
 
     def __init__(self,
                  interpolator,
-                 eccentricity_pdf,
+                 eccentricity_likelihood,
                  secondary_is_star,
                  initial_eccentricity,
                  **kwargs):
@@ -73,7 +73,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             interpolator:    A POET stelar evolution interpolator to use for
                 calculating the orbital evolution.
 
-            eccentricity_pdf:    See :attr:`eccentricity_pdf`.
+            eccentricity_likelihood:    See :attr:`eccentricity_likelihood`.
 
             secondary_is_star(bool):    True iff the secondary in the system is
                 an evolving star.
@@ -88,7 +88,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         """
 
         self.interpolator = interpolator
-        self.eccentricity_pdf = eccentricity_pdf
+        self.eccentricity_likelihood = eccentricity_likelihood
         self.initial_eccentricity = initial_eccentricity
         self.final_eccentricity = None
 
@@ -150,7 +150,9 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                     self.final_eccentricity
                 )
 
-                return numpy.log(self.eccentricity_pdf(self.final_eccentricity))
+                return numpy.log(
+                    self.eccentricity_likelihood(self.final_eccentricity)
+                )
 
             self._logger.error(
                 'Evolution terminated prematurely at t=%g (< %g) with ef = %g',

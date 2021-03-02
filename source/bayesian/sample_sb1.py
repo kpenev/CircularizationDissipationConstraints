@@ -8,6 +8,7 @@ from multiprocessing import set_start_method
 
 from astropy import units
 from scipy import stats
+from dynesty import NestedSampler
 
 from stellar_evolution.manager import StellarEvolutionManager
 from orbital_evolution.evolve_interface import library as\
@@ -50,10 +51,11 @@ def get_independent_priors(config, observed_orbit):
 
         result = [
             (
-                'lgQ_min',
-                get_uniform_distribution('lgQ_min'),
+                param_name,
+                get_uniform_distribution(param_name),
                 units.dimensionless_unscaled
             )
+            for param_name in ['lgQ_min', 'lgQ_inertial_boost']
         ]
         if (
                 config.lgQ_break_period is not None
@@ -68,10 +70,6 @@ def get_independent_priors(config, observed_orbit):
                 )
                 for param in ['lgQ_break_period', 'lgQ_powerlaw']
             ])
-
-        if config.lgQ_inertial_boost:
-            raise RuntimeError('Inertial mode range dissipation boost is not '
-                               'yet implemented')
 
         return result
 
@@ -99,21 +97,6 @@ def get_independent_priors(config, observed_orbit):
                 'disk_dissipation_age',
                 get_uniform_distribution('disk_dissipation_age'),
                 units.Myr
-            ),
-            (
-                'orbical_period',
-                7.0,
-                units.day
-            ),
-            (
-                'rv_semi_amplitude',
-                stats.norm(16.46, 0.16),
-                units.km / units.s
-            ),
-            (
-                'cos_inclination',
-                stats.uniform(-1.0, 2.0),
-                units.dimensionless_unscaled
             ),
             (
                 'orbital_period',
@@ -158,9 +141,8 @@ def prepare_sampling(config):
         log_likelihood = LogLikelihoodSB1(
             rv_semiamplitude_constraint=rvk_constraint,
             interpolator=interpolator,
-            eccentricity_pdf=ngc188_util.get_final_eccentricity_pdf(
-                binary_orbit,
-                num_parallel_processes=config.num_parallel_processes
+            eccentricity_likelihood=(
+                ngc188_util.get_final_eccentricity_likelihood(binary_orbit)
             ),
             initial_eccentricity=0.5
         )
@@ -180,8 +162,17 @@ def prepare_sampling(config):
 def main(config):
     """Avoid polluting global namespace."""
 
-    assert config.lgQ_inertial_boost_range is None
     log_likelihood, prior_transform = prepare_sampling(config)
+
+    num_params = prior_transform.count_sampled_parameters()
+
+    logging.info(
+        'Starting sampling of binary %s with %d free parameters.',
+        config.system,
+        num_params
+    )
+
+    sampler = NestedSampler(log_likelihood, prior_transform, num_params)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
