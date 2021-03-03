@@ -69,8 +69,9 @@ class EvolutionParameters:
                 ('disk_dissipation_age', units.Gyr),
                 ('primary_disk_lock_period', units.day),
                 ('primary_wind_strength', units.dimensionless_unscaled),
-                ('prinmary_wind_saturation', units.dimensionless_unscaled),
-                ('primary_core_envelope_coupling_timescale', units.Gyr)
+                ('primary_wind_saturation', units.dimensionless_unscaled),
+                ('primary_core_envelope_coupling_timescale', units.Gyr),
+                ('initial_eccentricity', units.dimensionless_unscaled)
             ],
             system=[
                 ('age', units.Gyr),

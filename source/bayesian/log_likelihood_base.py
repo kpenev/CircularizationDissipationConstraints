@@ -26,9 +26,6 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         eccentricity_likelihood(callable):    The likelihood functionof the
             final eccentricity.
 
-        initial_eccentricity(float):    The "high" initial eccentricity the
-            evolution will always start with.
-
     """
 
     _logger = logging.getLogger(__name__)
@@ -53,7 +50,6 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         }
         kwargs['dissipation'] = self._get_dissipation(parameters)
         kwargs['interpolator'] = self.interpolator
-        kwargs['initial_eccentricity'] = self.initial_eccentricity
         kwargs['max_age'] = system.age
         kwargs['system'] = system
         kwargs['secondary_is_star'] = self.secondary_is_star
@@ -64,7 +60,6 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                  interpolator,
                  eccentricity_likelihood,
                  secondary_is_star,
-                 initial_eccentricity,
                  **kwargs):
         """
         Set-up the log-likelihood calculator.
@@ -78,8 +73,6 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             secondary_is_star(bool):    True iff the secondary in the system is
                 an evolving star.
 
-            initial_eccentricity:    See :attr:`initial_eccentricity`.
-
             kwargs:    Arguments in addition to `secondary_is_star` required by
                 the parent's :meth:`__init__()`.
 
@@ -89,7 +82,6 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
 
         self.interpolator = interpolator
         self.eccentricity_likelihood = eccentricity_likelihood
-        self.initial_eccentricity = initial_eccentricity
         self.final_eccentricity = None
 
         self.secondary_is_star = secondary_is_star

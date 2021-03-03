@@ -66,18 +66,24 @@ class LogLikelihoodSB1(LogLikelihoodBase):
     def __init__(self,
                  *parent_args,
                  rv_semiamplitude_constraint,
+                 powerlaw_dissipation,
                  max_dissipative_mstar=1.2 * units.M_sun,
                  **parent_kwargs):
 
         self.max_dissipative_mstar = max_dissipative_mstar
         self._rv_semiamplitude_constraint = rv_semiamplitude_constraint
 
+        dissipation_parameters=[
+            ('lgQ_min', units.dimensionless_unscaled),
+            ('lgQ_inertial_boost', units.dimensionless_unscaled),
+        ]
+        if powerlaw_dissipation:
+            dissipation_parameters.extend([
+                ('lgQ_break_period', units.day),
+                ('lgQ_powerlaw', units.dimensionless_unscaled)
+            ])
         super().__init__(*parent_args,
-                         dissipation_parameters=[
-                             ('lgQ_min', units.dimensionless_unscaled),
-                             ('lgQ_break_period', units.day),
-                             ('lgQ_powerlaw', units.dimensionless_unscaled)
-                         ],
+                         dissipation_parameters=dissipation_parameters,
                          secondary_is_star=True,
                          **parent_kwargs)
 
@@ -98,7 +104,8 @@ class LogLikelihoodSB1(LogLikelihoodBase):
             )
             /
             self._rv_semiamplitude_constraint.rv_semi_amplitude_pdf(
-                eccentricity=self.initial_eccentricity,
+                eccentricity=self.get_parameter_value(parameters,
+                                                      'initial_eccentricity'),
                 **mass_kwargs
             )
         )

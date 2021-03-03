@@ -50,7 +50,7 @@ def add_dissipation_args(parser):
         '--lgQ-min',
         nargs=2,
         type=float,
-        default=5.0,
+        default=(4.0, 12.0),
         help='The range to use for the uniform prior in the log10(`Qmin`) '
         'parameter.'
     )
@@ -77,7 +77,7 @@ def add_dissipation_args(parser):
         '--lgQ-inertial-boost',
         nargs=2,
         type=float,
-        default=None,
+        default=(1.0, 1.0),
         help='The range to assume for log10(`boost`) dissipation argument '
         '(boost of dissipation in inertial mode range). If not specified, '
         'dissipation is not enhanced in the inertial mode range (i.e. `boost` '
@@ -335,6 +335,14 @@ def parse_command_line(description,
         help='How many multiprocessing processes to use when parallel '
         'processing is available.'
     )
+    parser.add_argument(
+        '--initial-eccentricity',
+        type=float,
+        nargs=2,
+        default=(0.5, 0.5),
+        help='The range to use for the uniform prior on initial eccentricity.'
+    )
+
 
     if dissipation:
         add_dissipation_args(parser)

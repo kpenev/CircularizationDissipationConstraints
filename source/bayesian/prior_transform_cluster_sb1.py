@@ -26,7 +26,7 @@ class PriorTransformClusterSB1(PriorTransformBase):
 
         self._rv_semiamplitude_constraint.prepare_secondary_sampling(
             primary_mass=model_parameters['primary_mass'],
-            eccentricity=model_parameters['eccentricity'],
+            eccentricity=model_parameters['initial_eccentricity'],
             orbital_period=model_parameters['orbital_period'],
             secondary_mass_prior=(
                 self._photometric_mass_constraint
@@ -39,7 +39,7 @@ class PriorTransformClusterSB1(PriorTransformBase):
             self._rv_semiamplitude_constraint
         ).secondary_mass_ppf(
             next(unit_cube_iter)
-        ) * units.M_sun
+        )
 
     def __init__(self,
                  photometric_mass_constraint,

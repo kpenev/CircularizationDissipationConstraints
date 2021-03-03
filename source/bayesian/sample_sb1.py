@@ -113,6 +113,11 @@ def get_independent_priors(config, observed_orbit):
                 'feh',
                 ngc188_util.cluster_feh_distribution,
                 units.dimensionless_unscaled
+            ),
+            (
+                'initial_eccentricity',
+                get_uniform_distribution('initial_eccentricity'),
+                units.dimensionless_unscaled
             )
         ]
     )
@@ -139,12 +144,16 @@ def prepare_sampling(config):
         )
         rvk_constraint = ngc188_util.get_rvk_constraint(binary_orbit)
         log_likelihood = LogLikelihoodSB1(
+            powerlaw_dissipation=(
+                config.lgQ_break_period is not None
+                and
+                config.lgQ_powerlaw is not None
+            ),
             rv_semiamplitude_constraint=rvk_constraint,
             interpolator=interpolator,
             eccentricity_likelihood=(
                 ngc188_util.get_final_eccentricity_likelihood(binary_orbit)
-            ),
-            initial_eccentricity=0.5
+            )
         )
 
         prior_transform = PriorTransformClusterSB1(

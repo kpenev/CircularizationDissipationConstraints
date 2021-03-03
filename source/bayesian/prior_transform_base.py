@@ -73,7 +73,7 @@ class PriorTransformBase(metaclass=ABCMeta):
                         *
                         param_units
                     )
-            else:
+            elif model_parameters is not None:
                 try:
                     model_parameters[name] = float(distribution) * param_units
                 except TypeError:
@@ -128,9 +128,9 @@ class PriorTransformBase(metaclass=ABCMeta):
     def __call__(self, unit_cube_values):
         """Return an array of the parameter values for evolving the system."""
 
-        transformed_values = numpy.empty(shape=(len(self.parameter_order),),
-                                         fill_value=numpy.nan,
-                                         dtype=float)
+        transformed_values = numpy.full(shape=(len(self.parameter_order),),
+                                        fill_value=numpy.nan,
+                                        dtype=float)
 
         model_parameters = dict()
         unit_cube_iter = iter(unit_cube_values)
