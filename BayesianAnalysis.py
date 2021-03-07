@@ -69,7 +69,7 @@ class SuperEccentricityDistribution(metaclass=ABCMeta):
 
 
     @abstractmethod
-    def distribution_of_present_eccentricity(self, e_now):
+    def create_distribution_of_present_eccentricity(self, e_now):
         pass
 
     @abstractmethod
@@ -99,9 +99,6 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         self.distribution_of_present_eccentricity = distribution_of_present_eccentricity
         return distribution_of_present_eccentricity
 
-    def distribution_of_present_eccentricity(self, e_now):
-        return self.distribution_of_present_eccentricity(e_now)
-
     def distribution_of_envelope_eccentricity(self, e_env):
         e_env_stdev = (self.e_env_upper_uncertainty-self.e_env_lower_uncertainty)/2
         if e_env_stdev == 0:
@@ -113,7 +110,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
             2 * math.pi)
 
 
-    def distribution_of_eccentricity_by_nquad(self, e, e_env_exists=True):
+    def distribution_of_eccentricity_by_nquad_old(self, e, e_env_exists=True):
         if e > 1 or e < 0:
             return 0
         if (not e_env_exists):
@@ -129,7 +126,10 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         if (self.e_env_upper_uncertainty==0 or self.e_env_lower_uncertainty==0):
             if (e<self.mean_e_env and self.mean_e_env<1):
                 w = lambda e_now: self.distribution_of_present_eccentricity(e_now) / (self.mean_e_env - e_now)
-                value = nquad(w, [[0, e]])
+
+                value = quad(w, 0, e, epsabs=1.49e-16)
+
+
                 return value[0]
             return 0
 
@@ -144,6 +144,29 @@ class EccentricityDistribution(SuperEccentricityDistribution):
 
     def bounds_e_env(self, e):
         return [e, 1]
+
+    def distribution_of_eccentricity_by_nquad(self, e, e_env_exists=True):
+        if e > 1 or e < 0:
+            return 0
+
+        def cdf_e_now(e):
+            return quad(lambda e_now: self.distribution_of_present_eccentricity(e_now), 0, e)
+
+        def cdf_e_env(e):
+            if (self.e_env_upper_uncertainty == 0 or self.e_env_lower_uncertainty == 0):
+                if e > self.mean_e_env:
+                    return 1
+                if e == self.mean_e_env:
+                    return 0.5
+                return 0
+            return quad(lambda e_env: self.distribution_ofenvelope_eccentricity(e_env), 0, e)
+
+
+        if e_env_exists:
+            return cdf_e_now(e)*(1-cdf_e_env(e))
+
+        print('Envelope eccentricity does not exists')
+        return 0
 
 
 class System:
@@ -842,15 +865,15 @@ if __name__ == '__main__':
     test = EccentricityDistribution(mean_e_now=0.8,
                                     e_now_upper_uncertainty=0.01,
                                     e_now_lower_uncertainty=-0.01,
-                                    mean_e_env=0.3)
+                                    mean_e_env=0.6)
 
 
 
     print('roots for Rice parameters are:',test.root_for_Rice_parameters())
     a = test.create_distribution_of_present_eccentricity()
-    print('probability of present eccentricity is 0.8 = ',test.distribution_of_present_eccentricity(0.78))
-    print('probability density of eccentricity = ', 0.78, 'is ',test.distribution_of_eccentricity_by_nquad(0.79))
-    print('probability density of eccentricity = ', 0.6, 'is', test.distribution_of_eccentricity_by_nquad(0.6))
+    print('probability of present eccentricity is 0.8 = ',test.distribution_of_present_eccentricity(0.8))
+    print('probability density of eccentricity = ', 0.2, 'is ',test.distribution_of_eccentricity_by_nquad(0.2))
+    print('probability density of eccentricity = ', 0.2, 'is', test.distribution_of_eccentricity_by_nquad(0.2))
 
 
     #print('Testing rice distribution: Starts')
@@ -900,10 +923,10 @@ if __name__ == '__main__':
     #Testing testing_log_prob, MCMC and other methods
 
     print('Testing testing_log_prob, MCMC and other methods: Start')
-    test = BayesianAnalysis()
+    #test = BayesianAnalysis()
 
-    test.testing_log_prob()
-    test.MCMC()
+    #test.testing_log_prob()
+    #test.MCMC()
 
     #    b = EccentricityDistribution(mean_e_now=0.2, e_now_stdev=0.5, mean_e_env=0.8, e_env_stdev=0.5)
     #    print('The value of b is nquad = ', b.distribution_of_eccentricity_by_nquad(e=0.6))
