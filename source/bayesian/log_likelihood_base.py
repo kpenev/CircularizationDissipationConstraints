@@ -9,6 +9,7 @@ import numpy
 
 from reproduce_system import find_evolution
 from bayesian.evolution_parameters import EvolutionParameters
+from bayesian.custom_logger_adapter import CustomLoggerAdapter
 
 #Intended to function as callable no need for more public methods
 #pylint: disable=too-few-public-methods
@@ -87,6 +88,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         self.secondary_is_star = secondary_is_star
         super().__init__(secondary_is_star=secondary_is_star,
                          **kwargs)
+        self._logger = self._raw_logger
 
     def __call__(self, parameters):
         """
@@ -104,7 +106,10 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 specified value. This includes the circularization envelope.
         """
 
-        self._logger.update_context(hex(hash(parameters.tostring()))[2:])
+        self._logger = CustomLoggerAdapter(
+            self._raw_logger,
+            dict(param_hash=hex(hash(parameters.tostring()))[2:])
+        )
 
         try:
             self.log_parameters('Evaluating log-likelihood for parameters:',
@@ -150,10 +155,13 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 'Evolution terminated prematurely at t=%g (< %g) with ef = %g',
                 evolution.age[-1],
                 expected_final_age,
-                self.final_eccentricity
+                (
+                    numpy.nan if self.final_eccentricity is None
+                    else self.final_eccentricity
+                )
             )
 
             return -numpy.inf
         finally:
-            self._logger.revert_context()
+            self._logger = self._raw_logger
 #pylint: enable=too-few-public-methods

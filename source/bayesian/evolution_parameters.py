@@ -39,12 +39,14 @@ class EvolutionParameters:
 
         self._logger.log(
             level,
-            message + '\n\t%s: %s' * parameters.size(),
+            message + '\n\t%s: %s %s' * parameters.size,
             *(
                 sub
-                for param_name in self.parameter_names_units
-                for sub in (param_name, self.get_parameter_value(parameters,
-                                                                 param_name))
+                for (param_name, param_units), value in zip(
+                    self.parameter_order,
+                    parameters
+                )
+                for sub in (param_name, repr(value), param_units)
             )
         )
 

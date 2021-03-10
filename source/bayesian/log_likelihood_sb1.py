@@ -61,6 +61,8 @@ class LogLikelihoodSB1(LogLikelihoodBase):
                 dissipation[component] = dict(dissipation)
         #pylint: enable=invalid-name
 
+        self._logger.debug('Dissipation: %s', repr(dissipation))
+
         return dissipation
 
     def __init__(self,
