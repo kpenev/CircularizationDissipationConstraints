@@ -23,7 +23,7 @@ class LogLikelihoodSB1(LogLikelihoodBase):
                 self.get_parameter_value(parameters, 'lgQ_min')
             )
         )
-        if 'lgQ_break_period' in parameters:
+        if 'lgQ_break_period' in self.parameter_indices:
             star_dissipation['tidal_frequency_breaks'] = numpy.array([
                 2.0 * numpy.pi
                 /
@@ -58,7 +58,7 @@ class LogLikelihoodSB1(LogLikelihoodBase):
             ):
                 dissipation[component] = None
             else:
-                dissipation[component] = dict(dissipation)
+                dissipation[component] = dict(star_dissipation)
         #pylint: enable=invalid-name
 
         self._logger.debug('Dissipation: %s', repr(dissipation))
@@ -75,7 +75,7 @@ class LogLikelihoodSB1(LogLikelihoodBase):
         self.max_dissipative_mstar = max_dissipative_mstar
         self._rv_semiamplitude_constraint = rv_semiamplitude_constraint
 
-        dissipation_parameters=[
+        dissipation_parameters = [
             ('lgQ_min', units.dimensionless_unscaled),
             ('lgQ_inertial_boost', units.dimensionless_unscaled),
         ]
@@ -92,23 +92,35 @@ class LogLikelihoodSB1(LogLikelihoodBase):
     def __call__(self, parameters):
         """Evaluate the log-likelihood at the given model parameters."""
 
-        circularization_likelihood = super().__call__(parameters)
+        circularization_log_likelihood = super().__call__(parameters)
         mass_kwargs = dict(
             primary_mass=self.get_parameter_value(parameters,
                                                   'primary_mass'),
             secondary_mass=self.get_parameter_value(parameters,
                                                     'secondary_mass'),
         )
-        return circularization_likelihood * (
-            self._rv_semiamplitude_constraint.rv_semi_amplitude_pdf(
-                eccentricity=self.final_eccentricity,
-                **mass_kwargs
+        return (
+            circularization_log_likelihood
+            +
+            numpy.log(
+                self._rv_semiamplitude_constraint.rv_semi_amplitude_pdf(
+                    self._rv_semiamplitude_constraint.rv_semi_amplitude(
+                        eccentricity=self.final_eccentricity,
+                        **mass_kwargs
+                    )
+                )
             )
-            /
-            self._rv_semiamplitude_constraint.rv_semi_amplitude_pdf(
-                eccentricity=self.get_parameter_value(parameters,
-                                                      'initial_eccentricity'),
-                **mass_kwargs
+            -
+            numpy.log(
+                self._rv_semiamplitude_constraint.rv_semi_amplitude_pdf(
+                    self._rv_semiamplitude_constraint.rv_semi_amplitude(
+                        eccentricity=self.get_parameter_value(
+                            parameters,
+                            'initial_eccentricity'
+                        ),
+                        **mass_kwargs
+                    )
+                )
             )
         )
 

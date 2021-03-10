@@ -29,7 +29,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
 
     """
 
-    _logger = logging.getLogger(__name__)
+    _raw_logger = logging.getLogger(__name__)
 
     @abstractmethod
     def _get_dissipation(self, parameters):
@@ -41,13 +41,20 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         system = SimpleNamespace(
             **{
                 param_name: self.get_parameter_value(parameters, param_name)
-                for param_name in self.parameter_names_units['system']
+                for param_name, _ in self.parameter_names_units['system']
             }
         )
 
         kwargs = {
-            param_name: self.get_parameter_value(parameters, param_name)
-            for param_name in self.parameter_names_units['evolution']
+            (
+                'disk_period' if param_name == 'primary_disk_lock_period'
+                else (
+                    'secondary_disk_period'
+                    if param_name == 'secondary_disk_lock_period' else
+                    param_name
+                )
+            ): self.get_parameter_value(parameters, param_name)
+            for param_name, _ in self.parameter_names_units['evolution']
         }
         kwargs['dissipation'] = self._get_dissipation(parameters)
         kwargs['interpolator'] = self.interpolator

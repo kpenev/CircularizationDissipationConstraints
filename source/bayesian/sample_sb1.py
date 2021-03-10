@@ -181,7 +181,11 @@ def main(config):
         num_params
     )
 
-    sampler = NestedSampler(log_likelihood, prior_transform, num_params)
+    sampler = NestedSampler(log_likelihood,
+                            prior_transform,
+                            ndim=len(log_likelihood.parameter_order),
+                            npdim=num_params,
+                            nlive=1)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
