@@ -14,5 +14,3 @@ class CustomLoggerAdapter(logging.LoggerAdapter):
             kwargs['extra'] = self.extra
 
         return msg, kwargs
-
-
