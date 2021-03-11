@@ -213,8 +213,7 @@ def run_mcmc(config, log_likelihood, prior_transform, num_params):
                      samples_fname,
                      backend.iteration)
 
-    with Pool(config.num_parallel_processes) as pool:
-        sampler = emcee.EnsembleSampler(
+    sampler_kwargs = dict(
             nwalkers=config.mcmc_nwalkers,
             ndim=num_params,
             log_prob_fn=functools.partial(mcmc_log_probability,
@@ -223,12 +222,22 @@ def run_mcmc(config, log_likelihood, prior_transform, num_params):
             blobs_dtype=[(name, float)
                          for name, _ in log_likelihood.parameter_order],
             backend=backend,
-            pool=pool
-        )
+    )
+
+    if config.num_parallel_processes > 1:
+        with Pool(config.num_parallel_processes) as workers:
+            sampler = emcee.EnsembleSampler(**sampler_kwargs, pool=workers)
+            sampler.run_mcmc(
+                numpy.random.rand(config.mcmc_nwalkers, num_params),
+                config.mcmc_nsteps
+            )
+    else:
+        sampler = emcee.EnsembleSampler(**sampler_kwargs)
         sampler.run_mcmc(
             numpy.random.rand(config.mcmc_nwalkers, num_params),
             config.mcmc_nsteps
         )
+
 
 def main(config):
     """Avoid polluting global namespace."""
