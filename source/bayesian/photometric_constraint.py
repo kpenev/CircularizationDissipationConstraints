@@ -39,15 +39,23 @@ class PhotometricConstraint:
                 filter_index,
                 min_difference
         ) in self._min_magnitude_difference:
-            primary_mag, secondary_mag = self._photometry_interpolators[
-                interpolator_index
-            ](
-                numpy.array([primary_mass, secondary_mass])
-            )[
-                filter_index
-            ]
-            if secondary_mag - primary_mag < min_difference:
-                return False
+            try:
+                primary_mag, secondary_mag = self._photometry_interpolators[
+                    interpolator_index
+                ](
+                    numpy.array([primary_mass, secondary_mass])
+                )[
+                    filter_index
+                ]
+                if secondary_mag - primary_mag < min_difference:
+                    return False
+            except ValueError:
+                self._logger.critical(
+                    'Invalid input masses to photometry interpolator: %s, %s',
+                    repr(primary_mass),
+                    repr(secondary_mass)
+                )
+                raise
 
         return True
 
