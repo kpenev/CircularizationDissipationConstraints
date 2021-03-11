@@ -146,7 +146,12 @@ def prepare_sampling(config):
         photometric_constraint = ngc188_util.get_photometric_constraint(
             binary_pkm_id
         )
-        rvk_constraint = ngc188_util.get_rvk_constraint(binary_orbit)
+        rvk_constraint = ngc188_util.get_rvk_constraint(
+            observed_orbit=binary_orbit,
+            num_parallel_processes=config.num_parallel_processes,
+            interpolation_accuracy=config.rvk_interpolation_accuracy,
+            show_mismatch_plot=config.rvk_show_interpolation
+        )
         log_likelihood = LogLikelihoodSB1(
             powerlaw_dissipation=(
                 config.lgQ_break_period is not None

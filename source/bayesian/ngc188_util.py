@@ -247,22 +247,38 @@ def get_photometric_constraint(binary_pkm_id):
         min_magnitude_difference=dict(V=2.5)
     )
 
-def get_rvk_constraint(observed_orbit):
+def get_rvk_constraint(observed_orbit,
+                       num_parallel_processes,
+                       interpolation_accuracy,
+                       show_mismatch_plot):
     """Return fully set-up RV semi-amplitude constraint for an NGC188 binary."""
 
+    signal_to_noise = float(observed_orbit['K']) / float(observed_orbit['e_K'])
     return RVSemiAmplitudeConstraint(
-        observed_rvk=stats.rice(
-            b=float(observed_orbit['K']) / float(observed_orbit['e_K']),
-            scale=float(observed_orbit['e_K']) * 1000.0
+        observed_rvk=(
+            stats.norm(
+                loc=numpy.sqrt(
+                    float(observed_orbit['K'])**2
+                    +
+                    float(observed_orbit['e_K'])**2
+                ) * 1000.0,
+                scale=float(observed_orbit['e_K']) * 1000.0
+            )
+            if signal_to_noise > 50 else
+            stats.rice(
+                b=signal_to_noise,
+                scale=float(observed_orbit['e_K']) * 1000.0
+            )
         ),
         max_discarded_probabiity=1e-6,
-        interpolation_accuracy=(0, 1e-4),
-        num_parallel_processes=4,
+        interpolation_accuracy=interpolation_accuracy,
+        num_parallel_processes=num_parallel_processes,
         pickle_fname='rvk_constraints.pkl',
         epsabs=0,
         epsrel=1e-8,
         limit=200,
-        maxp1=200
+        maxp1=200,
+        show_mismatch_plot=show_mismatch_plot
     )
 
 def get_final_eccentricity_likelihood(observed_orbit):
@@ -306,7 +322,12 @@ def _test_rvk_constraint(binary_pkm_id):
     """Display plots showing the RV based constraint."""
 
     observed_orbit = get_observed_orbit(binary_pkm_id)
-    rvk_constraint = get_rvk_constraint(observed_orbit)
+    rvk_constraint = get_rvk_constraint(
+        observed_orbit=observed_orbit,
+        num_parallel_processes=4,
+        interpolation_accuracy=(1e-8, 1e-4),
+        show_mismatch_plot=True
+    )
     photometric_constraint = get_photometric_constraint(binary_pkm_id)
 
     single_lined_binaries, _ = get_binary_data()

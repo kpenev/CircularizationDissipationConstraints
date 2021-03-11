@@ -269,7 +269,7 @@ def add_binary_selection_args(parser):
     )
 
 def add_sampling_parameters(parser):
-    """Add parameters configuring how to run the emcee sampler."""
+    """Add parameters configuring how to perform the sampling."""
 
     sampler = parser.add_argument_group(
         title='Sampling parameters.',
@@ -305,6 +305,22 @@ def add_sampling_parameters(parser):
         'can contain the following %% substitutions: %%(system)s - replaced by '
         'the name of the system, %%(sampling) - replaced by the sampling '
         'method.'
+    )
+    sampler.add_argument(
+        '--rvk-interpolation-accuracy',
+        type=float,
+        nargs=2,
+        default=(1e-8, 1e-4),
+        help='The maximum error allowed in the interpolation of the radial '
+        'velocity PDF as a fraction of the largest PDF value, and as the PDF '
+        'at the inteprolated position. Comparison is to direct numerical '
+        'integration.'
+    )
+    sampler.add_argument(
+        '--rvk-show-interpolation',
+        action='store_true',
+        help='Enable dispylaying plots of the interpolation of the radial '
+        'velocity semi-amplitude PDF as it is being refined.'
     )
 
 def parse_command_line(description,
