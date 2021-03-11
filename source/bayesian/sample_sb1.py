@@ -4,11 +4,15 @@
 
 import logging
 import traceback
-from multiprocessing import set_start_method
+import functools
+import os.path
+from multiprocessing import set_start_method, Pool
 
 from astropy import units
 from scipy import stats
-from dynesty import NestedSampler
+import numpy
+import dynesty
+import emcee
 
 from stellar_evolution.manager import StellarEvolutionManager
 from orbital_evolution.evolve_interface import library as\
@@ -168,6 +172,59 @@ def prepare_sampling(config):
 
     return log_likelihood, prior_transform
 
+def mcmc_log_probability(unit_cube_values, prior_transform, log_likelihood):
+    """The posterior for MCMC, will track actual params & likelihood."""
+
+    if unit_cube_values.min() < 0 or unit_cube_values.max() > 1:
+        return tuple(
+            -numpy.inf if i == 0 else numpy.nan
+            for i in range(len(log_likelihood.parameter_order) + 1)
+        )
+
+    parameters = prior_transform(unit_cube_values)
+    log_likelihood_value = log_likelihood(parameters)
+    return (
+        (log_likelihood_value,)
+        +
+        tuple(parameters)
+    )
+
+def run_mcmc(config, log_likelihood, prior_transform, num_params):
+    """Sample the selected system using MCMC."""
+
+    samples_fname = (
+        config.samples_fname
+        %
+        dict(system=config.system,
+             sampling=config.sampling)
+        +
+        '.h5'
+    )
+    backend = emcee.backends.HDFBackend(samples_fname)
+    if not os.path.exists(samples_fname):
+        backend.reset(config.mcmc_nwalkers, num_params)
+    if backend.iteration > 0:
+        logging.info("Extending chanin in '%s', containing %d samples",
+                     samples_fname,
+                     backend.iteration)
+
+    with Pool(config.num_parallel_processes) as pool:
+        sampler = emcee.EnsembleSampler(
+            nwalkers=config.mcmc_nwalkers,
+            ndim=num_params,
+            log_prob_fn=functools.partial(mcmc_log_probability,
+                                          prior_transform=prior_transform,
+                                          log_likelihood=log_likelihood),
+            blobs_dtype=[(name, float)
+                         for name, _ in log_likelihood.parameter_order],
+            backend=backend,
+            pool=pool
+        )
+        sampler.run_mcmc(
+            numpy.random.rand(config.mcmc_nwalkers, num_params),
+            config.mcmc_nsteps
+        )
+
 def main(config):
     """Avoid polluting global namespace."""
 
@@ -176,16 +233,23 @@ def main(config):
     num_params = prior_transform.count_sampled_parameters()
 
     logging.info(
-        'Starting sampling of binary %s with %d free parameters.',
+        'Starting %s sampling of binary %s with %d free parameters.',
+        config.sampling,
         config.system,
         num_params
     )
 
-    sampler = NestedSampler(log_likelihood,
-                            prior_transform,
-                            ndim=len(log_likelihood.parameter_order),
-                            npdim=num_params,
-                            nlive=1)
+    if config.sampling.lower() == 'nested':
+        sampler = dynesty.NestedSampler(
+            log_likelihood,
+            prior_transform,
+            ndim=len(log_likelihood.parameter_order),
+            npdim=num_params,
+            nlive=1
+        )
+        sampler.run_nested()
+    else:
+        run_mcmc(config, log_likelihood, prior_transform, num_params)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)

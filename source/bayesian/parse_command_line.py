@@ -268,6 +268,45 @@ def add_binary_selection_args(parser):
         help='Select the system to analyze.'
     )
 
+def add_sampling_parameters(parser):
+    """Add parameters configuring how to run the emcee sampler."""
+
+    sampler = parser.add_argument_group(
+        title='Sampling parameters.',
+        description='Configuration for how to perform the sampling.'
+    )
+    sampler.add_argument(
+        '--mcmc-nwalkers',
+        type=int,
+        default=12,
+        help='The number of walkers in the MCMC ensemble. Ignored if nested '
+        'sampling is used.'
+    )
+    sampler.add_argument(
+        '--mcmc-nsteps',
+        type=int,
+        default=1000000,
+        help='The number of MCMC steps to generate. Ignored if nested sampling '
+        'is used.'
+    )
+    sampler.add_argument(
+        '--num-parallel-processes',
+        type=int,
+        default=4,
+        help='How many multiprocessing processes to use when parallel '
+        'processing is available.'
+    )
+    sampler.add_argument(
+        '--samples-fname',
+        default='%(system)s_%(sampling)s_samples',
+        help='The filename where to save generated MCMC samples. An extension '
+        'is added automatically depending on the sampling method. If the file '
+        'exists, sampling continues from the state saved in it. The filename '
+        'can contain the following %% substitutions: %%(system)s - replaced by '
+        'the name of the system, %%(sampling) - replaced by the sampling '
+        'method.'
+    )
+
 def parse_command_line(description,
                        config_fname,
                        *,
@@ -329,11 +368,11 @@ def parse_command_line(description,
         help='The file to read eccentricity expansion coefficients from.'
     )
     parser.add_argument(
-        '--num-parallel-processes',
-        type=int,
-        default=4,
-        help='How many multiprocessing processes to use when parallel '
-        'processing is available.'
+        '--sampling',
+        choices=['mcmc', 'nested'],
+        default='mcmc',
+        help='Which sampling method to use. MCMC sampling useng the `emcee` '
+        'package and nested sampling used `dynesty`.'
     )
     parser.add_argument(
         '--initial-eccentricity',
@@ -342,6 +381,7 @@ def parse_command_line(description,
         default=(0.5, 0.5),
         help='The range to use for the uniform prior on initial eccentricity.'
     )
+    add_sampling_parameters(parser)
 
 
     if dissipation:
