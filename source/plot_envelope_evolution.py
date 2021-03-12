@@ -6,7 +6,7 @@ import pickle
 from os import path, makedirs, remove
 from subprocess import call
 
-from matplotlib import pyplot
+from matplotlib import pyplot, rcParams
 from configargparse import\
     ArgumentParser,\
     DefaultsFormatter
@@ -79,6 +79,12 @@ def parse_configuration():
         default=0.1,
         help='The eccentricity threshold value uesd to determine the '
         'circularization cut-off period.'
+    )
+    parser.add_argument(
+        '--plotting-function',
+        choices=['plot', 'semilogx', 'semilogy', 'loglog'],
+        default='plot',
+        help='The matplotlib plotting function to use.'
     )
     parser.add_argument(
         '--label', '-l',
@@ -252,34 +258,43 @@ def create_movie(frame_pattern, movie_fname):
 def plot_frame(frame, data, label, show_interpolation):
     """Setup a plot to save as a single frame of the circularization movie."""
 
-    plot_colors = ['#e41a1c',
-                   '#377eb8',
-                   '#4daf4a',
-                   '#984ea3',
-                   '#ff7f00']
+    plot_colors = ['#1f78b4',
+                   '#e31a1c',
+                   '#33a02c',
+                   '#ff7f00',
+                   '#6a3d9a',
+                   '#a6cee3',
+                   '#fb9a99',
+                   '#b2df8a',
+                   '#fdbf6f',
+                   '#cab2d6']
 
     xmax = ymax = -numpy.inf
-    for color_index, single_run_data in enumerate(data):
-
+    color_index = 0
+    for single_run_data in data:
         scenario_config, _ = single_run_data
-        color = plot_colors[color_index % len(plot_colors)]
-        plot_config = dict(markeredgecolor=color,
-                           markerfacecolor=color)
-        if label is not None:
-            plot_config['label'] = label % get_label_substitutions(
-                scenario_config
-            )
-        pyplot.plot(single_run_data[1][0][frame].flatten(),
-                    single_run_data[1][1][frame].flatten(),
-                    'o',
-                    **plot_config)
         xmax = max(scenario_config.orbital_period_grid[-1], xmax)
         ymax = max(scenario_config.eccentricity_grid[-1], ymax)
-        if show_interpolation:
-            eval_x = numpy.linspace(0, xmax, 1000)
-            for eccentricity_index in range(
-                    scenario_config.eccentricity_grid.size
-            ):
+
+        for eccentricity_index, initial_eccentricity in enumerate(
+                single_run_data[0].eccentricity_grid
+        ):
+            color = plot_colors[color_index % len(plot_colors)]
+            plot_config = dict(markeredgecolor=color,
+                               markerfacecolor=color)
+            color_index += 1
+
+            if label is not None:
+                plot_config['label'] = label % dict(
+                    get_label_substitutions(scenario_config),
+                    e0=initial_eccentricity
+                )
+            pyplot.plot(single_run_data[1][0][frame, :, eccentricity_index],
+                        single_run_data[1][1][frame, :, eccentricity_index],
+                        'o',
+                        **plot_config)
+            if show_interpolation:
+                eval_x = numpy.linspace(0, xmax, 1000)
                 pyplot.plot(
                     eval_x,
                     interpolate_envelope(single_run_data,
@@ -291,7 +306,7 @@ def plot_frame(frame, data, label, show_interpolation):
 
     pyplot.xlim(0, xmax)
     pyplot.ylim(0, ymax)
-    pyplot.legend(loc=2)
+    pyplot.figlegend(loc=2)
 
 def main(config):
     """Avoid polluting global namespace."""
@@ -316,6 +331,11 @@ def main(config):
             pyplot.savefig(outfname)
             pyplot.cla()
             frame_fnames.append(outfname)
+
+            print('Envelope movie progress: %s%%'
+                  %
+                  (100.0 * frame / plot_ages.size),
+                  end='\r')
 
         if config.envelope_movie_fname:
             create_movie(config.frame_fname_pattern,
@@ -347,9 +367,11 @@ def main(config):
                     circularization_period[eccentricity_index],
                     **plot_config
                 )
-        pyplot.legend(loc=2)
+        pyplot.figlegend(loc=2)
         pyplot.savefig(config.circularization_period_plot)
         pyplot.cla()
 
 if __name__ == '__main__':
+    rcParams['figure.figsize'] = [6.4, 9.6]
+    rcParams['figure.subplot.top'] = 0.5
     main(parse_configuration())
