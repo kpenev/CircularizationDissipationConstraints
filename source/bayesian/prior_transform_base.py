@@ -78,11 +78,11 @@ class PriorTransformBase(metaclass=ABCMeta):
                     model_parameters[name] = float(distribution) * param_units
                 except TypeError:
                     raise TypeError(
-                        'Inval:id direct observable %s = %s * %s! Should be '
+                        'Invalid direct observable %s = %s * %s! Should be '
                         'scipy.stats distribution, None, or numeric.'
                         %
                         (repr(name), repr(distribution), repr(param_units))
-                    )
+                    ) from None
 
     @abstractmethod
     def _fill_coupled_parameters(self,
@@ -139,7 +139,7 @@ class PriorTransformBase(metaclass=ABCMeta):
             self._fill_coupled_parameters(unit_cube_iter, model_parameters)
         except StopIteration:
             raise IndexError('Too few unit cube values provided to generate '
-                             'model parameters!')
+                             'model parameters!') from None
 
         try:
             next(unit_cube_iter)
@@ -147,7 +147,7 @@ class PriorTransformBase(metaclass=ABCMeta):
             pass
         else:
             raise IndexError('Too many unit cube values provided for '
-                             'generating model parameters!')
+                             'generating model parameters!') from None
 
         for param_index, (param_name, param_units) in enumerate(
                 self.parameter_order
@@ -171,7 +171,7 @@ class PriorTransformBase(metaclass=ABCMeta):
                         'No method for calculating %s parameter found!'
                         %
                         repr(param_name)
-                    )
+                    ) from None
 
         self._logger.debug(
             'Prior transform: U(%s) -> Parameters:\n\t%s',

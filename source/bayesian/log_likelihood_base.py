@@ -29,8 +29,6 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
 
     """
 
-    _raw_logger = logging.getLogger(__name__)
-
     @abstractmethod
     def _get_dissipation(self, parameters):
         """Return the dissipation argument for `find_evolution`."""
@@ -95,7 +93,6 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         self.secondary_is_star = secondary_is_star
         super().__init__(secondary_is_star=secondary_is_star,
                          **kwargs)
-        self._logger = self._raw_logger
 
     def __call__(self, parameters):
         """
@@ -113,62 +110,59 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 specified value. This includes the circularization envelope.
         """
 
-        self._logger = CustomLoggerAdapter(
-            self._raw_logger,
+        logger = CustomLoggerAdapter(
+            logging.getLogger(__name__),
             dict(param_hash=hex(hash(parameters.tostring()))[2:])
         )
 
+        self.log_parameters('Evaluating log-likelihood for parameters:',
+                            parameters,
+                            logging.INFO)
+
         try:
-            self.log_parameters('Evaluating log-likelihood for parameters:',
-                                parameters,
-                                logging.INFO)
+            #False positive: dissipation is included find_evolution_kwargs
+            #pylint: disable=no-value-for-parameter
+            evolution = find_evolution(
+                **self._parse_parameters(parameters)
+            )
+            #pylint: enable=no-value-for-parameter
+        except AssertionError:
+            logger.exception('Calculating evolution failed.')
+            return -numpy.inf
 
-            try:
-                #False positive: dissipation is included find_evolution_kwargs
-                #pylint: disable=no-value-for-parameter
-                evolution = find_evolution(
-                    **self._parse_parameters(parameters)
-                )
-                #pylint: enable=no-value-for-parameter
-            except AssertionError:
-                self._logger.excption('Calculating evolution failed.')
-                return -numpy.inf
+        expected_final_age = self.get_parameter_value(
+            parameters,
+            'age'
+        ).to_value('Gyr')
 
-            expected_final_age = self.get_parameter_value(
-                parameters,
-                'age'
-            ).to_value('Gyr')
+        #False positive
+        #pylint: disable=no-member
+        if numpy.allclose(evolution.age[-1],
+                          expected_final_age,
+                          rtol=1e-10,
+                          atol=1e-10):
 
-            #False positive
-            #pylint: disable=no-member
-            if numpy.allclose(evolution.age[-1],
-                              expected_final_age,
-                              rtol=1e-10,
-                              atol=1e-10):
+            self.final_eccentricity = evolution.eccentricity[-1]
+            #pylint: enable=no-member
 
-                self.final_eccentricity = evolution.eccentricity[-1]
-                #pylint: enable=no-member
-
-                self._logger.info(
-                    'Successful evolution found: ef = %g',
-                    self.final_eccentricity
-                )
-
-                return numpy.log(
-                    self.eccentricity_likelihood(self.final_eccentricity)
-                )
-
-            self._logger.error(
-                'Evolution terminated prematurely at t=%g (< %g) with ef = %g',
-                evolution.age[-1],
-                expected_final_age,
-                (
-                    numpy.nan if self.final_eccentricity is None
-                    else self.final_eccentricity
-                )
+            logger.info(
+                'Successful evolution found: ef = %g',
+                self.final_eccentricity
             )
 
-            return -numpy.inf
-        finally:
-            self._logger = self._raw_logger
+            return numpy.log(
+                self.eccentricity_likelihood(self.final_eccentricity)
+            )
+
+        logger.error(
+            'Evolution terminated prematurely at t=%g (< %g) with ef = %g',
+            evolution.age[-1],
+            expected_final_age,
+            (
+                numpy.nan if self.final_eccentricity is None
+                else self.final_eccentricity
+            )
+        )
+
+        return -numpy.inf
 #pylint: enable=too-few-public-methods

@@ -1,5 +1,7 @@
 """Define a base log-likelihood class that assumes constant phase lag."""
 
+import logging
+
 import numpy
 from astropy import units
 
@@ -61,7 +63,7 @@ class LogLikelihoodSB1(LogLikelihoodBase):
                 dissipation[component] = dict(star_dissipation)
         #pylint: enable=invalid-name
 
-        self._logger.debug('Dissipation: %s', repr(dissipation))
+        logging.getLogger(__name__).debug('Dissipation: %s', repr(dissipation))
 
         return dissipation
 

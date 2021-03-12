@@ -16,8 +16,6 @@ class EvolutionParameters:
             array to :meth:`__call__`.
     """
 
-    _logger = logging.getLogger(__name__)
-
     def log_parameters(self, message, parameters, level):
         """
         Issue log message along with a description of this step's parameters.
@@ -37,7 +35,7 @@ class EvolutionParameters:
             None
         """
 
-        self._logger.log(
+        logging.getLogger(__name__).log(
             level,
             message + '\n\t%s: %s %s' * parameters.size,
             *(

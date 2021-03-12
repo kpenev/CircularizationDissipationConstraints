@@ -53,8 +53,10 @@ class PhotometricSecondaryConstraint(rv_continuous):
         self._joint_constraint = joint_constraint
         self._primary_mass = primary_mass
         minimization = optimize.minimize_scalar(
-            lambda secondary_mass: -joint_constraint.logpdf(primary_mass,
-                                                            float(secondary_mass)),
+            lambda secondary_mass: -joint_constraint.logpdf(
+                primary_mass,
+                float(secondary_mass)
+            ),
             bounds=self.support(),
             method='bounded'
         )

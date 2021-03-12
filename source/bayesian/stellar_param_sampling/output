@@ -1,0 +1,257 @@
+nohup: ignoring input
+/usr/local/lib/python3.6/dist-packages/configargparse.py:518: FutureWarning: elementwise comparison failed; returning scalar instead, but in the future will perform elementwise comparison
+  action.default == SUPPRESS or
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+Checking M=0.40000000000000224, [Fe/H]=-1.0139999999999978
+Checking M=0.4999999999999978, [Fe/H]=-1.0139999999999978
+Checking M=0.5000000000000022, [Fe/H]=-1.0139999999999978
+Checking M=0.5999999999999978, [Fe/H]=-1.0139999999999978
+Checking M=0.6000000000000022, [Fe/H]=-1.0139999999999978
+Checking M=0.6999999999999977, [Fe/H]=-1.0139999999999978
+Checking M=0.7000000000000022, [Fe/H]=-1.0139999999999978
+Checking M=0.7999999999999978, [Fe/H]=-1.0139999999999978
+Checking M=0.8000000000000023, [Fe/H]=-1.0139999999999978
+Checking M=0.8999999999999978, [Fe/H]=-1.0139999999999978
+Checking M=0.9000000000000022, [Fe/H]=-1.0139999999999978
+Checking M=0.9999999999999978, [Fe/H]=-1.0139999999999978
+Checking M=1.0000000000000022, [Fe/H]=-1.0139999999999978
+Checking M=1.0999999999999979, [Fe/H]=-1.0139999999999978
+Checking M=1.1000000000000023, [Fe/H]=-1.0139999999999978
+Checking M=1.1999999999999977, [Fe/H]=-1.0139999999999978
+Checking M=0.40000000000000224, [Fe/H]=-0.7630000000000022
+Checking M=0.40000000000000224, [Fe/H]=-0.7629999999999978
+Checking M=0.4999999999999978, [Fe/H]=-0.7630000000000022
+Checking M=0.4999999999999978, [Fe/H]=-0.7629999999999978
+Checking M=0.5000000000000022, [Fe/H]=-0.7630000000000022
+Checking M=0.5000000000000022, [Fe/H]=-0.7629999999999978
+Checking M=0.5999999999999978, [Fe/H]=-0.7630000000000022
+Checking M=0.5999999999999978, [Fe/H]=-0.7629999999999978
+Checking M=0.6000000000000022, [Fe/H]=-0.7630000000000022
+Checking M=0.6000000000000022, [Fe/H]=-0.7629999999999978
+Checking M=0.6999999999999977, [Fe/H]=-0.7630000000000022
+Checking M=0.6999999999999977, [Fe/H]=-0.7629999999999978
+Checking M=0.7000000000000022, [Fe/H]=-0.7630000000000022
+Checking M=0.7000000000000022, [Fe/H]=-0.7629999999999978
+Checking M=0.7999999999999978, [Fe/H]=-0.7630000000000022
+Checking M=0.7999999999999978, [Fe/H]=-0.7629999999999978
+Checking M=0.8000000000000023, [Fe/H]=-0.7630000000000022
+Checking M=0.8000000000000023, [Fe/H]=-0.7629999999999978
+Checking M=0.8999999999999978, [Fe/H]=-0.7630000000000022
+Checking M=0.8999999999999978, [Fe/H]=-0.7629999999999978
+Checking M=0.9000000000000022, [Fe/H]=-0.7630000000000022
+Checking M=0.9000000000000022, [Fe/H]=-0.7629999999999978
+Checking M=0.9999999999999978, [Fe/H]=-0.7630000000000022
+Checking M=0.9999999999999978, [Fe/H]=-0.7629999999999978
+Checking M=1.0000000000000022, [Fe/H]=-0.7630000000000022
+Checking M=1.0000000000000022, [Fe/H]=-0.7629999999999978
+Checking M=1.0999999999999979, [Fe/H]=-0.7630000000000022
+Checking M=1.0999999999999979, [Fe/H]=-0.7629999999999978
+Checking M=1.1000000000000023, [Fe/H]=-0.7630000000000022
+Checking M=1.1000000000000023, [Fe/H]=-0.7629999999999978
+Checking M=1.1999999999999977, [Fe/H]=-0.7630000000000022
+Checking M=1.1999999999999977, [Fe/H]=-0.7629999999999978
+Checking M=0.40000000000000224, [Fe/H]=-0.5110000000000022
+Checking M=0.40000000000000224, [Fe/H]=-0.5109999999999978
+Checking M=0.4999999999999978, [Fe/H]=-0.5110000000000022
+Checking M=0.4999999999999978, [Fe/H]=-0.5109999999999978
+Checking M=0.5000000000000022, [Fe/H]=-0.5110000000000022
+Checking M=0.5000000000000022, [Fe/H]=-0.5109999999999978
+Checking M=0.5999999999999978, [Fe/H]=-0.5110000000000022
+Checking M=0.5999999999999978, [Fe/H]=-0.5109999999999978
+Checking M=0.6000000000000022, [Fe/H]=-0.5110000000000022
+Checking M=0.6000000000000022, [Fe/H]=-0.5109999999999978
+Checking M=0.6999999999999977, [Fe/H]=-0.5110000000000022
+Checking M=0.6999999999999977, [Fe/H]=-0.5109999999999978
+Checking M=0.7000000000000022, [Fe/H]=-0.5110000000000022
+Checking M=0.7000000000000022, [Fe/H]=-0.5109999999999978
+Checking M=0.7999999999999978, [Fe/H]=-0.5110000000000022
+Checking M=0.7999999999999978, [Fe/H]=-0.5109999999999978
+Checking M=0.8000000000000023, [Fe/H]=-0.5110000000000022
+Checking M=0.8000000000000023, [Fe/H]=-0.5109999999999978
+Checking M=0.8999999999999978, [Fe/H]=-0.5110000000000022
+Checking M=0.8999999999999978, [Fe/H]=-0.5109999999999978
+Checking M=0.9000000000000022, [Fe/H]=-0.5110000000000022
+Checking M=0.9000000000000022, [Fe/H]=-0.5109999999999978
+Checking M=0.9999999999999978, [Fe/H]=-0.5110000000000022
+Checking M=0.9999999999999978, [Fe/H]=-0.5109999999999978
+Checking M=1.0000000000000022, [Fe/H]=-0.5110000000000022
+Checking M=1.0000000000000022, [Fe/H]=-0.5109999999999978
+Checking M=1.0999999999999979, [Fe/H]=-0.5110000000000022
+Checking M=1.0999999999999979, [Fe/H]=-0.5109999999999978
+Checking M=1.1000000000000023, [Fe/H]=-0.5110000000000022
+Checking M=1.1000000000000023, [Fe/H]=-0.5109999999999978
+Checking M=1.1999999999999977, [Fe/H]=-0.5110000000000022
+Checking M=1.1999999999999977, [Fe/H]=-0.5109999999999978
+Checking M=0.40000000000000224, [Fe/H]=-0.2570000000000022
+Checking M=0.40000000000000224, [Fe/H]=-0.2569999999999978
+Checking M=0.4999999999999978, [Fe/H]=-0.2570000000000022
+Checking M=0.4999999999999978, [Fe/H]=-0.2569999999999978
+Checking M=0.5000000000000022, [Fe/H]=-0.2570000000000022
+Checking M=0.5000000000000022, [Fe/H]=-0.2569999999999978
+Checking M=0.5999999999999978, [Fe/H]=-0.2570000000000022
+Checking M=0.5999999999999978, [Fe/H]=-0.2569999999999978
+Checking M=0.6000000000000022, [Fe/H]=-0.2570000000000022
+Checking M=0.6000000000000022, [Fe/H]=-0.2569999999999978
+Checking M=0.6999999999999977, [Fe/H]=-0.2570000000000022
+Checking M=0.6999999999999977, [Fe/H]=-0.2569999999999978
+Checking M=0.7000000000000022, [Fe/H]=-0.2570000000000022
+Checking M=0.7000000000000022, [Fe/H]=-0.2569999999999978
+Checking M=0.7999999999999978, [Fe/H]=-0.2570000000000022
+Checking M=0.7999999999999978, [Fe/H]=-0.2569999999999978
+Checking M=0.8000000000000023, [Fe/H]=-0.2570000000000022
+Checking M=0.8000000000000023, [Fe/H]=-0.2569999999999978
+Checking M=0.8999999999999978, [Fe/H]=-0.2570000000000022
+Checking M=0.8999999999999978, [Fe/H]=-0.2569999999999978
+Checking M=0.9000000000000022, [Fe/H]=-0.2570000000000022
+Checking M=0.9000000000000022, [Fe/H]=-0.2569999999999978
+Checking M=0.9999999999999978, [Fe/H]=-0.2570000000000022
+Checking M=0.9999999999999978, [Fe/H]=-0.2569999999999978
+Checking M=1.0000000000000022, [Fe/H]=-0.2570000000000022
+Checking M=1.0000000000000022, [Fe/H]=-0.2569999999999978
+Checking M=1.0999999999999979, [Fe/H]=-0.2570000000000022
+Checking M=1.0999999999999979, [Fe/H]=-0.2569999999999978
+Checking M=1.1000000000000023, [Fe/H]=-0.2570000000000022
+Checking M=1.1000000000000023, [Fe/H]=-0.2569999999999978
+Checking M=1.1999999999999977, [Fe/H]=-0.2570000000000022
+Checking M=1.1999999999999977, [Fe/H]=-0.2569999999999978
+Checking M=0.40000000000000224, [Fe/H]=-2.220446049250313e-15
+Checking M=0.40000000000000224, [Fe/H]=2.220446049250313e-15
+Checking M=0.4999999999999978, [Fe/H]=-2.220446049250313e-15
+Checking M=0.4999999999999978, [Fe/H]=2.220446049250313e-15
+Checking M=0.5000000000000022, [Fe/H]=-2.220446049250313e-15
+Checking M=0.5000000000000022, [Fe/H]=2.220446049250313e-15
+Checking M=0.5999999999999978, [Fe/H]=-2.220446049250313e-15
+Checking M=0.5999999999999978, [Fe/H]=2.220446049250313e-15
+Checking M=0.6000000000000022, [Fe/H]=-2.220446049250313e-15
+Checking M=0.6000000000000022, [Fe/H]=2.220446049250313e-15
+Checking M=0.6999999999999977, [Fe/H]=-2.220446049250313e-15
+Checking M=0.6999999999999977, [Fe/H]=2.220446049250313e-15
+Checking M=0.7000000000000022, [Fe/H]=-2.220446049250313e-15
+Checking M=0.7000000000000022, [Fe/H]=2.220446049250313e-15
+Checking M=0.7999999999999978, [Fe/H]=-2.220446049250313e-15
+Checking M=0.7999999999999978, [Fe/H]=2.220446049250313e-15
+Checking M=0.8000000000000023, [Fe/H]=-2.220446049250313e-15
+Checking M=0.8000000000000023, [Fe/H]=2.220446049250313e-15
+Checking M=0.8999999999999978, [Fe/H]=-2.220446049250313e-15
+Checking M=0.8999999999999978, [Fe/H]=2.220446049250313e-15
+Checking M=0.9000000000000022, [Fe/H]=-2.220446049250313e-15
+Checking M=0.9000000000000022, [Fe/H]=2.220446049250313e-15
+Checking M=0.9999999999999978, [Fe/H]=-2.220446049250313e-15
+Checking M=0.9999999999999978, [Fe/H]=2.220446049250313e-15
+Checking M=1.0000000000000022, [Fe/H]=-2.220446049250313e-15
+Checking M=1.0000000000000022, [Fe/H]=2.220446049250313e-15
+Checking M=1.0999999999999979, [Fe/H]=-2.220446049250313e-15
+Checking M=1.0999999999999979, [Fe/H]=2.220446049250313e-15
+Checking M=1.1000000000000023, [Fe/H]=-2.220446049250313e-15
+Checking M=1.1000000000000023, [Fe/H]=2.220446049250313e-15
+Checking M=1.1999999999999977, [Fe/H]=-2.220446049250313e-15
+Checking M=1.1999999999999977, [Fe/H]=2.220446049250313e-15
+Checking M=0.40000000000000224, [Fe/H]=0.2629999999999978
+Checking M=0.40000000000000224, [Fe/H]=0.26300000000000223
+Checking M=0.4999999999999978, [Fe/H]=0.2629999999999978
+Checking M=0.4999999999999978, [Fe/H]=0.26300000000000223
+Checking M=0.5000000000000022, [Fe/H]=0.2629999999999978
+Checking M=0.5000000000000022, [Fe/H]=0.26300000000000223
+Checking M=0.5999999999999978, [Fe/H]=0.2629999999999978
+Checking M=0.5999999999999978, [Fe/H]=0.26300000000000223
+Checking M=0.6000000000000022, [Fe/H]=0.2629999999999978
+Checking M=0.6000000000000022, [Fe/H]=0.26300000000000223
+Checking M=0.6999999999999977, [Fe/H]=0.2629999999999978
+Checking M=0.6999999999999977, [Fe/H]=0.26300000000000223
+Checking M=0.7000000000000022, [Fe/H]=0.2629999999999978
+Checking M=0.7000000000000022, [Fe/H]=0.26300000000000223
+Checking M=0.7999999999999978, [Fe/H]=0.2629999999999978
+Checking M=0.7999999999999978, [Fe/H]=0.26300000000000223
+Checking M=0.8000000000000023, [Fe/H]=0.2629999999999978
+Checking M=0.8000000000000023, [Fe/H]=0.26300000000000223
+Checking M=0.8999999999999978, [Fe/H]=0.2629999999999978
+Checking M=0.8999999999999978, [Fe/H]=0.26300000000000223
+Checking M=0.9000000000000022, [Fe/H]=0.2629999999999978
+Checking M=0.9000000000000022, [Fe/H]=0.26300000000000223
+Checking M=0.9999999999999978, [Fe/H]=0.2629999999999978
+Checking M=0.9999999999999978, [Fe/H]=0.26300000000000223
+Checking M=1.0000000000000022, [Fe/H]=0.2629999999999978
+Checking M=1.0000000000000022, [Fe/H]=0.26300000000000223
+Checking M=1.0999999999999979, [Fe/H]=0.2629999999999978
+Checking M=1.0999999999999979, [Fe/H]=0.26300000000000223
+Checking M=1.1000000000000023, [Fe/H]=0.2629999999999978
+Checking M=1.1000000000000023, [Fe/H]=0.26300000000000223
+Checking M=1.1999999999999977, [Fe/H]=0.2629999999999978
+Checking M=1.1999999999999977, [Fe/H]=0.26300000000000223
+Checking M=0.40000000000000224, [Fe/H]=0.5369999999999978
+Checking M=0.4999999999999978, [Fe/H]=0.5369999999999978
+Checking M=0.5000000000000022, [Fe/H]=0.5369999999999978
+Checking M=0.5999999999999978, [Fe/H]=0.5369999999999978
+Checking M=0.6000000000000022, [Fe/H]=0.5369999999999978
+Checking M=0.6999999999999977, [Fe/H]=0.5369999999999978
+Checking M=0.7000000000000022, [Fe/H]=0.5369999999999978
+Checking M=0.7999999999999978, [Fe/H]=0.5369999999999978
+Checking M=0.8000000000000023, [Fe/H]=0.5369999999999978
+Checking M=0.8999999999999978, [Fe/H]=0.5369999999999978
+Checking M=0.9000000000000022, [Fe/H]=0.5369999999999978
+Checking M=0.9999999999999978, [Fe/H]=0.5369999999999978
+Checking M=1.0000000000000022, [Fe/H]=0.5369999999999978
+Checking M=1.0999999999999979, [Fe/H]=0.5369999999999978
+Checking M=1.1000000000000023, [Fe/H]=0.5369999999999978
+Checking M=1.1999999999999977, [Fe/H]=0.5369999999999978
+Pickled config: {'feh_max_cdf_step': 0.1, 'feh_max_step': 0.1, 'max_discarded_feh_probability': 1e-08, 'mass_max_step': 0.1, 'time_ode_max_step': 0.1, 'time_ode_rtol': 1e-06, 'time_ode_atol': 1e-08, 'age_cdf_interp_tolerance': 0.001, 'mass_cdf_interp_tolerance': 0.001}
+Current config: {'feh_max_cdf_step': 0.1, 'feh_max_step': 0.1, 'max_discarded_feh_probability': 1e-08, 'mass_max_step': 0.1, 'time_ode_max_step': 0.1, 'time_ode_rtol': 1e-06, 'time_ode_atol': 1e-08, 'age_cdf_interp_tolerance': 0.001, 'mass_cdf_interp_tolerance': 0.001}
+Match found
+[Fe/H] CDF: array([0.00000000e+00, 1.76008914e-07, 7.62405865e-07, 3.76328165e-06,
+       1.71236222e-05, 6.92366206e-05, 2.48792642e-04, 4.39039470e-04,
+       7.66305275e-04, 2.28067892e-03, 6.03339476e-03, 1.44304621e-02,
+       3.13981516e-02, 4.96653504e-02, 7.57558269e-02, 1.11347274e-01,
+       1.57709734e-01, 1.84050348e-01, 2.13019043e-01, 2.78362138e-01,
+       3.93289462e-01, 5.03162199e-01, 6.07711787e-01, 7.06408243e-01,
+       7.54921475e-01, 7.98663406e-01, 8.44461907e-01, 8.82555194e-01,
+       9.25894183e-01, 9.55156038e-01, 9.90857375e-01, 9.99047065e-01,
+       9.99727332e-01, 1.00000000e+00])
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
+/usr/local/lib/python3.6/dist-packages/sqlalchemy/sql/sqltypes.py:603: SAWarning: Dialect sqlite+pysqlite does *not* support Decimal objects natively, and SQLAlchemy must convert from floating point - rounding errors and other issues may occur. Please consider storing Decimal numbers as strings or integers on this platform for lossless storage.
+  'storage.' % (dialect.name, dialect.driver))
