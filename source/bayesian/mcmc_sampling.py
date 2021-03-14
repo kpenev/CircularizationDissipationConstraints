@@ -3,6 +3,7 @@
 import logging
 import functools
 from multiprocessing import Pool
+import os.path
 
 import numpy
 import emcee
@@ -12,7 +13,9 @@ from astropy import units
 _mutable_config_params = set(['mcmc_nsteps',
                               'num_parallel_processes',
                               'samples_fname',
-                              'rvk_show_interpolation'])
+                              'rvk_show_interpolation',
+                              'eccentricity_expansion_coefficients',
+                              'stellar_evolution_interpolator_dir'])
 
 _logger = logging.getLogger(__name__)
 
@@ -123,8 +126,27 @@ def add_configuration_attributes(config, destination):
                     else config_value
                 )
 
-def prepare_backend(config, num_params):
+def prepare_backend(config, num_params, code_version_str):
     """Return properly configured backend for storing new MCMC samples."""
+
+    def init_chain(chain_group):
+        """Prepare newly created group for holding MCMC chains."""
+
+        add_configuration_attributes(
+            config,
+            chain_group.attrs
+        )
+        version_group = chain_group.create_group('code_version')
+        version_dset = version_group.create_dataset('version',
+                                                    (1,),
+                                                    dtype=h5py.string_dtype(),
+                                                    maxshape=(None,))
+        first_iter_dset = version_group.create_dataset('first_iteration',
+                                                       (1,),
+                                                       dtype=int,
+                                                       maxshape=(None,))
+        version_dset[0] = code_version_str
+        first_iter_dset[0] = 0
 
     samples_fname = (
         config.samples_fname
@@ -136,22 +158,16 @@ def prepare_backend(config, num_params):
     )
 
     selected_chain_name = None
-    with h5py.File(samples_fname, 'a') as samples_file:
-        next_chain_index = 0
-        for chain_name, chain_group in samples_file.items():
-            if not isinstance(chain_group, h5py.Group):
-                continue
-            if (
-                    'stellar_evolution_interpolator_dir'
-                    not in
-                    chain_group.attrs
-            ):
-                selected_chain_name = chain_name
-                break
-            if compare_chain_configuration(config, chain_group):
-                selected_chain_name = chain_name
-                break
-            next_chain_index += 1
+    next_chain_index = 0
+    if os.path.exists(samples_fname):
+        with h5py.File(samples_fname, 'r') as samples_file:
+            for chain_name, chain_group in samples_file.items():
+                if not isinstance(chain_group, h5py.Group):
+                    continue
+                if compare_chain_configuration(config, chain_group):
+                    selected_chain_name = chain_name
+                    break
+                next_chain_index += 1
     if selected_chain_name is None:
         selected_chain_name = ('chain%05d' % next_chain_index)
         emcee.backends.HDFBackend(
@@ -162,14 +178,21 @@ def prepare_backend(config, num_params):
             num_params
         )
         with h5py.File(samples_fname, 'a') as samples_file:
-            add_configuration_attributes(
-                config,
-                samples_file[selected_chain_name].attrs
-            )
+            init_chain(samples_file[selected_chain_name])
         _logger.info("Creating new chain in '%s': %s",
                      samples_fname,
                      selected_chain_name)
-
+    else:
+        with h5py.File(samples_fname, 'a') as samples_file:
+            chain_group = samples_file[selected_chain_name]
+            version_group = chain_group['code_version']
+            version_dset = version_group['version']
+            first_iter_dset = version_group['first_iteration']
+            assert version_dset.shape == first_iter_dset.shape
+            version_dset.resize((version_dset.size + 1,))
+            first_iter_dset.resize((first_iter_dset.size + 1,))
+            version_dset[-1] = code_version_str
+            first_iter_dset[-1] = chain_group.attrs['iteration']
 
     backend = emcee.backends.HDFBackend(samples_fname,
                                         selected_chain_name)
@@ -182,7 +205,11 @@ def prepare_backend(config, num_params):
 
     return backend
 
-def run(config, log_likelihood, prior_transform, num_params):
+def run(config,
+        log_likelihood,
+        prior_transform,
+        num_params,
+        code_version_str):
     """Sample the selected system using MCMC."""
 
     sampler_kwargs = dict(
@@ -193,7 +220,7 @@ def run(config, log_likelihood, prior_transform, num_params):
                                       log_likelihood=log_likelihood),
         blobs_dtype=[(name, float)
                      for name, _ in log_likelihood.parameter_order],
-        backend=prepare_backend(config, num_params)
+        backend=prepare_backend(config, num_params, code_version_str)
     )
 
     if config.num_parallel_processes > 1:

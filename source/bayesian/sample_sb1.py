@@ -5,10 +5,12 @@
 import logging
 import traceback
 from multiprocessing import set_start_method
+import os.path
 
 from astropy import units
 from scipy import stats
 import dynesty
+import git
 
 from stellar_evolution.manager import StellarEvolutionManager
 from orbital_evolution.evolve_interface import library as\
@@ -174,6 +176,23 @@ def prepare_sampling(config):
 
     return log_likelihood, prior_transform
 
+def get_code_version_str():
+    """Return a string identifying the version of the code being used."""
+
+    repository = git.Repo(
+        os.path.dirname(
+            os.path.dirname(
+                os.path.dirname(
+                    os.path.abspath(__file__)
+                )
+            )
+        )
+    )
+    head_sha = repository.commit().hexsha
+    if repository.is_dirty():
+        return head_sha + ':dirty'
+    return head_sha
+
 def main(config):
     """Avoid polluting global namespace."""
 
@@ -198,7 +217,11 @@ def main(config):
         )
         sampler.run_nested()
     else:
-        mcmc_sampling.run(config, log_likelihood, prior_transform, num_params)
+        mcmc_sampling.run(config,
+                          log_likelihood,
+                          prior_transform,
+                          num_params,
+                          get_code_version_str())
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
