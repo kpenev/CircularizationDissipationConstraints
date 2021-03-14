@@ -208,7 +208,8 @@ def get_observed_orbit(binary_pkm_id):
             binary_pkm_id
         )
     selected = single_lined_data[selected]
-    print('Selected binary data:\n' + repr(selected.T))
+    _logger.info('Selected binary data:\n%s',
+                 repr(selected.T))
     return selected
 
 def get_photometric_constraint(binary_pkm_id):
@@ -356,7 +357,6 @@ def _test_rvk_constraint(binary_pkm_id):
             primary_mass.to_value(units.M_sun)
         )
     )
-    print('Primary mass: ' + repr(primary_mass))
 
     for eccentricity in numpy.linspace(0.5, 0, 6):
 
@@ -417,7 +417,8 @@ def _test_rvk_constraint(binary_pkm_id):
                       plot_fk_ratio.size,
                       (time() - start_time) / 60.0)
 
-        print('e=' + repr(eccentricity))
+        _logger.info('Finished calculations for e = %s',
+                     repr(eccentricity))
 
         plots['left'].plot(plot_m2,
                            plot_pdf,

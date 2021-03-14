@@ -415,7 +415,6 @@ def plot_m1_pdf(constraint):
     with Pool(4) as workers:
         plot_z = numpy.array(workers.map(constraint.primary_mass_pdf,
                                          plot_x))
-    print('PDF(M1): ' + repr(plot_z))
     pyplot.plot(plot_x, plot_z)
     pyplot.show()
 
@@ -446,7 +445,6 @@ def plot_joint_pdf(constraint, literature_masses=None):
             workers.starmap(constraint.pdf,
                             zip(plot_x.flatten(), plot_y.flatten()))
         ).reshape(plot_x.shape)
-    print('Plot z: ' + repr(plot_z))
 
     if literature_masses is None:
         axis = pyplot.gca(projection='3d')

@@ -10,12 +10,20 @@ import emcee
 import h5py
 from astropy import units
 
+from bayesian.sampling import get_code_version_str, setup_process
+
 _mutable_config_params = set(['mcmc_nsteps',
                               'num_parallel_processes',
                               'samples_fname',
                               'rvk_show_interpolation',
                               'eccentricity_expansion_coefficients',
-                              'stellar_evolution_interpolator_dir'])
+                              'stellar_evolution_interpolator_dir',
+                              'fname_datetime_format',
+                              'std_out_err_fname',
+                              'logging_fname',
+                              'logging_verbosity',
+                              'logging_datetime_format',
+                              'logging_message_format'])
 
 _logger = logging.getLogger(__name__)
 
@@ -79,6 +87,9 @@ def compare_chain_configuration(config, chain_group):
     config_set -= set(chain_group.attrs.keys())
     config_set -= _mutable_config_params
     if config_set:
+        _logger.debug('Configuration parameters %s not saved in chain %s',
+                      config_set,
+                      chain_group.name)
         return False
     for param, config_value in vars(config).items():
         if param in _mutable_config_params:
@@ -90,14 +101,35 @@ def compare_chain_configuration(config, chain_group):
                     !=
                     distribution_to_attribute(config_value)
             ).any():
+                _logger.debug(
+                    'Distribution for %s (%s) in chain %s does not match %s',
+                    param,
+                    repr(saved_value),
+                    chain_group.name,
+                    repr(distribution_to_attribute(config_value))
+                )
                 return False
         else:
             try:
                 len(config_value)
                 if (numpy.array(config_value) != saved_value).any():
+                    _logger.debug(
+                        'Parameter %s (%s) in chain %s does not match %s',
+                        param,
+                        repr(saved_value),
+                        chain_group.name,
+                        repr(config_value)
+                    )
                     return False
             except TypeError:
                 if saved_value != config_value:
+                    _logger.debug(
+                        'Parameter %s (%s) in chain %s does not match %s',
+                        param,
+                        repr(saved_value),
+                        chain_group.name,
+                        repr(config_value)
+                    )
                     return False
 
     return True
@@ -208,8 +240,7 @@ def prepare_backend(config, num_params, code_version_str):
 def run(config,
         log_likelihood,
         prior_transform,
-        num_params,
-        code_version_str):
+        num_params):
     """Sample the selected system using MCMC."""
 
     sampler_kwargs = dict(
@@ -220,11 +251,15 @@ def run(config,
                                       log_likelihood=log_likelihood),
         blobs_dtype=[(name, float)
                      for name, _ in log_likelihood.parameter_order],
-        backend=prepare_backend(config, num_params, code_version_str)
+        backend=prepare_backend(config, num_params, get_code_version_str())
     )
 
     if config.num_parallel_processes > 1:
-        with Pool(config.num_parallel_processes) as workers:
+        with Pool(
+                config.num_parallel_processes,
+                initializer=setup_process,
+                initargs=[config]
+        ) as workers:
             sampler = emcee.EnsembleSampler(**sampler_kwargs, pool=workers)
             sampler.run_mcmc(
                 numpy.random.rand(config.mcmc_nwalkers, num_params),

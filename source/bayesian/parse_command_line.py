@@ -271,32 +271,46 @@ def add_binary_selection_args(parser):
 def add_sampling_parameters(parser):
     """Add parameters configuring how to perform the sampling."""
 
-    sampler = parser.add_argument_group(
+    sampling = parser.add_argument_group(
         title='Sampling parameters.',
         description='Configuration for how to perform the sampling.'
     )
-    sampler.add_argument(
+    sampling.add_argument(
+        '--initial-eccentricity',
+        type=float,
+        nargs=2,
+        default=(0.5, 0.5),
+        help='The range to use for the uniform prior on initial eccentricity.'
+    )
+    parser.add_argument(
+        '--sampling',
+        choices=['mcmc', 'nested'],
+        default='mcmc',
+        help='Which sampling method to use. MCMC sampling useng the `emcee` '
+        'package and nested sampling used `dynesty`.'
+    )
+    sampling.add_argument(
         '--mcmc-nwalkers',
         type=int,
         default=12,
         help='The number of walkers in the MCMC ensemble. Ignored if nested '
         'sampling is used.'
     )
-    sampler.add_argument(
+    sampling.add_argument(
         '--mcmc-nsteps',
         type=int,
         default=1000000,
         help='The number of MCMC steps to generate. Ignored if nested sampling '
         'is used.'
     )
-    sampler.add_argument(
+    sampling.add_argument(
         '--num-parallel-processes',
         type=int,
         default=4,
         help='How many multiprocessing processes to use when parallel '
         'processing is available.'
     )
-    sampler.add_argument(
+    sampling.add_argument(
         '--samples-fname',
         default='%(system)s_%(sampling)s_samples',
         help='The filename where to save generated MCMC samples. An extension '
@@ -306,7 +320,7 @@ def add_sampling_parameters(parser):
         'the name of the system, %%(sampling) - replaced by the sampling '
         'method.'
     )
-    sampler.add_argument(
+    sampling.add_argument(
         '--rvk-interpolation-accuracy',
         type=float,
         nargs=2,
@@ -316,11 +330,55 @@ def add_sampling_parameters(parser):
         'at the inteprolated position. Comparison is to direct numerical '
         'integration.'
     )
-    sampler.add_argument(
+    sampling.add_argument(
         '--rvk-show-interpolation',
         action='store_true',
         help='Enable dispylaying plots of the interpolation of the radial '
         'velocity semi-amplitude PDF as it is being refined.'
+    )
+    sampling.add_argument(
+        '--fname-datetime-format',
+        default='%Y%m%d%H%M%S',
+        help='How to format date and time as part of filenames (e.g. when '
+        'creating output files for multiprocessing.'
+    )
+    sampling.add_argument(
+        '--std-out-err-fname',
+        default='sampling_output/%(system)s_%(now)s_%(pid)d.outerr',
+        help='Filename to redirect worker process stdout and stderr to during '
+        'multiprocessing. Should include at least `%%(pid)d` (worker process '
+        'id) substitution to avoid mangling, but may also include `%%(system)s`'
+        ' (system name) and `%(now)s` (approximate date and time the process '
+        'started).'
+    )
+    sampling.add_argument(
+        '--logging-fname',
+        default='sampling_output/%(system)s_%(now)s_%(pid)d.log',
+        help='Filename for log mesasges from sampling. Should include at least '
+        '`%%(pid)d` (worker process id) substitution to avoid mangling during '
+        'multiprocessing, but may also include `%%(system)s`'
+        ' (system name) and `%(now)s` (approximate date and time the process '
+        'started).'
+    )
+    sampling.add_argument(
+        '--logging-verbosity', '--verbosity',
+        choices=['debug', 'info', 'warning', 'error', 'critical'],
+        default='info',
+        help='The lowest importance level of logging messages to issue.'
+    )
+    sampling.add_argument(
+        '--logging-datetime-format',
+        default=None,
+        help='How to format date and time as part of filenames (e.g. when '
+        'creating output files for multiprocessing.'
+    )
+
+    sampling.add_argument(
+        '--logging-message-format', '--logging-format', '--log-fmt',
+        default=('%(levelname)s %(asctime)s %(name)s: %(message)s | '
+                 '%(pathname)s.%(funcName)s:%(lineno)d'),
+        help='How to format logging messages. See python logging module '
+        'documentation for details.'
     )
 
 def parse_command_line(description,
@@ -383,23 +441,8 @@ def parse_command_line(description,
         ),
         help='The file to read eccentricity expansion coefficients from.'
     )
-    parser.add_argument(
-        '--sampling',
-        choices=['mcmc', 'nested'],
-        default='mcmc',
-        help='Which sampling method to use. MCMC sampling useng the `emcee` '
-        'package and nested sampling used `dynesty`.'
-    )
-    parser.add_argument(
-        '--initial-eccentricity',
-        type=float,
-        nargs=2,
-        default=(0.5, 0.5),
-        help='The range to use for the uniform prior on initial eccentricity.'
-    )
+
     add_sampling_parameters(parser)
-
-
     if dissipation:
         add_dissipation_args(parser)
     if cluster:

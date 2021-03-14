@@ -17,7 +17,6 @@ import numpy
 
 from binary_utils import calculate_secondary_mass
 
-#TODO: allow stopping once CDF error falls below some value (small grid step)
 class RVSemiAmplitudeConstraint:
     """Secondary mass constraint from observed RV semi-amplitude."""
 
@@ -471,14 +470,14 @@ class RVSemiAmplitudeConstraint:
                 )
             )
         )
-        self._logger.debug('Upper bound for RVKPDF result: %s',
+        self._logger.debug('Upper bound for RVK PDF result: %s',
                            repr(upper_bound_solution))
         assert upper_bound_solution.converged
         self._support = (
             observed_rvk.ppf(max_discarded_probabiity),
             upper_bound_solution.root
         )
-        print('Support: '+ repr(self._support))
+        self._logger.debug('RVK PDF Support: '+ repr(self._support))
 
         self._rv_semiamplitude_pdf_interp = self._check_for_pickled(
             pickle_fname
@@ -752,9 +751,8 @@ def main():
         maxp1=200
     )
 
-    print(
-        'K = '
-        +
+    logging.debug(
+        'K = %s',
         repr(
             #False positive
             #pylint: disable=no-member
@@ -796,7 +794,8 @@ def main():
         if reference_pdf is None:
             reference_pdf = plot_pdf
 
-        print('e=' + repr(eccentricity))
+        logging.info('Finished calculations for e = %s',
+                     repr(eccentricity))
 
         left_plot.plot(plot_m2,
                        plot_pdf,
@@ -805,8 +804,7 @@ def main():
                              plot_pdf / reference_pdf,
                              label='e = ' + str(eccentricity))
         right_plot.plot(plot_m2,
-                        plot_cdf,
-                        )
+                        plot_cdf)
     middle_plot.set_ylim((0.1, 10.0))
     pyplot.show()
 

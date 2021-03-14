@@ -5,12 +5,10 @@
 import logging
 import traceback
 from multiprocessing import set_start_method
-import os.path
 
 from astropy import units
 from scipy import stats
 import dynesty
-import git
 
 from stellar_evolution.manager import StellarEvolutionManager
 from orbital_evolution.evolve_interface import library as\
@@ -21,6 +19,7 @@ from orbital_evolution.evolve_interface import library as\
 import update_search_paths
 #pylint: enable=unused-import
 import ngc188_util
+from bayesian.sampling import setup_process
 from bayesian.prior_transform_cluster_sb1 import PriorTransformClusterSB1
 from bayesian.log_likelihood_sb1 import LogLikelihoodSB1
 from bayesian.parse_command_line import parse_command_line
@@ -176,25 +175,12 @@ def prepare_sampling(config):
 
     return log_likelihood, prior_transform
 
-def get_code_version_str():
-    """Return a string identifying the version of the code being used."""
-
-    repository = git.Repo(
-        os.path.dirname(
-            os.path.dirname(
-                os.path.dirname(
-                    os.path.abspath(__file__)
-                )
-            )
-        )
-    )
-    head_sha = repository.commit().hexsha
-    if repository.is_dirty():
-        return head_sha + ':dirty'
-    return head_sha
-
 def main(config):
     """Avoid polluting global namespace."""
+
+    setup_process(config)
+
+    set_start_method('forkserver')
 
     log_likelihood, prior_transform = prepare_sampling(config)
 
@@ -220,13 +206,9 @@ def main(config):
         mcmc_sampling.run(config,
                           log_likelihood,
                           prior_transform,
-                          num_params,
-                          get_code_version_str())
+                          num_params)
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
-    set_start_method('forkserver')
-
     try:
         main(
             parse_command_line(
