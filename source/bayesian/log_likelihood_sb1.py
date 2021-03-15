@@ -94,7 +94,6 @@ class LogLikelihoodSB1(LogLikelihoodBase):
     def __call__(self, parameters):
         """Evaluate the log-likelihood at the given model parameters."""
 
-        return 1.0
         circularization_log_likelihood = super().__call__(parameters)
         mass_kwargs = dict(
             primary_mass=self.get_parameter_value(parameters,
