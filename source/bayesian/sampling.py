@@ -46,7 +46,8 @@ def setup_process(config):
 
     io_destination = os.open(
         std_out_err_fname,
-        os.O_WRONLY | os.O_TRUNC | os.O_CREAT | os.O_DSYNC
+        os.O_WRONLY | os.O_TRUNC | os.O_CREAT | os.O_DSYNC,
+        mode=0o666
     )
     os.dup2(io_destination, 1)
     os.dup2(io_destination, 2)
@@ -56,7 +57,8 @@ def setup_process(config):
     logging_config = dict(
         filename=logging_fname,
         level=getattr(logging, config.logging_verbosity.upper()),
-        format=config.logging_message_format
+        format=config.logging_message_format,
+        force=True
     )
     if config.logging_datetime_format is not None:
         logging_config['datefmt'] = config.logging_datetime_format
