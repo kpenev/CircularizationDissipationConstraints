@@ -348,7 +348,7 @@ def add_sampling_parameters(parser):
         help='Filename to redirect worker process stdout and stderr to during '
         'multiprocessing. Should include at least `%%(pid)d` (worker process '
         'id) substitution to avoid mangling, but may also include `%%(system)s`'
-        ' (system name) and `%(now)s` (approximate date and time the process '
+        ' (system name) and `%%(now)s` (approximate date and time the process '
         'started).'
     )
     sampling.add_argument(
@@ -357,7 +357,7 @@ def add_sampling_parameters(parser):
         help='Filename for log mesasges from sampling. Should include at least '
         '`%%(pid)d` (worker process id) substitution to avoid mangling during '
         'multiprocessing, but may also include `%%(system)s`'
-        ' (system name) and `%(now)s` (approximate date and time the process '
+        ' (system name) and `%%(now)s` (approximate date and time the process '
         'started).'
     )
     sampling.add_argument(
