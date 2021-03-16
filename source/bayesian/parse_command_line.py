@@ -423,7 +423,7 @@ def parse_command_line(description,
         description=description,
         default_config_files=[config_fname],
         args_for_writing_out_config_file=['--generate-config-file'],
-        args_for_setting_config_file=['--config-file'],
+        args_for_setting_config_path=['--config-file', '-c'],
         formatter_class=DefaultsFormatter,
         ignore_unknown_config_file_keys=True
     )
