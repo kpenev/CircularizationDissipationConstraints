@@ -426,6 +426,11 @@ def parse_command_line(description,
         ignore_unknown_config_file_keys=True
     )
     parser.add_argument(
+        '--config-file', '--config', '-c',
+        is_config_file=True,
+        help='Configuration file to overwrite argument defaults.'
+    )
+    parser.add_argument(
         '--stellar-evolution-interpolator-dir', '--interpolator-dir',
         default=(
             os.path.expanduser(
