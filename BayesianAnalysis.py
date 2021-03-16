@@ -3,166 +3,91 @@ import planetary_system_io
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy import units as u
-from astropy import constants as cnst
 from abc import ABCMeta, abstractmethod
-from scipy.integrate import quad, dblquad, nquad
-import random
 import emcee
 import sys
 from scipy.optimize import curve_fit
 from scipy.stats import rice
 from scipy.stats import norm
-from scipy.special import i0
-from scipy.special import i1
 from scipy.special import erf
 from scipy.optimize import fsolve
-from scipy.optimize import root
-from scipy.optimize import broyden1
 from sympy import *
-
-
-from scipy.optimize import root_scalar
-from scipy.optimize import newton
-
-
 
 sys.path.append('/home/mmmahmud/poet/PythonPackage')
 sys.path.append('../scripts')
 
-# from matplotlib import pyplot
-# from stellar_evolution.manager import StellarEvolutionManager
-
 from orbital_evolution.evolve_interface import library as \
     orbital_evolution_library
-from orbital_evolution.binary import Binary
-from orbital_evolution.transformations import phase_lag
-from orbital_evolution.star_interface import EvolvingStar
-from orbital_evolution.planet_interface import LockedPlanet
-from orbital_evolution.initial_condition_solver import InitialConditionSolver
-from basic_utils import Structure
-import numpy
-from astropy import units, constants
+
 from reproduce_system import *
+
+def phi(z):
+    return 0.5 * (1 + erf(z / math.sqrt(2)))
+
 
 
 class SuperEccentricityDistribution(metaclass=ABCMeta):
+
+    @abstractmethod
+    def create_probability_density_of_present_eccentricity(self):
+        pass
+
+    @abstractmethod
+    def probability_density_of_eccentricity(self, e):
+        pass
+
+class EccentricityDistribution(SuperEccentricityDistribution):
+
     def __init__(self,
                  mean_e_now,
                  e_now_upper_uncertainty,
                  e_now_lower_uncertainty,
                  mean_e_env,
-                 percentile_for_e_now_upper_uncertainty = 0.5*(1+erf(1/math.sqrt(2))),
-                 percentile_for_e_now_lower_uncertainty = 1-0.5*(1+erf(1/math.sqrt(2))),
+                 percentile_for_e_now_upper_uncertainty=phi(1),
+                 percentile_for_e_now_lower_uncertainty=1 - phi(1),
                  e_env_upper_uncertainty=0.0,
                  e_env_lower_uncertainty=0.0
                  ):
+
         self.mean_e_now = mean_e_now
         self.e_now_upper_uncertainty = e_now_upper_uncertainty
         self.e_now_lower_uncertainty = e_now_lower_uncertainty
         self.percentile_for_e_now_upper_uncertainty = percentile_for_e_now_upper_uncertainty
         self.percentile_for_e_now_lower_uncertainty = percentile_for_e_now_lower_uncertainty
-
-
-
-        self.distribution_of_present_eccentricity = None
-        self.rice_b = None
-        self.rice_s = None
-
+        self.probability_density_of_present_eccentricity, self.roots = self.create_probability_density_of_present_eccentricity()
         self.mean_e_env = mean_e_env
         self.e_env_upper_uncertainty = e_env_upper_uncertainty
         self.e_env_lower_uncertainty = e_env_lower_uncertainty
 
 
-    @abstractmethod
-    def create_distribution_of_present_eccentricity(self, e_now):
-        pass
-
-    @abstractmethod
-    def distribution_of_envelope_eccentricity(self, e_env):
-        pass
-
-
-class EccentricityDistribution(SuperEccentricityDistribution):
-
-    def phi(self, z):
-        return 0.5 * (1 + erf(z / math.sqrt(2)))
-
     def equations_to_be_solved_for_Rice_distribution_parameters(self, x):
         return [rice.cdf((self.mean_e_now+self.e_now_upper_uncertainty), x[0], scale = x[1]) - self.percentile_for_e_now_upper_uncertainty,
                 rice.cdf((self.mean_e_now+self.e_now_lower_uncertainty), x[0], scale = x[1]) - self.percentile_for_e_now_lower_uncertainty]
 
-    def root_for_Rice_parameters(self):
+    def roots_for_Rice_parameters(self):
         estimated_s = self.e_now_upper_uncertainty
         estimated_b = self.mean_e_now/self.e_now_upper_uncertainty
-        root = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, [estimated_b, estimated_s])
-        return root
+        roots = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, np.asarray([estimated_b, estimated_s]))
+        return roots
 
-    def create_distribution_of_present_eccentricity(self):
-        root = self.root_for_Rice_parameters()
-        def distribution_of_present_eccentricity(e_now):
-            return rice.pdf(e_now, root[0], scale = root[1])
-        self.distribution_of_present_eccentricity = distribution_of_present_eccentricity
-        self.rice_b = root[0]
-        self.rice_s = root[1]
-        return distribution_of_present_eccentricity
+    def create_probability_density_of_present_eccentricity(self):
+        roots = self.roots_for_Rice_parameters()
+        def probability_density_of_present_eccentricity(e_now):
+            return rice.pdf(e_now, roots[0], scale = roots[1])
+        return probability_density_of_present_eccentricity, roots
 
-    def distribution_of_envelope_eccentricity(self, e_env):
+    def probability_density_of_envelope_eccentricity(self, e_env):
         e_env_stdev = (self.e_env_upper_uncertainty-self.e_env_lower_uncertainty)/2
-        if e_env_stdev == 0:
-            if e_env == self.mean_e_env:
-                return math.inf
-            else:
-                return 0
-        return math.exp(-0.5 * ((e_env - self.mean_e_env) / e_env_stdev) ** 2) / e_env_stdev / math.sqrt(
-            2 * math.pi)
+        value = norm.pdf(e_env, loc = self.mean_e_env, scale = e_env_stdev)
+        return value
 
-#_____________________________________________________________________________________________________________________
-    def distribution_of_eccentricity_by_nquad_old(self, e, e_env_exists=True):
+
+    def probability_density_of_eccentricity(self, e):
         if e > 1 or e < 0:
             return 0
-        if (not e_env_exists):
-            # For the left part of the eccentricity vs log(orbital period) graph where datapoints are on the x axis:
-            if self.mean_e_env == 0:
-                return 0
-            # For the right part of the eccentricity vs. log(orbital period) graph where eccentricity excedes 0.5:
-            w = lambda e_now: self.distribution_of_present_eccentricity(e_now) / (1 - e_now)
-            value = nquad(w, [[0, e]])
-            return value[0]
-
-        # For the middle part of the eccentricity vs. log(orbital period) graph where we have to find the envelop.
-        if (self.e_env_upper_uncertainty==0 or self.e_env_lower_uncertainty==0):
-            if (e<self.mean_e_env and self.mean_e_env<1):
-                w = lambda e_now: self.distribution_of_present_eccentricity(e_now) / (self.mean_e_env - e_now)
-
-                value = quad(w, 0, e, epsabs=1.49e-16)
-
-
-                return value[0]
-            return 0
-
-        value = nquad(lambda e_now, e_envelope: self.distribution_of_present_eccentricity(
-            e_now) * self.distribution_of_envelope_eccentricity(e_envelope) / (e_envelope - e_now),
-                     [self.bounds_e_now(e), self.bounds_e_env(e)])
-
-        return value[0]
-
-    def bounds_e_now(self, e):
-        return [0, e]
-
-    def bounds_e_env(self, e):
-        return [e, 1]
-#____________________________________________________________________________________________________________________
-    def distribution_of_eccentricity(self, e):
-        if e > 1 or e < 0:
-            return 0
-
         def cdf_e_now(e):
-            value = rice.cdf(e, b=self.rice_b, loc=0, scale=self.rice_s)
-            #value1 = quad(lambda e_now: self.distribution_of_present_eccentricity(e_now), 0, e)
-            #print('cdf_e_now = ', value, value1[0])
-            print('cdf value ', value)
+            value = rice.cdf(e, b=self.roots[0], loc=0, scale=self.roots[1])
             return value
-
         def cdf_e_env(e):
             if (self.e_env_upper_uncertainty == 0 or self.e_env_lower_uncertainty == 0):
                 if e > self.mean_e_env:
@@ -171,17 +96,12 @@ class EccentricityDistribution(SuperEccentricityDistribution):
                     return 0.5
                 return 0
             value = norm.cdf(e, loc=self.mean_e_env, scale=(self.e_env_upper_uncertainty-self.e_env_lower_uncertainty)/2)
-            #value1 = quad(lambda e_env: self.distribution_of_envelope_eccentricity(e_env), 0, e)
-            #print('cdf_e_env = ', value, value1[0])
-            print('cdf norm value ', value)
             return value
-
-        print('frrfrfvrr ', cdf_e_now(e)*(1-cdf_e_env(e)))
         return cdf_e_now(e)*(1-cdf_e_env(e))
 
 
 
-class System:
+class BinarySystem:
     def __init__(self,
                  primary_mass,
                  secondary_mass,
@@ -218,7 +138,7 @@ class System:
         print('Vsini = ', self.Vsini, '=', self.Vsini.to(u.m /u.s))
 
 
-class BayesianAnalysis:
+class EnvelopeEccentricityDistribution:
 
     def __init__(self,
                  path='/home/mmmahmud/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv',
@@ -278,26 +198,16 @@ class BayesianAnalysis:
         self.vsini_lower_uncertainty = readPlanet.st_vsinierr2
 
 
-        self.envelope_eccentricity_function = self.workout_envelope_eccentricity(nsegments=10)  # nsegments is chosen in
-        # such a way that we get a clear eccentricity vs log(orbital period) graph, apparently free of noise.
+        self.envelope_eccentricity_function = self.workout_envelope_eccentricity()  # nsegments is chosen in
+        # such a way that we get an eccentricity vs log(orbital period) graph with minimized fluctuations.
 
         self.probability_density_distribution_of_eccentricity = None
 
         self.position_of_binary_system = -1  # null value
 
 
-
-
-    def pick_a_tuple_from_the_multi_variable_Gaussian_distribution(self, mean, standard_deviation):
-        n_cross_n_dimensional_array_of_standard_deviations = np.diag(
-            np.array([element ** 2 for element in standard_deviation]))
-        temp = np.random.default_rng().multivariate_normal(numpy.array(mean),
-                                                           n_cross_n_dimensional_array_of_standard_deviations).tolist()
-
-        return temp
-
-    def workout_envelope_eccentricity(self,
-                                     nsegments=10,
+    def workout_envelope_eccentricity_old(self,
+                                     nsegments=20,
                                      maximum_number_of_data_points = 5000,
                                      threshold_value_of_envelope_eccentricity = 0.05,
                                      largest_acceptable_value_of_envelope_eccentricity = 0.5):
@@ -359,8 +269,8 @@ class BayesianAnalysis:
                               ' log(period) for envelope =',((x[i] + x[j]) / 2),
                               ', eccentricity = ', m)
 
-                u = u + [(x[i] + x[j]) / 2]  # if we assume the maximum v occurs at the midpoint of u-interval
-                # u = u + [x[i]] #We are assuming the maximum v occurs at the left end of u-interval. We are overestimating the envelop-eccentricity by doing so
+                #u = u + [(x[i] + x[j]) / 2]  # if we assume the maximum v occurs at the midpoint of u-interval
+                u = u + [x[i]] #We are assuming the maximum v occurs at the left end of u-interval. We are overestimating the envelop-eccentricity by doing so
                 i = j
 
         # Figuring out the value of log(orbital period) upto which envelop eccentricity is close to zero, i.e. less than 0.05
@@ -378,23 +288,24 @@ class BayesianAnalysis:
             j = j + 1
         j = j+1
 
-        # figuring out the equation of envelop curve
-        popt, pcov = curve_fit(self.trial_func_for_envelope_eccentricity, u[i:j], v[i:j])
-        xdata = np.linspace(u[i], u[j - 1], 50)
-        plt.plot(x, y, 'x')
-        plt.plot(xdata, self.trial_func_for_envelope_eccentricity(xdata, *popt))
-        # naming the x axis
-        plt.xlabel('log(Period)')
-        # naming the y axis
-        plt.ylabel('Present Envelope Eccentricity')
-        # giving a title to my graph
-        plt.title('Present Envelope Eccentricity vs log(Period)')
-        # function to show the plot
-        plt.plot(u, v, 'o', label="Envelope Eccentricities vs. log(Periods)")
-        plt.show()
 
+
+        # figuring out the equation of envelop curve
+        w =np.polyfit(u,v, (j-i-1))
+        print('dffd ', (j-i))
+        print('fdsffeee', u[i:j], v[i:j])
+        f = np.poly1d(w)
+
+
+        popt, pcov = curve_fit(self.trial_func_for_envelope_eccentricity, u[i:j], v[i:j])
+
+        self.print_present_eccentricity_vs_log_period(x, y, u, v, i, j, popt)
+        #popt = w
+
+        self.print_present_eccentricity_vs_log_period1(x, y, u, v, i, j, f)
 
         def envelope_eccentricity_function(orbital_period):
+
             if math.log(orbital_period, 10) < u[i]:
                 return threshold_value_of_envelope_eccentricity
             envelope_eccentricity = self.trial_func_for_envelope_eccentricity(math.log(orbital_period, 10), *popt)
@@ -408,6 +319,167 @@ class BayesianAnalysis:
 
         return a * x ** 2 + b * x + c
 
+
+
+    def workout_envelope_eccentricity(self,
+                                     maximum_number_of_data_points = 5000,
+                                     threshold_value_of_envelope_eccentricity = 0.05,
+                                     largest_acceptable_value_of_envelope_eccentricity = 0.5):
+
+        log_orbital_period = [] #Will store 10 based log of orbital period
+        eccentricity_now = [] #Will store present eccentricity
+        planet_name = [] #Will store planet's name
+        j = -1
+        for i in range(0, len(self.orbital_period)):
+            if not (math.isnan(self.orbital_period[i])
+                    or math.isnan(self.eccentricity_now[i])
+            ):
+                if self.orbital_period[i] <= 10 and (self.primary_mass[i] > 0.4 and self.primary_mass[i] < 1.2) and (
+                        self.metallicity[i] > -1.014 and self.metallicity[i] < 0.537):
+                    j = j + 1
+                    log_orbital_period = log_orbital_period + [math.log(self.orbital_period[i], 10)]
+                    eccentricity_now = eccentricity_now + [self.eccentricity_now[i]]
+                    planet_name = planet_name +  [self.planet_name[i]]
+                    print('planet name = ', self.planet_name[i],
+                          ', period = ', self.orbital_period[i],
+                          ', log(period) = ', math.log(self.orbital_period[i], 10),
+                          ', eccentricity_now = ', self.eccentricity_now[i])
+            if j >= maximum_number_of_data_points-1:
+                break
+
+        # Sorting
+        for i in range(0, j):
+            for k in range(i + 1, j+1):
+                if log_orbital_period[i] > log_orbital_period[k]:
+                    temp = log_orbital_period[k]
+                    temp2 = eccentricity_now[k]
+                    temp3 = planet_name[k]
+                    log_orbital_period[k] = log_orbital_period[i]
+                    eccentricity_now[k] = eccentricity_now[i]
+                    planet_name[k] = planet_name[i]
+                    log_orbital_period[i] = temp
+                    eccentricity_now[i] = temp2
+                    planet_name[i] = temp3
+
+
+        eccentricity_now_on_envelope = []
+        log_orbital_period_on_envelope = []
+
+        for i in range(0, j+1):
+            if eccentricity_now[i] <= threshold_value_of_envelope_eccentricity:
+                log_orbital_period_on_envelope = log_orbital_period_on_envelope + [log_orbital_period[i]]
+                eccentricity_now_on_envelope = eccentricity_now_on_envelope + [threshold_value_of_envelope_eccentricity]
+            if eccentricity_now[i] > threshold_value_of_envelope_eccentricity:
+                break
+
+        maximum_eccentricity_now = threshold_value_of_envelope_eccentricity
+
+        log_orbital_period_on_the_curved_segment_of_envelope = []
+        eccentricity_now_on_the_curved_segment_of_envelope = []
+
+        for k in range(i, j+1):
+            if eccentricity_now[k] >= maximum_eccentricity_now and eccentricity_now[k] <= largest_acceptable_value_of_envelope_eccentricity:
+                maximum_eccentricity_now = eccentricity_now[k]
+                log_orbital_period_on_envelope = log_orbital_period_on_envelope + [log_orbital_period[k]]
+                eccentricity_now_on_envelope = eccentricity_now_on_envelope + [eccentricity_now[k]]
+                log_orbital_period_on_the_curved_segment_of_envelope = log_orbital_period_on_the_curved_segment_of_envelope + [log_orbital_period[k]]
+                eccentricity_now_on_the_curved_segment_of_envelope = eccentricity_now_on_the_curved_segment_of_envelope + [eccentricity_now[k]]
+            if eccentricity_now[k] > largest_acceptable_value_of_envelope_eccentricity:
+                break
+
+
+        maximum_eccentricity_now = largest_acceptable_value_of_envelope_eccentricity
+        topmost_point_of_the_curved_segment_of_the_envelope_not_yet_found = true
+        for m in range(k, j+1):
+            if eccentricity_now[m]>=maximum_eccentricity_now:
+                log_orbital_period_on_envelope = log_orbital_period_on_envelope + [log_orbital_period[m]]
+                eccentricity_now_on_envelope = eccentricity_now_on_envelope + [largest_acceptable_value_of_envelope_eccentricity]
+                if topmost_point_of_the_curved_segment_of_the_envelope_not_yet_found:
+                    log_orbital_period_on_the_curved_segment_of_envelope = log_orbital_period_on_the_curved_segment_of_envelope + [log_orbital_period[m]]
+                    eccentricity_now_on_the_curved_segment_of_envelope = eccentricity_now_on_the_curved_segment_of_envelope + [largest_acceptable_value_of_envelope_eccentricity]
+                    topmost_point_of_the_curved_segment_of_the_envelope_not_yet_found = false
+
+
+
+
+        # figuring out the equation of envelop curve
+        coefficients_and_constant_of_envelope_eccentricity_function_for_curved_segment =np.polyfit(log_orbital_period_on_the_curved_segment_of_envelope,
+                                                                                eccentricity_now_on_the_curved_segment_of_envelope,
+                                                                                (len(log_orbital_period_on_the_curved_segment_of_envelope)-1))
+        envelope_eccentricity_function_for_curved_segment = np.poly1d(coefficients_and_constant_of_envelope_eccentricity_function_for_curved_segment)
+
+        def envelope_eccentricity_function(orbital_period):
+            x = math.log(orbital_period, 10)
+            if x<log_orbital_period_on_the_curved_segment_of_envelope[0]:
+                return threshold_value_of_envelope_eccentricity
+            if x>log_orbital_period_on_the_curved_segment_of_envelope[-1]:
+                return largest_acceptable_value_of_envelope_eccentricity
+            return envelope_eccentricity_function_for_curved_segment(x)
+
+        self.print_present_eccentricity_vs_log_period1(log_orbital_period,
+                                                       eccentricity_now,
+                                                       log_orbital_period_on_envelope,
+                                                       eccentricity_now_on_envelope,
+                                                       envelope_eccentricity_function)
+
+
+
+        return envelope_eccentricity_function
+
+
+
+
+    def print_present_eccentricity_vs_log_period1(self,
+                                                  log_orbital_period,
+                                                  eccentricity_now,
+                                                  log_orbital_period_on_envelope,
+                                                  eccentricity_now_on_envelope,
+                                                  envelope_eccentricity_function):
+        xdata = np.linspace(log_orbital_period_on_envelope[0], log_orbital_period_on_envelope[-1], 50)
+
+        ydata = []
+        for i in range(0, len(xdata)):
+            ydata = ydata + [envelope_eccentricity_function(10**xdata[i])]
+        plt.plot(log_orbital_period, eccentricity_now, 'x')
+        plt.plot(xdata, ydata)
+        # naming the x axis
+        plt.xlabel('log(Period)')
+        # naming the y axis
+        plt.ylabel('Present Envelope Eccentricity')
+        # giving a title to my graph
+        plt.title('Present Envelope Eccentricity vs log(Period)')
+        # function to show the plot
+        plt.plot(log_orbital_period_on_envelope, eccentricity_now_on_envelope, 'o', label="Envelope Eccentricities vs. log(Periods)")
+        plt.show()
+        return
+
+
+
+    def print_present_eccentricity_vs_log_period(self, x, y, u, v, i, j, popt):
+        xdata = np.linspace(u[i], u[j - 1], 50)
+        plt.plot(x, y, 'x')
+        plt.plot(xdata, self.trial_func_for_envelope_eccentricity(xdata, *popt))
+        # naming the x axis
+        plt.xlabel('log(Period)')
+        # naming the y axis
+        plt.ylabel('Present Envelope Eccentricity')
+        # giving a title to my graph
+        plt.title('Present Envelope Eccentricity vs log(Period)')
+        # function to show the plot
+        plt.plot(u, v, 'o', label="Envelope Eccentricities vs. log(Periods)")
+        plt.show()
+        return
+
+
+
+    def pick_a_tuple_from_the_multi_variable_Gaussian_distribution(self, mean, standard_deviation):
+        n_cross_n_dimensional_array_of_standard_deviations = np.diag(
+            np.array([element ** 2 for element in standard_deviation]))
+        temp = np.random.default_rng().multivariate_normal(np.array(mean),
+                                                           n_cross_n_dimensional_array_of_standard_deviations).tolist()
+
+        return temp
+
     def construct_probability_density_distribution_of_eccentricity(self,
                                                                    mean_e_now,
                                                                    e_now_upper_uncertainty,
@@ -415,14 +487,9 @@ class BayesianAnalysis:
                                                                    orbital_period):
 
         mean_e_env = self.envelope_eccentricity_function(orbital_period=orbital_period)
-
         b = EccentricityDistribution(mean_e_now, e_now_upper_uncertainty, e_now_lower_uncertainty, mean_e_env)
 
-        b.create_distribution_of_present_eccentricity()
-        def f(e):
-            return b.distribution_of_eccentricity(e)
-
-        return f
+        return b.probability_density_of_eccentricity
 
     def log_prob(self, theta, initial_eccentricity = 0.5):
         # theta = (primary_mass, secondary_mass, secondary_radius, feh, orbital_period, obliquity, age, vsini)
@@ -442,7 +509,7 @@ class BayesianAnalysis:
         if priors == 0:
             return -math.inf
 
-        a = System(primary_mass * u.solMass,
+        a = BinarySystem(primary_mass * u.solMass,
                    secondary_mass * u.earthMass,
                    secondary_radius * u.earthRad,
                    metallicity * u.dimensionless_unscaled,
@@ -458,8 +525,8 @@ class BayesianAnalysis:
             secondary=dict(
                 tidal_frequency_breaks=None,
                 spin_frequency_breaks=None,
-                tidal_frequency_powers=numpy.array([0.0]),
-                spin_frequency_powers=numpy.array([0.0]),
+                tidal_frequency_powers=np.array([0.0]),
+                spin_frequency_powers=np.array([0.0]),
                 reference_phase_lag=phase_lag(argument_of_phase_lag_function)
             )
         )
@@ -497,9 +564,7 @@ class BayesianAnalysis:
         #       print(repr(dir(b)))
         if  calculated_eccentricity_now >= 0 and calculated_eccentricity_now <=1:
             print('calculated eccentricity now = ', calculated_eccentricity_now)
-            print('start&&&&&&&&&&&&&&')
             probability_density_of_eccentricity_now = self.probability_density_distribution_of_eccentricity(calculated_eccentricity_now)
-            print('stop********')
 
             print('probability density ', probability_density_of_eccentricity_now)
             print('priors ', priors)
@@ -691,7 +756,7 @@ class BayesianAnalysis:
         prob = []
         Qpl = []
         print('log_prob for Qpl = 6.5,', self.log_prob(theta0))
-        for i in range(3,7):
+        for i in range(1,9):
             theta0[9] = i*1
             Qpl = Qpl + [i*1]
             prob = prob + [self.log_prob(theta0)]
@@ -760,7 +825,7 @@ class BayesianAnalysis:
                         metallicity[i] > -1.014 and metallicity[i] < 0.537):
                     j = j + 1
                     print(primary_mass[i], (primary_mass[i] > 0.4 and primary_mass[i] < 1.2))
-                    a = System(primary_mass[i] * u.solMass,
+                    a = BinarySystem(primary_mass[i] * u.solMass,
                                secondary_mass[i] * u.earthMass,
                                secondary_radius[i] * u.earthRad,
                                metallicity[i] * u.dimensionless_unscaled,
@@ -778,8 +843,8 @@ class BayesianAnalysis:
                         secondary=dict(
                             tidal_frequency_breaks=None,
                             spin_frequency_breaks=None,
-                            tidal_frequency_powers=numpy.array([0.0]),
-                            spin_frequency_powers=numpy.array([0.0]),
+                            tidal_frequency_powers=np.array([0.0]),
+                            spin_frequency_powers=np.array([0.0]),
                             reference_phase_lag=phase_lag(5)
                         )
                     )
@@ -928,9 +993,9 @@ if __name__ == '__main__':
     #Testing testing_log_prob, MCMC and other methods
 
     print('Testing testing_log_prob, MCMC and other methods: Start')
-    test = BayesianAnalysis()
+    test = EnvelopeEccentricityDistribution()
 
-    test.testing_log_prob()
+    #test.testing_log_prob()
     #test.MCMC()
 
     #    b = EccentricityDistribution(mean_e_now=0.2, e_now_stdev=0.5, mean_e_env=0.8, e_env_stdev=0.5)
