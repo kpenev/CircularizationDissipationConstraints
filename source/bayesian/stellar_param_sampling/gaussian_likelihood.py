@@ -2,7 +2,8 @@
 
 from scipy.stats import multivariate_normal
 
-from feh_conditional_likelihood_base import FeHConditionalLikelihoodBase
+from bayesian.stellar_param_sampling.feh_conditional_likelihood_base import\
+    FeHConditionalLikelihoodBase
 
 class GaussianLikelihood(FeHConditionalLikelihoodBase):
     """Log-likelihood class with 3-D correlated Gaussian for debugging."""

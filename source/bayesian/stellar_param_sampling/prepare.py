@@ -10,17 +10,23 @@ import numpy
 from numpy.random import rand
 
 from stellar_evolution.manager import StellarEvolutionManager
-from marginalized_parameter_distribution import MarginalizedParamterDistribution
-from poet_interp_likelihood import POETInterpLikelihood
-from feh_conditional_likelihood_base import FeHConditionalLikelihoodBase
 
-from star_sampler import StarSampler
-from gaussian_likelihood import GaussianLikelihood
-from config_util import add_star_sampler_config_args
+from bayesian.stellar_param_sampling.config_util import\
+    add_star_sampler_config_args
 #False positive
 #pylint: disable=import-error
 from bayesian.parse_command_line import parse_quantity_with_errors
 #pylint: enable=import-error
+
+from bayesian.stellar_param_sampling.marginalized_parameter_distribution import\
+    MarginalizedParamterDistribution
+from bayesian.stellar_param_sampling.poet_interp_likelihood import\
+    POETInterpLikelihood
+from bayesian.stellar_param_sampling.feh_conditional_likelihood_base import\
+    FeHConditionalLikelihoodBase
+from bayesian.stellar_param_sampling.star_sampler import StarSampler
+from bayesian.stellar_param_sampling.gaussian_likelihood import\
+    GaussianLikelihood
 
 def parse_configuration():
     """Return the configuration to use per the command line."""

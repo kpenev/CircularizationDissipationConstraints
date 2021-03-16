@@ -477,7 +477,8 @@ class RVSemiAmplitudeConstraint:
             observed_rvk.ppf(max_discarded_probabiity),
             upper_bound_solution.root
         )
-        self._logger.debug('RVK PDF Support: '+ repr(self._support))
+        self._logger.debug('RVK PDF Support: %s',
+                           repr(self._support))
 
         self._rv_semiamplitude_pdf_interp = self._check_for_pickled(
             pickle_fname

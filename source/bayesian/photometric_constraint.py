@@ -10,12 +10,11 @@ from matplotlib import pyplot, cm
 from scipy import integrate, optimize
 import numpy
 
-from mass_fitting import fit_binary_masses
-
 #False positive (fixed in __init__.py)
 #pylint: disable=import-error
 from photometric_secondary_constraint import PhotometricSecondaryConstraint
 #pylint: enable=import-error
+from mass_fitting import fit_binary_masses
 
 #Simplifying decreases readability
 #pylint: disable=too-many-instance-attributes

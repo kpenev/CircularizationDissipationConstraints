@@ -1,6 +1,5 @@
 """Functions used by multiple bayesian sampling scripts."""
 
-import sys
 import os
 import os.path
 from datetime import datetime

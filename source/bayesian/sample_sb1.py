@@ -17,13 +17,18 @@ from orbital_evolution.evolve_interface import library as\
 #Fixed module search paths, not intended to provide anything.
 #pylint: disable=unused-import
 import update_search_paths
+#pylint: disable=wrong-import-order
 #pylint: enable=unused-import
+#False positive
+#pylint: disable=import-error
 import ngc188_util
+#pylint: enable=import-error
 from bayesian.sampling import setup_process
 from bayesian.prior_transform_cluster_sb1 import PriorTransformClusterSB1
 from bayesian.log_likelihood_sb1 import LogLikelihoodSB1
 from bayesian.parse_command_line import parse_command_line
 from bayesian import mcmc_sampling
+#pylint: enable=wrong-import-order
 
 def get_independent_priors(config, observed_orbit):
     """Return the independent parameters for the prior transform."""

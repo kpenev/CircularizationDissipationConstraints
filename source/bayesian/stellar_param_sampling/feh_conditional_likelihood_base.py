@@ -8,7 +8,8 @@ from scipy.integrate import solve_ivp
 
 from stellar_evolution.manager import StellarEvolutionManager
 
-from continous_max_age import get_continuous_max_age
+from bayesian.stellar_param_sampling.continous_max_age import\
+    get_continuous_max_age
 
 class FeHConditionalLikelihoodBase(ABC):
     """Common interface for log-likelihood functions of stellar paramseters."""
