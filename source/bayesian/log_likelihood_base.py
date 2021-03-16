@@ -119,15 +119,25 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                             parameters,
                             logging.INFO)
 
-        try:
-            #False positive: dissipation is included find_evolution_kwargs
-            #pylint: disable=no-value-for-parameter
-            evolution = find_evolution(
-                **self._parse_parameters(parameters)
-            )
-            #pylint: enable=no-value-for-parameter
-        except AssertionError:
-            logger.exception('Calculating evolution failed.')
+        evolve_parameters = self._parse_parameters(parameters)
+        failed = True
+        while failed and evolve_parameters['initial_eccentricity'] > 0.4:
+            try:
+                #False positive: dissipation is included find_evolution_kwargs
+                #pylint: disable=no-value-for-parameter
+                evolution = find_evolution(
+                    **evolve_parameters
+                )
+                #pylint: enable=no-value-for-parameter
+            except AssertionError:
+                evolve_parameters['initial_eccentricity'] -= 1e-3
+                logger.warning('Calculating evolution failed, trying e0 = %g.',
+                               evolve_parameters['initial_eccentricity'])
+            else:
+                failed = False
+
+        if failed:
+            logger.error('Calculating evolution failed!')
             return -numpy.inf
 
         expected_final_age = self.get_parameter_value(
