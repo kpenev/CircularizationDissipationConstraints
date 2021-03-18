@@ -71,11 +71,15 @@ def get_independent_priors(config, observed_orbit):
         ):
             result.extend([
                 (
-                    param,
-                    get_uniform_distribution(param),
+                    'lgQ_break_period',
+                    get_uniform_distribution('lgQ_break_period'),
+                    units.day
+                ),
+                (
+                    'lgQ_powerlaw',
+                    get_uniform_distribution('lgQ_powerlaw'),
                     units.dimensionless_unscaled
                 )
-                for param in ['lgQ_break_period', 'lgQ_powerlaw']
             ])
 
         return result
