@@ -311,16 +311,6 @@ def add_sampling_parameters(parser):
         'processing is available.'
     )
     sampling.add_argument(
-        '--samples-fname',
-        default='%(system)s_%(sampling)s_samples',
-        help='The filename where to save generated MCMC samples. An extension '
-        'is added automatically depending on the sampling method. If the file '
-        'exists, sampling continues from the state saved in it. The filename '
-        'can contain the following %% substitutions: %%(system)s - replaced by '
-        'the name of the system, %%(sampling) - replaced by the sampling '
-        'method.'
-    )
-    sampling.add_argument(
         '--rvk-interpolation-accuracy',
         type=float,
         nargs=2,
@@ -337,12 +327,45 @@ def add_sampling_parameters(parser):
         'velocity semi-amplitude PDF as it is being refined.'
     )
     sampling.add_argument(
+        '--initial-period-search-factor', '--period-search-factor',
+        type=float,
+        default=1.2,
+        help='The factor by which to change the initial period guess while '
+        'searching for a range surrounding the known present day orbital period'
+    )
+    sampling.add_argument(
+        '--initial-period-scaled-guess', '--period-scaled-guess',
+        type=float,
+        default=2.0,
+        help='The search for initial period to bracked the observed final '
+        'period will start from this value multiplied by the final orbital '
+        'period.'
+    )
+
+def add_output_parameters(parser):
+    """Add parameters controlling how and what output to generate."""
+
+    output = parser.add_argument_group(
+        title='Output parameters.',
+        description='Configuration controlling how and what output to generate.'
+    )
+    output.add_argument(
+        '--samples-fname',
+        default='%(system)s_%(sampling)s_samples',
+        help='The filename where to save generated MCMC samples. An extension '
+        'is added automatically depending on the sampling method. If the file '
+        'exists, sampling continues from the state saved in it. The filename '
+        'can contain the following %% substitutions: %%(system)s - replaced by '
+        'the name of the system, %%(sampling) - replaced by the sampling '
+        'method.'
+    )
+    output.add_argument(
         '--fname-datetime-format',
         default='%Y%m%d%H%M%S',
         help='How to format date and time as part of filenames (e.g. when '
         'creating output files for multiprocessing.'
     )
-    sampling.add_argument(
+    output.add_argument(
         '--std-out-err-fname',
         default='sampling_output/%(system)s_%(now)s_%(pid)d.outerr',
         help='Filename to redirect worker process stdout and stderr to during '
@@ -351,7 +374,7 @@ def add_sampling_parameters(parser):
         ' (system name) and `%%(now)s` (approximate date and time the process '
         'started).'
     )
-    sampling.add_argument(
+    output.add_argument(
         '--logging-fname',
         default='sampling_output/%(system)s_%(now)s_%(pid)d.log',
         help='Filename for log mesasges from sampling. Should include at least '
@@ -360,20 +383,20 @@ def add_sampling_parameters(parser):
         ' (system name) and `%%(now)s` (approximate date and time the process '
         'started).'
     )
-    sampling.add_argument(
+    output.add_argument(
         '--logging-verbosity', '--verbosity',
         choices=['debug', 'info', 'warning', 'error', 'critical'],
         default='info',
         help='The lowest importance level of logging messages to issue.'
     )
-    sampling.add_argument(
+    output.add_argument(
         '--logging-datetime-format',
         default=None,
         help='How to format date and time as part of filenames (e.g. when '
         'creating output files for multiprocessing.'
     )
 
-    sampling.add_argument(
+    output.add_argument(
         '--logging-message-format', '--logging-format', '--log-fmt',
         default=('%(levelname)s %(asctime)s %(name)s: %(message)s | '
                  '%(pathname)s.%(funcName)s:%(lineno)d'),
@@ -445,6 +468,7 @@ def parse_command_line(description,
     )
 
     add_sampling_parameters(parser)
+    add_output_parameters(parser)
     if dissipation:
         add_dissipation_args(parser)
     if cluster:
