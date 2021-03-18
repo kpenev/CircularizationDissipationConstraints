@@ -237,6 +237,22 @@ def prepare_backend(config, num_params, code_version_str):
 
     return backend
 
+#Work around emcee limitation
+#pylint: disable=too-few-public-methods
+class UnchunkedPool:
+    """Disable chunking in Pool.map."""
+
+    def __init__(self, pool):
+        """Wrap around the given pool's map."""
+
+        self._pool = pool
+
+    def map(self, *args, **kwargs):
+        """Delegate everything to parent, but set chunksize to 1."""
+
+        self._pool.map(*args, **kwargs, chunksize=1)
+#pylint: enable=too-few-public-methods
+
 def run(config,
         log_likelihood,
         prior_transform,
@@ -258,9 +274,11 @@ def run(config,
         with Pool(
                 config.num_parallel_processes,
                 initializer=setup_process,
-                initargs=[config]
+                initargs=[config],
+                maxtasksperchild=1
         ) as workers:
-            sampler = emcee.EnsembleSampler(**sampler_kwargs, pool=workers)
+            sampler = emcee.EnsembleSampler(**sampler_kwargs,
+                                            pool=UnchunkedPool(workers))
             sampler.run_mcmc(
                 numpy.random.rand(config.mcmc_nwalkers, num_params),
                 config.mcmc_nsteps
