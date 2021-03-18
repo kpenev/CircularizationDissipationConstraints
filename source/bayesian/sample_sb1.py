@@ -169,7 +169,8 @@ def prepare_sampling(config):
             interpolator=interpolator,
             eccentricity_likelihood=(
                 ngc188_util.get_final_eccentricity_likelihood(binary_orbit)
-            )
+            ),
+            evolution_timeout=config.evolution_timeout
         )
 
         prior_transform = PriorTransformClusterSB1(

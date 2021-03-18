@@ -59,6 +59,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         kwargs['max_age'] = system.age
         kwargs['system'] = system
         kwargs['secondary_is_star'] = self.secondary_is_star
+        kwargs['timeout'] = self._evolution_timeout
 
         return kwargs
 
@@ -66,6 +67,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                  interpolator,
                  eccentricity_likelihood,
                  secondary_is_star,
+                 evolution_timeout,
                  **kwargs):
         """
         Set-up the log-likelihood calculator.
@@ -88,6 +90,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
 
         self.interpolator = interpolator
         self.eccentricity_likelihood = eccentricity_likelihood
+        self._evolution_timeout = evolution_timeout
         self.final_eccentricity = None
 
         self.secondary_is_star = secondary_is_star
@@ -130,7 +133,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 )
                 #pylint: enable=no-value-for-parameter
             except AssertionError:
-                evolve_parameters['initial_eccentricity'] -= 1e-3
+                evolve_parameters['initial_eccentricity'] -= 1e-2
                 logger.warning('Calculating evolution failed, trying e0 = %g.',
                                evolve_parameters['initial_eccentricity'])
             else:

@@ -311,6 +311,13 @@ def add_sampling_parameters(parser):
         'processing is available.'
     )
     sampling.add_argument(
+        '--evolution-timeout',
+        type=float,
+        default=3600.0,
+        help='The maximum amount of time a single evolution is allowed to run. '
+        'If exceeded, the associated parameters are rejected.'
+    )
+    sampling.add_argument(
         '--samples-fname',
         default='%(system)s_%(sampling)s_samples',
         help='The filename where to save generated MCMC samples. An extension '
