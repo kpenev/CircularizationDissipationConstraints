@@ -55,11 +55,14 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             for param_name, _ in self.parameter_names_units['evolution']
         }
         kwargs['dissipation'] = self._get_dissipation(parameters)
-        kwargs['interpolator'] = self.interpolator
         kwargs['max_age'] = system.age
-        kwargs['system'] = system
-        kwargs['secondary_is_star'] = self.secondary_is_star
         kwargs['timeout'] = self._evolution_timeout
+        for parameter in ['system',
+                          'interpolator',
+                          'secondary_is_star',
+                          'period_search_factor',
+                          'scaled_period_guess']:
+            kwargs[parameter] = getattr(self, parameter)
 
         return kwargs
 
@@ -67,7 +70,10 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                  interpolator,
                  eccentricity_likelihood,
                  secondary_is_star,
+                 *,
                  evolution_timeout,
+                 period_search_factor,
+                 scaled_period_guess,
                  **kwargs):
         """
         Set-up the log-likelihood calculator.
@@ -80,6 +86,15 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
 
             secondary_is_star(bool):    True iff the secondary in the system is
                 an evolving star.
+
+            evolution_timeout(float):    Maximum time to allow for a single
+                orbital evolution
+
+            period_search_factor(float):    See same name argument to
+                :meth:`InitialConditionSolver.__init__`.
+
+            scaled_period_guess(float):    See same name argument to
+                :meth:`InitialConditionSolver.__init__`.
 
             kwargs:    Arguments in addition to `secondary_is_star` required by
                 the parent's :meth:`__init__()`.
@@ -94,6 +109,8 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         self.final_eccentricity = None
 
         self.secondary_is_star = secondary_is_star
+        self.period_search_factor = period_search_factor
+        self.scaled_period_guess = scaled_period_guess
         super().__init__(secondary_is_star=secondary_is_star,
                          **kwargs)
 

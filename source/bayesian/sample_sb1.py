@@ -170,7 +170,9 @@ def prepare_sampling(config):
             eccentricity_likelihood=(
                 ngc188_util.get_final_eccentricity_likelihood(binary_orbit)
             ),
-            evolution_timeout=config.evolution_timeout
+            evolution_timeout=config.evolution_timeout,
+            period_search_factor=config.initial_period_search_factor,
+            scaled_period_guess=config.initial-period-scaled-guess
         )
 
         prior_transform = PriorTransformClusterSB1(
