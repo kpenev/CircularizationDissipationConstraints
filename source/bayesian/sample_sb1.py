@@ -172,7 +172,7 @@ def prepare_sampling(config):
             ),
             evolution_timeout=config.evolution_timeout,
             period_search_factor=config.initial_period_search_factor,
-            scaled_period_guess=config.initial-period-scaled-guess
+            scaled_period_guess=config.initial_period_scaled_guess
         )
 
         prior_transform = PriorTransformClusterSB1(
