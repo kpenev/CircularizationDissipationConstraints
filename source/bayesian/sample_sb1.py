@@ -192,7 +192,7 @@ def main(config):
 
     setup_process(config)
 
-    set_start_method('forkserver')
+#    set_start_method('forkserver')
 
     log_likelihood, prior_transform = prepare_sampling(config)
 
