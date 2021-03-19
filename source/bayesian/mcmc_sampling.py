@@ -250,7 +250,7 @@ class UnchunkedPool:
     def map(self, *args, **kwargs):
         """Delegate everything to parent, but set chunksize to 1."""
 
-        self._pool.map(*args, **kwargs, chunksize=1)
+        return self._pool.map(*args, **kwargs, chunksize=1)
 #pylint: enable=too-few-public-methods
 
 def run(config,
