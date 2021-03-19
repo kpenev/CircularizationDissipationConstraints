@@ -57,8 +57,8 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         kwargs['dissipation'] = self._get_dissipation(parameters)
         kwargs['max_age'] = system.age
         kwargs['timeout'] = self._evolution_timeout
-        for parameter in ['system',
-                          'interpolator',
+        kwargs['system'] = system
+        for parameter in ['interpolator',
                           'secondary_is_star',
                           'period_search_factor',
                           'scaled_period_guess']:
@@ -150,7 +150,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 )
                 #pylint: enable=no-value-for-parameter
             except AssertionError:
-                evolve_parameters['initial_eccentricity'] -= 1e-2
+                evolve_parameters['initial_eccentricity'] -= 2e-2
                 logger.warning('Calculating evolution failed, trying e0 = %g.',
                                evolve_parameters['initial_eccentricity'])
             else:
