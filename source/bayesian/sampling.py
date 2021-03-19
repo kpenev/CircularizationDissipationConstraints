@@ -53,11 +53,14 @@ def setup_process(config):
 
     logging_fname = config.logging_fname % fname_substitutions
     ensure_directory(logging_fname)
+
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+        handler.close()
     logging_config = dict(
         filename=logging_fname,
         level=getattr(logging, config.logging_verbosity.upper()),
         format=config.logging_message_format,
-        force=True
     )
     if config.logging_datetime_format is not None:
         logging_config['datefmt'] = config.logging_datetime_format
