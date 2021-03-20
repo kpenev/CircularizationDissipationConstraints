@@ -369,12 +369,6 @@ class EnvelopeEccentricityDistribution:
 
         self.envelope_eccentricity_function = self.create_envelope_eccentricity_function()
 
-        # nsegments is chosen in
-        # such a way that we get an eccentricity vs log(orbital period) graph with minimized fluctuations.
-
-        #self.probability_density_distribution_of_eccentricity = None
-
-        #self.position_of_binary_system = -1  # null value
 
     def create_envelope_eccentricity_function(self,
                                      maximum_number_of_data_points = 5000,
@@ -902,7 +896,6 @@ class SamplingPropertiesOfSystem:
 
 
     def testing_log_prob(self):
-        #theta0 = self.create_initial_theta_and_probability_density_distribution_of_eccentricity(index_of_the_binary_system=15)  # I am choosing index = 15
         prob = []
         Qpl = []
         for i in range(3,9):
@@ -975,80 +968,4 @@ if __name__ == '__main__':
                                        planet_name=planet_name
                                        )
     test3.testing_log_prob()
-
-    #test = EnvelopeEccentricityDistribution()
-    #print(test.envelope_eccentricity_function(10**0.2))
-
-
-
-    #print('roots for Rice parameters are:',test.root_for_Rice_parameters())
-    #a = test.create_distribution_of_present_eccentricity()
-    #j = 0.49
-    #print('probability of present eccentricity = ', j, ' is ', test.distribution_of_present_eccentricity(j))
-    #print('probability density of eccentricity = ', j, ' is ',test.distribution_of_eccentricity(j))
-    #print('probability density of eccentricity = ', 0.2, 'is', test.distribution_of_eccentricity_by_nquad(0.6))
-
-
-    #print('Testing rice distribution: Starts')
-    #fig, ax = plt.subplots(1, 1)
-    #print(ax)
-
-    #b = 0.5
-    #mean, var, skew, kurt = rice.stats(b, moments='mvsk')
-    #print('mean =', mean)
-    #print('var =', var)
-    #print('skew =', skew)
-    #print('kurt =', kurt)
-    #x = np.linspace(rice.ppf(0.01, b),
-                    #rice.ppf(0.99, b), 100)
-    #print('ppf .99 is ', rice.ppf(.99, b))
-    #print('x = ', x)
-    #ax.plot(x, rice.pdf(x, b),'r-', lw=5, alpha=0.6, label='rice pdf')
-    #rv = rice(b)
-    #print('rv ', rv)
-    #ax.plot(x, rv.pdf(x), 'k-', lw=2, label='frozen pdf')
-    #vals = rice.ppf([0.001, 0.5, 0.999], b)
-    #np.allclose([0.001, 0.5, 0.999], rice.cdf(vals, b))
-    #r = rice.rvs(b, size=1000)
-    #ax.hist(r, density=True, histtype='stepfilled', alpha=0.2)
-    #ax.legend(loc='best', frameon=False)
-    #plt.show()
-    #print('End')
-
-    #Testing evolution of binary systems using test_Nasa_exoplanet_data
-    print('_____________________________________________________________________________')
-    print('Testing evolution of binary systems using test_Nasa_exoplanet_data.txt: Start')
-
-
-
-    #print('End')
-    #print('_____________________________________________________________________________')
-
-    #Testing testing_log_prob, MCMC and other methods
-
-    #print('Testing testing_log_prob, MCMC and other methods: Start')
-    #test = EnvelopeEccentricityDistribution()
-
-    #test.testing_log_prob()
-    #test.MCMC()
-
-    #    b = EccentricityDistribution(mean_e_now=0.2, e_now_stdev=0.5, mean_e_env=0.8, e_env_stdev=0.5)
-    #    print('The value of b is nquad = ', b.distribution_of_eccentricity_by_nquad(e=0.6))
-
-    #   test = BayesianAnalysis()
-    #   test.MCMC()
-    #   print('envelope eccentricity = ',test.workout_envelope_eccentricity(planet_orbital_period=0.5))
-    #   f = test.construct_probability_density_distribution_of_eccentricity(mean_e_now=0.2, e_now_stdev=0.5, orbital_period=5.6)
-    #    print('f(.3) = ', f( e=0.3))
-
-    #  c = test.pick_a_tuple_from_the_multi_variable_Gaussian_distribution(mean = [2,3,4], standard_deviation=[.2,.4,.5])
-    #   print('a random tuple from gaussian distribution: ',c)
-
-
-
-
-
-
-
-
 
