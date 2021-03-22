@@ -318,6 +318,12 @@ def add_sampling_parameters(parser):
         'If exceeded, the associated parameters are rejected.'
     )
     sampling.add_argument(
+        '--track-final-eccentricity',
+        action='store_true',
+        help='If passed, the calculated final eccentricity is stored along with'
+        ' the input parameters.'
+    )
+    sampling.add_argument(
         '--rvk-interpolation-accuracy',
         type=float,
         nargs=2,

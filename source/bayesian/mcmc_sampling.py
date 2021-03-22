@@ -27,7 +27,10 @@ _mutable_config_params = set(['mcmc_nsteps',
 
 _logger = logging.getLogger(__name__)
 
-def log_probability(unit_cube_values, prior_transform, log_likelihood):
+def log_probability(unit_cube_values,
+                    prior_transform,
+                    log_likelihood,
+                    track_final_eccentricity):
     """The posterior for MCMC, will track actual params & likelihood."""
 
     if unit_cube_values.min() < 0 or unit_cube_values.max() > 1:
@@ -38,10 +41,13 @@ def log_probability(unit_cube_values, prior_transform, log_likelihood):
 
     parameters = prior_transform(unit_cube_values)
     log_likelihood_value = log_likelihood(parameters)
+    parameters = tuple(parameters)
+    if track_final_eccentricity:
+        parameters += (log_likelihood.final_eccentricity,)
     return (
         (log_likelihood_value,)
         +
-        tuple(parameters)
+        parameters
     )
 
 def distribution_to_attribute(distribution):
@@ -259,14 +265,22 @@ def run(config,
         num_params):
     """Sample the selected system using MCMC."""
 
+    blobs_dtype = [(name, float)
+                   for name, _ in log_likelihood.parameter_order]
+
+    if config.track_final_eccentricity:
+        blobs_dtype.append(('e_f', float))
+
     sampler_kwargs = dict(
         nwalkers=config.mcmc_nwalkers,
         ndim=num_params,
-        log_prob_fn=functools.partial(log_probability,
-                                      prior_transform=prior_transform,
-                                      log_likelihood=log_likelihood),
-        blobs_dtype=[(name, float)
-                     for name, _ in log_likelihood.parameter_order],
+        log_prob_fn=functools.partial(
+            log_probability,
+            prior_transform=prior_transform,
+            log_likelihood=log_likelihood,
+            track_final_eccentricity=config.track_final_eccentricity
+        ),
+        blobs_dtype=blobs_dtype,
         backend=prepare_backend(config, num_params, get_code_version_str())
     )
 
