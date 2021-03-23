@@ -36,7 +36,11 @@ def log_probability(unit_cube_values,
     if unit_cube_values.min() < 0 or unit_cube_values.max() > 1:
         return tuple(
             -numpy.inf if i == 0 else numpy.nan
-            for i in range(len(log_likelihood.parameter_order) + 1)
+            for i in range(
+                len(log_likelihood.parameter_order)
+                +
+                (2 if track_final_eccentricity else 1)
+            )
         )
 
     parameters = prior_transform(unit_cube_values)
@@ -89,9 +93,14 @@ def is_distribution(config_value):
 def compare_chain_configuration(config, chain_group):
     """Return True iff MCMC chan_group can be extended with current config."""
 
+    config_param_defaults = {
+        'track_final_eccentricity': False
+    }
+
     config_set = set(vars(config).keys())
     config_set -= set(chain_group.attrs.keys())
     config_set -= _mutable_config_params
+    config_set -= set(config_param_defaults.keys())
     if config_set:
         _logger.debug('Configuration parameters %s not saved in chain %s',
                       config_set,
@@ -100,7 +109,10 @@ def compare_chain_configuration(config, chain_group):
     for param, config_value in vars(config).items():
         if param in _mutable_config_params:
             continue
-        saved_value = chain_group.attrs[param]
+        try:
+            saved_value = chain_group.attrs[param]
+        except KeyError:
+            saved_value = config_param_defaults[param]
         if is_distribution(config_value):
             if (
                     saved_value
