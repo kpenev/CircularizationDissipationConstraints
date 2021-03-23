@@ -91,7 +91,7 @@ class LogLikelihoodSB1(LogLikelihoodBase):
                          secondary_is_star=True,
                          **parent_kwargs)
 
-    def __call__(self, parameters):
+    def calculate_log_likelihood(self, parameters):
         """Evaluate the log-likelihood at the given model parameters."""
 
         circularization_log_likelihood = super().__call__(parameters)

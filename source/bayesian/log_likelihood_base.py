@@ -9,7 +9,6 @@ import numpy
 
 from reproduce_system import find_evolution
 from bayesian.evolution_parameters import EvolutionParameters
-from bayesian.custom_logger_adapter import CustomLoggerAdapter
 
 #Intended to function as callable no need for more public methods
 #pylint: disable=too-few-public-methods
@@ -58,11 +57,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         kwargs['max_age'] = system.age
         kwargs['timeout'] = self._evolution_timeout
         kwargs['system'] = system
-        for parameter in ['interpolator',
-                          'secondary_is_star',
-                          'period_search_factor',
-                          'scaled_period_guess']:
-            kwargs[parameter] = getattr(self, parameter)
+        kwargs.update(self._find_evolution_kwargs)
 
         return kwargs
 
@@ -108,15 +103,19 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         self._evolution_timeout = evolution_timeout
         self.final_eccentricity = None
 
-        self.secondary_is_star = secondary_is_star
-        self.period_search_factor = period_search_factor
-        self.scaled_period_guess = scaled_period_guess
+        self._find_evolution_kwargs = dict(
+            secondary_is_star=secondary_is_star,
+            period_search_factor=period_search_factor,
+            scaled_period_guess=scaled_period_guess
+        )
         super().__init__(secondary_is_star=secondary_is_star,
                          **kwargs)
+        self._stashed_results = dict()
+        self._stash = False
 
-    def __call__(self, parameters):
+    def calculate_log_likelihood(self, parameters):
         """
-        Evaluate the log-likelihood at the given model parameters.
+        Calculate the log-likelihood for the given model parameters
 
         Args:
             parameters:    The parameters to evaluate the log-likelihood at. The
@@ -130,10 +129,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 specified value. This includes the circularization envelope.
         """
 
-        logger = CustomLoggerAdapter(
-            logging.getLogger(__name__),
-            dict(param_hash=hex(hash(parameters.tostring()))[2:])
-        )
+        logger = logging.getLogger(__name__)
 
         self.log_parameters('Evaluating log-likelihood for parameters:',
                             parameters,
@@ -195,4 +191,40 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         )
 
         return -numpy.inf
+
+    def start_stashing(self):
+        """
+        Store :meth:`__call__()` results for re-use if invoked with same params.
+
+        Can be used to re-set stashing, as currently stashed results are
+        cleared.
+        """
+
+        self._stashed_results = dict()
+        self._stash = True
+
+    def stop_stashing(self):
+        """Stop stashing future :meth:`__call__`s but keep current stash."""
+
+        self._stash = False
+
+    def __call__(self, parameters):
+        """Same as :meth:`calculate_log_likelihood` but handles stashing."""
+
+        param_hash = hex(hash(parameters.tostring()))[2:]
+        if param_hash in self._stashed_results:
+            result = self._stashed_results[param_hash]
+            logging.getLogger(__name__).info(
+                'Reusing stashed log log_likelihood: %s',
+                repr(result)
+            )
+            return result
+
+        result = self.calculate_log_likelihood(parameters)
+
+        if self._stash:
+            self._stashed_results[param_hash] = result
+
+        return result
+
 #pylint: enable=too-few-public-methods

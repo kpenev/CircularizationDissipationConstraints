@@ -276,6 +276,34 @@ class UnchunkedPool:
         return self._pool.map(*args, **kwargs, chunksize=1)
 #pylint: enable=too-few-public-methods
 
+def get_random_walker_position(nparams_logprob):
+    """Pick a random positions for MCMC walker with non zero probability."""
+
+    num_params, log_prob_fn = nparams_logprob
+    result = numpy.random.rand(num_params)
+    while not numpy.isfinite(log_prob_fn(result)[0]):
+        result = numpy.random.rand(num_params)
+
+    return result
+
+def get_initial_walker_positions(num_walkers,
+                                 num_params,
+                                 log_prob_fn,
+                                 pool=None):
+    """Pick initial positions for walkers avoiding zero probability spots."""
+
+    if pool is None:
+        map_func = map
+    else:
+        map_func = pool.map
+
+    return numpy.stack(
+        map_func(
+            get_random_walker_position,
+            [(num_params, log_prob_fn) for _ in range(num_walkers)]
+        )
+    )
+
 def run(config,
         log_likelihood,
         prior_transform,
@@ -310,14 +338,23 @@ def run(config,
         ) as workers:
             sampler = emcee.EnsembleSampler(**sampler_kwargs,
                                             pool=UnchunkedPool(workers))
-            sampler.run_mcmc(
+            log_likelihood.start_stashing()
+            initial_walker_positions = (
                 None if sampler_kwargs['backend'].iteration > 0
-                else numpy.random.rand(config.mcmc_nwalkers, num_params),
-                config.mcmc_nsteps
+                else get_initial_walker_positions(config.mcmc_nwalkers,
+                                                  num_params,
+                                                  sampler_kwargs['log_prob_fn'],
+                                                  workers)
             )
+            log_likelihood.stop_stashing()
+            sampler.run_mcmc(initial_walker_positions, config.mcmc_nsteps)
     else:
         sampler = emcee.EnsembleSampler(**sampler_kwargs)
-        sampler.run_mcmc(
-            numpy.random.rand(config.mcmc_nwalkers, num_params),
-            config.mcmc_nsteps
+        initial_walker_positions = (
+            None if sampler_kwargs['backend'].iteration > 0
+            else get_initial_walker_positions(config.mcmc_nwalkers,
+                                              num_params,
+                                              sampler_kwargs['log_prob_fn'])
         )
+
+        sampler.run_mcmc(initial_walker_positions, config.mcmc_nsteps)
