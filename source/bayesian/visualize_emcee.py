@@ -40,6 +40,12 @@ def parse_command_line():
         help='If supplied, a trace plot is generated and saved with the given '
         'filaname.'
     )
+    parser.add_argument(
+        '--burn-in',
+        type=int,
+        default=0,
+        help='The number of samples to discard as burn-in.'
+    )
     return parser.parse_args()
 
 def get_backend(config):
@@ -66,7 +72,7 @@ def main(config):
     """"Avoid polluting global namespace."""
 
     backend = get_backend(config)
-    samples = backend.get_blobs()
+    samples = backend.get_blobs(discard=config.burn_in)
     if config.corner_plot_fname:
         samples = samples.flatten()
         include_params = [
