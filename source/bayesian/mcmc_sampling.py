@@ -294,7 +294,8 @@ def run(config,
             sampler = emcee.EnsembleSampler(**sampler_kwargs,
                                             pool=UnchunkedPool(workers))
             sampler.run_mcmc(
-                numpy.random.rand(config.mcmc_nwalkers, num_params),
+                None if sampler_kwargs['backend'].iteration > 0
+                else numpy.random.rand(config.mcmc_nwalkers, num_params),
                 config.mcmc_nsteps
             )
     else:
