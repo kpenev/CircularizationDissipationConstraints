@@ -34,6 +34,11 @@ def log_probability(unit_cube_values,
     """The posterior for MCMC, will track actual params & likelihood."""
 
     if unit_cube_values.min() < 0 or unit_cube_values.max() > 1:
+        _logger.warning(
+            'At least one proposed unit cube value is outside the range(0, 1): '
+            '%s',
+            repr(unit_cube_values)
+        )
         return tuple(
             -numpy.inf if i == 0 else numpy.nan
             for i in range(
