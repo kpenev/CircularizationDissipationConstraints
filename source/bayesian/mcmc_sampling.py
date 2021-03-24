@@ -276,21 +276,28 @@ class UnchunkedPool:
         return self._pool.map(*args, **kwargs, chunksize=1)
 #pylint: enable=too-few-public-methods
 
-def test_walker_positions(position_queue, result_queue, log_prob_fn, config):
+def evaluate_walker_positions(position_queue,
+                              result_queue,
+                              log_prob_fn,
+                              config):
     """Pick a random positions for MCMC walker with non zero probability."""
 
     setup_process(config)
     _logger.info('Evaluating starting positions.')
     for position in iter(position_queue.get, 'STOP'):
-        log_prob = log_prob_fn(position)[0]
-        result_queue.put((position, log_prob))
+        log_prob_result = log_prob_fn(position)
+        result_queue.put((position, log_prob_result))
 
-def get_initial_walker_positions(num_params,
-                                 log_prob_fn,
-                                 config):
+def get_initial_state(num_params,
+                      blobs_dtype,
+                      log_prob_fn,
+                      config):
     """Pick initial positions for walkers avoiding zero probability spots."""
 
-    starting_positions = numpy.empty(config.mcmc_nwalkers, num_params)
+    starting_positions = numpy.empty((config.mcmc_nwalkers, num_params),
+                                     dtype=float)
+    starting_log_prob = numpy.empty(config.mcmc_nwalkers, dtype=float)
+    starting_blobs = numpy.empty(config.mcmc_nwalkers, dtype=blobs_dtype)
     _logger.info('Looking for %d suitable walker starting positions',
                  config.mcmc_nwalkers)
 
@@ -302,28 +309,31 @@ def get_initial_walker_positions(num_params,
 
     workers = [
         Process(
-            target=test_walker_positions,
+            target=evaluate_walker_positions,
             args=(position_queue, result_queue, log_prob_fn, config)
         )
-        for _ in config.num_parallel_processes
+        for _ in range(config.num_parallel_processes)
     ]
     for process in workers:
         process.start()
 
     positions_found = 0
     while positions_found < config.mcmc_nwalkers:
-        position, log_prob = result_queue.get()
-        if log_prob > config.min_initial_log_probability:
+        position, log_prob_result = result_queue.get()
+        if log_prob_result[0] > config.mcmc_min_initial_log_probability:
             starting_positions[positions_found, :] = position
+            starting_log_prob[positions_found] = log_prob_result[0]
+            starting_blobs[positions_found] = log_prob_result[1:]
             positions_found += 1
             _logger.debug('%d/%d starting positions found',
                           positions_found,
                           config.mcmc_nwalkers)
-        else:
-            position_queue.put(numpy.random.rand(num_params))
+        position_queue.put(numpy.random.rand(num_params))
 
     for process in workers:
         process.terminate()
+
+    return emcee.State(starting_positions, starting_log_prob, starting_blobs)
 
 def run(config,
         log_likelihood,
@@ -352,13 +362,13 @@ def run(config,
         backend=backend
     )
 
-    initial_walker_positions = (
+    initial_state = (
         None if backend.iteration > 0
-        else get_initial_walker_positions(num_params,
-                                          sampler_kwargs['log_prob_fn'],
-                                          config)
+        else get_initial_state(num_params,
+                               blobs_dtype,
+                               sampler_kwargs['log_prob_fn'],
+                               config)
     )
-
 
     if config.num_parallel_processes > 1:
         with Pool(
@@ -369,10 +379,8 @@ def run(config,
         ) as workers:
             sampler = emcee.EnsembleSampler(**sampler_kwargs,
                                             pool=UnchunkedPool(workers))
-            log_likelihood.start_stashing()
-            log_likelihood.stop_stashing()
-            sampler.run_mcmc(initial_walker_positions, config.mcmc_nsteps)
+            sampler.run_mcmc(initial_state, config.mcmc_nsteps)
     else:
         sampler = emcee.EnsembleSampler(**sampler_kwargs)
 
-        sampler.run_mcmc(initial_walker_positions, config.mcmc_nsteps)
+        sampler.run_mcmc(initial_state, config.mcmc_nsteps)
