@@ -98,12 +98,12 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             None
         """
 
-        self.interpolator = interpolator
         self.eccentricity_likelihood = eccentricity_likelihood
         self._evolution_timeout = evolution_timeout
         self.final_eccentricity = None
 
         self._find_evolution_kwargs = dict(
+            interpolator = interpolator,
             secondary_is_star=secondary_is_star,
             period_search_factor=period_search_factor,
             scaled_period_guess=scaled_period_guess
