@@ -97,7 +97,7 @@ def make_corner_plot(samples, log_probability, config):
     corner(plot_data_frame, range=plot_ranges)
     pyplot.savefig(config.corner_plot_fname)
 
-def make_trace_plot(samples, _, config):
+def make_trace_plot(samples, log_probability, config):
     """Create the trace plot specified on the command line."""
 
     num_panels = samples.shape[1] // config.max_traces_per_plot
@@ -105,25 +105,26 @@ def make_trace_plot(samples, _, config):
                                     1,
                                     sharex=True,
                                     figsize=[6.4, 2.4 * num_panels])
+    finite_probability = numpy.isfinite(log_probability)
     for first, panel in zip(
             range(0, samples.shape[1], config.max_traces_per_plot),
             panel_list
     ):
-        print(
-            'trace shape: '
-            +
-            repr(
-                samples[
-                    'lgQ_min'
-                ][
-                    :,
-                    first : first + config.max_traces_per_plot
-                ].shape
-            )
-        )
-        panel.plot(
-            samples['lgQ_min'][:, first : first + config.max_traces_per_plot]
-        )
+        for trace in range(first, first + config.max_traces_per_plot):
+            plot_y = samples['lgQ_min'][:, trace].flatten()
+            plot_x = numpy.arange(plot_y.size)
+            plot_solid = finite_probability[:, trace].flatten()
+            plot_dotted = numpy.logical_not(plot_solid)
+            plot_dotted[numpy.argmax(plot_solid)] = True
+            solid_line = panel.plot(plot_x[plot_solid],
+                                    plot_y[plot_solid],
+                                    '-')[0]
+            panel.plot(plot_x[plot_dotted],
+                       plot_y[plot_dotted],
+                       ':',
+                       color=solid_line.get_color())
+
+
     pyplot.savefig(config.trace_plot_fname)
 
 def main(config):
