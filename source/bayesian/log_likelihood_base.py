@@ -221,6 +221,10 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             return result
 
         result = self.calculate_log_likelihood(parameters)
+        logging.getLogger(__name__).info(
+            'Calculated log_likelihood: %s',
+            repr(result)
+        )
 
         if self._stash:
             self._stashed_results[param_hash] = result
