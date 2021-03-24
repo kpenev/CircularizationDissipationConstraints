@@ -290,14 +290,14 @@ def get_initial_walker_positions(num_params,
                                  config):
     """Pick initial positions for walkers avoiding zero probability spots."""
 
-    starting_positions = numpy.empty(config.mcmc_walkers, num_params)
+    starting_positions = numpy.empty(config.mcmc_nwalkers, num_params)
     _logger.info('Looking for %d suitable walker starting positions',
-                 config.mcmc_walkers)
+                 config.mcmc_nwalkers)
 
     position_queue = Queue()
     result_queue = Queue()
 
-    for _ in range(config.mcmc_walkers):
+    for _ in range(config.mcmc_nwalkers):
         position_queue.put(numpy.random.rand(num_params))
 
     workers = [
@@ -311,14 +311,14 @@ def get_initial_walker_positions(num_params,
         process.start()
 
     positions_found = 0
-    while positions_found < config.mcmc_walkers:
+    while positions_found < config.mcmc_nwalkers:
         position, log_prob = result_queue.get()
         if log_prob > config.min_initial_log_probability:
             starting_positions[positions_found, :] = position
             positions_found += 1
             _logger.debug('%d/%d starting positions found',
                           positions_found,
-                          config.mcmc_walkers)
+                          config.mcmc_nwalkers)
         else:
             position_queue.put(numpy.random.rand(num_params))
 
