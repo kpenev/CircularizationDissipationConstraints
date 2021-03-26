@@ -167,7 +167,7 @@ def get_label_substitutions(system_config):
                     reversed(dissipation['tidal_frequency_powers'][1:]),
                     reversed(dissipation['tidal_frequency_breaks'])
             ):
-                entry += (r'%g \leftarrow P_{tide} = %g d\rightarrow '
+                entry += (r'%g \leftarrow P_t = %g d\rightarrow '
                           %
                           (0.0 - powerlaw_above, 2.0 * numpy.pi / frequency))
             entry += '%g)' % dissipation['tidal_frequency_powers'][0]
@@ -255,7 +255,7 @@ def create_movie(frame_pattern, movie_fname):
           '-i', frame_pattern,
           movie_fname])
 
-def plot_frame(frame, data, label, show_interpolation):
+def plot_frame(frame, data, config):
     """Setup a plot to save as a single frame of the circularization movie."""
 
     plot_colors = ['#1f78b4',
@@ -269,12 +269,17 @@ def plot_frame(frame, data, label, show_interpolation):
                    '#fdbf6f',
                    '#cab2d6']
 
+    plot = getattr(pyplot, cnofig.plotting_function)
+
     xmax = ymax = -numpy.inf
+    xmin = numpy.inf
     color_index = 0
     for single_run_data in data:
         scenario_config, _ = single_run_data
         xmax = max(scenario_config.orbital_period_grid[-1], xmax)
         ymax = max(scenario_config.eccentricity_grid[-1], ymax)
+        xmin = min(scenario_config.orbital_period_grid[0], xmin)
+
 
         for eccentricity_index, initial_eccentricity in enumerate(
                 single_run_data[0].eccentricity_grid
@@ -284,18 +289,18 @@ def plot_frame(frame, data, label, show_interpolation):
                                markerfacecolor=color)
             color_index += 1
 
-            if label is not None:
-                plot_config['label'] = label % dict(
+            if config.label is not None:
+                plot_config['label'] = config.label % dict(
                     get_label_substitutions(scenario_config),
                     e0=initial_eccentricity
                 )
-            pyplot.plot(single_run_data[1][0][frame, :, eccentricity_index],
-                        single_run_data[1][1][frame, :, eccentricity_index],
-                        'o',
-                        **plot_config)
-            if show_interpolation:
+            plot(single_run_data[1][0][frame, :, eccentricity_index],
+                 single_run_data[1][1][frame, :, eccentricity_index],
+                 'o',
+                 **plot_config)
+            if config.show_interpolation:
                 eval_x = numpy.linspace(0, xmax, 1000)
-                pyplot.plot(
+                plot(
                     eval_x,
                     interpolate_envelope(single_run_data,
                                          eccentricity_index,
@@ -304,8 +309,14 @@ def plot_frame(frame, data, label, show_interpolation):
                     color=color
                 )
 
-    pyplot.xlim(0, xmax)
-    pyplot.ylim(0, ymax)
+    if config.plotting_function in ['plot', 'semilogy']:
+        pyplot.xlim(0, xmax)
+    else:
+        pyplot.xlim(xmin, xmax)
+    if config.plotting_function in ['plot', 'semilogx']:
+        pyplot.ylim(0, ymax)
+    else:
+        pyplot.ylim(1e-3, ymax)
     pyplot.figlegend(loc=2)
 
 def main(config):
@@ -362,7 +373,7 @@ def main(config):
                         e0=initial_eccentricity
                     )
 
-                pyplot.plot(
+                getattr(pyplot, config.plotting_function)(
                     scenario_data[0].plot_ages,
                     circularization_period[eccentricity_index],
                     **plot_config
