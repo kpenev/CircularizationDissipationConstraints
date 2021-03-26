@@ -134,6 +134,13 @@ def compare_chain_configuration(config, chain_group):
                 return False
         elif param == 'evolution_timeout':
             if config_value < saved_value:
+                    _logger.debug(
+                        'Parameter %s (%s) in chain %s does not match %s',
+                        param,
+                        repr(saved_value),
+                        chain_group.name,
+                        repr(config_value)
+                    )
                 return False
         else:
             try:
