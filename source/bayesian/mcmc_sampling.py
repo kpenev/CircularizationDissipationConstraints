@@ -132,6 +132,9 @@ def compare_chain_configuration(config, chain_group):
                     repr(distribution_to_attribute(config_value))
                 )
                 return False
+        elif param == 'evolution_timeout':
+            if config_value < saved_value:
+                return False
         else:
             try:
                 len(config_value)
