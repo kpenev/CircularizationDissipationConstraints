@@ -23,7 +23,8 @@ _mutable_config_params = set(['mcmc_nsteps',
                               'logging_fname',
                               'logging_verbosity',
                               'logging_datetime_format',
-                              'logging_message_format'])
+                              'logging_message_format',
+                              'config_file'])
 
 _logger = logging.getLogger(__name__)
 
