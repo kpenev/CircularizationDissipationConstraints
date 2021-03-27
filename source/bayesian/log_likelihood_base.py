@@ -62,7 +62,9 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 kwargs['secondary_is_star']
                 and
                 (
-                    kwargs['secondary_mass']
+                    self.get_parameter_value(
+                        parameters, 'secondary_mass'
+                    ).to_value(units.M_sun)
                     <
                     kwargs['interpolator'].mass_range()[0]
                 )
