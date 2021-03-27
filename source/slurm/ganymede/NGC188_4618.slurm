@@ -4,6 +4,7 @@
 #SBATCH -n 16 #Total number of tasks to run at one time
 #SBATCH -N 1  #Number of nodes on which to distribute the tasks evenly
 #SBATCH -o /home/kxp174430/scratch/open_cluster_circularization/sampling_output/NGC188_4618_slurm.out
+#SBATCH --mail-user=kxp174430@utdallas.edu
 #SBATCH -t 4-00:00:00
 
 module load boost
@@ -26,9 +27,9 @@ OUTPUT_DIR=${OUTPUT_ROOT}/sampling_output
 python3 \
     ${SOURCE_DIR}/bayesian/sample_sb1.py NGC188_4618 \
     -c ${SOURCE_DIR}/sampling_config/open_cluster_constQ_nolock.cfg\
-    --std-out-err-fname = ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.outerr'\
-    --logging-fname = ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.log'\
-    --samples-fname = ${OUTPUT_ROOT}'/sampling_results/%(system)s_%(sampling)s_samples'\
+    --std-out-err-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.outerr'\
+    --logging-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.log'\
+    --samples-fname ${OUTPUT_ROOT}'/sampling_results/%(system)s_%(sampling)s_samples'\
     >\
     ${OUTPUT_DIR}/sample_NGC188_4618_1.outerr\
     2>&1
