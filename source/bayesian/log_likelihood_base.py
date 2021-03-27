@@ -32,7 +32,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
     def _get_dissipation(self, parameters):
         """Return the dissipation argument for `find_evolution`."""
 
-    def _parse_parameters(self, parameters):
+    def _parse_parameters(self, parameters, logger):
         """Return all keyword arguments to pass to `find_evolution`."""
 
         system = SimpleNamespace(
@@ -67,6 +67,13 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                     kwargs['interpolator'].mass_range()[0]
                 )
         ):
+            logger.warning(
+                'Secondary mass %s is below the stellar evolution interpolator '
+                'mass range. Ignoring evolution and spindown, fixing radius to '
+                '%s',
+                repr(kwargs['secondary_mass']),
+                repr(kwargs['secondary_radius'])
+            )
             kwargs['secondary_radius'] = self.get_parameter_value(
                 parameters,
                 'cmd_secondary_radius'
@@ -149,7 +156,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                             parameters,
                             logging.INFO)
 
-        evolve_parameters = self._parse_parameters(parameters)
+        evolve_parameters = self._parse_parameters(parameters, logger)
         failed = True
         while failed and evolve_parameters['initial_eccentricity'] > 0.4:
             try:
