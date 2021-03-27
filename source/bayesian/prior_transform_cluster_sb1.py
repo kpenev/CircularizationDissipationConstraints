@@ -40,6 +40,12 @@ class PriorTransformClusterSB1(PriorTransformBase):
         ).secondary_mass_ppf(
             next(unit_cube_iter)
         )
+        for component in ['primary', 'secondary']:
+            model_parameters[
+                'cmd_%s_radius' % component
+            ] = self._photometric_mass_constraint.get_component_radius(
+                model_parameters[component + '_mass'].to_value(units.M_sun)
+            )
 
     def __init__(self,
                  photometric_mass_constraint,

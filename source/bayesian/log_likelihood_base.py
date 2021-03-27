@@ -58,6 +58,20 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         kwargs['timeout'] = self._evolution_timeout
         kwargs['system'] = system
         kwargs.update(self._find_evolution_kwargs)
+        if (
+                kwargs['secondary_is_star']
+                and
+                (
+                    kwargs['secondary_mass']
+                    <
+                    kwargs['interpolator'].mass_range()[0]
+                )
+        ):
+            kwargs['secondary_radius'] = self.get_parameter_value(
+                parameters,
+                'cmd_secondary_radius'
+            )
+            kwargs['secondary_is_star'] = False
 
         return kwargs
 

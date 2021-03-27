@@ -8,6 +8,7 @@ import logging
 
 from matplotlib import pyplot, cm
 from scipy import integrate, optimize
+from astropy import units, constants
 import numpy
 
 #False positive (fixed in __init__.py)
@@ -401,6 +402,30 @@ class PhotometricConstraint:
         """Return scipy style RV for the secondary mass given primary mass."""
 
         return PhotometricSecondaryConstraint(self, primary_mass)
+
+    def get_component_radius(self, mass):
+        """
+        Return the radii of a component at the given mass for ecah interpolator.
+
+        Radius is estimated using log10(g)
+
+        Args:
+            mass(float):    The mass at which to evaluate the interpolations.
+
+        Returns:
+            numpy.array:
+                The radius each interpolator predicts for the given mass.
+        """
+
+        surface_g = 10.0**numpy.array([
+            float(interp.get_interpolated('logg', mass, None))
+            for interp in self._photometry_interpolators
+        ]) * units.cm / units.s**2
+        return numpy.sqrt(
+            constants.G * mass * units.M_sun
+            /
+            surface_g
+        ).to_value(units.R_sun)
 
 #pylint: enable=too-many-instance-attributes
 

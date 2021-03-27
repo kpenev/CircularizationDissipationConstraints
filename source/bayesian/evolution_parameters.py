@@ -78,7 +78,9 @@ class EvolutionParameters:
                 ('feh', units.dimensionless_unscaled),
                 ('orbital_period', units.day),
                 ('primary_mass', units.M_sun),
-                ('secondary_mass', units.M_sun)
+                ('secondary_mass', units.M_sun),
+                ('cmd_primary_radius', units.M_sun),
+                ('cmd_secondary_radius', units.M_sun)
             ]
         )
 
