@@ -6,6 +6,7 @@ import logging
 from types import SimpleNamespace
 
 import numpy
+from astropy import units
 
 from reproduce_system import find_evolution
 from bayesian.evolution_parameters import EvolutionParameters
