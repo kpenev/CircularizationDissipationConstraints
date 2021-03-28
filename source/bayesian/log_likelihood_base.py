@@ -63,23 +63,21 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 kwargs['secondary_is_star']
                 and
                 (
-                    self.get_parameter_value(
-                        parameters, 'secondary_mass'
-                    ).to_value(units.M_sun)
+                    system.secondary_mass.to_value(units.M_sun)
                     <
                     kwargs['interpolator'].mass_range()[0]
                 )
         ):
-            logger.warning(
-                'Secondary mass %s is below the stellar evolution interpolator '
-                'mass range. Ignoring evolution and spindown, fixing radius to '
-                '%s',
-                repr(kwargs['secondary_mass']),
-                repr(kwargs['secondary_radius'])
-            )
-            kwargs['secondary_radius'] = self.get_parameter_value(
+            system.secondary_radius = self.get_parameter_value(
                 parameters,
                 'cmd_secondary_radius'
+            )
+            logger.warning(
+                'Secondary mass %s M_sun is below the stellar evolution '
+                'interpolator mass range. Ignoring evolution and spindown, '
+                'fixing radius to %s R_sun',
+                repr(system.secondary_mass.to_value(units.M_sun)),
+                repr(system.secondary_radius.to_value(units.R_sun))
             )
             kwargs['secondary_is_star'] = False
 
