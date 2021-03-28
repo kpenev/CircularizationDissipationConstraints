@@ -29,7 +29,7 @@ python3 \
     -c ${SOURCE_DIR}/sampling_config/open_cluster_constQ_nolock.cfg\
     --std-out-err-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.outerr'\
     --logging-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.log'\
-    --samples-fname ${OUTPUT_ROOT}'/sampling_results/%(system)s_%(sampling)s_samples'\
+    --samples-fname '/home/kxp174430/%(system)s_%(sampling)s_samples'\
     >\
     ${OUTPUT_DIR}/sample_NGC188_4618_1.outerr\
     2>&1
