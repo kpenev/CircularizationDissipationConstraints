@@ -31,7 +31,8 @@ _logger = logging.getLogger(__name__)
 def log_probability(unit_cube_values,
                     prior_transform,
                     log_likelihood,
-                    track_final_eccentricity):
+                    track_final_eccentricity,
+                    exclude_from_blob=()):
     """The posterior for MCMC, will track actual params & likelihood."""
 
     if unit_cube_values.min() < 0 or unit_cube_values.max() > 1:
@@ -51,7 +52,15 @@ def log_probability(unit_cube_values,
 
     parameters = prior_transform(unit_cube_values)
     log_likelihood_value = log_likelihood(parameters)
-    parameters = tuple(parameters)
+    if exclude_from_blob:
+        parameters = tuple(
+            value
+            for value, (param_name, _) in zip(parameters,
+                                              prior_transform.parameter_order)
+            if param_name not in exclude_from_blob
+        )
+    else:
+        parameters = tuple(parameters)
     if track_final_eccentricity:
         parameters += (log_likelihood.final_eccentricity,)
     return (
@@ -360,25 +369,40 @@ def run(config,
 
     backend = prepare_backend(config, num_params, get_code_version_str())
 
+    log_prob_kwargs = dict(
+        prior_transform=prior_transform,
+        log_likelihood=log_likelihood,
+        track_final_eccentricity=config.track_final_eccentricity
+    )
+
+    if backend.iteration > 0:
+        initial_state = None
+        stored_blobs_dtype = backend.get_blobs(flat=True).dtype
+
+        log_prob_function = functools.partial(
+            log_probability,
+            exclude_from_blob=(set(blobs_dtype.names) -
+                               set(stored_blobs_dtype.names))
+            **log_prob_kwargs
+        )
+        blobs_dtype = stored_blobs_dtype
+
+    else:
+        log_prob_function = functools.partial(
+            log_probability,
+            **log_prob_kwargs
+        )
+        initial_state = get_initial_state(num_params,
+                                          blobs_dtype,
+                                          log_prob_function,
+                                          config)
+
     sampler_kwargs = dict(
         nwalkers=config.mcmc_nwalkers,
         ndim=num_params,
-        log_prob_fn=functools.partial(
-            log_probability,
-            prior_transform=prior_transform,
-            log_likelihood=log_likelihood,
-            track_final_eccentricity=config.track_final_eccentricity
-        ),
+        log_prob_fn=log_prob_function,
         blobs_dtype=blobs_dtype,
         backend=backend
-    )
-
-    initial_state = (
-        None if backend.iteration > 0
-        else get_initial_state(num_params,
-                               blobs_dtype,
-                               sampler_kwargs['log_prob_fn'],
-                               config)
     )
 
     if config.num_parallel_processes > 1:
