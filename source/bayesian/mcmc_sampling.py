@@ -361,12 +361,13 @@ def run(config,
         num_params):
     """Sample the selected system using MCMC."""
 
-    blobs_dtype = numpy.dtype(
-        [(name, float) for name, _ in log_likelihood.parameter_order]
-    )
+    blobs_dtype = [(name, float)
+                   for name, _ in log_likelihood.parameter_order]
 
     if config.track_final_eccentricity:
         blobs_dtype.append(('e_f', float))
+
+    blobs_dtype = numpy.dtype(blobs_dtype)
 
     backend = prepare_backend(config, num_params, get_code_version_str())
 
