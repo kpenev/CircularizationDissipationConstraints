@@ -384,7 +384,7 @@ def run(config,
         log_prob_function = functools.partial(
             log_probability,
             exclude_from_blob=(set(blobs_dtype.names) -
-                               set(stored_blobs_dtype.names))
+                               set(stored_blobs_dtype.names)),
             **log_prob_kwargs
         )
         blobs_dtype = stored_blobs_dtype
