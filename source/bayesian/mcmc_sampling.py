@@ -380,11 +380,19 @@ def run(config,
     if backend.iteration > 0:
         initial_state = None
         stored_blobs_dtype = backend.get_blobs(flat=True).dtype
+        exclude_from_blob = (set(blobs_dtype.names)
+                             -
+                             set(stored_blobs_dtype.names))
+        if exclude_from_blob:
+            _logger.warning(
+                'Excluding parameters %s from MCMC blobs to allow extending '
+                'existing chain',
+                repr(exclude_from_blob)
+            )
 
         log_prob_function = functools.partial(
             log_probability,
-            exclude_from_blob=(set(blobs_dtype.names) -
-                               set(stored_blobs_dtype.names)),
+            exclude_from_blob=exclude_from_blob,
             **log_prob_kwargs
         )
         blobs_dtype = stored_blobs_dtype
