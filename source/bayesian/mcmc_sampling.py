@@ -45,6 +45,8 @@ def log_probability(unit_cube_values,
             -numpy.inf if i == 0 else numpy.nan
             for i in range(
                 len(log_likelihood.parameter_order)
+                -
+                len(exclude_from_blob)
                 +
                 (2 if track_final_eccentricity else 1)
             )
@@ -59,8 +61,13 @@ def log_probability(unit_cube_values,
                                               prior_transform.parameter_order)
             if param_name not in exclude_from_blob
         )
+        _logger.debug('Created blob with %d parameters, excluding %s.',
+                      len(parameters),
+                      repr(exclude_from_blob))
     else:
         parameters = tuple(parameters)
+        _logger.debug('Created blob containing all %d parameters.',
+                      len(parameters))
     if track_final_eccentricity:
         parameters += (log_likelihood.final_eccentricity,)
     return (
