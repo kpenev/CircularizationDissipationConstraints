@@ -11,6 +11,7 @@ import h5py
 from astropy import units
 
 from bayesian.sampling import get_code_version_str, setup_process
+from bayesian.hacked_emcee_hdf5_backend import HDFBackend
 
 _mutable_config_params = set(['mcmc_nsteps',
                               'num_parallel_processes',
@@ -253,7 +254,7 @@ def prepare_backend(config, num_params):
                 next_chain_index += 1
     if selected_chain_name is None:
         selected_chain_name = ('chain%05d' % next_chain_index)
-        emcee.backends.HDFBackend(
+        HDFBackend(
             samples_fname,
             name=selected_chain_name
         ).reset(
@@ -278,8 +279,7 @@ def prepare_backend(config, num_params):
             version_dset[-1] = code_version_str
             first_iter_dset[-1] = chain_group.attrs['iteration']
 
-    backend = emcee.backends.HDFBackend(samples_fname,
-                                        selected_chain_name)
+    backend = HDFBackend(samples_fname, selected_chain_name)
 
     if backend.iteration > 0:
         _logger.info("Extending %s chain in '%s', containing %d samples",
