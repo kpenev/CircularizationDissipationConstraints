@@ -64,22 +64,28 @@ class HDFBackend(Backend):
         """Save any unsaved steps and initialize a fresh unsaved steps file."""
 
         pending_steps = os.path.exists(self.unsaved_steps_fname)
-        with self.open('r+' if pending_steps else 'r') as progress_file:
-            saved_iterations = progress_file[self.name]['iteration']
-            if pending_steps:
-                with open(self.unsaved_steps_fname, 'rb') as unsaved_steps_file:
-                    unsaved_iteration = pickle.load(unsaved_steps_file)
-                    assert unsaved_iteration <= saved_iterations
-                    try:
-                        while unsaved_iteration < saved_iterations:
-                            pickle.load(unsaved_steps_file)
-                            unsaved_iteration += 1
-                        while True:
-                            step = pickle.load(unsaved_steps_file)
-                            self._save_step_to_file(*step, progress_file)
-                            saved_iterations += 1
-                    except EOFError:
-                        pass
+        saved_iterations = 0
+        if os.path.exists(self.filename):
+            with self.open('r+' if pending_steps else 'r') as progress_file:
+                saved_iterations = progress_file[self.name].attrs['iteration']
+                if pending_steps:
+                    with open(self.unsaved_steps_fname, 'rb') as unsaved_steps_file:
+                        unsaved_iteration = pickle.load(unsaved_steps_file)
+                        assert unsaved_iteration <= saved_iterations
+                        try:
+                            while unsaved_iteration < saved_iterations:
+                                pickle.load(unsaved_steps_file)
+                                unsaved_iteration += 1
+                            while True:
+                                step = pickle.load(unsaved_steps_file)
+                                self._save_step_to_file(*step, progress_file)
+                                saved_iterations += 1
+                        except EOFError:
+                            pass
+        elif pending_steps:
+            with open(self.unsaved_steps_fname, 'rb') as unsaved_steps_file:
+                assert pickle.load(unsaved_steps_file) == 0
+
         with open(self.unsaved_steps_fname, 'wb') as unsaved_steps_file:
             pickle.dump(saved_iterations, unsaved_steps_file)
 
@@ -100,7 +106,7 @@ class HDFBackend(Backend):
             self.dtype = dtype
 
 
-        self.unsaved_steps_fname = os.path.splitext(filename) + '.unsaved_steps'
+        self.unsaved_steps_fname = os.path.splitext(filename)[0] + '.unsaved_steps'
         self._flush_unsaved_steps()
     #pylint: enable=super-init-not-called
 
