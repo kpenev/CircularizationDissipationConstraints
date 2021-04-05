@@ -10,6 +10,7 @@ import os
 import os.path
 from tempfile import NamedTemporaryFile
 import pickle
+import logging
 
 import numpy as np
 
@@ -274,7 +275,9 @@ class HDFBackend(Backend):
         try:
             self._flush_unsaved_steps()
         except BlockingIOError:
-            pass
+            logging.getLogger(__name__).error(
+                'Failed to save step to HDF5 file, will try again later'
+            )
 
 class TempHDFBackend():
     """HDF5 backend based on a temporary file."""
