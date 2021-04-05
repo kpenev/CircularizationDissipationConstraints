@@ -373,41 +373,47 @@ def load_initial_positions(samples_fname,
     starting_blobs = numpy.empty(nwalkers, dtype=blobs_dtype)
 
     with h5py.File(samples_fname, 'r') as samples_file:
-        position_group = samples_file[chain_name]['starting_positions']
+        if 'starting_positions' in samples_file[chain_name]:
+            position_group = samples_file[chain_name]['starting_positions']
 
-        positions_found = position_group.attrs['num_positions_found']
+            positions_found = position_group.attrs['num_positions_found']
 
-        starting_positions[
-            :positions_found,
-            :
-        ] = position_group[
-            'unit_cube_values'
-        ][
-            :positions_found,
-            :
-        ]
+            starting_positions[
+                :positions_found,
+                :
+            ] = position_group[
+                'unit_cube_values'
+            ][
+                :positions_found,
+                :
+            ]
 
-        starting_log_prob[
-            :positions_found
-        ] = position_group[
-            'log_prob_results'
-        ][
-            :positions_found,
-            0
-        ]
-        starting_blobs[
-            :positions_found
-        ] = [
-            tuple(row)
-            for row in
-            position_group[
+            starting_log_prob[
+                :positions_found
+            ] = position_group[
                 'log_prob_results'
             ][
                 :positions_found,
-                1:
+                0
             ]
-        ]
+            starting_blobs[
+                :positions_found
+            ] = [
+                tuple(row)
+                for row in
+                position_group[
+                    'log_prob_results'
+                ][
+                    :positions_found,
+                    1:
+                ]
+            ]
+        else:
+            positions_found = 0
 
+    _logger.info('Loaded %d/%d starting positions from a previous run.',
+                 positions_found,
+                 nwalkers)
     return (
         starting_positions,
         starting_log_prob,
@@ -456,7 +462,6 @@ def get_initial_state(*,
     for process in workers:
         process.start()
 
-    positions_found = 0
     while positions_found < config.mcmc_nwalkers:
         position, log_prob_result = result_queue.get()
         if log_prob_result[0] > config.mcmc_min_initial_log_probability:
