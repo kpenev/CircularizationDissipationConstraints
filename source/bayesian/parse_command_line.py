@@ -299,7 +299,7 @@ def add_sampling_parameters(parser):
     sampling.add_argument(
         '--mcmc-nsteps',
         type=int,
-        default=1000000,
+        default=1000,
         help='The number of MCMC steps to generate. Ignored if nested sampling '
         'is used.'
     )
