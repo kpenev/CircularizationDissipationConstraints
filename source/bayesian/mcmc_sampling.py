@@ -334,13 +334,15 @@ def save_initial_position(position,
             destination.create_dataset(
                 'unit_cube_values',
                 (nwalkers,) + position.shape,
-                maxshape=(None, len(position))
+                maxshape=(None, len(position)),
+                dtype=numpy.float64
             )
             assert 'log_prob_results' not in destination
             destination.create_dataset(
                 'log_prob_results',
                 (nwalkers, len(log_prob_result)),
-                maxshape=(None, len(log_prob_result))
+                maxshape=(None, len(log_prob_result)),
+                dtype=numpy.float64
             )
 
         current_positions = destination.attrs['num_positions_found']
