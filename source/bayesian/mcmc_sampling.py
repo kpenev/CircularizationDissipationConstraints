@@ -4,17 +4,21 @@ import logging
 import functools
 from multiprocessing import Pool, Process, Queue
 import os.path
+from glob import glob
+import re
 
 import numpy
 import emcee
 import h5py
 from astropy import units
+from asteval import Interpreter
 
 from bayesian.sampling import get_code_version_str, setup_process
 from bayesian.hacked_emcee_hdf5_backend import HDFBackend
 
 _mutable_config_params = set(['mcmc_nsteps',
                               'num_parallel_processes',
+                              'mcmc_recover_initial_conditions',
                               'samples_fname',
                               'rvk_show_interpolation',
                               'eccentricity_expansion_coefficients',
@@ -421,6 +425,65 @@ def load_initial_positions(samples_fname,
         positions_found
     )
 
+def recover_initial_positions(config, num_params):
+    """Return list of good unit-cube positions from logs of interrupted run."""
+
+    result = numpy.empty((config.mcmc_nwalkers, num_params), dtype=float)
+    parse_line = dict(
+        unit_cube_start=re.compile(
+            r'DEBUG .* bayesian.prior_transform_base: Prior transform: '
+            r'U\((?P<values>array\(\[.*)'
+        ),
+        unit_cube_end=re.compile(
+            r'(?P<values>.*\]\))\) -> Parameters:.*'
+        ),
+        log_probability=re.compile(
+            r'INFO .* bayesian.log_likelihood_base: Calculated log_likelihood: '
+            r'(?P<log_prob>[^ ]*) \|.*'
+        )
+    )
+    aeval = Interpreter()
+    looking_for = 'unit_cube_start'
+    total_num_found = 0
+    for log_fname in glob(
+        config.logging_fname.replace('%(pid)d', '*')
+        %
+        dict(system=config.system, now='*')
+    ):
+        num_found = 0
+        with open(log_fname) as logf:
+            for line in logf:
+                match = parse_line[looking_for].fullmatch(line.strip())
+                if match:
+                    if looking_for == 'unit_cube_start':
+                        values = match['values']
+                        looking_for = 'unit_cube_end'
+                    elif looking_for == 'unit_cube_end':
+                        values += match['values']
+                        values = aeval(values)
+                        looking_for = 'log_probability'
+                    elif looking_for == 'log_probability':
+                        if (
+                                float(match['log_prob'])
+                                >
+                                config.mcmc_min_initial_log_probability
+                        ):
+                            result[total_num_found + num_found] = values
+                            num_found += 1
+                            looking_for = 'unit_cube_start'
+                elif looking_for == 'unit_cube_end':
+                    values += line
+
+        _logger.debug('Recovered %d potential starting positions from %s',
+                      num_found,
+                      log_fname)
+        total_num_found += num_found
+    _logger.info('Recovered %d potential starting positions from previous run.',
+                 total_num_found)
+
+    return result[:total_num_found]
+
+
 #No clean way to simplify
 #pylint: disable=too-many-locals
 def get_initial_state(*,
@@ -449,7 +512,13 @@ def get_initial_state(*,
     position_queue = Queue()
     result_queue = Queue()
 
-    for _ in range(config.mcmc_nwalkers):
+    if config.mcmc_recover_initial_conditions:
+        recovered_positions = recover_initial_positions(config, num_params)
+        for position in recovered_positions:
+            position_queue.put(position)
+    else:
+        recovered_positions = numpy.array([])
+    for _ in range(config.mcmc_nwalkers - recovered_positions.shape[0]):
         position_queue.put(numpy.random.rand(num_params))
 
     workers = [
