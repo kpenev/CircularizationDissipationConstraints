@@ -1,17 +1,21 @@
 # -*- coding: utf-8 -*-
 
+"""Modified HDF5 EMCEE backend EMCEE that buffers steps in case saving fails."""
+
 from __future__ import division, print_function
 
 __all__ = ["HDFBackend", "TempHDFBackend"]
 
 import os
+import os.path
 from tempfile import NamedTemporaryFile
-from time import sleep
+import pickle
+import logging
 
 import numpy as np
 
-from .. import __version__
-from .backend import Backend
+from emcee import __version__
+from emcee.backends import Backend
 
 
 try:
@@ -35,6 +39,60 @@ class HDFBackend(Backend):
             ``RuntimeError`` if the file is opened with write access.
 
     """
+
+    #Inherited from EMCEE
+    #pylint: disable=invalid-name
+    def _save_step_to_file(self, state, accepted, f):
+        """Save a single step to already appropriately open HDF5 file."""
+
+        g = f[self.name]
+        iteration = g.attrs["iteration"]
+
+        g["chain"][iteration, :, :] = state.coords
+        g["log_prob"][iteration, :] = state.log_prob
+        if state.blobs is not None:
+            g["blobs"][iteration, :] = state.blobs
+        g["accepted"][:] += accepted
+
+        for i, v in enumerate(state.random_state):
+            g.attrs["random_state_{0}".format(i)] = v
+
+        g.attrs["iteration"] = iteration + 1
+    #pylint: enable=invalid-name
+
+
+    def _flush_unsaved_steps(self):
+        """Save any unsaved steps and initialize a fresh unsaved steps file."""
+
+        pending_steps = os.path.exists(self.unsaved_steps_fname)
+        saved_iterations = 0
+        if os.path.exists(self.filename):
+            with self.open('r+' if pending_steps else 'r') as progress_file:
+                saved_iterations = progress_file[self.name].attrs['iteration']
+                if pending_steps:
+                    with open(self.unsaved_steps_fname, 'rb') as unsaved_steps_file:
+                        unsaved_iteration = pickle.load(unsaved_steps_file)
+                        assert unsaved_iteration <= saved_iterations
+                        try:
+                            while unsaved_iteration < saved_iterations:
+                                pickle.load(unsaved_steps_file)
+                                unsaved_iteration += 1
+                            while True:
+                                step = pickle.load(unsaved_steps_file)
+                                self._save_step_to_file(*step, progress_file)
+                                saved_iterations += 1
+                        except EOFError:
+                            pass
+        elif pending_steps:
+            with open(self.unsaved_steps_fname, 'rb') as unsaved_steps_file:
+                assert pickle.load(unsaved_steps_file) == 0
+
+        with open(self.unsaved_steps_fname, 'wb') as unsaved_steps_file:
+            pickle.dump(saved_iterations, unsaved_steps_file)
+
+
+    #Inherited from EMCEE
+    #pylint: disable=super-init-not-called
     def __init__(self, filename, name="mcmc", read_only=False, dtype=None):
         if h5py is None:
             raise ImportError("you must install 'h5py' to use the HDFBackend")
@@ -48,6 +106,14 @@ class HDFBackend(Backend):
             self.dtype_set = True
             self.dtype = dtype
 
+
+        self.unsaved_steps_fname = os.path.splitext(filename)[0] + '.unsaved_steps'
+        self._flush_unsaved_steps()
+    #pylint: enable=super-init-not-called
+
+    #Inherited from EMCEE
+    #pylint: disable=missing-function-docstring
+    #pylint: disable=invalid-name
     @property
     def initialized(self):
         if not os.path.exists(self.filename):
@@ -65,11 +131,7 @@ class HDFBackend(Backend):
                 "mode. Set `read_only = False` to make "
                 "changes."
             )
-        try:
-            f = h5py.File(self.filename, mode)
-        except:
-            sleep(120)
-            f = h5py.File(self.filename, mode)
+        f = h5py.File(self.filename, mode)
         if not self.dtype_set and self.name in f:
             g = f[self.name]
             if "chain" in g:
@@ -164,7 +226,11 @@ class HDFBackend(Backend):
                 for k, v in sorted(f[self.name].attrs.items())
                 if k.startswith("random_state_")
             ]
+        #Inherited from EMCEE
+        #pylint: disable=len-as-condition
         return elements if len(elements) else None
+        #pylint: enable=len-as-condition
+    #pylint: enable=missing-function-docstring
 
     def grow(self, ngrow, blobs):
         """Expand the storage space by some number of samples
@@ -177,7 +243,7 @@ class HDFBackend(Backend):
         """
         self._check_blobs(blobs)
 
-        with self.open("a") as f:
+        with self.open('r+') as f:
             g = f[self.name]
             ntot = g.attrs["iteration"] + ngrow
             g["chain"].resize(ntot, axis=0)
@@ -196,6 +262,7 @@ class HDFBackend(Backend):
                 else:
                     g["blobs"].resize(ntot, axis=0)
                 g.attrs["has_blobs"] = True
+    #pylint: enable=invalid-name
 
     def save_step(self, state, accepted):
         """Save a step to the backend
@@ -208,35 +275,32 @@ class HDFBackend(Backend):
         """
         self._check(state, accepted)
 
-        with self.open("a") as f:
-            g = f[self.name]
-            iteration = g.attrs["iteration"]
+        with open(self.unsaved_steps_fname, 'ab') as unsaved_steps_file:
+            pickle.dump((state, accepted), unsaved_steps_file)
 
-            g["chain"][iteration, :, :] = state.coords
-            g["log_prob"][iteration, :] = state.log_prob
-            if state.blobs is not None:
-                g["blobs"][iteration, :] = state.blobs
-            g["accepted"][:] += accepted
+        try:
+            self._flush_unsaved_steps()
+        except BlockingIOError:
+            logging.getLogger(__name__).error(
+                'Failed to save step to HDF5 file, will try again later'
+            )
 
-            for i, v in enumerate(state.random_state):
-                g.attrs["random_state_{0}".format(i)] = v
-
-            g.attrs["iteration"] = iteration + 1
-
-
-class TempHDFBackend(object):
+class TempHDFBackend():
+    """HDF5 backend based on a temporary file."""
 
     def __init__(self, dtype=None):
         self.dtype = dtype
         self.filename = None
 
     def __enter__(self):
+        #pylint: disable=invalid-name
         f = NamedTemporaryFile(prefix="emcee-temporary-hdf5",
                                suffix=".hdf5",
                                delete=False)
         f.close()
         self.filename = f.name
         return HDFBackend(f.name, "test", dtype=self.dtype)
+        #pylint: enable=invalid-name
 
     def __exit__(self, exception_type, exception_value, traceback):
         os.remove(self.filename)

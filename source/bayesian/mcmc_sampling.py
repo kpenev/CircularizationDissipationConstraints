@@ -11,6 +11,7 @@ import h5py
 from astropy import units
 
 from bayesian.sampling import get_code_version_str, setup_process
+from bayesian.hacked_emcee_hdf5_backend import HDFBackend
 
 _mutable_config_params = set(['mcmc_nsteps',
                               'num_parallel_processes',
@@ -208,10 +209,10 @@ def add_configuration_attributes(config, destination):
                     else config_value
                 )
 
-def prepare_backend(config, num_params, code_version_str):
+def prepare_backend(config, num_params):
     """Return properly configured backend for storing new MCMC samples."""
 
-    def init_chain(chain_group):
+    def init_chain(chain_group, code_version_str):
         """Prepare newly created group for holding MCMC chains."""
 
         add_configuration_attributes(
@@ -238,6 +239,7 @@ def prepare_backend(config, num_params, code_version_str):
         +
         '.h5'
     )
+    code_version_str = get_code_version_str()
 
     selected_chain_name = None
     next_chain_index = 0
@@ -252,7 +254,7 @@ def prepare_backend(config, num_params, code_version_str):
                 next_chain_index += 1
     if selected_chain_name is None:
         selected_chain_name = ('chain%05d' % next_chain_index)
-        emcee.backends.HDFBackend(
+        HDFBackend(
             samples_fname,
             name=selected_chain_name
         ).reset(
@@ -260,7 +262,8 @@ def prepare_backend(config, num_params, code_version_str):
             num_params
         )
         with h5py.File(samples_fname, 'a') as samples_file:
-            init_chain(samples_file[selected_chain_name])
+            init_chain(samples_file[selected_chain_name],
+                       code_version_str)
         _logger.info("Creating new chain in '%s': %s",
                      samples_fname,
                      selected_chain_name)
@@ -276,8 +279,7 @@ def prepare_backend(config, num_params, code_version_str):
             version_dset[-1] = code_version_str
             first_iter_dset[-1] = chain_group.attrs['iteration']
 
-    backend = emcee.backends.HDFBackend(samples_fname,
-                                        selected_chain_name)
+    backend = HDFBackend(samples_fname, selected_chain_name)
 
     if backend.iteration > 0:
         _logger.info("Extending %s chain in '%s', containing %d samples",
@@ -285,7 +287,7 @@ def prepare_backend(config, num_params, code_version_str):
                      samples_fname,
                      backend.iteration)
 
-    return backend
+    return backend, samples_fname, selected_chain_name
 
 #Work around emcee limitation
 #pylint: disable=too-few-public-methods
@@ -315,18 +317,134 @@ def evaluate_walker_positions(position_queue,
         log_prob_result = log_prob_fn(position)
         result_queue.put((position, log_prob_result))
 
-def get_initial_state(num_params,
+def save_initial_position(position,
+                          log_prob_result,
+                          samples_fname,
+                          chain_name,
+                          nwalkers=1):
+    """Add a good starting position found for the given chain."""
+
+    with h5py.File(samples_fname, 'a') as samples_file:
+        if 'starting_positions' not in samples_file[chain_name]:
+            samples_file[chain_name].create_group('starting_positions')
+        destination = samples_file[chain_name]['starting_positions']
+        if 'num_positions_found' not in destination.attrs:
+            destination.attrs['num_positions_found'] = 0
+            assert 'unit_cube_values' not in destination
+            destination.create_dataset(
+                'unit_cube_values',
+                (nwalkers,) + position.shape,
+                maxshape=(None, len(position))
+            )
+            assert 'log_prob_results' not in destination
+            destination.create_dataset(
+                'log_prob_results',
+                (nwalkers, len(log_prob_result)),
+                maxshape=(None, len(log_prob_result))
+            )
+
+        current_positions = destination.attrs['num_positions_found']
+
+        assert (destination['unit_cube_values'].shape[0]
+                ==
+                destination['log_prob_results'].shape[0])
+        assert destination['unit_cube_values'].shape[1] == len(position)
+        assert destination['log_prob_results'].shape[1] == len(log_prob_result)
+
+        assert destination['unit_cube_values'].shape[0] >= current_positions
+        if destination['unit_cube_values'].shape[0] == current_positions:
+            for dset_name in ['unit_cube_values', 'log_prob_results']:
+                destination[dset_name].resize(current_positions + nwalkers,
+                                              axis=0)
+        destination['unit_cube_values'][current_positions, :] = position
+        destination['log_prob_results'][current_positions, :] = log_prob_result
+        destination.attrs['num_positions_found'] = current_positions + 1
+
+def load_initial_positions(samples_fname,
+                           chain_name,
+                           nwalkers,
+                           num_params,
+                           blobs_dtype):
+    """Load previously saved initial positions."""
+
+    starting_positions = numpy.empty((nwalkers, num_params),
+                                     dtype=float)
+    starting_log_prob = numpy.empty(nwalkers, dtype=float)
+    starting_blobs = numpy.empty(nwalkers, dtype=blobs_dtype)
+
+    with h5py.File(samples_fname, 'r') as samples_file:
+        if 'starting_positions' in samples_file[chain_name]:
+            position_group = samples_file[chain_name]['starting_positions']
+
+            positions_found = position_group.attrs['num_positions_found']
+
+            starting_positions[
+                :positions_found,
+                :
+            ] = position_group[
+                'unit_cube_values'
+            ][
+                :positions_found,
+                :
+            ]
+
+            starting_log_prob[
+                :positions_found
+            ] = position_group[
+                'log_prob_results'
+            ][
+                :positions_found,
+                0
+            ]
+            starting_blobs[
+                :positions_found
+            ] = [
+                tuple(row)
+                for row in
+                position_group[
+                    'log_prob_results'
+                ][
+                    :positions_found,
+                    1:
+                ]
+            ]
+        else:
+            positions_found = 0
+
+    _logger.info('Loaded %d/%d starting positions from a previous run.',
+                 positions_found,
+                 nwalkers)
+    return (
+        starting_positions,
+        starting_log_prob,
+        starting_blobs,
+        positions_found
+    )
+
+#No clean way to simplify
+#pylint: disable=too-many-locals
+def get_initial_state(*,
+                      num_params,
                       blobs_dtype,
                       log_prob_fn,
-                      config):
+                      config,
+                      samples_fname,
+                      chain_name):
     """Pick initial positions for walkers avoiding zero probability spots."""
 
-    starting_positions = numpy.empty((config.mcmc_nwalkers, num_params),
-                                     dtype=float)
-    starting_log_prob = numpy.empty(config.mcmc_nwalkers, dtype=float)
-    starting_blobs = numpy.empty(config.mcmc_nwalkers, dtype=blobs_dtype)
     _logger.info('Looking for %d suitable walker starting positions',
                  config.mcmc_nwalkers)
+
+    (
+        starting_positions,
+        starting_log_prob,
+        starting_blobs,
+        positions_found
+    ) = load_initial_positions(samples_fname,
+                               chain_name,
+                               config.mcmc_nwalkers,
+                               num_params,
+                               blobs_dtype)
 
     position_queue = Queue()
     result_queue = Queue()
@@ -344,13 +462,17 @@ def get_initial_state(num_params,
     for process in workers:
         process.start()
 
-    positions_found = 0
     while positions_found < config.mcmc_nwalkers:
         position, log_prob_result = result_queue.get()
         if log_prob_result[0] > config.mcmc_min_initial_log_probability:
             starting_positions[positions_found, :] = position
             starting_log_prob[positions_found] = log_prob_result[0]
             starting_blobs[positions_found] = log_prob_result[1:]
+            save_initial_position(position,
+                                  log_prob_result,
+                                  samples_fname,
+                                  chain_name,
+                                  config.mcmc_nwalkers)
             positions_found += 1
             _logger.debug('%d/%d starting positions found',
                           positions_found,
@@ -361,12 +483,13 @@ def get_initial_state(num_params,
         process.terminate()
 
     return emcee.State(starting_positions, starting_log_prob, starting_blobs)
+#pylint: enable=too-many-locals
 
-def run(config,
-        log_likelihood,
-        prior_transform,
-        num_params):
-    """Sample the selected system using MCMC."""
+def get_sampler_config_and_initial_state(config,
+                                         log_likelihood,
+                                         prior_transform,
+                                         num_params):
+    """Return configuration and initial state to start or resume sampling."""
 
     blobs_dtype = [(name, float)
                    for name, _ in log_likelihood.parameter_order]
@@ -376,7 +499,7 @@ def run(config,
 
     blobs_dtype = numpy.dtype(blobs_dtype)
 
-    backend = prepare_backend(config, num_params, get_code_version_str())
+    backend, samples_fname, chain_name = prepare_backend(config, num_params)
 
     log_prob_kwargs = dict(
         prior_transform=prior_transform,
@@ -409,17 +532,36 @@ def run(config,
             log_probability,
             **log_prob_kwargs
         )
-        initial_state = get_initial_state(num_params,
-                                          blobs_dtype,
-                                          log_prob_function,
-                                          config)
+        initial_state = get_initial_state(num_params=num_params,
+                                          blobs_dtype=blobs_dtype,
+                                          log_prob_fn=log_prob_function,
+                                          config=config,
+                                          samples_fname=samples_fname,
+                                          chain_name=chain_name)
 
-    sampler_kwargs = dict(
-        nwalkers=config.mcmc_nwalkers,
-        ndim=num_params,
-        log_prob_fn=log_prob_function,
-        blobs_dtype=blobs_dtype,
-        backend=backend
+    return (
+        dict(
+            nwalkers=config.mcmc_nwalkers,
+            ndim=num_params,
+            log_prob_fn=log_prob_function,
+            blobs_dtype=blobs_dtype,
+            backend=backend
+        ),
+        initial_state
+    )
+
+
+def run(config,
+        log_likelihood,
+        prior_transform,
+        num_params):
+    """Sample the selected system using MCMC."""
+
+    sampler_config, initial_state = get_sampler_config_and_initial_state(
+        config,
+        log_likelihood,
+        prior_transform,
+        num_params
     )
 
     if config.num_parallel_processes > 1:
@@ -429,10 +571,10 @@ def run(config,
                 initargs=[config],
                 maxtasksperchild=1
         ) as workers:
-            sampler = emcee.EnsembleSampler(**sampler_kwargs,
+            sampler = emcee.EnsembleSampler(**sampler_config,
                                             pool=UnchunkedPool(workers))
             sampler.run_mcmc(initial_state, config.mcmc_nsteps)
     else:
-        sampler = emcee.EnsembleSampler(**sampler_kwargs)
+        sampler = emcee.EnsembleSampler(**sampler_config)
 
         sampler.run_mcmc(initial_state, config.mcmc_nsteps)
