@@ -361,6 +361,13 @@ def add_sampling_parameters(parser):
         'period will start from this value multiplied by the final orbital '
         'period.'
     )
+    sampling.add_argument(
+        '--mcmc-recover-initial-conditions',
+        action='store_true',
+        help='If passed, log files matching the currently defined pattern are '
+        'parsed for initial mcmc walker positions that resulted in acceptable '
+        'log probability, to allow continuing previously interrupted run.'
+    )
 
 def add_output_parameters(parser):
     """Add parameters controlling how and what output to generate."""
