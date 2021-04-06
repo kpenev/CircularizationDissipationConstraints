@@ -12,7 +12,7 @@ class PriorTransformClusterSB1(PriorTransformBase):
     def _fill_coupled_parameters(self,
                                  unit_cube_iter,
                                  model_parameters):
-        """Fills [Fe/H], current system age, and primary mass."""
+        """Fills primary and secondary mass."""
 
         if model_parameters is None:
             next(unit_cube_iter)
