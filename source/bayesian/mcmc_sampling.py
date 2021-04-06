@@ -19,6 +19,7 @@ from bayesian.hacked_emcee_hdf5_backend import HDFBackend
 _mutable_config_params = set(['mcmc_nsteps',
                               'num_parallel_processes',
                               'mcmc_recover_initial_conditions',
+                              'mcmc_starting_positions_only',
                               'samples_fname',
                               'rvk_show_interpolation',
                               'eccentricity_expansion_coefficients',
@@ -634,6 +635,10 @@ def run(config,
         prior_transform,
         num_params
     )
+
+    if config.mcmc_starting_positions_only:
+        _logger.info('Found initial positions for all walkers, exiting!')
+        return
 
     if config.num_parallel_processes > 1:
         with Pool(

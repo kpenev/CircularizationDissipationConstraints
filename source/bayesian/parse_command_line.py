@@ -311,6 +311,13 @@ def add_sampling_parameters(parser):
         'is used.'
     )
     sampling.add_argument(
+        '--mcmc-starting-positions-only',
+        type=float,
+        default=-numpy.inf,
+        help='The number of MCMC steps to generate. Ignored if nested sampling '
+        'is used.'
+    )
+    sampling.add_argument(
         '--num-parallel-processes',
         type=int,
         default=4,
