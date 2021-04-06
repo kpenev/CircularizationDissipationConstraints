@@ -7,7 +7,7 @@
 #SBATCH --mail-user=kxp174430@utdallas.edu
 #SBATCH --mail-type=all
 #SBATCH -t 48:00:00
-#SBATCH -p skx
+#SBATCH -p skx-normal
 
 source /home1/05392/kpenev/module_load_order.txt
 
