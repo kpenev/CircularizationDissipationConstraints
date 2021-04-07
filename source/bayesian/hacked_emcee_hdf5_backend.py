@@ -70,7 +70,8 @@ class HDFBackend(Backend):
             with self.open('r+' if pending_steps else 'r') as progress_file:
                 saved_iterations = progress_file[self.name].attrs['iteration']
                 if pending_steps:
-                    with open(self.unsaved_steps_fname, 'rb') as unsaved_steps_file:
+                    with open(self.unsaved_steps_fname, 'rb') as \
+                            unsaved_steps_file:
                         unsaved_iteration = pickle.load(unsaved_steps_file)
                         assert unsaved_iteration <= saved_iterations
                         try:
@@ -106,8 +107,10 @@ class HDFBackend(Backend):
             self.dtype_set = True
             self.dtype = dtype
 
-
-        self.unsaved_steps_fname = os.path.splitext(filename)[0] + '.unsaved_steps'
+        self._has_blobs = None
+        self.unsaved_steps_fname = (os.path.splitext(filename)[0]
+                                    +
+                                    '.unsaved_steps')
         self._flush_unsaved_steps()
     #pylint: enable=super-init-not-called
 
@@ -151,6 +154,8 @@ class HDFBackend(Backend):
             if self.name in f:
                 del f[self.name]
 
+            self._has_blobs = False
+
             g = f.create_group(self.name)
             g.attrs["version"] = __version__
             g.attrs["nwalkers"] = nwalkers
@@ -172,8 +177,10 @@ class HDFBackend(Backend):
             )
 
     def has_blobs(self):
-        with self.open() as f:
-            return f[self.name].attrs["has_blobs"]
+        if self._has_blobs is None:
+            raise RuntimeError('HDF5 backend not ready for use.')
+
+        return self._has_blobs
 
     def get_value(self, name, flat=False, thin=1, discard=0):
         if not self.initialized:
@@ -192,7 +199,8 @@ class HDFBackend(Backend):
                     "results"
                 )
 
-            if name == "blobs" and not g.attrs["has_blobs"]:
+            assert g.attrs["has_blobs"] == self._has_blobs
+            if name == "blobs" and not self._has_blobs:
                 return None
 
             v = g[name][discard + thin - 1 : self.iteration : thin]
@@ -249,8 +257,8 @@ class HDFBackend(Backend):
             g["chain"].resize(ntot, axis=0)
             g["log_prob"].resize(ntot, axis=0)
             if blobs is not None:
-                has_blobs = g.attrs["has_blobs"]
-                if not has_blobs:
+                assert self._has_blobs == g.attrs["has_blobs"]
+                if not self._has_blobs:
                     nwalkers = g.attrs["nwalkers"]
                     dt = np.dtype((blobs[0].dtype, blobs[0].shape))
                     g.create_dataset(
@@ -261,6 +269,7 @@ class HDFBackend(Backend):
                     )
                 else:
                     g["blobs"].resize(ntot, axis=0)
+                self._has_blobs = True
                 g.attrs["has_blobs"] = True
     #pylint: enable=invalid-name
 
