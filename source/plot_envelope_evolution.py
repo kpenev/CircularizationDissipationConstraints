@@ -269,7 +269,7 @@ def plot_frame(frame, data, config):
                    '#fdbf6f',
                    '#cab2d6']
 
-    plot = getattr(pyplot, cnofig.plotting_function)
+    plot = getattr(pyplot, config.plotting_function)
 
     xmax = ymax = -numpy.inf
     xmin = numpy.inf
@@ -332,7 +332,7 @@ def main(config):
 
     if config.frame_fname_pattern:
         for frame, age in enumerate(plot_ages):
-            plot_frame(frame, data, config.label, config.show_interpolation)
+            plot_frame(frame, data, config)
             pyplot.title('Age = %.3f' % age)
 
             outfname = config.frame_fname_pattern % frame
