@@ -140,6 +140,7 @@ class HDFBackend(Backend):
             if "chain" in g:
                 self.dtype = g["chain"].dtype
                 self.dtype_set = True
+            self._has_blobs = g.attrs["has_blobs"]
         return f
 
     def reset(self, nwalkers, ndim):
