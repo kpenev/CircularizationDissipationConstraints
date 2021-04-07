@@ -312,10 +312,9 @@ def add_sampling_parameters(parser):
     )
     sampling.add_argument(
         '--mcmc-starting-positions-only',
-        type=float,
-        default=-numpy.inf,
-        help='The number of MCMC steps to generate. Ignored if nested sampling '
-        'is used.'
+        action='store_true',
+        help='If passed, the script only runs until it has found acceptable '
+        'starting positions for all walkers.'
     )
     sampling.add_argument(
         '--num-parallel-processes',
