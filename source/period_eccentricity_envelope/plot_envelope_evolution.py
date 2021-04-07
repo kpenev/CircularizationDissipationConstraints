@@ -2,7 +2,6 @@
 
 """Plot the evolution of the eccentricity envelope from pickled calculations."""
 
-import pickle
 from os import path, makedirs, remove
 from subprocess import call
 
@@ -16,6 +15,8 @@ from scipy.optimize import root_scalar
 
 from orbital_evolution.transformations import lgQ
 from orbital_evolution.command_line_util import get_phase_lag_config
+
+from .unpickle_data import unpickle_data
 
 def parse_configuration():
     """Return the configurations of how to create the plots."""
@@ -99,59 +100,6 @@ def parse_configuration():
         ' envelope is based on.'
     )
     return parser.parse_args()
-
-def unpickle_data(pickle_fname):
-    """Return the pickled data to plot from the given file."""
-
-    with open(pickle_fname, 'rb') as pickle_file:
-        pickled_config = pickle.load(pickle_file)
-        period_evolutions = numpy.full(
-            shape=(pickled_config.plot_ages.size,
-                   pickled_config.orbital_period_grid.size,
-                   pickled_config.eccentricity_grid.size),
-            fill_value=numpy.nan,
-            dtype=numpy.float64
-        )
-        eccentricity_evolutions = numpy.full(
-            shape=period_evolutions.shape,
-            fill_value=numpy.nan,
-            dtype=numpy.float64
-        )
-
-        try:
-            while True:
-                period_index = pickled_config.orbital_period_grid.searchsorted(
-                    pickle.load(pickle_file)
-                )
-                ecc_index = pickled_config.eccentricity_grid.searchsorted(
-                    pickle.load(pickle_file)
-                )
-                evolution = pickle.load(pickle_file)
-                num_steps = evolution.age.size
-                if not (
-                        numpy.abs(pickled_config.plot_ages[:num_steps]
-                                  -
-                                  evolution.age)
-                        <
-                        1e-10
-                ).all():
-                    continue
-                period_evolutions[:num_steps, period_index, ecc_index] = (
-                    evolution.orbital_period
-                )
-                eccentricity_evolutions[:num_steps, period_index, ecc_index] = (
-                    evolution.eccentricity
-                )
-        except EOFError:
-            pass
-
-    return (
-        pickled_config,
-        (
-            period_evolutions,
-            eccentricity_evolutions
-        )
-    )
 
 def get_label_substitutions(system_config):
     """Return dictionary of everything that can be included in plot labels."""
