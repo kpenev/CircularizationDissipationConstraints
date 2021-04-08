@@ -9,11 +9,11 @@ class MeibomMathieuEnvelopeResidual(EnvelopeResidualBase):
 
     def max_eccentricity(self, orbital_period, model_parameters, sim_config):
 
-        circularization_period, alpha, beta, gamma = model_parameters
+        circularization_period, beta, gamma = model_parameters
 
         return numpy.maximum(
             0.0,
-            alpha * (
+            (
                 1.0
                 -
                 numpy.exp(beta * (circularization_period - orbital_period))

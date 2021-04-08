@@ -12,13 +12,14 @@ from configargparse import\
     DefaultsFormatter
 import numpy
 from scipy.interpolate import UnivariateSpline
-from scipy.optimize import root_scalar, least_squares
+from scipy.optimize import root_scalar, minimize
 
 from orbital_evolution.transformations import lgQ
 from orbital_evolution.command_line_util import get_phase_lag_config
 
-from .unpickle_data import unpickle_data
-from .meibom_matthieu_2005_envelope import MeibomMathieuEnvelopeResidual
+from period_eccentricity_envelope.unpickle_data import unpickle_data
+from period_eccentricity_envelope.meibom_matthieu_2005_envelope import\
+    MeibomMathieuEnvelopeResidual
 
 def parse_configuration():
     """Return the configurations of how to create the plots."""
@@ -166,7 +167,19 @@ def get_mm05_envelope(data, age_index):
     def simulated_period(eccentricity):
         """Return the period at which the simulated envelope exceeds given e."""
 
-        return data[1][0][numpy.searchsorted(data[1][1], eccentricity)]
+        sim_periods = data[1][0][age_index, :, -1]
+        sim_eccentricities = data[1][1][age_index, :, -1]
+        finite = numpy.isfinite(sim_periods)
+        if not finite.any():
+            return numpy.nan
+        sim_peridos = sim_periods[finite]
+        sim_eccentricities = sim_eccentricities[finite]
+        crossing_index = int(
+            numpy.searchsorted(sim_eccentricities, eccentricity)
+        )
+        if crossing_index == sim_eccentricities.size:
+            crossing_index -= 1
+        return sim_peridos[crossing_index]
 
     max_fit_e = data[0].eccentricity_grid[-1] - 0.2
     pcirc_guess = simulated_period(0.025)
@@ -175,15 +188,17 @@ def get_mm05_envelope(data, age_index):
                   /
                   (pcirc_guess - simulated_period(max_fit_e)))
     gamma_guess = 1.0
+    parameter_guess = [pcirc_guess, beta_guess, gamma_guess]
 
     calc_residuals = MeibomMathieuEnvelopeResidual([data],
                                                    (0.05, max_fit_e),
                                                    age_index)
-    fit_result = least_squares(
-        calc_residuals,
-        [pcirc_guess, alpha_guess, beta_guess, gamma_guess]
-    )
-    assert fit_result.success
+    if not numpy.isfinite(calc_residuals(parameter_guess)):
+        return None
+
+    fit_result = minimize(calc_residuals, parameter_guess)
+    if not fit_result.success:
+        return None
     return partial(calc_residuals.max_eccentricity,
                    model_parameters=fit_result.x,
                    sim_config=data[0])
@@ -217,6 +232,8 @@ def find_circularization_period(data, threshold, get_envelope):
     )
     for age_index in range(config.plot_ages.size):
         envelope = get_envelope(data, age_index)
+        if envelope is None:
+            continue
         try:
             root_find_result = root_scalar(
                 #pylint: disable=cell-var-from-loop
@@ -289,12 +306,9 @@ def plot_frame(frame, data, get_envelope, config):
                  **plot_config)
         if config.show_interpolation:
             eval_x = numpy.linspace(0, xmax, 1000)
-            plot(
-                eval_x,
-                get_envelope(single_run_data, frame)(eval_x),
-                '-',
-                color=color
-            )
+            envelope = get_envelope(single_run_data, frame)
+            if envelope is not None:
+                plot(eval_x, envelope(eval_x), '-', color=color)
 
     if config.plotting_function in ['plot', 'semilogy']:
         pyplot.xlim(0, xmax)

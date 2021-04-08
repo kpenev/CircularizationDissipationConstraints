@@ -85,10 +85,10 @@ class EnvelopeResidualBase(ABC):
                 simulated initial eccentricity.
         """
 
-        result = 0.0
+        result = numpy.nan
 
         for sim_config, sim_data in self._simulations:
-            simulated_eccentricities, simulated_periods = (
+            simulated_periods, simulated_eccentricities = (
                 values[self._age_index, :, -1]
                 for values in sim_data
             )
@@ -96,12 +96,16 @@ class EnvelopeResidualBase(ABC):
                 simulated_eccentricities > self.fit_eccentricity_range[0],
                 simulated_eccentricities < self.fit_eccentricity_range[1]
             )
+            if not include_in_fit.any():
+                continue
+            if not numpy.isfinite(result):
+                result = 0.0
             model_eccentricities = self.max_eccentricity(
                 simulated_periods[include_in_fit],
                 model_parameters,
                 sim_config
             )
-            result[self._age_index] += numpy.square(
+            result += numpy.square(
                 model_eccentricities
                 -
                 simulated_eccentricities[include_in_fit]
