@@ -83,7 +83,11 @@ class HDFBackend(Backend):
                                 self._save_step_to_file(*step, progress_file)
                                 saved_iterations += 1
                         except EOFError:
-                            pass
+                            logging.getLogger(__name__).info(
+                                'Successfully added %d steps to %s',
+                                saved_iterations - unsaved_iteration,
+                                self.filename
+                            )
         elif pending_steps:
             with open(self.unsaved_steps_fname, 'rb') as unsaved_steps_file:
                 assert pickle.load(unsaved_steps_file) == 0
