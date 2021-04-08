@@ -18,8 +18,7 @@ from orbital_evolution.transformations import lgQ
 from orbital_evolution.command_line_util import get_phase_lag_config
 
 from period_eccentricity_envelope.unpickle_data import unpickle_data
-from period_eccentricity_envelope.meibom_matthieu_2005_envelope import\
-    MeibomMathieuEnvelopeResidual
+from period_eccentricity_envelope.mm05_envelope import MM05EnvelopeResidual
 
 def parse_configuration():
     """Return the configurations of how to create the plots."""
@@ -79,10 +78,11 @@ def parse_configuration():
         'automatically deleted!'
     )
     parser.add_argument(
-        '--circularization-period-plot',
+        '--model-evolution-plot',
         default=None,
-        help='Create a plot of the circularization cut-off period as a '
-        'function of age with the given filename.'
+        help='Create figure with plots of the circularization cut-off period '
+        'and the best fit parameters of the period eccentricity envelope as a '
+        'function of age. Save to a file with the given filename.'
     )
     parser.add_argument(
         '--circularization-threshold',
@@ -159,7 +159,7 @@ def get_spline_envelope(data, age_index):
                               interp_y,
                               s=1e-6 * interp_y.size)
     result.support = interp_x[0], interp_x[-1]
-    return result
+    return result, None
 
 def get_mm05_envelope(data, age_index):
     """Return best fit Meibom & Matthieu 05 model of the given P-e envelope."""
@@ -183,27 +183,29 @@ def get_mm05_envelope(data, age_index):
 
     max_fit_e = data[0].eccentricity_grid[-1] - 0.2
     pcirc_guess = simulated_period(0.025)
-    alpha_guess = 1.0
     beta_guess = (numpy.log(1.0 - max_fit_e)
                   /
                   (pcirc_guess - simulated_period(max_fit_e)))
     gamma_guess = 1.0
     parameter_guess = [pcirc_guess, beta_guess, gamma_guess]
 
-    calc_residuals = MeibomMathieuEnvelopeResidual([data],
-                                                   (0.05, max_fit_e),
-                                                   age_index)
+    calc_residuals = MM05EnvelopeResidual([data],
+                                          (0.05, max_fit_e),
+                                          age_index)
     if not numpy.isfinite(calc_residuals(parameter_guess)):
         return None
 
     fit_result = minimize(calc_residuals, parameter_guess)
     if not fit_result.success:
         return None
-    return partial(calc_residuals.max_eccentricity,
-                   model_parameters=fit_result.x,
-                   sim_config=data[0])
+    return (
+        partial(calc_residuals.max_eccentricity,
+                model_parameters=fit_result.x,
+                sim_config=data[0]),
+        fit_result.x
+    )
 
-def find_circularization_period(data, threshold, get_envelope):
+def get_model_evolution(data, threshold, get_envelope):
     """
     Estimate the period where the eccentricity envelope crosses a threshold.
 
@@ -217,23 +219,33 @@ def find_circularization_period(data, threshold, get_envelope):
             envelope given data and age index.
 
     Returns:
-        2-D array:
-            The largest orbital period below which all systems at a given age
-            starting with the same initial eccentricity should have
-            eccentricities below threshold. The first index is over initial
-            eccentricity and the second index is over age.
+        2-D array with the following columns:
+
+            0. The largest orbital period below which all systems at a given age
+               starting with the same initial eccentricity should have
+               eccentricities below threshold. The first index is over initial
+               eccentricity and the second index is over age.
+
+            1. The best fit value of the first model parameter
+
+            2. The best fit value of the second model parameter
+
+            ...
     """
 
     config = data[0]
-    result = numpy.full(
-        shape=(config.plot_ages.size,),
-        dtype=numpy.float64,
-        fill_value=numpy.nan
-    )
+    result = None
     for age_index in range(config.plot_ages.size):
-        envelope = get_envelope(data, age_index)
+        envelope, parameters = get_envelope(data, age_index)
         if envelope is None:
             continue
+        if result is None:
+            result = numpy.full(
+                shape=(parameters.size + 1, config.plot_ages.size),
+                dtype=numpy.float64,
+                fill_value=numpy.nan
+            )
+        result[1:, age_index] = parameters
         try:
             root_find_result = root_scalar(
                 #pylint: disable=cell-var-from-loop
@@ -244,7 +256,7 @@ def find_circularization_period(data, threshold, get_envelope):
                 fprime2=envelope.derivative(2)
             )
             assert root_find_result.converged
-            result[age_index] = root_find_result.root
+            result[0, age_index] = root_find_result.root
         except ValueError:
             pass
 
@@ -306,7 +318,7 @@ def plot_frame(frame, data, get_envelope, config):
                  **plot_config)
         if config.show_interpolation:
             eval_x = numpy.linspace(0, xmax, 1000)
-            envelope = get_envelope(single_run_data, frame)
+            envelope = get_envelope(single_run_data, frame)[0]
             if envelope is not None:
                 plot(eval_x, envelope(eval_x), '-', color=color)
 
@@ -321,10 +333,68 @@ def plot_frame(frame, data, get_envelope, config):
     pyplot.figlegend(loc=2)
 #pylint: enable=too-many-locals
 
+def create_envelope_movie(data, plot_ages, get_envelope, config):
+    """Create the movie showing the simulated envelope evolution."""
+
+    frame_fnames = []
+    for frame, age in enumerate(plot_ages):
+        plot_frame(frame, data, get_envelope, config)
+        pyplot.title('Age = %.3f' % age)
+
+        outfname = config.frame_fname_pattern % frame
+        outdir = path.dirname(outfname)
+        if outdir and not path.exists(outdir):
+            makedirs(outdir)
+        pyplot.savefig(outfname)
+        pyplot.cla()
+        frame_fnames.append(outfname)
+
+        print('Envelope movie progress: %s%%'
+              %
+              (100.0 * frame / plot_ages.size),
+              end='\r')
+
+    if config.envelope_movie_fname:
+        create_movie(config.frame_fname_pattern,
+                     config.envelope_movie_fname)
+        if not config.keep_envelope_frames:
+            for oufname in frame_fnames:
+                remove(oufname)
+
+def create_model_age_dependence_figure(data, plot_ages, get_envelope, config):
+    """Craete the figure with plots of the evolution of P-e model parameters."""
+
+    plot_config = dict(linestyle='-')
+    plot_axes = None
+    for scenario_data in data:
+        model_evolution = get_model_evolution(
+            scenario_data,
+            config.circularization_threshold,
+            get_envelope
+        )
+        if plot_axes is None:
+            plot_axes = pyplot.subplots(model_evolution.shape[0])
+        if config.label is not None:
+            plot_config['label'] = config.label % dict(
+                get_label_substitutions(
+                    scenario_data[0]
+                ),
+                e0=scenario_data[0].eccentricity_grid[-1]
+            )
+
+        for destination, evolution in zip(plot_axes, model_evolution):
+            getattr(destination, config.plotting_function)(
+                plot_ages,
+                evolution,
+                **plot_config
+            )
+    pyplot.figlegend(loc=2)
+    pyplot.savefig(config.circularization_period_plot)
+    pyplot.cla()
+
 def main(config):
     """Avoid polluting global namespace."""
 
-    frame_fnames = []
     data = [unpickle_data(evolution_pickle)
             for evolution_pickle in config.evolution_pickles]
     plot_ages = data[0][0].plot_ages
@@ -335,55 +405,15 @@ def main(config):
 
 
     if config.frame_fname_pattern:
-        for frame, age in enumerate(plot_ages):
-            plot_frame(frame, data, get_envelope, config)
-            pyplot.title('Age = %.3f' % age)
-
-            outfname = config.frame_fname_pattern % frame
-            outdir = path.dirname(outfname)
-            if outdir and not path.exists(outdir):
-                makedirs(outdir)
-            pyplot.savefig(outfname)
-            pyplot.cla()
-            frame_fnames.append(outfname)
-
-            print('Envelope movie progress: %s%%'
-                  %
-                  (100.0 * frame / plot_ages.size),
-                  end='\r')
-
-        if config.envelope_movie_fname:
-            create_movie(config.frame_fname_pattern,
-                         config.envelope_movie_fname)
-            if not config.keep_envelope_frames:
-                for oufname in frame_fnames:
-                    remove(oufname)
-
-    if config.circularization_period_plot:
-        plot_config = dict(linestyle='-')
-        for scenario_data in data:
-            circularization_period = find_circularization_period(
-                scenario_data,
-                config.circularization_threshold,
-                get_envelope
-            )
-            if config.label is not None:
-                plot_config['label'] = config.label % dict(
-                    get_label_substitutions(
-                        scenario_data[0]
-                    ),
-                    e0=scenario_data[0].eccentricity_grid[-1]
-                )
-
-            getattr(pyplot, config.plotting_function)(
-                scenario_data[0].plot_ages,
-                circularization_period,
-                **plot_config
-            )
-        pyplot.figlegend(loc=2)
-        pyplot.savefig(config.circularization_period_plot)
-        pyplot.cla()
-
+        create_envelope_movie(data,
+                              plot_ages,
+                              get_envelope,
+                              config)
+    if config.model_age_dependence_plot:
+        create_model_age_dependence_figure(data,
+                                           plot_ages,
+                                           get_envelope,
+                                           config)
 if __name__ == '__main__':
     rcParams['figure.figsize'] = [6.4, 9.6]
     rcParams['figure.subplot.top'] = 0.5

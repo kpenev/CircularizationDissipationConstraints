@@ -4,7 +4,7 @@ import numpy
 
 from .envelope_residual_base import EnvelopeResidualBase
 
-class MeibomMathieuEnvelopeResidual(EnvelopeResidualBase):
+class MM05EnvelopeResidual(EnvelopeResidualBase):
     """Use Eq. 1 from Meibom & Matthieu 2005 as the envelope model."""
 
     def max_eccentricity(self, orbital_period, model_parameters, sim_config):
