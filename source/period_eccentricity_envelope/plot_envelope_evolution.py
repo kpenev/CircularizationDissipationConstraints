@@ -193,15 +193,18 @@ def get_mm05_envelope(data, age_index):
                                           (0.05, max_fit_e),
                                           age_index)
     if not numpy.isfinite(calc_residuals(parameter_guess)):
-        return None
+        return None, None
 
     fit_result = minimize(calc_residuals, parameter_guess)
     if not fit_result.success:
-        return None
+        return None, None
+    envelope_function = partial(calc_residuals.max_eccentricity,
+                                model_parameters=fit_result.x,
+                                sim_config=data[0])
+    envelope_function.support=(fit_result.x[0],
+                               fit_result.x[0] + 1.0 / fit_result.x[1])
     return (
-        partial(calc_residuals.max_eccentricity,
-                model_parameters=fit_result.x,
-                sim_config=data[0]),
+        envelope_function,
         fit_result.x
     )
 
@@ -247,13 +250,16 @@ def get_model_evolution(data, threshold, get_envelope):
             )
         result[1:, age_index] = parameters
         try:
+            extra_args = dict()
+            if hasattr(envelope, 'derivative'):
+                extra_args['fprime'] = envelope.derivative()
+                extra_args['fprime2'] = envelope.derivative(2)
             root_find_result = root_scalar(
                 #pylint: disable=cell-var-from-loop
                 lambda x: envelope(x) - threshold,
                 #pylint: enable=cell-var-from-loop
                 bracket=envelope.support,
-                fprime=envelope.derivative(),
-                fprime2=envelope.derivative(2)
+                **extra_args
             )
             assert root_find_result.converged
             result[0, age_index] = root_find_result.root
@@ -361,19 +367,37 @@ def create_envelope_movie(data, plot_ages, get_envelope, config):
             for oufname in frame_fnames:
                 remove(oufname)
 
-def create_model_age_dependence_figure(data, plot_ages, get_envelope, config):
+def create_model_evolution_figure(data, plot_ages, get_envelope, config):
     """Craete the figure with plots of the evolution of P-e model parameters."""
 
     plot_config = dict(linestyle='-')
     plot_axes = None
+    print('%25s %25s %25s %25s %25s %25s'
+          %
+          ('M1', 'M2', 'Pthresh', 'Pcirc', 'beta', 'gamma'))
     for scenario_data in data:
         model_evolution = get_model_evolution(
             scenario_data,
             config.circularization_threshold,
             get_envelope
         )
+        print(
+            '%25.16e %25.16e %25.16e %25.16e %25.16e %25.16e'
+            %
+            (
+                (
+                    scenario_data[0].primary_mass,
+                    scenario_data[0].secondary_mass
+                )
+                +
+                tuple(numpy.nanmedian(model_evolution, axis=1))
+            )
+        )
         if plot_axes is None:
-            plot_axes = pyplot.subplots(model_evolution.shape[0])
+            plot_axes = pyplot.subplots(
+                model_evolution.shape[0],
+                figsize=(6.4, 4.8 * (model_evolution.shape[0] + 1))
+            )[1]
         if config.label is not None:
             plot_config['label'] = config.label % dict(
                 get_label_substitutions(
@@ -389,7 +413,7 @@ def create_model_age_dependence_figure(data, plot_ages, get_envelope, config):
                 **plot_config
             )
     pyplot.figlegend(loc=2)
-    pyplot.savefig(config.circularization_period_plot)
+    pyplot.savefig(config.model_evolution_plot)
     pyplot.cla()
 
 def main(config):
@@ -409,11 +433,11 @@ def main(config):
                               plot_ages,
                               get_envelope,
                               config)
-    if config.model_age_dependence_plot:
-        create_model_age_dependence_figure(data,
-                                           plot_ages,
-                                           get_envelope,
-                                           config)
+    if config.model_evolution_plot:
+        create_model_evolution_figure(data,
+                                      plot_ages,
+                                      get_envelope,
+                                      config)
 if __name__ == '__main__':
     rcParams['figure.figsize'] = [6.4, 9.6]
     rcParams['figure.subplot.top'] = 0.5
