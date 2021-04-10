@@ -27,7 +27,6 @@ from bayesian.photometric_constraint import\
 from bayesian.rv_semiamplitude_constraint import RVSemiAmplitudeConstraint
 from bayesian.eccentricity_likelihood import EccentricityLikelihood
 
-
 _logger = logging.getLogger(__name__)
 
 cluster_age_distribution = stats.norm(7.0, 0.5)
@@ -155,7 +154,7 @@ def get_binary_data(
                 read_cds_pipe_table(single_lined_orbits_fname)
             ),
             on='PKM',
-            how='outer'
+            how='right'
         ),
         pandas.merge(
             physical_parameters,
@@ -163,7 +162,7 @@ def get_binary_data(
                 read_cds_pipe_table(double_lined_orbits_fname)
             ),
             on='PKM',
-            how='outer'
+            how='right'
         )
     )
 
@@ -281,6 +280,22 @@ def get_rvk_constraint(observed_orbit,
         maxp1=200,
         show_mismatch_plot=show_mismatch_plot
     )
+
+def alternative_eccentricity_envelope(orbital_period):
+    """Return the envelope at the given orbital period."""
+
+    gamma = 0.8
+    beta = 0.25
+    circularization_period = 13.8
+
+    return numpy.maximum(
+        0.05,
+        0.6 * (
+            1.0
+            -
+            numpy.exp(beta * (circularization_period - orbital_period))
+        )
+    )**gamma
 
 def get_final_eccentricity_likelihood(observed_orbit):
     """Return :class:`EccentricityLikelihood` instance per the given orbit."""
@@ -432,7 +447,72 @@ def _test_rvk_constraint(binary_pkm_id):
     pyplot.show()
 #pylint: enable=too-many-locals
 
+def plot_eccentricity_vs_period():
+    """Show a period-eccentricity plot for NGC188."""
+
+    def add_shifted_periods(binary_class):
+        """Calculate the shifted orbital period for determining envelope."""
+
+        m1_mult = 3.97405
+        m2_mult = 2.5685
+        m1_pwrlaw = 1.72462
+        m2_pwrlaw = 1.55429
+
+        binary_class.insert(
+            len(binary_class.columns),
+            'ShiftedPer',
+            (
+                binary_class['Per']
+                +
+                m1_mult * (1.0 - binary_class['M1']**m1_pwrlaw)
+                +
+                m2_mult * (1.0 - binary_class['M2']**m2_pwrlaw)
+            )
+        )
+
+    binaries = get_binary_data()
+    binaries = [
+        binary_class[
+            numpy.logical_and(
+                binary_class['Prv'] > 50,
+                binary_class['Ppm'] > 50
+            )
+        ]
+        for binary_class in binaries
+    ]
+
+    for binary_class in binaries:
+        add_shifted_periods(binary_class)
+
+    print('Single lined binaries:\n' + repr(binaries[0]))
+    print('Double lined binaries:\n' + repr(binaries[1]))
+
+    pyplot.gca().set_xscale('log')
+
+    for label, binary_class in zip(['SB1', 'SB2'], binaries):
+        color = pyplot.errorbar(binary_class['ShiftedPer'],
+                                binary_class['e'],
+                                binary_class['e_e'],
+                                fmt='o',
+                                label=label)[0].get_color()
+        pyplot.errorbar(binary_class['Per'],
+                        binary_class['e'],
+                        binary_class['e_e'],
+                        fmt='o',
+                        markeredgecolor=color,
+                        markerfacecolor='none')
+    envelope_x = 2.0**numpy.linspace(1, 6, 1000)
+    pyplot.plot(envelope_x, alternative_eccentricity_envelope(envelope_x), '-k')
+    pyplot.axhline(0.5)
+    pyplot.ylim(0, 1.0)
+    pyplot.xlim(2, 64)
+    pyplot.xlabel('Orbital Period [d]')
+    pyplot.ylabel('Eccentricity')
+    pyplot.legend()
+    pyplot.show()
+
 if __name__ == '__main__':
     set_start_method('forkserver')
-    logging.basicConfig(level=logging.DEBUG)
-    _test_rvk_constraint(3732)
+#    logging.basicConfig(level=logging.DEBUG)
+    plot_eccentricity_vs_period()
+    #_test_rvk_constraint(3732)
