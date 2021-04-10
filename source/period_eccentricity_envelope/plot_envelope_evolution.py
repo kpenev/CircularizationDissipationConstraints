@@ -375,6 +375,9 @@ def create_model_evolution_figure(data, plot_ages, get_envelope, config):
     print('%25s %25s %25s %25s %25s %25s'
           %
           ('M1', 'M2', 'Pthresh', 'Pcirc', 'beta', 'gamma'))
+    ngc188_age_index = numpy.searchsorted(plot_ages, 7.0)
+    if plot_ages[ngc188_age_index - 1] < plot_ages[ngc188_age_index]:
+        ngc188_age_index -= 1
     for scenario_data in data:
         model_evolution = get_model_evolution(
             scenario_data,
@@ -390,7 +393,7 @@ def create_model_evolution_figure(data, plot_ages, get_envelope, config):
                     scenario_data[0].secondary_mass
                 )
                 +
-                tuple(numpy.nanmedian(model_evolution, axis=1))
+                tuple(model_evolution[:, ngc188_age_index])
             )
         )
         if plot_axes is None:
