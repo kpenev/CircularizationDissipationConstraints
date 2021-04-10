@@ -2,9 +2,8 @@
 
 #SBATCH -J NGC188_5362/4618/5733_pwrlaw
 #SBATCH -N 1  #Number of nodes on which to distribute the tasks evenly
-#SBATCH -n 48 #Total number of tasks to run at one time
-#SBATCH -o
-/work/05392/kpenev/stampede2/open_cluster_circularization/sampling_output/NGC188_5362_4618_5733_slurm.out
+#SBATCH -n 1 #Total number of tasks to run at one time
+#SBATCH -o /work/05392/kpenev/stampede2/open_cluster_circularization/sampling_output/NGC188_5362_4618_5733_slurm.out
 #SBATCH --mail-user=kxp174430@utdallas.edu
 #SBATCH --mail-type=all
 #SBATCH -t 48:00:00
