@@ -1,9 +1,10 @@
 #!/bin/bash
 
-#SBATCH -J NGC188_4618_pwrlaw
+#SBATCH -J NGC188_5362/4618/5733_pwrlaw
 #SBATCH -N 1  #Number of nodes on which to distribute the tasks evenly
-#SBATCH -n 1 #Total number of tasks to run at one time
-#SBATCH -o /work/05392/kpenev/stampede2/open_cluster_circularization/sampling_output/NGC188_4618_slurm.out
+#SBATCH -n 48 #Total number of tasks to run at one time
+#SBATCH -o
+/work/05392/kpenev/stampede2/open_cluster_circularization/sampling_output/NGC188_5362_4618_5733_slurm.out
 #SBATCH --mail-user=kxp174430@utdallas.edu
 #SBATCH --mail-type=all
 #SBATCH -t 48:00:00
@@ -26,12 +27,17 @@ SOURCE_DIR=/home1/05392/kpenev/projects/git/CircularizationDissipationConstraint
 OUTPUT_ROOT=/work/05392/kpenev/stampede2/open_cluster_circularization
 OUTPUT_DIR=${OUTPUT_ROOT}/sampling_output
 
-python3 \
-    ${SOURCE_DIR}/bayesian/sample_sb1.py NGC188_4618 \
-    -c ${SOURCE_DIR}/sampling_config/open_cluster_powerlaw_nolock.cfg\
-    --std-out-err-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.outerr'\
-    --logging-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.log'\
-    --samples-fname '/home1/05392/kpenev/%(system)s_%(sampling)s_powerlawlgQ_samples'\
-    >\
-    ${OUTPUT_DIR}/sample_NGC188_4618_1.outerr\
-    2>&1
+for PKM in 5362 4618 5733; do 
+    python3 \
+        ${SOURCE_DIR}/bayesian/sample_sb1.py NGC188_${PKM} \
+        -c ${SOURCE_DIR}/sampling_config/open_cluster_powerlaw_nolock.cfg\
+        --std-out-err-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.outerr'\
+        --logging-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.log'\
+        --samples-fname '/home1/05392/kpenev/%(system)s_%(sampling)s_powerlawlgQ_samples'\
+        >\
+        ${OUTPUT_DIR}/sample_NGC188_${PKM}_1.outerr\
+        2>&1\
+        &
+done
+
+wait
