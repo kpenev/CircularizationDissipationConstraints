@@ -188,9 +188,9 @@ def constraints(smallest_acceptable_value_of_orbital_period = 0,
                 smallest_acceptable_value_of_metallicity = -1.014,
                 largest_acceptable_value_of_metallicity = 0.537,
                 smallest_acceptable_value_of_stellar_age = 0,
-                largest_acceptable_value_of_stellar_age = 1000,
+                largest_acceptable_value_of_stellar_age = 10,
                 smallest_acceptable_value_of_eccentricity_now = 0,
-                largest_acceptable_value_of_eccentricity_now = 0.55):
+                largest_acceptable_value_of_eccentricity_now = 0.45):
     smallest = {'orbital period': smallest_acceptable_value_of_orbital_period,
                 'primary mass': smallest_acceptable_value_of_primary_mass,
                 'secondary mass': smallest_acceptable_value_of_secondary_mass,
@@ -322,9 +322,7 @@ class System:
                  feh,
                  orbital_period,
                  obliquity,
-                 age,
-                 eccentricity,
-                 vsini):
+                 age):
         self.primary_mass = primary_mass
         self.Mprimary = primary_mass
         self.secondary_mass = secondary_mass
@@ -335,9 +333,7 @@ class System:
         self.Porb = orbital_period
         self.orbital_period = orbital_period
         self.obliquity = obliquity
-        self.eccentricity = eccentricity
         self.age = age
-        self.Vsini = vsini
 
     def printing(self):
         print('Primary mass = ', self.primary_mass, '=', self.primary_mass.to(u.kg))
@@ -346,9 +342,7 @@ class System:
         print('Metallicity = ', self.feh.to(u.dimensionless_unscaled))
         print('Orbital period = ', self.orbital_period, '=', self.orbital_period.to(u.s))
         print('Obliquity = ', self.obliquity.to(u.deg))
-        print('Eccentricity = ', self.eccentricity.to(u.dimensionless_unscaled))
         print('Age = ', self.age, '=', self.age.to(u.s))
-        print('Vsini = ', self.Vsini, '=', self.Vsini.to(u.m /u.s))
 
 
 class EnvelopeEccentricityDistribution:
@@ -489,11 +483,13 @@ class EnvelopeEccentricityDistribution:
             for i in range(1, len(records_of_the_points_on_envelope)):
                 if log_of_orbital_period == records_of_the_points_on_envelope[i]['log of orbital period']:
                     return records_of_the_points_on_envelope[i]['envelope eccentricity']
-                if (log_of_orbital_period<records_of_the_points_on_envelope[i]['log of orbital period']
-                        and log_of_orbital_period>records_of_the_points_on_envelope[i-1]['log of orbital period']):
+                if ((log_of_orbital_period<records_of_the_points_on_envelope[i]['log of orbital period'])
+                        and (log_of_orbital_period>records_of_the_points_on_envelope[i-1]['log of orbital period'])):
                     return (records_of_the_points_on_envelope[i]['envelope eccentricity']
-                            + (records_of_the_points_on_envelope[i]['envelope eccentricity']-records_of_the_points_on_envelope[i-1]['envelope eccentricity'])
-                            /(records_of_the_points_on_envelope[i]['log of orbital period']-records_of_the_points_on_envelope[i-1]['log of orbital period'])
+                            + (records_of_the_points_on_envelope[i]['envelope eccentricity']
+                               - records_of_the_points_on_envelope[i-1]['envelope eccentricity'])
+                            /(records_of_the_points_on_envelope[i]['log of orbital period']
+                              - records_of_the_points_on_envelope[i-1]['log of orbital period'])
                             *(log_of_orbital_period - records_of_the_points_on_envelope[i]['log of orbital period']))
             print('This situation is not possible')
             return
@@ -535,8 +531,6 @@ class EnvelopeEccentricityDistribution:
         return
 
     def properties_of_ith_binary_system_if_satisfies_constraints(self, i, constraints=constraints()):
-        smallest = constraints[0]
-        largest = constraints[1]
         if i > len(self.planet_name) - 1 or i < 0: return None, None, None
         if not (math.isnan(self.orbital_period[i])
                 or math.isnan(self.orbital_period_upper_uncertainty[i])
@@ -610,8 +604,7 @@ class EnvelopeEccentricityDistribution:
                 print('log of orbital period = ', math.log(means['orbital period'], 10))
                 print('Envelope eccentricity for orbital period = ', means['orbital period'], ' is = ',
                       self.envelope_eccentricity_function(means['orbital period']))
-                index_of_binary_system_with_constrained_properties = index_of_binary_system_with_constrained_properties + [
-                    i]
+                index_of_binary_system_with_constrained_properties = index_of_binary_system_with_constrained_properties + [i]
         return index_of_binary_system_with_constrained_properties
 
 
@@ -623,47 +616,21 @@ class SamplingPropertiesOfSystem:
                  planet_name='Exo Planet',
                  serialized_directory='/home/mmmahmud/poet/stellar_evolution_interpolators',
                  envelope_eccentricity_function=None,
-                 highest_acceptable_value_of_orbital_period=10,
-                 lowest_acceptable_value_of_orbital_period=0,
-                 highest_acceptable_value_of_metallicity=0.537,
-                 lowest_acceptable_value_of_metallicity=-1.014,
-                 highest_acceptable_value_of_primary_mass=1.2,
-                 lowest_acceptable_value_of_primary_mass=0.4):
+                 initial_eccentricity = 0.5,
+                 max_argument_of_phase_lag_function_for_planet=5,
+                 min_argument_of_phase_lag_function_for_planet=10,
+                 max_initial_stellar_spin=5,
+                 min_initial_stellar_spin=15,
+                 constraints = constraints(),
+                 find_argument_of_phase_lag_function_for_planet_range_auto = False):
 
-        self.primary_mass = means['primary mass']
-        self.secondary_mass = means['secondary mass']
-        self.secondary_radius = means['secondary radius']
-        self.metallicity = means['metallicity']
-        self.orbital_period = means['orbital period']
-        self.obliquity = means['obliquity']
-        self.stellar_age = means['stellar age']
-        self.eccentricity_now = means['present eccentricity']
-        self.vsini = means['v sin i']
-        self.primary_mass_upper_uncertainty = standard_deviations['primary_mass_upper_uncertainty']
-        self.primary_mass_lower_uncertainty = standard_deviations['primary_mass_lower_uncertainty']
-        self.secondary_mass_upper_uncertainty = standard_deviations['secondary_mass_upper_uncertainty']
-        self.secondary_mass_lower_uncertainty = standard_deviations['secondary_mass_lower_uncertainty']
-        self.secondary_radius_upper_uncertainty = standard_deviations['secondary_radius_upper_uncertainty']
-        self.secondary_radius_lower_uncertainty = standard_deviations['secondary_radius_lower_uncertainty']
-        self.metallicity_upper_uncertainty = standard_deviations['metallicity_upper_uncertainty']
-        self.metallicity_lower_uncertainty = standard_deviations['metallicity_lower_uncertainty']
-        self.orbital_period_upper_uncertainty = standard_deviations['orbital_period_upper_uncertainty']
-        self.orbital_period_lower_uncertainty = standard_deviations['orbital_period_lower_uncertainty']
-        self.obliquity_upper_uncertainty = standard_deviations['obliquity_upper_uncertainty']
-        self.obliquity_lower_uncertainty = standard_deviations['obliquity_lower_uncertainty']
-        self.stellar_age_upper_uncertainty = standard_deviations['stellar_age_upper_uncertainty']
-        self.stellar_age_lower_uncertainty = standard_deviations['stellar_age_lower_uncertainty']
-        self.eccentricity_now_upper_uncertainty = standard_deviations['eccentricity_now_upper_uncertainty']
-        self.eccentricity_now_lower_uncertainty = standard_deviations['eccentricity_now_lower_uncertainty']
-        self.vsini_upper_uncertainty = standard_deviations['vsini_upper_uncertainty']
-        self.vsini_lower_uncertainty = standard_deviations['vsini_lower_uncertainty']
-        self.planet_name = planet_name
-        self.highest_acceptable_value_of_orbital_period = highest_acceptable_value_of_orbital_period,
-        self.lowest_acceptable_value_of_orbital_period = lowest_acceptable_value_of_orbital_period,
-        self.highest_acceptable_value_of_metallicity = highest_acceptable_value_of_metallicity,
-        self.lowest_acceptable_value_of_metallicity = lowest_acceptable_value_of_metallicity,
-        self.highest_acceptable_value_of_primary_mass = highest_acceptable_value_of_primary_mass,
-        self.lowest_acceptable_value_of_primary_mass = lowest_acceptable_value_of_primary_mass
+        self.initial_eccentricity = initial_eccentricity
+        self.max_argument_of_phase_lag_function_for_planet = max_argument_of_phase_lag_function_for_planet
+        self.min_argument_of_phase_lag_function_for_planet = min_argument_of_phase_lag_function_for_planet
+        self.max_initial_stellar_spin = max_initial_stellar_spin
+        self.min_initial_stellar_spin = min_initial_stellar_spin
+
+
 
         self.serialized_directory = serialized_directory
         manager = StellarEvolutionManager(serialized_directory)
@@ -675,58 +642,30 @@ class SamplingPropertiesOfSystem:
         else:
             self.envelope_eccentricity_function = envelope_eccentricity_function
 
-        if (not (math.isnan(self.orbital_period)
-                 or math.isnan(self.orbital_period_upper_uncertainty)
-                 or math.isnan(self.orbital_period_lower_uncertainty)
-                 or math.isnan(self.primary_mass)
-                 or math.isnan(self.primary_mass_upper_uncertainty)
-                 or math.isnan(self.primary_mass_lower_uncertainty)
-                 or math.isnan(self.secondary_mass)
-                 or math.isnan(self.secondary_mass_upper_uncertainty)
-                 or math.isnan(self.secondary_mass_lower_uncertainty)
-                 or math.isnan(self.metallicity)
-                 or math.isnan(self.metallicity_upper_uncertainty)
-                 or math.isnan(self.metallicity_lower_uncertainty)
-                 or math.isnan(self.secondary_radius)
-                 or math.isnan(self.secondary_radius_upper_uncertainty)
-                 or math.isnan(self.secondary_radius_lower_uncertainty)
-                 or math.isnan(self.stellar_age)
-                 or math.isnan(self.stellar_age_upper_uncertainty)
-                 or math.isnan(self.stellar_age_lower_uncertainty)
-                 or math.isnan(self.eccentricity_now)
-                 or math.isnan(self.eccentricity_now_lower_uncertainty)
-                 or self.eccentricity_now_lower_uncertainty == 0
-                 or math.isnan(self.eccentricity_now_upper_uncertainty)
-                 or self.eccentricity_now_upper_uncertainty == 0
-                 or math.isnan(self.obliquity)
-                 or math.isnan(self.obliquity_upper_uncertainty)
-                 or math.isnan(self.obliquity_lower_uncertainty)
-                 or math.isnan(self.vsini)
-                 or math.isnan(self.vsini_upper_uncertainty)
-                 or math.isnan(self.vsini_lower_uncertainty))
-                and ((
-                             self.orbital_period <= highest_acceptable_value_of_orbital_period and self.orbital_period > lowest_acceptable_value_of_orbital_period)
-                     and (
-                             self.primary_mass > lowest_acceptable_value_of_primary_mass and self.primary_mass < highest_acceptable_value_of_primary_mass)
-                     and (
-                             self.metallicity > lowest_acceptable_value_of_metallicity and self.metallicity < highest_acceptable_value_of_metallicity))):
-            self.theta0 = [self.primary_mass,
-                           self.secondary_mass,
-                           self.secondary_radius,
-                           self.metallicity,
-                           self.orbital_period,
-                           self.obliquity,
-                           self.stellar_age,
-                           self.eccentricity_now,
-                           self.vsini]
-            # self.argument_of_phase_lag_function]
+        self.standard_deviations = standard_deviations
 
-            self.mean_e_env = self.envelope_eccentricity_function(orbital_period=self.orbital_period)
-            eccentricity_distribution_object = EccentricityDistribution(self.eccentricity_now,
-                                                                        self.eccentricity_now_upper_uncertainty,
-                                                                        self.eccentricity_now_lower_uncertainty,
+        if (constraints_are_satisfied(orbital_period=means['orbital period'],
+                                      primary_mass=means['primary mass'],
+                                      secondary_mass=means['secondary mass'],
+                                      metallicity=means['metallicity'],
+                                      eccentricity_now=means['present eccentricity'],
+                                      stellar_age=means['stellar age'],
+                                      constraints=constraints)):
+            self.means = means
+
+            self.means['obliquity'] = 0
+
+            self.mean_e_env = self.envelope_eccentricity_function(orbital_period=self.means['orbital period'])
+            eccentricity_distribution_object = EccentricityDistribution(self.means['present eccentricity'],
+                                                                        self.standard_deviations['eccentricity_now_upper_uncertainty'],
+                                                                        self.standard_deviations['eccentricity_now_lower_uncertainty'],
                                                                         self.mean_e_env)
             self.probability_density_of_eccentricity = eccentricity_distribution_object.probability_density_of_eccentricity
+
+            if find_argument_of_phase_lag_function_for_planet_range_auto:
+                min_Qpl, max_Qpl = self.determine_a_suitable_range_of_argument_of_phase_lag_function_for_planet()
+                self.max_argument_of_phase_lag_function_for_planet = min_Qpl
+                self.min_argument_of_phase_lag_function_for_planet = max_Qpl
 
     def pick_a_tuple_from_the_multi_variable_Gaussian_distribution(self, mean, standard_deviation):
         n_cross_n_dimensional_array_of_standard_deviations = np.diag(
@@ -735,70 +674,80 @@ class SamplingPropertiesOfSystem:
                                                            n_cross_n_dimensional_array_of_standard_deviations).tolist()
         return temp
 
-    def priors(self, theta):
-        def prior_orbital_period(orbital_period):
-            if (
-                    orbital_period <= self.highest_acceptable_value_of_orbital_period and orbital_period > self.lowest_acceptable_value_of_orbital_period):
-                return 1
-            return 0
+    def priors(self,
+               theta,
+               constraints=constraints()):
+
+        smallest = constraints[0]
+        largest = constraints[1]
 
         def prior_primary_mass(primary_mass):
-            if (
-                    primary_mass > self.lowest_acceptable_value_of_primary_mass and primary_mass < self.highest_acceptable_value_of_primary_mass):
+            if (primary_mass > smallest['primary mass'] and primary_mass < largest['primary mass']):
                 return 1
             return 0
-
+        def prior_secondary_mass(secondary_mass):
+            if (secondary_mass > smallest['secondary mass'] and secondary_mass < largest['secondary mass']):
+                return 1
+            return 0
         def prior_metallicity(metallicity):
-            if metallicity > self.lowest_acceptable_value_of_metallicity and metallicity < self.highest_acceptable_value_of_metallicity:
+            if metallicity > smallest['metallicity'] and metallicity < largest['metallicity']:
+                return 1
+            return 0
+        def prior_stellar_age(stellar_age):
+            if stellar_age > smallest['stellar age'] and stellar_age < largest['stellar age']:
                 return 1
             return 0
 
-        priors = prior_orbital_period(theta[4]) * prior_primary_mass(theta[0]) * prior_metallicity(theta[3])
+        priors = (prior_primary_mass(theta[0])
+                  * prior_secondary_mass(theta[1])
+                  * prior_metallicity(theta[3])
+                  * prior_stellar_age(theta[4]))
         return priors
 
-    def draw_a_successful_walker_from_Gaussian_distribution(self, mean, standard_deviation):
+
+    def walker_satisfies_constraints(self, walker, smallest, largest):
+        for i in range(0, len(walker)):
+            if not(walker[i]>smallest[i] and walker[i]<largest[i]):
+                return False
+        return True
+
+    def draw_a_successful_walker_from_Gaussian_distribution(self,
+                                                            mean,
+                                                            standard_deviation,
+                                                            smallest,
+                                                            largest):
         success = False
         walker = None
         while not success:
             walker = self.pick_a_tuple_from_the_multi_variable_Gaussian_distribution(mean, standard_deviation)
-            # (walker[4] <= self.highest_acceptable_value_of_orbital_period and walker[4]>self.lowest_acceptable_value_of_orbital_period)
-            # and
-            if ((walker[0] > self.lowest_acceptable_value_of_primary_mass and walker[
-                0] < self.highest_acceptable_value_of_primary_mass)
-                    and (walker[3] > self.lowest_acceptable_value_of_metallicity and walker[
-                        3] < self.highest_acceptable_value_of_metallicity)):
+            if self.walker_satisfies_constraints(walker, smallest, largest):
                 success = True
         return walker
 
-    def log_prob(self, theta, initial_eccentricity=0.45):
-        # theta = (primary_mass, secondary_mass, secondary_radius, feh, orbital_period, obliquity, age, vsini)
+    def log_prob(self, theta):
+        # theta = (primary_mass, secondary_mass, secondary_radius, metallicity, stellar_age, initial_stellar_spin, argument_of_phase_lag_function_for_planet)
+        initial_eccentricity = self.initial_eccentricity
+        priors = self.priors(theta)
+        if priors == 0:
+            return -math.inf
 
         primary_mass = theta[0]
         secondary_mass = theta[1]
         secondary_radius = theta[2]
         metallicity = theta[3]
-        orbital_period = theta[4]
-        obliquity = theta[5]
-        age = theta[6]
-        eccentricity_now = theta[7]
-        vsini = theta[8]
-        argument_of_phase_lag_function = theta[9]
-        self.initial_eccentricity = initial_eccentricity
+        stellar_age = theta[4]
+        initial_stellar_spin = theta[5]
+        argument_of_phase_lag_function_for_planet = theta[6]
+        orbital_period = self.means['orbital period']
+        obliquity = self.means['obliquity']
 
-        priors = self.priors(theta)
-        if priors == 0:
-            return -math.inf
-
-        a = System(primary_mass * u.solMass,
-                   secondary_mass * u.earthMass,
-                   secondary_radius * u.earthRad,
-                   metallicity * u.dimensionless_unscaled,
-                   orbital_period * u.d,
-                   obliquity * u.deg,
-                   age * u.Gyr,
-                   eccentricity_now * u.dimensionless_unscaled,
-                   vsini * u.kilometer / u.second
-                   )
+        star_exoplanet_binary_system = System(primary_mass=primary_mass * u.solMass,
+                                              secondary_mass=secondary_mass * u.earthMass,
+                                              secondary_radius=secondary_radius * u.earthRad,
+                                              feh=metallicity * u.dimensionless_unscaled,
+                                              orbital_period=orbital_period * u.d,
+                                              obliquity=obliquity * u.deg,
+                                              age=stellar_age * u.Gyr)
 
         dissipation = dict(
             primary=None,
@@ -807,45 +756,45 @@ class SamplingPropertiesOfSystem:
                 spin_frequency_breaks=None,
                 tidal_frequency_powers=np.array([0.0]),
                 spin_frequency_powers=np.array([0.0]),
-                reference_phase_lag=phase_lag(argument_of_phase_lag_function)
+                reference_phase_lag=phase_lag(argument_of_phase_lag_function_for_planet)
             )
         )
 
-        b = find_evolution(system=a,
-                           interpolator=self.interpolator,
-                           dissipation=dissipation,
-                           max_age=age * u.Gyr,
-                           initial_eccentricity=initial_eccentricity,
-                           initial_obliquity=0.0,
-                           disk_period=None,
-                           disk_dissipation_age=2e-3 * u.Gyr,
-                           primary_wind_strength=0.17,
-                           primary_wind_saturation=2.78,
-                           primary_core_envelope_coupling_timescale=0.05,
-                           secondary_wind_strength=0.0,
-                           secondary_wind_saturation=100.0,
-                           secondary_core_envelope_coupling_timescale=0.05,
-                           orbital_period_tolerance=1e-6,
-                           solve=True,
-                           secondary_is_star=False)
+        evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
+                                              interpolator=self.interpolator,
+                                              dissipation=dissipation,
+                                              max_age=stellar_age * u.Gyr,
+                                              initial_eccentricity=initial_eccentricity * u.dimensionless_unscaled,
+                                              initial_obliquity=0.0,
+                                              disk_period=initial_stellar_spin * u.d,
+                                              disk_dissipation_age=2e-3 * u.Gyr,
+                                              primary_wind_strength=0.17,
+                                              primary_wind_saturation=2.78,
+                                              primary_core_envelope_coupling_timescale=0.05,
+                                              secondary_wind_strength=0.0,
+                                              secondary_wind_saturation=100.0,
+                                              secondary_core_envelope_coupling_timescale=0.05,
+                                              orbital_period_tolerance=1e-6,
+                                              solve=True,
+                                              secondary_is_star=False)
 
-        calculated_eccentricity_now = b.eccentricity[- 1]
+
+        calculated_eccentricity_now = evolutionary_history.eccentricity[- 1]
         self.calculated_eccentricity_now = calculated_eccentricity_now
         print('Calculated eccentricity_now = ',
               calculated_eccentricity_now,
-              ' actual present eccentricity = ',
-              eccentricity_now,
-              ' at calculated age = ', b.age[- 1],
-              ', where actual age of the star = ', age)
+              ' present eccentricity recorded in the archive = ',
+              self.means['present eccentricity'],
+              ' at calculated age = ', evolutionary_history.age[- 1],
+              ', where age of the star recorded in the archive = ', stellar_age)
 
         #       print(repr(dir(b)))
         if calculated_eccentricity_now >= 0 and calculated_eccentricity_now <= 1:
-            probability_density_of_eccentricity_now = self.probability_density_of_eccentricity(
+            probability_density_of_the_calculated_eccentricity = self.probability_density_of_eccentricity(
                 calculated_eccentricity_now)
-            probability_density = probability_density_of_eccentricity_now * priors
+            probability_density = probability_density_of_the_calculated_eccentricity * priors
             if probability_density == 0:
                 return -math.inf
-
             if probability_density < 0:
                 print('Probability density cannot be less than zero.')
                 return None
@@ -853,31 +802,71 @@ class SamplingPropertiesOfSystem:
         print('Calculated present eccentricity cannot be less that zero or greater than one')
         return None
 
-    def MCMC(self, nwalker=32, ndim=9):
-        # mean = self.theta0
-        mean = self.theta0[0:4] + self.theta0[5:9]
+    def MCMC(self,
+             nwalker=32,
+             ndim=7):
 
-        standard_deviation = [(self.primary_mass_upper_uncertainty - self.primary_mass_lower_uncertainty) / 2,
-                              (self.secondary_mass_upper_uncertainty - self.secondary_mass_lower_uncertainty) / 2,
-                              (self.secondary_radius_upper_uncertainty - self.secondary_radius_lower_uncertainty) / 2,
-                              (self.metallicity_upper_uncertainty - self.metallicity_lower_uncertainty) / 2,
-                              # (self.orbital_period_upper_uncertainty - self.orbital_period_lower_uncertainty) / 2,
-                              (self.obliquity_upper_uncertainty - self.obliquity_lower_uncertainty) / 2,
-                              (self.stellar_age_upper_uncertainty - self.stellar_age_lower_uncertainty) / 2,
-                              (self.eccentricity_now_upper_uncertainty - self.eccentricity_now_lower_uncertainty) / 2,
-                              (self.vsini_upper_uncertainty - self.vsini_lower_uncertainty) / 2]
-        # (self.upper_uncertainty_associated_with_argument_of_phase_lag_function - self.lower_uncertainty_associated_with_argument_of_phase_lag_function) / 2]
+        initial_stellar_spin = (self.min_initial_stellar_spin
+                                + self.max_initial_stellar_spin)/2
+        argument_of_phase_lag_function_for_planet = (self.min_argument_of_phase_lag_function_for_planet
+                                                     + self.max_argument_of_phase_lag_function_for_planet)/2
 
-        Qpl = np.random.uniform(low=(self.argument_of_phase_lag_function + self.lower_uncertainty_associated_with_argument_of_phase_lag_function),
-                                high=(self.argument_of_phase_lag_function + self.upper_uncertainty_associated_with_argument_of_phase_lag_function),
-                                size=1)
-        Qpl = Qpl.tolist()
-        p0 = [self.theta0]
+        theta0 = [self.means['primary mass'],
+                  self.means['secondary mass'],
+                  self.means['secondary radius'],
+                  self.means['metallicity'],
+                  self.means['stellar age'],
+                  initial_stellar_spin,
+                  argument_of_phase_lag_function_for_planet]
+        p0 = [theta0]
+
+        mean = [self.means['primary mass'],
+                self.means['secondary mass'],
+                self.means['secondary radius'],
+                self.means['metallicity'],
+                self.means['stellar age']]
+        standard_deviation = [(self.standard_deviations['primary_mass_upper_uncertainty']
+                               - self.standard_deviations['primary_mass_lower_uncertainty'])/2,
+                              (self.standard_deviations['secondary_mass_upper_uncertainty']
+                               - self.standard_deviations['secondary_mass_lower_uncertainty'])/2,
+                              (self.standard_deviations['secondary_radius_upper_uncertainty']
+                               - self.standard_deviations['secondary_radius_lower_uncertainty'])/2,
+                              (self.standard_deviations['metallicity_upper_uncertainty']
+                               - self.standard_deviations['metallicity_lower_uncertainty'])/2,
+                              (self.standard_deviations['stellar_age_upper_uncertainty']
+                               - self.standard_deviations['stellar_age_lower_uncertainty'])/2]
+
+
+
         print('p0 initial = ', p0)
+
+        smallest, largest = constraints()
+
+        smallest_acceptable_values = [smallest['primary mass'],
+                                      smallest['secondary mass'],
+                                      0,
+                                      smallest['metallicity'],
+                                      smallest['stellar age']] #secondary radius does not have constraints
+        largest_acceptable_values = [largest['primary mass'],
+                                     largest['secondary mass'],
+                                     math.inf,
+                                     largest['metallicity'],
+                                     largest['stellar age']]  #secondary radius does not have constraints
+
         for i in range(1, nwalker):
-            temp = self.draw_a_successful_walker_from_Gaussian_distribution(mean, standard_deviation)
-            p_next = temp[0:4] + [self.theta0[4]] + temp[4:8] + Qpl
+            temp = self.draw_a_successful_walker_from_Gaussian_distribution(mean,
+                                                                            standard_deviation,
+                                                                            smallest_acceptable_values,
+                                                                            largest_acceptable_values)
+            argument_of_phase_lag_function_for_planet = np.random.uniform(low=self.min_argument_of_phase_lag_function_for_planet,
+                                    high=self.max_argument_of_phase_lag_function_for_planet,
+                                    size=1)
+            initial_stellar_spin = np.random.uniform(low=self.min_initial_stellar_spin,
+                                    high=self.max_initial_stellar_spin,
+                                    size=1)
+            p_next = temp +  argument_of_phase_lag_function_for_planet.tolist() + initial_stellar_spin.tolist()
             p0.append(p_next)
+
         print('Full p0 = ', p0)
 
         sampler = emcee.EnsembleSampler(nwalker, ndim, self.log_prob)
@@ -895,22 +884,66 @@ class SamplingPropertiesOfSystem:
 
         return
 
+    def determine_a_suitable_range_of_argument_of_phase_lag_function_for_planet(self):
+
+        initial_stellar_spin = 10
+        argument_of_phase_lag_function_for_planet = 5.0
+
+        theta0 = [self.means['primary mass'],
+                  self.means['secondary mass'],
+                  self.means['secondary radius'],
+                  self.means['metallicity'],
+                  self.means['stellar age'],
+                  initial_stellar_spin,
+                  argument_of_phase_lag_function_for_planet]
+
+        min_value_found = False
+        max_value_found = False
+        i=0
+        while not min_value_found:
+            theta0[6] = 5 + i * 0.25
+            prob = self.log_prob(theta0)
+            if prob <0.01:
+                min_value_found = True
+            i = i+1
+        min_argument_of_phase_lag_function_for_planet = 5 + (i-1)*0.25
+        while not max_value_found:
+            theta0[6] = 5 + i * 0.25
+            prob = self.log_prob(theta0)
+            if prob == - math.inf:
+                max_value_found = True
+            i = i+1
+        max_argument_of_phase_lag_function_for_planet = 5 + (i - 1) * 0.25
+
+        return min_argument_of_phase_lag_function_for_planet, max_argument_of_phase_lag_function_for_planet
+
     def testing_log_prob(self):
+
+        initial_stellar_spin = 10
+        argument_of_phase_lag_function_for_planet = 5.0
+
+        theta0 = [self.means['primary mass'],
+                  self.means['secondary mass'],
+                  self.means['secondary radius'],
+                  self.means['metallicity'],
+                  self.means['stellar age'],
+                  initial_stellar_spin,
+                  argument_of_phase_lag_function_for_planet]
+
         prob = []
         Qpl = []
         eccentricity = []
         k = -1
         for i in range(0, 20):
-            self.theta0[9] = 4 + i * 0.25
+            theta0[6] = 5 + i * 0.25
             k = k + 1
-            Qpl = Qpl + [4 + i * 0.25]
-            prob = prob + [self.log_prob(self.theta0)]
+            Qpl = Qpl + [5 + i * 0.25]
+            prob = prob + [self.log_prob(theta0)]
             eccentricity = eccentricity + [self.calculated_eccentricity_now]
             print('Qpl = ', Qpl[k], ' log prob = ', prob[k])
 
-        plt.plot(Qpl, prob, label=(
-        "Prob vs. Qpl when initial eccentricity = ", self.initial_eccentricity, ' for oribtal period = ',
-        self.orbital_period))
+        plt.plot(Qpl, prob, label=("Prob vs. Qpl when initial eccentricity = ", self.initial_eccentricity,
+                                   ' for orbital period = ', self.means['orbital period']))
         # naming the x axis
         plt.xlabel('Qpl')
         # naming the y axis
@@ -924,8 +957,8 @@ class SamplingPropertiesOfSystem:
 
         plt.plot(Qpl, eccentricity, label=("Calculated eccentricity vs. Qpl when initial eccentricity = ",
                                            self.initial_eccentricity,
-                                           ' for oribtal period = ', self.orbital_period,
-                                           ' present eccentricity = ', self.eccentricity_now,
+                                           ' for orbital period = ', self.means['orbital period'],
+                                           ' present eccentricity = ', self.means['present eccentricity'],
                                            ' envelope eccentricity = ', self.mean_e_env))
         # naming the x axis
         plt.xlabel('Qpl')
@@ -964,7 +997,8 @@ if __name__ == '__main__':
                                        planet_name=planet_name,
                                        envelope_eccentricity_function=test2.envelope_eccentricity_function
                                        )
-    test3.testing_log_prob()
+    #test3.testing_log_prob()
+    test3.MCMC()
 
 
 
