@@ -1,7 +1,9 @@
 SYSTEM=$1
 
+SLURM_DIR=~/projects/git/CircularizationDissipationConstraints/source/slurm
+
 sed\
     -e 's%@@SYSTEM@@%'"$SYSTEM"'%g'\
-    slurm/ganymede/template.slurm\
+    ${SLURM_DIR}/ganymede/template.slurm\
     >\
-    ~/projects/git/CircularizationDissipationConstraints/source/slurm/ganymede/${SYSTEM}.slurm
+    ${SLURM_DIR}/ganymede/${SYSTEM}.slurm
