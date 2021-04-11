@@ -3,16 +3,32 @@
 """Create plots of emcee sampling results."""
 
 from matplotlib import pyplot
-from configargparse import ArgumentParser, DefaultsFormatter
+from configargparse import\
+    ArgumentParser,\
+    DefaultsFormatter,\
+    Action as ArgparseAction
 import numpy
 import emcee
 import h5py
 import pandas
+from scipy import stats
 
 from visuals import make_corner_plot
 
 def parse_command_line():
     """Parse the command line for what and how to plot."""
+
+    class ParseGrid(ArgparseAction):
+        """Action for parsing linspace arguments."""
+
+        def __call__(self, parser, namespace, values, option_string=None):
+            """Parse a grid option to a numpy.arary()."""
+
+            setattr(namespace,
+                    self.dest,
+                    numpy.linspace(float(values[0]),
+                                   float(values[1]),
+                                   int(values[2])))
 
     parser = ArgumentParser(
         description=__doc__,
@@ -33,14 +49,21 @@ def parse_command_line():
     parser.add_argument(
         '--corner-plot-fname', '--corner-plot', '--corner',
         default=None,
-        help='If supplied, a coner plot is created and saved with the given '
+        help='If specified, a coner plot is created and saved with the given '
         'filename.'
     )
     parser.add_argument(
         '--trace-plot-fname', '--traces-plot', '--traces',
         default=None,
-        help='If supplied, a trace plot is generated and saved with the given '
+        help='If specified, a trace plot is generated and saved with the given '
         'filaname.'
+    )
+    parser.add_argument(
+        '--constraint-plot-fname', '--constraint-plot', '--constraint',
+        default=None,
+        help='If specified, a plot of the confidence interval of lgQ vs tidal '
+        'frequency is generated and saved with the given filename. Inertial '
+        'mode enhancement is ignored.'
     )
     parser.add_argument(
         '--burn-in',
@@ -54,6 +77,27 @@ def parse_command_line():
         default=5,
         help='The maximum number of traces to include in a trace plot (more '
         'walkers will results in more panels in the plot).'
+    )
+    parser.add_argument(
+        '--constraint-plot-confidence',
+        type=float,
+        nargs='+',
+        default=[stats.norm.cdf(1.0) - stats.norm.cdf(-1.0)],
+        help='Specify the confidence to display in the dissipation vs tidal '
+        'frequency plot (see --constraint-plot-fname argument).'
+    )
+    parser.add_argument(
+        '--constraint-plot-ptide-grid',
+        nargs=3,
+        default=numpy.linspace(1.0, 20.0, 100),
+        metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES'),
+        help='Set the range and resolution of the tidal period to include in '
+        'the constraint plot (see --constraint-plot-fname argument).'
+    )
+    parser.add_argument(
+        '--constraint-plot-no-lines',
+        action='store_true',
+        help='If passed, the constraint plot will not include individual lines.'
     )
     return parser.parse_args()
 
@@ -120,6 +164,62 @@ def save_trace_plot(samples, log_probability, config):
 
     pyplot.savefig(config.trace_plot_fname)
 
+def save_dissipation_constraint_plot(samples, config):
+    """Create a plot showing the constraint of lgQ vs tidal frequency."""
+
+    evaluated_lgq = numpy.maximum(
+        1.0,
+        (
+            config.constraint_plot_ptide_grid[:, None]
+            /
+            samples['lgQ_break_period'].flatten()[None, :]
+        )**samples['lgQ_powerlaw'].flatten()[None, :]
+    ) * samples['lgQ_min'].flatten()[None, :]
+
+    if not config.constraint_plot_no_lines:
+        pyplot.plot(
+            config.constraint_plot_ptide_grid,
+            evaluated_lgq[:,::1],
+            '-k',
+            linewidth=20,
+            alpha=0.01
+        )
+
+    evaluated_lgq.sort(1)
+
+    for confidence in config.constraint_plot_confidence:
+        num_exclude = int(
+            numpy.floor(
+                (1.0 - confidence) * evaluated_lgq.shape[1]
+            )
+        )
+        print('Excluding %d points' % num_exclude)
+        min_lgq = evaluated_lgq[:, :num_exclude + 1]
+        max_lgq = evaluated_lgq[:, -num_exclude-1:]
+        selected_indices = numpy.argmin(max_lgq - min_lgq, axis=1)
+        min_lgq = numpy.take_along_axis(min_lgq,
+                                        selected_indices[:, None],
+                                        axis=1)
+        max_lgq = numpy.take_along_axis(max_lgq,
+                                        selected_indices[:, None],
+                                        axis=1)
+
+        pyplot.plot(
+            config.constraint_plot_ptide_grid,
+            min_lgq,
+            '-b'
+        )
+        pyplot.plot(
+            config.constraint_plot_ptide_grid,
+            max_lgq,
+            '-r'
+        )
+
+    pyplot.xlabel(r'Orbital Period [days]')
+    pyplot.ylabel(r"$\log_{10}Q_\star'$")
+    pyplot.ylim(5.0, 12.0)
+    pyplot.show()
+
 def main(config):
     """"Avoid polluting global namespace."""
 
@@ -130,6 +230,8 @@ def main(config):
         save_corner_plot(samples, log_probability, config)
     if config.trace_plot_fname:
         save_trace_plot(samples, log_probability, config)
+    if config.constraint_plot_fname:
+        save_dissipation_constraint_plot(samples, config)
 
 if __name__ == '__main__':
     main(parse_command_line())
