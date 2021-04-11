@@ -16,8 +16,6 @@ class EvolutionParameters:
             array to :meth:`__call__`.
     """
 
-    _logger = logging.getLogger(__name__)
-
     def log_parameters(self, message, parameters, level):
         """
         Issue log message along with a description of this step's parameters.
@@ -37,14 +35,16 @@ class EvolutionParameters:
             None
         """
 
-        self._logger.log(
+        logging.getLogger(__name__).log(
             level,
-            message + '\n\t%s: %s' * parameters.size(),
+            message + '\n\t%s: %s %s' * parameters.size,
             *(
                 sub
-                for param_name in self.parameter_names_units
-                for sub in (param_name, self.get_parameter_value(parameters,
-                                                                 param_name))
+                for (param_name, param_units), value in zip(
+                    self.parameter_order,
+                    parameters
+                )
+                for sub in (param_name, repr(value), param_units)
             )
         )
 
@@ -69,15 +69,18 @@ class EvolutionParameters:
                 ('disk_dissipation_age', units.Gyr),
                 ('primary_disk_lock_period', units.day),
                 ('primary_wind_strength', units.dimensionless_unscaled),
-                ('prinmary_wind_saturation', units.dimensionless_unscaled),
-                ('primary_core_envelope_coupling_timescale', units.Gyr)
+                ('primary_wind_saturation', units.dimensionless_unscaled),
+                ('primary_core_envelope_coupling_timescale', units.Gyr),
+                ('initial_eccentricity', units.dimensionless_unscaled)
             ],
             system=[
                 ('age', units.Gyr),
                 ('feh', units.dimensionless_unscaled),
                 ('orbital_period', units.day),
                 ('primary_mass', units.M_sun),
-                ('secondary_mass', units.M_sun)
+                ('secondary_mass', units.M_sun),
+                ('cmd_primary_radius', units.R_sun),
+                ('cmd_secondary_radius', units.R_sun)
             ]
         )
 

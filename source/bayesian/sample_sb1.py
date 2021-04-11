@@ -8,6 +8,7 @@ from multiprocessing import set_start_method
 
 from astropy import units
 from scipy import stats
+import dynesty
 
 from stellar_evolution.manager import StellarEvolutionManager
 from orbital_evolution.evolve_interface import library as\
@@ -16,11 +17,18 @@ from orbital_evolution.evolve_interface import library as\
 #Fixed module search paths, not intended to provide anything.
 #pylint: disable=unused-import
 import update_search_paths
+#pylint: disable=wrong-import-order
 #pylint: enable=unused-import
+#False positive
+#pylint: disable=import-error
 import ngc188_util
+#pylint: enable=import-error
+from bayesian.sampling import setup_process
 from bayesian.prior_transform_cluster_sb1 import PriorTransformClusterSB1
 from bayesian.log_likelihood_sb1 import LogLikelihoodSB1
-from parse_command_line import parse_command_line
+from bayesian.parse_command_line import parse_command_line
+from bayesian import mcmc_sampling
+#pylint: enable=wrong-import-order
 
 def get_independent_priors(config, observed_orbit):
     """Return the independent parameters for the prior transform."""
@@ -50,10 +58,11 @@ def get_independent_priors(config, observed_orbit):
 
         result = [
             (
-                'lgQ_min',
-                get_uniform_distribution('lgQ_min'),
+                param_name,
+                get_uniform_distribution(param_name),
                 units.dimensionless_unscaled
             )
+            for param_name in ['lgQ_min', 'lgQ_inertial_boost']
         ]
         if (
                 config.lgQ_break_period is not None
@@ -62,16 +71,16 @@ def get_independent_priors(config, observed_orbit):
         ):
             result.extend([
                 (
-                    param,
-                    get_uniform_distribution(param),
+                    'lgQ_break_period',
+                    get_uniform_distribution('lgQ_break_period'),
+                    units.day
+                ),
+                (
+                    'lgQ_powerlaw',
+                    get_uniform_distribution('lgQ_powerlaw'),
                     units.dimensionless_unscaled
                 )
-                for param in ['lgQ_break_period', 'lgQ_powerlaw']
             ])
-
-        if config.lgQ_inertial_boost:
-            raise RuntimeError('Inertial mode range dissipation boost is not '
-                               'yet implemented')
 
         return result
 
@@ -101,21 +110,6 @@ def get_independent_priors(config, observed_orbit):
                 units.Myr
             ),
             (
-                'orbical_period',
-                7.0,
-                units.day
-            ),
-            (
-                'rv_semi_amplitude',
-                stats.norm(16.46, 0.16),
-                units.km / units.s
-            ),
-            (
-                'cos_inclination',
-                stats.uniform(-1.0, 2.0),
-                units.dimensionless_unscaled
-            ),
-            (
                 'orbital_period',
                 stats.norm(float(observed_orbit['Per']),
                            float(observed_orbit['e_Per'])),
@@ -129,6 +123,11 @@ def get_independent_priors(config, observed_orbit):
             (
                 'feh',
                 ngc188_util.cluster_feh_distribution,
+                units.dimensionless_unscaled
+            ),
+            (
+                'initial_eccentricity',
+                get_uniform_distribution('initial_eccentricity'),
                 units.dimensionless_unscaled
             )
         ]
@@ -154,15 +153,26 @@ def prepare_sampling(config):
         photometric_constraint = ngc188_util.get_photometric_constraint(
             binary_pkm_id
         )
-        rvk_constraint = ngc188_util.get_rvk_constraint(binary_orbit)
+        rvk_constraint = ngc188_util.get_rvk_constraint(
+            observed_orbit=binary_orbit,
+            num_parallel_processes=config.num_parallel_processes,
+            interpolation_accuracy=config.rvk_interpolation_accuracy,
+            show_mismatch_plot=config.rvk_show_interpolation
+        )
         log_likelihood = LogLikelihoodSB1(
+            powerlaw_dissipation=(
+                config.lgQ_break_period is not None
+                and
+                config.lgQ_powerlaw is not None
+            ),
             rv_semiamplitude_constraint=rvk_constraint,
             interpolator=interpolator,
-            eccentricity_pdf=ngc188_util.get_final_eccentricity_pdf(
-                binary_orbit,
-                num_parallel_processes=config.num_parallel_processes
+            eccentricity_likelihood=(
+                ngc188_util.get_final_eccentricity_likelihood(binary_orbit)
             ),
-            initial_eccentricity=0.5
+            evolution_timeout=config.evolution_timeout,
+            period_search_factor=config.initial_period_search_factor,
+            scaled_period_guess=config.initial_period_scaled_guess
         )
 
         prior_transform = PriorTransformClusterSB1(
@@ -180,13 +190,37 @@ def prepare_sampling(config):
 def main(config):
     """Avoid polluting global namespace."""
 
-    assert config.lgQ_inertial_boost_range is None
+    setup_process(config)
+
+#    set_start_method('forkserver')
+
     log_likelihood, prior_transform = prepare_sampling(config)
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
-    set_start_method('forkserver')
+    num_params = prior_transform.count_sampled_parameters()
 
+    logging.info(
+        'Starting %s sampling of binary %s with %d free parameters.',
+        config.sampling,
+        config.system,
+        num_params
+    )
+
+    if config.sampling.lower() == 'nested':
+        sampler = dynesty.NestedSampler(
+            log_likelihood,
+            prior_transform,
+            ndim=len(log_likelihood.parameter_order),
+            npdim=num_params,
+            nlive=1
+        )
+        sampler.run_nested()
+    else:
+        mcmc_sampling.run(config,
+                          log_likelihood,
+                          prior_transform,
+                          num_params)
+
+if __name__ == '__main__':
     try:
         main(
             parse_command_line(

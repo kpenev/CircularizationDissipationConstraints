@@ -9,8 +9,15 @@ from bayesian.prior_transform_base import PriorTransformBase
 class PriorTransformClusterSB1(PriorTransformBase):
     """Prior transfromations for SB1 binary star and exoplanet systems."""
 
-    def _fill_coupled_parameters(self, unit_cube_iter, model_parameters):
-        """Fills [Fe/H], current system age, and primary mass."""
+    def _fill_coupled_parameters(self,
+                                 unit_cube_iter,
+                                 model_parameters):
+        """Fills primary and secondary mass."""
+
+        if model_parameters is None:
+            next(unit_cube_iter)
+            next(unit_cube_iter)
+            return
 
         primary_mass = self._photometric_mass_constraint.primary_mass_ppf(
             next(unit_cube_iter)
@@ -19,7 +26,7 @@ class PriorTransformClusterSB1(PriorTransformBase):
 
         self._rv_semiamplitude_constraint.prepare_secondary_sampling(
             primary_mass=model_parameters['primary_mass'],
-            eccentricity=model_parameters['eccentricity'],
+            eccentricity=model_parameters['initial_eccentricity'],
             orbital_period=model_parameters['orbital_period'],
             secondary_mass_prior=(
                 self._photometric_mass_constraint
@@ -32,7 +39,13 @@ class PriorTransformClusterSB1(PriorTransformBase):
             self._rv_semiamplitude_constraint
         ).secondary_mass_ppf(
             next(unit_cube_iter)
-        ) * units.M_sun
+        )
+        for component in ['primary', 'secondary']:
+            model_parameters[
+                'cmd_%s_radius' % component
+            ] = self._photometric_mass_constraint.get_component_radius(
+                model_parameters[component + '_mass'].to_value(units.M_sun)
+            )[0] * units.R_sun
 
     def __init__(self,
                  photometric_mass_constraint,

@@ -12,12 +12,7 @@ from command_line_utilities import data_dir
 
 def fit_milliman(single_lined_data,
                  double_lined_data,
-                 interpolator=CMDPhotometryInterpolator(
-                     os.path.join(
-                         data_dir,
-                         'CMD_2.5Gyr_isochrone_Av0.45_FeH0.09_UBVRIJHK.dat'
-                     )
-                 ),
+                 interpolator=None,
                  distance_modulus=11.85):
     """
     Fit for the masses of the NGC6819 binaries using Milliman's photometry.
@@ -30,7 +25,8 @@ def fit_milliman(single_lined_data,
             lined binaries. Should include both RV info and photemtry.
 
         interpolator:     See ``photometry_interp`` argument to
-            :func:`fit_binary_masses`.
+            :func:`fit_binary_masses`. Defaults to 2.5 Gyr interpolator of
+            UBVRIJHK magnitudes.
 
         distance_modulus:     See same name argument to
             :func:`fit_binary_masses`.
@@ -46,6 +42,15 @@ def fit_milliman(single_lined_data,
             containing the maximum likelihood primary and secondary mass for
             each binary.
     """
+
+    if interpolator is None:
+        interpolator = CMDPhotometryInterpolator(
+            os.path.join(
+                data_dir,
+                'CMD_2.5Gyr_isochrone_Av0.45_FeH0.09_UBVRIJHK.dat'
+            ),
+            distance_modulus
+        )
 
     for is_double_lined, binary_data in [(False, single_lined_data),
                                          (True, double_lined_data)]:

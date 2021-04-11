@@ -25,8 +25,7 @@ from bayesian.photometric_constraint import\
     plot_m1_cdf,\
     plot_m2_cdf
 from bayesian.rv_semiamplitude_constraint import RVSemiAmplitudeConstraint
-from bayesian.eccentricity_pdf import EccentricityPDF
-
+from bayesian.eccentricity_likelihood import EccentricityLikelihood
 
 _logger = logging.getLogger(__name__)
 
@@ -155,7 +154,7 @@ def get_binary_data(
                 read_cds_pipe_table(single_lined_orbits_fname)
             ),
             on='PKM',
-            how='outer'
+            how='right'
         ),
         pandas.merge(
             physical_parameters,
@@ -163,7 +162,7 @@ def get_binary_data(
                 read_cds_pipe_table(double_lined_orbits_fname)
             ),
             on='PKM',
-            how='outer'
+            how='right'
         )
     )
 
@@ -208,7 +207,8 @@ def get_observed_orbit(binary_pkm_id):
             binary_pkm_id
         )
     selected = single_lined_data[selected]
-    print('Selected binary data:\n' + repr(selected.T))
+    _logger.info('Selected binary data:\n%s',
+                 repr(selected.T))
     return selected
 
 def get_photometric_constraint(binary_pkm_id):
@@ -247,41 +247,71 @@ def get_photometric_constraint(binary_pkm_id):
         min_magnitude_difference=dict(V=2.5)
     )
 
-def get_rvk_constraint(observed_orbit):
+def get_rvk_constraint(observed_orbit,
+                       num_parallel_processes,
+                       interpolation_accuracy,
+                       show_mismatch_plot):
     """Return fully set-up RV semi-amplitude constraint for an NGC188 binary."""
 
+    signal_to_noise = float(observed_orbit['K']) / float(observed_orbit['e_K'])
     return RVSemiAmplitudeConstraint(
-        observed_rvk=stats.rice(
-            b=float(observed_orbit['K']) / float(observed_orbit['e_K']),
-            scale=float(observed_orbit['e_K']) * 1000.0
+        observed_rvk=(
+            stats.norm(
+                loc=numpy.sqrt(
+                    float(observed_orbit['K'])**2
+                    +
+                    float(observed_orbit['e_K'])**2
+                ) * 1000.0,
+                scale=float(observed_orbit['e_K']) * 1000.0
+            )
+            if signal_to_noise > 50 else
+            stats.rice(
+                b=signal_to_noise,
+                scale=float(observed_orbit['e_K']) * 1000.0
+            )
         ),
         max_discarded_probabiity=1e-6,
-        interpolation_accuracy=(0, 1e-4),
-        num_parallel_processes=4,
+        interpolation_accuracy=interpolation_accuracy,
+        num_parallel_processes=num_parallel_processes,
         pickle_fname='rvk_constraints.pkl',
         epsabs=0,
         epsrel=1e-8,
         limit=200,
-        maxp1=200
+        maxp1=200,
+        show_mismatch_plot=show_mismatch_plot
     )
 
-def get_final_eccentricity_pdf(observed_orbit, num_parallel_processes):
-    """Return :class:`EccentricityPDF` instance set-up per an NGC188 binary."""
+def alternative_eccentricity_envelope(orbital_period):
+    """Return the envelope at the given orbital period."""
+
+    gamma = 0.8
+    beta = 0.25
+    circularization_period = 13.8
+
+    return numpy.maximum(
+        0.05,
+        0.6 * (
+            1.0
+            -
+            numpy.exp(beta * (circularization_period - orbital_period))
+        )
+    )**gamma
+
+def get_final_eccentricity_likelihood(observed_orbit):
+    """Return :class:`EccentricityLikelihood` instance per the given orbit."""
 
     eccentricity_envelope = LinearEccentricityEnvelope(min_period=3.0,
                                                        max_period=20.0,
                                                        max_eccentricity=0.6)
 
-    return EccentricityPDF(
+    return EccentricityLikelihood(
         observed_eccentricity=stats.rice(
             b=float(observed_orbit['e']) / float(observed_orbit['e_e']),
             scale=float(observed_orbit['e_e'])
         ),
         envelope_eccentricity=eccentricity_envelope(
             float(observed_orbit['Per'])
-        ),
-        pickle_fname='ngc188_sampling.pkl',
-        num_parallel_processes=num_parallel_processes
+        )
     )
 
 def _test_photometric_constraint(binary_pkm_id):
@@ -302,11 +332,18 @@ def _test_photometric_constraint(binary_pkm_id):
     plot_m1_cdf(constraint)
     plot_m2_cdf(constraint)
 
+#TODO: split up
+#pylint: disable=too-many-locals
 def _test_rvk_constraint(binary_pkm_id):
     """Display plots showing the RV based constraint."""
 
     observed_orbit = get_observed_orbit(binary_pkm_id)
-    rvk_constraint = get_rvk_constraint(observed_orbit)
+    rvk_constraint = get_rvk_constraint(
+        observed_orbit=observed_orbit,
+        num_parallel_processes=4,
+        interpolation_accuracy=(1e-8, 1e-4),
+        show_mismatch_plot=True
+    )
     photometric_constraint = get_photometric_constraint(binary_pkm_id)
 
     single_lined_binaries, _ = get_binary_data()
@@ -335,7 +372,6 @@ def _test_rvk_constraint(binary_pkm_id):
             primary_mass.to_value(units.M_sun)
         )
     )
-    print('Primary mass: ' + repr(primary_mass))
 
     for eccentricity in numpy.linspace(0.5, 0, 6):
 
@@ -396,7 +432,8 @@ def _test_rvk_constraint(binary_pkm_id):
                       plot_fk_ratio.size,
                       (time() - start_time) / 60.0)
 
-        print('e=' + repr(eccentricity))
+        _logger.info('Finished calculations for e = %s',
+                     repr(eccentricity))
 
         plots['left'].plot(plot_m2,
                            plot_pdf,
@@ -408,8 +445,74 @@ def _test_rvk_constraint(binary_pkm_id):
                             plot_cdf)
     plots['middle'].set_ylim((0.1, 10.0))
     pyplot.show()
+#pylint: enable=too-many-locals
+
+def plot_eccentricity_vs_period():
+    """Show a period-eccentricity plot for NGC188."""
+
+    def add_shifted_periods(binary_class):
+        """Calculate the shifted orbital period for determining envelope."""
+
+        m1_mult = 3.97405
+        m2_mult = 2.5685
+        m1_pwrlaw = 1.72462
+        m2_pwrlaw = 1.55429
+
+        binary_class.insert(
+            len(binary_class.columns),
+            'ShiftedPer',
+            (
+                binary_class['Per']
+                +
+                m1_mult * (1.0 - binary_class['M1']**m1_pwrlaw)
+                +
+                m2_mult * (1.0 - binary_class['M2']**m2_pwrlaw)
+            )
+        )
+
+    binaries = get_binary_data()
+    binaries = [
+        binary_class[
+            numpy.logical_and(
+                binary_class['Prv'] > 50,
+                binary_class['Ppm'] > 50
+            )
+        ]
+        for binary_class in binaries
+    ]
+
+    for binary_class in binaries:
+        add_shifted_periods(binary_class)
+
+    print('Single lined binaries:\n' + repr(binaries[0]))
+    print('Double lined binaries:\n' + repr(binaries[1]))
+
+    pyplot.gca().set_xscale('log')
+
+    for label, binary_class in zip(['SB1', 'SB2'], binaries):
+        color = pyplot.errorbar(binary_class['ShiftedPer'],
+                                binary_class['e'],
+                                binary_class['e_e'],
+                                fmt='o',
+                                label=label)[0].get_color()
+        pyplot.errorbar(binary_class['Per'],
+                        binary_class['e'],
+                        binary_class['e_e'],
+                        fmt='o',
+                        markeredgecolor=color,
+                        markerfacecolor='none')
+    envelope_x = 2.0**numpy.linspace(1, 6, 1000)
+    pyplot.plot(envelope_x, alternative_eccentricity_envelope(envelope_x), '-k')
+    pyplot.axhline(0.5)
+    pyplot.ylim(0, 1.0)
+    pyplot.xlim(2, 64)
+    pyplot.xlabel('Orbital Period [d]')
+    pyplot.ylabel('Eccentricity')
+    pyplot.legend()
+    pyplot.show()
 
 if __name__ == '__main__':
     set_start_method('forkserver')
-    logging.basicConfig(level=logging.DEBUG)
-    _test_rvk_constraint(3732)
+#    logging.basicConfig(level=logging.DEBUG)
+    plot_eccentricity_vs_period()
+    #_test_rvk_constraint(3732)

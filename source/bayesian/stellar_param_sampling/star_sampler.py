@@ -20,7 +20,8 @@ from scipy.optimize import brentq
 from scipy.special import erf
 #pylint: enable=no-name-in-module
 
-from feh_conditional_likelihood_base import FeHConditionalLikelihoodBase
+from bayesian.stellar_param_sampling.feh_conditional_likelihood_base import\
+    FeHConditionalLikelihoodBase
 
 #Could not find reasonable way to reduce attributes.
 #pylint: disable=too-many-instance-attributes
@@ -809,7 +810,10 @@ class StarSampler:
             open(self.config.star_sampler_pickle_fname, 'wb').close()
             return False
         try:
-            with open(self.config.star_sampler_pickle_fname, 'rb') as pickle_file:
+            with open(
+                    self.config.star_sampler_pickle_fname,
+                    'rb'
+            ) as pickle_file:
                 unpickler = Unpickler(pickle_file)
                 while True:
                     section, nobjects = unpickler.load()

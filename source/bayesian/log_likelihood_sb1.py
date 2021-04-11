@@ -1,5 +1,7 @@
 """Define a base log-likelihood class that assumes constant phase lag."""
 
+import logging
+
 import numpy
 from astropy import units
 
@@ -23,7 +25,7 @@ class LogLikelihoodSB1(LogLikelihoodBase):
                 self.get_parameter_value(parameters, 'lgQ_min')
             )
         )
-        if 'lgQ_break_period' in parameters:
+        if 'lgQ_break_period' in self.parameter_indices:
             star_dissipation['tidal_frequency_breaks'] = numpy.array([
                 2.0 * numpy.pi
                 /
@@ -58,48 +60,71 @@ class LogLikelihoodSB1(LogLikelihoodBase):
             ):
                 dissipation[component] = None
             else:
-                dissipation[component] = dict(dissipation)
+                dissipation[component] = dict(star_dissipation)
         #pylint: enable=invalid-name
+
+        logging.getLogger(__name__).debug('Dissipation: %s', repr(dissipation))
 
         return dissipation
 
     def __init__(self,
                  *parent_args,
                  rv_semiamplitude_constraint,
+                 powerlaw_dissipation,
                  max_dissipative_mstar=1.2 * units.M_sun,
                  **parent_kwargs):
 
         self.max_dissipative_mstar = max_dissipative_mstar
         self._rv_semiamplitude_constraint = rv_semiamplitude_constraint
 
+        dissipation_parameters = [
+            ('lgQ_min', units.dimensionless_unscaled),
+            ('lgQ_inertial_boost', units.dimensionless_unscaled),
+        ]
+        if powerlaw_dissipation:
+            dissipation_parameters.extend([
+                ('lgQ_break_period', units.day),
+                ('lgQ_powerlaw', units.dimensionless_unscaled)
+            ])
         super().__init__(*parent_args,
-                         dissipation_parameters=[
-                             ('lgQ_min', units.dimensionless_unscaled),
-                             ('lgQ_break_period', units.day),
-                             ('lgQ_powerlaw', units.dimensionless_unscaled)
-                         ],
+                         dissipation_parameters=dissipation_parameters,
                          secondary_is_star=True,
                          **parent_kwargs)
 
-    def __call__(self, parameters):
+    def calculate_log_likelihood(self, parameters):
         """Evaluate the log-likelihood at the given model parameters."""
 
-        circularization_likelihood = super().__call__(parameters)
+        circularization_log_likelihood = super().calculate_log_likelihood(
+            parameters
+        )
         mass_kwargs = dict(
             primary_mass=self.get_parameter_value(parameters,
                                                   'primary_mass'),
             secondary_mass=self.get_parameter_value(parameters,
                                                     'secondary_mass'),
         )
-        return circularization_likelihood * (
-            self._rv_semiamplitude_constraint.rv_semi_amplitude_pdf(
-                eccentricity=self.final_eccentricity,
-                **mass_kwargs
+        return (
+            circularization_log_likelihood
+            +
+            numpy.log(
+                self._rv_semiamplitude_constraint.rv_semi_amplitude_pdf(
+                    self._rv_semiamplitude_constraint.rv_semi_amplitude(
+                        eccentricity=self.final_eccentricity,
+                        **mass_kwargs
+                    )
+                )
             )
-            /
-            self._rv_semiamplitude_constraint.rv_semi_amplitude_pdf(
-                eccentricity=self.initial_eccentricity,
-                **mass_kwargs
+            -
+            numpy.log(
+                self._rv_semiamplitude_constraint.rv_semi_amplitude_pdf(
+                    self._rv_semiamplitude_constraint.rv_semi_amplitude(
+                        eccentricity=self.get_parameter_value(
+                            parameters,
+                            'initial_eccentricity'
+                        ),
+                        **mass_kwargs
+                    )
+                )
             )
         )
 

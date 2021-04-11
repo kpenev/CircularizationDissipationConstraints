@@ -9,11 +9,11 @@ from configargparse import ArgumentParser, DefaultsFormatter
 from split_normal_distribution import split_normal
 from planetary_system_io import read_cds_pipe_table
 
-from command_line_utilities import data_dir
 #False positive (hanhdled in __init__.py).
 #pylint: disable=import-error
 import praesepe_binaries
 import hyades_binaries
+from command_line_utilities import data_dir
 #pylint: enable=import-error
 
 
@@ -50,7 +50,7 @@ def add_dissipation_args(parser):
         '--lgQ-min',
         nargs=2,
         type=float,
-        default=5.0,
+        default=(4.0, 12.0),
         help='The range to use for the uniform prior in the log10(`Qmin`) '
         'parameter.'
     )
@@ -77,7 +77,7 @@ def add_dissipation_args(parser):
         '--lgQ-inertial-boost',
         nargs=2,
         type=float,
-        default=None,
+        default=(1.0, 1.0),
         help='The range to assume for log10(`boost`) dissipation argument '
         '(boost of dissipation in inertial mode range). If not specified, '
         'dissipation is not enhanced in the inertial mode range (i.e. `boost` '
@@ -143,7 +143,8 @@ def add_stellar_spindown_args(parser, num_stars):
             nargs=2,
             default=(5.0, 5.0),
             help='The prior distribution to assume for the period (in days) to '
-            'which the surface spin of stars is locked until the disk dissipates.'
+            'which the surface spin of stars is locked until the disk '
+            'dissipates.'
         )
         spin.add_argument(
             '--%s-wind-strength' % component,
@@ -158,8 +159,8 @@ def add_stellar_spindown_args(parser, num_stars):
             type=float,
             nargs=2,
             default=(2.45, 2.45),
-            help='The frequency, in rad/day, above which the scaling of angular '
-            'momentum loss with spin changes from cubic to linear.'
+            help='The frequency, in rad/day, above which the scaling of angular'
+            ' momentum loss with spin changes from cubic to linear.'
         )
         spin.add_argument(
             '--%s-core-envelope-coupling-timescale' % component,
@@ -267,6 +268,175 @@ def add_binary_selection_args(parser):
         help='Select the system to analyze.'
     )
 
+def add_sampling_parameters(parser):
+    """Add parameters configuring how to perform the sampling."""
+
+    sampling = parser.add_argument_group(
+        title='Sampling parameters.',
+        description='Configuration for how to perform the sampling.'
+    )
+    sampling.add_argument(
+        '--initial-eccentricity',
+        type=float,
+        nargs=2,
+        default=(0.5, 0.5),
+        help='The range to use for the uniform prior on initial eccentricity.'
+    )
+    parser.add_argument(
+        '--sampling',
+        choices=['mcmc', 'nested'],
+        default='mcmc',
+        help='Which sampling method to use. MCMC sampling useng the `emcee` '
+        'package and nested sampling used `dynesty`.'
+    )
+    sampling.add_argument(
+        '--mcmc-nwalkers',
+        type=int,
+        default=12,
+        help='The number of walkers in the MCMC ensemble. Ignored if nested '
+        'sampling is used.'
+    )
+    sampling.add_argument(
+        '--mcmc-nsteps',
+        type=int,
+        default=1000,
+        help='The number of MCMC steps to generate. Ignored if nested sampling '
+        'is used.'
+    )
+    sampling.add_argument(
+        '--mcmc-min-initial-log-probability',
+        type=float,
+        default=-numpy.inf,
+        help='The number of MCMC steps to generate. Ignored if nested sampling '
+        'is used.'
+    )
+    sampling.add_argument(
+        '--mcmc-starting-positions-only',
+        action='store_true',
+        help='If passed, the script only runs until it has found acceptable '
+        'starting positions for all walkers.'
+    )
+    sampling.add_argument(
+        '--num-parallel-processes',
+        type=int,
+        default=4,
+        help='How many multiprocessing processes to use when parallel '
+        'processing is available.'
+    )
+    sampling.add_argument(
+        '--evolution-timeout',
+        type=float,
+        default=3600.0,
+        help='The maximum amount of time a single evolution is allowed to run. '
+        'If exceeded, the associated parameters are rejected.'
+    )
+    sampling.add_argument(
+        '--track-final-eccentricity',
+        action='store_true',
+        help='If passed, the calculated final eccentricity is stored along with'
+        ' the input parameters.'
+    )
+    sampling.add_argument(
+        '--rvk-interpolation-accuracy',
+        type=float,
+        nargs=2,
+        default=(1e-8, 1e-4),
+        help='The maximum error allowed in the interpolation of the radial '
+        'velocity PDF as a fraction of the largest PDF value, and as the PDF '
+        'at the inteprolated position. Comparison is to direct numerical '
+        'integration.'
+    )
+    sampling.add_argument(
+        '--rvk-show-interpolation',
+        action='store_true',
+        help='Enable dispylaying plots of the interpolation of the radial '
+        'velocity semi-amplitude PDF as it is being refined.'
+    )
+    sampling.add_argument(
+        '--initial-period-search-factor', '--period-search-factor',
+        type=float,
+        default=1.2,
+        help='The factor by which to change the initial period guess while '
+        'searching for a range surrounding the known present day orbital period'
+    )
+    sampling.add_argument(
+        '--initial-period-scaled-guess', '--period-scaled-guess',
+        type=float,
+        default=2.0,
+        help='The search for initial period to bracked the observed final '
+        'period will start from this value multiplied by the final orbital '
+        'period.'
+    )
+    sampling.add_argument(
+        '--mcmc-recover-initial-conditions',
+        action='store_true',
+        help='If passed, log files matching the currently defined pattern are '
+        'parsed for initial mcmc walker positions that resulted in acceptable '
+        'log probability, to allow continuing previously interrupted run.'
+    )
+
+def add_output_parameters(parser):
+    """Add parameters controlling how and what output to generate."""
+
+    output = parser.add_argument_group(
+        title='Output parameters.',
+        description='Configuration controlling how and what output to generate.'
+    )
+    output.add_argument(
+        '--samples-fname',
+        default='%(system)s_%(sampling)s_samples',
+        help='The filename where to save generated MCMC samples. An extension '
+        'is added automatically depending on the sampling method. If the file '
+        'exists, sampling continues from the state saved in it. The filename '
+        'can contain the following %% substitutions: %%(system)s - replaced by '
+        'the name of the system, %%(sampling) - replaced by the sampling '
+        'method.'
+    )
+    output.add_argument(
+        '--fname-datetime-format',
+        default='%Y%m%d%H%M%S',
+        help='How to format date and time as part of filenames (e.g. when '
+        'creating output files for multiprocessing.'
+    )
+    output.add_argument(
+        '--std-out-err-fname',
+        default='sampling_output/%(system)s_%(now)s_%(pid)d.outerr',
+        help='Filename to redirect worker process stdout and stderr to during '
+        'multiprocessing. Should include at least `%%(pid)d` (worker process '
+        'id) substitution to avoid mangling, but may also include `%%(system)s`'
+        ' (system name) and `%%(now)s` (approximate date and time the process '
+        'started).'
+    )
+    output.add_argument(
+        '--logging-fname',
+        default='sampling_output/%(system)s_%(now)s_%(pid)d.log',
+        help='Filename for log mesasges from sampling. Should include at least '
+        '`%%(pid)d` (worker process id) substitution to avoid mangling during '
+        'multiprocessing, but may also include `%%(system)s`'
+        ' (system name) and `%%(now)s` (approximate date and time the process '
+        'started).'
+    )
+    output.add_argument(
+        '--logging-verbosity', '--verbosity',
+        choices=['debug', 'info', 'warning', 'error', 'critical'],
+        default='info',
+        help='The lowest importance level of logging messages to issue.'
+    )
+    output.add_argument(
+        '--logging-datetime-format',
+        default=None,
+        help='How to format date and time as part of filenames (e.g. when '
+        'creating output files for multiprocessing.'
+    )
+
+    output.add_argument(
+        '--logging-message-format', '--logging-format', '--log-fmt',
+        default=('%(levelname)s %(asctime)s %(name)s: %(message)s | '
+                 '%(pathname)s.%(funcName)s:%(lineno)d'),
+        help='How to format logging messages. See python logging module '
+        'documentation for details.'
+    )
+
 def parse_command_line(description,
                        config_fname,
                        *,
@@ -308,6 +478,8 @@ def parse_command_line(description,
     parser = ArgumentParser(
         description=description,
         default_config_files=[config_fname],
+        args_for_writing_out_config_file=['--generate-config-file'],
+        args_for_setting_config_path=['--config-file', '-c'],
         formatter_class=DefaultsFormatter,
         ignore_unknown_config_file_keys=True
     )
@@ -327,14 +499,9 @@ def parse_command_line(description,
         ),
         help='The file to read eccentricity expansion coefficients from.'
     )
-    parser.add_argument(
-        '--num-parallel-processes',
-        type=int,
-        default=4,
-        help='How many multiprocessing processes to use when parallel '
-        'processing is available.'
-    )
 
+    add_sampling_parameters(parser)
+    add_output_parameters(parser)
     if dissipation:
         add_dissipation_args(parser)
     if cluster:

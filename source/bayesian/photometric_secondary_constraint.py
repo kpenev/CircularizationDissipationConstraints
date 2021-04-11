@@ -47,13 +47,16 @@ class PhotometricSecondaryConstraint(rv_continuous):
     def __init__(self, joint_constraint, primary_mass):
         """Set-up the conditinoal secondary mass distrib. given a joint one."""
 
+        primary_mass = float(primary_mass)
         super().__init__(self, a=joint_constraint.mass_range[0], b=primary_mass)
 
         self._joint_constraint = joint_constraint
         self._primary_mass = primary_mass
         minimization = optimize.minimize_scalar(
-            lambda secondary_mass: -joint_constraint.logpdf(primary_mass,
-                                                            secondary_mass),
+            lambda secondary_mass: -joint_constraint.logpdf(
+                primary_mass,
+                float(secondary_mass)
+            ),
             bounds=self.support(),
             method='bounded'
         )

@@ -17,7 +17,6 @@ import numpy
 
 from binary_utils import calculate_secondary_mass
 
-#TODO: allow stopping once CDF error falls below some value (small grid step)
 class RVSemiAmplitudeConstraint:
     """Secondary mass constraint from observed RV semi-amplitude."""
 
@@ -170,7 +169,10 @@ class RVSemiAmplitudeConstraint:
                                             k=1)
 
 
-    def _get_mismatch_indices(self, semi_amplitude_grid, pdf_values):
+    def _get_mismatch_indices(self,
+                              semi_amplitude_grid,
+                              pdf_values,
+                              show_mismatch_plot):
         """
         Return odd indices where interpolation based on even grid pts fails.
 
@@ -180,6 +182,9 @@ class RVSemiAmplitudeConstraint:
 
             pdf_values(1-D array):    The values of the PDF at the
                 semi-amplitude grid points.
+
+            show_mismatch_plot(boool):    Should a plot be displayed showing the
+                poorly interpolated indices?
 
         Returns:
             1-D int array:
@@ -207,7 +212,7 @@ class RVSemiAmplitudeConstraint:
         max_differences = numpy.maximum(
             10.0 * pdf_values[1::2, 1],
             (
-                self._interpolation_accuracy[0]
+                self._interpolation_accuracy[0] * pdf_values[:, 0].max()
                 +
                 self._interpolation_accuracy[1] * pdf_values[1::2, 0]
             )
@@ -222,11 +227,12 @@ class RVSemiAmplitudeConstraint:
                 (
                     'Excessive differences at:'
                     +
-                    '\n\tK=%s, %s vs %s (diff=%s +- %s)' * result.size
+                    '\n\tK=%g, %g vs %g (diff=%g +- %g)' * result.size
                 ),
-                sum(
+                *sum(
                     zip(semi_amplitude_grid[result],
                         bad_interpolated_pdf,
+                        pdf_values[result, 0],
                         bad_interpolated_pdf - pdf_values[result, 0],
                         pdf_values[result, 1]),
                     ()
@@ -235,21 +241,23 @@ class RVSemiAmplitudeConstraint:
             #pylint: enable=logging-not-lazy
 
 
-        if result.size > 0 and False:
+        if result.size > 0 and show_mismatch_plot:
             plot_slice = slice(max(result.min() - 1, 0), result.max() + 1)
             pyplot.errorbar(semi_amplitude_grid[plot_slice],
                             pdf_values[plot_slice, 0],
                             pdf_values[plot_slice, 1],
                             fmt='xk')
-            interp_x = numpy.linspace(semi_amplitude_grid[result.min()],
-                                      semi_amplitude_grid[result.max()],
-                                      1000)
+            interp_x = numpy.empty(2 * semi_amplitude_grid[plot_slice].size - 1)
+            interp_x[::2] = semi_amplitude_grid[plot_slice]
+            interp_x[1::2] = 0.5 * (semi_amplitude_grid[plot_slice][1:]
+                                    +
+                                    semi_amplitude_grid[plot_slice][:-1])
             pyplot.plot(interp_x, interpolation(interp_x), '-r')
             pyplot.show()
 
         return result
 
-    def _tune_interpolation(self, num_parallel_processes):
+    def _tune_interpolation(self, num_parallel_processes, show_mismatch_plot):
         """Find an interpolation that satisfies the specified precision."""
 
         semi_amplitude_grid = numpy.concatenate(
@@ -271,7 +279,8 @@ class RVSemiAmplitudeConstraint:
 
         while True:
             mismatch_indices = self._get_mismatch_indices(semi_amplitude_grid,
-                                                          pdf_values)
+                                                          pdf_values,
+                                                          show_mismatch_plot)
             self._logger.debug(
                 '%d indices exceed maximum allowed interpolation error.',
                 mismatch_indices.size
@@ -397,6 +406,7 @@ class RVSemiAmplitudeConstraint:
                  interpolation_accuracy,
                  num_parallel_processes,
                  pickle_fname,
+                 show_mismatch_plot=False,
                  **integration_options):
         """
         Set-up the integrand given observed RV semi-amplitude distribution.
@@ -410,8 +420,9 @@ class RVSemiAmplitudeConstraint:
                 semi-amplitude distribution with weight less than this are
                 truncated to define the range for interpolation.
 
-            interplation_accuracy(float, float):    The maximum absolute and
-                relative errors allowed in the PDF interpolation compared to
+            interplation_accuracy(float, float):    The maximum error allowed
+                in the PDF interpolation as a fraction of the largest PDF value,
+                and as the PDF at the inteprolated position. Comparison is to
                 directly integrated values.
 
             integration_options(dict):    Passed directly to
@@ -432,7 +443,7 @@ class RVSemiAmplitudeConstraint:
                     workers.map(self.rv_semi_amplitude_pdf,
                                 plot_rvk * (u.m / u.s))
                 )
-            approx_arg = plot_rvk / (2.0**0.5 * observed_rvk.args[1])
+            approx_arg = plot_rvk / (2.0**0.5 * observed_rvk.kwds['scale'])
             pyplot.plot(plot_rvk, plot_pdf, '-r')
             pyplot.show()
         #pylint: enable=unused-variable
@@ -459,23 +470,27 @@ class RVSemiAmplitudeConstraint:
                 )
             )
         )
-        self._logger.debug('Upper bound for RVKPDF result: %s',
+        self._logger.debug('Upper bound for RVK PDF result: %s',
                            repr(upper_bound_solution))
         assert upper_bound_solution.converged
         self._support = (
             observed_rvk.ppf(max_discarded_probabiity),
             upper_bound_solution.root
         )
-        print('Support: '+ repr(self._support))
+        self._logger.debug('RVK PDF Support: %s',
+                           repr(self._support))
 
         self._rv_semiamplitude_pdf_interp = self._check_for_pickled(
             pickle_fname
         )
         if self._rv_semiamplitude_pdf_interp is None:
             self._rv_semiamplitude_pdf_interp = self._tune_interpolation(
-                num_parallel_processes
+                num_parallel_processes,
+                show_mismatch_plot
             )
             self._add_to_pickle_file(pickle_fname)
+        if show_mismatch_plot:
+            plot_pdf()
 
     def rv_semi_amplitude(self,
                           secondary_mass,
@@ -737,9 +752,8 @@ def main():
         maxp1=200
     )
 
-    print(
-        'K = '
-        +
+    logging.debug(
+        'K = %s',
         repr(
             #False positive
             #pylint: disable=no-member
@@ -781,7 +795,8 @@ def main():
         if reference_pdf is None:
             reference_pdf = plot_pdf
 
-        print('e=' + repr(eccentricity))
+        logging.info('Finished calculations for e = %s',
+                     repr(eccentricity))
 
         left_plot.plot(plot_m2,
                        plot_pdf,
@@ -790,8 +805,7 @@ def main():
                              plot_pdf / reference_pdf,
                              label='e = ' + str(eccentricity))
         right_plot.plot(plot_m2,
-                        plot_cdf,
-                        )
+                        plot_cdf)
     middle_plot.set_ylim((0.1, 10.0))
     pyplot.show()
 

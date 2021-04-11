@@ -6,6 +6,7 @@ import logging
 from types import SimpleNamespace
 
 import numpy
+from astropy import units
 
 from reproduce_system import find_evolution
 from bayesian.evolution_parameters import EvolutionParameters
@@ -23,48 +24,73 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         interpolator:    Stellar evolution interpolator to use in orbital
             evolution calculations.
 
-        eccentricity_pdf(callable):    The probability density for the final
-            eccentricity.
-
-        initial_eccentricity(float):    The "high" initial eccentricity the
-            evolution will always start with.
+        eccentricity_likelihood(callable):    The likelihood functionof the
+            final eccentricity.
 
     """
-
-    _logger = logging.getLogger(__name__)
 
     @abstractmethod
     def _get_dissipation(self, parameters):
         """Return the dissipation argument for `find_evolution`."""
 
-    def _parse_parameters(self, parameters):
+    def _parse_parameters(self, parameters, logger):
         """Return all keyword arguments to pass to `find_evolution`."""
 
         system = SimpleNamespace(
             **{
                 param_name: self.get_parameter_value(parameters, param_name)
-                for param_name in self.parameter_names_units['system']
+                for param_name, _ in self.parameter_names_units['system']
             }
         )
 
         kwargs = {
-            param_name: self.get_parameter_value(parameters, param_name)
-            for param_name in self.parameter_names_units['evolution']
+            (
+                'disk_period' if param_name == 'primary_disk_lock_period'
+                else (
+                    'secondary_disk_period'
+                    if param_name == 'secondary_disk_lock_period' else
+                    param_name
+                )
+            ): self.get_parameter_value(parameters, param_name)
+            for param_name, _ in self.parameter_names_units['evolution']
         }
         kwargs['dissipation'] = self._get_dissipation(parameters)
-        kwargs['interpolator'] = self.interpolator
-        kwargs['initial_eccentricity'] = self.initial_eccentricity
         kwargs['max_age'] = system.age
+        kwargs['timeout'] = self._evolution_timeout
         kwargs['system'] = system
-        kwargs['secondary_is_star'] = self.secondary_is_star
+        kwargs.update(self._find_evolution_kwargs)
+        if (
+                kwargs['secondary_is_star']
+                and
+                (
+                    system.secondary_mass.to_value(units.M_sun)
+                    <
+                    kwargs['interpolator'].mass_range()[0]
+                )
+        ):
+            system.secondary_radius = self.get_parameter_value(
+                parameters,
+                'cmd_secondary_radius'
+            )
+            logger.warning(
+                'Secondary mass %s M_sun is below the stellar evolution '
+                'interpolator mass range. Ignoring evolution and spindown, '
+                'fixing radius to %s R_sun',
+                repr(system.secondary_mass.to_value(units.M_sun)),
+                repr(system.secondary_radius.to_value(units.R_sun))
+            )
+            kwargs['secondary_is_star'] = False
 
         return kwargs
 
     def __init__(self,
                  interpolator,
-                 eccentricity_pdf,
+                 eccentricity_likelihood,
                  secondary_is_star,
-                 initial_eccentricity,
+                 *,
+                 evolution_timeout,
+                 period_search_factor,
+                 scaled_period_guess,
                  **kwargs):
         """
         Set-up the log-likelihood calculator.
@@ -73,12 +99,19 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             interpolator:    A POET stelar evolution interpolator to use for
                 calculating the orbital evolution.
 
-            eccentricity_pdf:    See :attr:`eccentricity_pdf`.
+            eccentricity_likelihood:    See :attr:`eccentricity_likelihood`.
 
             secondary_is_star(bool):    True iff the secondary in the system is
                 an evolving star.
 
-            initial_eccentricity:    See :attr:`initial_eccentricity`.
+            evolution_timeout(float):    Maximum time to allow for a single
+                orbital evolution
+
+            period_search_factor(float):    See same name argument to
+                :meth:`InitialConditionSolver.__init__`.
+
+            scaled_period_guess(float):    See same name argument to
+                :meth:`InitialConditionSolver.__init__`.
 
             kwargs:    Arguments in addition to `secondary_is_star` required by
                 the parent's :meth:`__init__()`.
@@ -87,18 +120,24 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             None
         """
 
-        self.interpolator = interpolator
-        self.eccentricity_pdf = eccentricity_pdf
-        self.initial_eccentricity = initial_eccentricity
+        self.eccentricity_likelihood = eccentricity_likelihood
+        self._evolution_timeout = evolution_timeout
         self.final_eccentricity = None
 
-        self.secondary_is_star = secondary_is_star
+        self._find_evolution_kwargs = dict(
+            interpolator = interpolator,
+            secondary_is_star=secondary_is_star,
+            period_search_factor=period_search_factor,
+            scaled_period_guess=scaled_period_guess
+        )
         super().__init__(secondary_is_star=secondary_is_star,
                          **kwargs)
+        self._stashed_results = dict()
+        self._stash = False
 
-    def __call__(self, parameters):
+    def calculate_log_likelihood(self, parameters):
         """
-        Evaluate the log-likelihood at the given model parameters.
+        Calculate the log-likelihood for the given model parameters
 
         Args:
             parameters:    The parameters to evaluate the log-likelihood at. The
@@ -112,54 +151,106 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 specified value. This includes the circularization envelope.
         """
 
-        self._logger.update_context(hex(hash(parameters.tostring()))[2:])
+        logger = logging.getLogger(__name__)
 
-        try:
-            self.log_parameters('Evaluating log-likelihood for parameters:',
-                                parameters,
-                                logging.INFO)
+        self.log_parameters('Evaluating log-likelihood for parameters:',
+                            parameters,
+                            logging.INFO)
 
+        evolve_parameters = self._parse_parameters(parameters, logger)
+        failed = True
+        while failed and evolve_parameters['initial_eccentricity'] > 0.4:
             try:
                 #False positive: dissipation is included find_evolution_kwargs
                 #pylint: disable=no-value-for-parameter
                 evolution = find_evolution(
-                    **self._parse_parameters(parameters)
+                    **evolve_parameters
                 )
                 #pylint: enable=no-value-for-parameter
             except AssertionError:
-                self._logger.excption('Calculating evolution failed.')
-                return -numpy.inf
+                evolve_parameters['initial_eccentricity'] -= 2e-2
+                logger.warning('Calculating evolution failed, trying e0 = %g.',
+                               evolve_parameters['initial_eccentricity'])
+            else:
+                failed = False
 
-            expected_final_age = self.get_parameter_value(
-                parameters,
-                'age'
-            ).to_value('Gyr')
+        if failed:
+            logger.error('Calculating evolution failed!')
+            return -numpy.inf
 
-            #False positive
-            #pylint: disable=no-member
-            if numpy.allclose(evolution.age[-1],
-                              expected_final_age,
-                              rtol=1e-10,
-                              atol=1e-10):
+        expected_final_age = self.get_parameter_value(
+            parameters,
+            'age'
+        ).to_value('Gyr')
 
-                self.final_eccentricity = evolution.eccentricity[-1]
-                #pylint: enable=no-member
+        #False positive
+        #pylint: disable=no-member
+        if numpy.allclose(evolution.age[-1],
+                          expected_final_age,
+                          rtol=1e-10,
+                          atol=1e-10):
 
-                self._logger.info(
-                    'Successful evolution found: ef = %g',
-                    self.final_eccentricity
-                )
+            self.final_eccentricity = evolution.eccentricity[-1]
+            #pylint: enable=no-member
 
-                return numpy.log(self.eccentricity_pdf(self.final_eccentricity))
-
-            self._logger.error(
-                'Evolution terminated prematurely at t=%g (< %g) with ef = %g',
-                evolution.age[-1],
-                expected_final_age,
+            logger.info(
+                'Successful evolution found: ef = %g',
                 self.final_eccentricity
             )
 
-            return -numpy.inf
-        finally:
-            self._logger.revert_context()
+            return numpy.log(
+                self.eccentricity_likelihood(self.final_eccentricity)
+            )
+
+        logger.error(
+            'Evolution terminated prematurely at t=%g (< %g) with ef = %g',
+            evolution.age[-1],
+            expected_final_age,
+            (
+                numpy.nan if self.final_eccentricity is None
+                else self.final_eccentricity
+            )
+        )
+
+        return -numpy.inf
+
+    def start_stashing(self):
+        """
+        Store :meth:`__call__()` results for re-use if invoked with same params.
+
+        Can be used to re-set stashing, as currently stashed results are
+        cleared.
+        """
+
+        self._stashed_results = dict()
+        self._stash = True
+
+    def stop_stashing(self):
+        """Stop stashing future :meth:`__call__`s but keep current stash."""
+
+        self._stash = False
+
+    def __call__(self, parameters):
+        """Same as :meth:`calculate_log_likelihood` but handles stashing."""
+
+        param_hash = hex(hash(parameters.tostring()))[2:]
+        if param_hash in self._stashed_results:
+            result = self._stashed_results[param_hash]
+            logging.getLogger(__name__).info(
+                'Reusing stashed log log_likelihood: %s',
+                repr(result)
+            )
+            return result
+
+        result = self.calculate_log_likelihood(parameters)
+        logging.getLogger(__name__).info(
+            'Calculated log_likelihood: %s',
+            repr(result)
+        )
+
+        if self._stash:
+            self._stashed_results[param_hash] = result
+
+        return result
+
 #pylint: enable=too-few-public-methods

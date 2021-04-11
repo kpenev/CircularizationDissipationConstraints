@@ -2,8 +2,10 @@
 
 import numpy
 
-from feh_conditional_likelihood_base import FeHConditionalLikelihoodBase
 from stellar_evolution.change_variables import QuantityEvaluator
+
+from bayesian.stellar_param_sampling.feh_conditional_likelihood_base import\
+    FeHConditionalLikelihoodBase
 
 class POETInterpLikelihood(FeHConditionalLikelihoodBase):
     """The likelihood of stellar measurements other than [Fe/H]."""
