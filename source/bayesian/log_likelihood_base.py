@@ -81,6 +81,17 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             )
             kwargs['secondary_is_star'] = False
 
+        if (
+                system.primary_mass.to_value(units.M_sun)
+                >
+                kwargs['interpolator'].mass_range()[1]
+                and
+                system.primary_mass.to_value(units.M_sun)
+                <
+                kwargs['interpolator'].mass_range()[1] * 1.05
+        ):
+            system.primary_mass = kwargs['interpolator'].mass_range()[1]
+
         return kwargs
 
     def __init__(self,
@@ -171,6 +182,9 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 evolve_parameters['initial_eccentricity'] -= 2e-2
                 logger.warning('Calculating evolution failed, trying e0 = %g.',
                                evolve_parameters['initial_eccentricity'])
+            except ValueError:
+                logger.error('Invalid parameter values encountered.')
+                return -numpy.inf
             else:
                 failed = False
 
