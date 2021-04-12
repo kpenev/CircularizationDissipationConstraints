@@ -90,7 +90,17 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 <
                 kwargs['interpolator'].mass_range()[1] * 1.05
         ):
-            system.primary_mass = kwargs['interpolator'].mass_range()[1]
+            logger.error(
+                'Primary mass is slightly above upper interpolator range. '
+                'Tweaking %s Msun -> %s Msun.',
+                repr(system.primary_mass.to_value(units.M_sun)),
+                repr(kwargs['interpolator'].mass_range()[1])
+            )
+            system.primary_mass = (
+                kwargs['interpolator'].mass_range()[1]
+                *
+                units.M_sun
+            )
 
         return kwargs
 
