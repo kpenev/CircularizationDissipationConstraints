@@ -167,14 +167,22 @@ def save_trace_plot(samples, log_probability, config):
 def save_dissipation_constraint_plot(samples, config):
     """Create a plot showing the constraint of lgQ vs tidal frequency."""
 
-    evaluated_lgq = numpy.maximum(
-        1.0,
-        (
-            config.constraint_plot_ptide_grid[:, None]
-            /
-            samples['lgQ_break_period'].flatten()[None, :]
-        )**samples['lgQ_powerlaw'].flatten()[None, :]
-    ) * samples['lgQ_min'].flatten()[None, :]
+    evaluated_lgq = (
+        samples['lgQ_min'].flatten()[None, :]
+        +
+        numpy.maximum(
+            0.0,
+            (
+                samples['lgQ_powerlaw'].flatten()[None, :]
+                *
+                numpy.log10(
+                    config.constraint_plot_ptide_grid[:, None]
+                    /
+                    samples['lgQ_break_period'].flatten()[None, :]
+                )
+            )
+        )
+    )
 
     if not config.constraint_plot_no_lines:
         pyplot.plot(
@@ -218,7 +226,7 @@ def save_dissipation_constraint_plot(samples, config):
     pyplot.xlabel(r'Orbital Period [days]')
     pyplot.ylabel(r"$\log_{10}Q_\star'$")
     pyplot.ylim(5.0, 12.0)
-    pyplot.show()
+    pyplot.savefig(config.constraint_plot_fname)
 
 def main(config):
     """"Avoid polluting global namespace."""
