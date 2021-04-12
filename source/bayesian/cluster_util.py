@@ -8,6 +8,7 @@ from scipy import stats
 import numpy
 from astropy import units
 
+from bayesian.eccentricity_likelihood import EccentricityLikelihood
 from bayesian.rv_semiamplitude_constraint import RVSemiAmplitudeConstraint
 
 _logger = logging.getLogger(__name__)
@@ -181,3 +182,72 @@ def get_final_eccentricity_likelihood(observed_orbit, eccentricity_envelope):
             float(observed_orbit['Per'])
         )
     )
+
+def plot_eccentricity_vs_period(binaries, eccentricity_envelope):
+    """
+    Show a period-eccentricity plot for a cluster.
+
+    Args:
+        binaries:    An iterable of two items: the single and double lined
+            binaries respectively.
+    """
+
+    def add_shifted_periods(binary_class):
+        """Calculate the shifted orbital period for determining envelope."""
+
+        m1_mult = 3.97405
+        m2_mult = 2.5685
+        m1_pwrlaw = 1.72462
+        m2_pwrlaw = 1.55429
+
+        binary_class.insert(
+            len(binary_class.columns),
+            'ShiftedPer',
+            (
+                binary_class['Per']
+                +
+                m1_mult * (1.0 - binary_class['M1']**m1_pwrlaw)
+                +
+                m2_mult * (1.0 - binary_class['M2']**m2_pwrlaw)
+            )
+        )
+
+    binaries = [
+        binary_class[
+            numpy.logical_and(
+                binary_class.get('Prv', binary_class.get('PRV')) > 50,
+                binary_class.get('Ppm', binary_class.get('PPM')) > 50
+            )
+        ]
+        for binary_class in binaries
+    ]
+
+    print('Single lined binaries:\n' + repr(binaries[0]))
+    print('Double lined binaries:\n' + repr(binaries[1]))
+
+    pyplot.gca().set_xscale('log')
+
+    for label, binary_class in zip(['SB1', 'SB2'], binaries):
+        color = pyplot.errorbar(binary_class['Per'],
+                                binary_class['e'],
+                                binary_class['e_e'],
+                                fmt='o',
+                                label=label)[0].get_color()
+
+        if 'M1' in binary_class:
+            add_shifted_periods(binary_class)
+            pyplot.errorbar(binary_class['ShiftedPer'],
+                            binary_class['e'],
+                            binary_class['e_e'],
+                            fmt='o',
+                            markeredgecolor=color,
+                            markerfacecolor='none')
+    envelope_x = 2.0**numpy.linspace(1, 6, 1000)
+    pyplot.plot(envelope_x, eccentricity_envelope(envelope_x), '-k')
+    pyplot.axhline(0.5)
+    pyplot.ylim(0, 1.0)
+    pyplot.xlim(2, 64)
+    pyplot.xlabel('Orbital Period [d]')
+    pyplot.ylabel('Eccentricity')
+    pyplot.legend()
+    pyplot.show()

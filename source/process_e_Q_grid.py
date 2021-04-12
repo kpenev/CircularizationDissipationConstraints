@@ -34,18 +34,25 @@ class LinearEccentricityEnvelope:
         """Evaluate the straight line portion of the eccentricity envelope."""
 
         return (
-            self.max_eccentricity
+            (self.max_eccentricity - self.min_eccenticity)
             *
             (numpy.log(orbital_period) - numpy.log(self.min_period))
             /
             (numpy.log(self.max_period) - numpy.log(self.min_period))
+            +
+            self.min_eccenticity
         )
 
-    def __init__(self, min_period=0.8, max_period=5.0, max_eccentricity=0.6):
+    def __init__(self,
+                 min_period=0.8,
+                 max_period=5.0,
+                 min_eccenticity=0.0,
+                 max_eccentricity=0.6):
         """Setup envelope going from 0 to max_e in the given period range."""
 
         self.min_period = min_period
         self.max_period = max_period
+        self.min_eccenticity = min_eccenticity
         self.max_eccentricity = max_eccentricity
 
     def __call__(self, orbital_period):
@@ -53,12 +60,14 @@ class LinearEccentricityEnvelope:
 
         try:
             if orbital_period < self.min_period:
-                return 0.0
+                return self.min_eccenticity
             if orbital_period < self.max_period:
                 return self._eccentricity_envelope_line(orbital_period)
             return self.max_eccentricity
         except ValueError:
-            result = numpy.zeros(orbital_period.shape, dtype=float)
+            result = numpy.full(orbital_period.shape,
+                                self.min_eccenticity,
+                                dtype=float)
             partial_circularization = numpy.logical_and(
                 orbital_period > self.min_period,
                 orbital_period < self.max_period

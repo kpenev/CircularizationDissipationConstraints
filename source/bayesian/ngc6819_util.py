@@ -11,15 +11,22 @@ from planetary_system_io import read_cds_pipe_table
 from command_line_utilities import data_dir
 from cmd_utils import CMDPhotometryInterpolator
 from process_e_Q_grid import LinearEccentricityEnvelope
-from bayesian.cluster_util import select_binary_data, plot_rvk_constraint
 from bayesian.photometric_constraint import PhotometricConstraint
-from bayesian.eccentricity_likelihood import EccentricityLikelihood
+from bayesian.cluster_util import\
+    select_binary_data,\
+    plot_rvk_constraint,\
+    plot_eccentricity_vs_period
 
 #https://ui.adsabs.harvard.edu/abs/2011ApJ...729L..10B/abstract
 cluster_age_distribution = stats.norm(2.4, 0.3)
 
 #https://ui.adsabs.harvard.edu/abs/2001AJ....121..327B/abstract
 cluster_feh_distribution = stats.norm(0.09, 0.03)
+
+eccentricity_envelope = LinearEccentricityEnvelope(min_period=8.0,
+                                                   max_period=14.0,
+                                                   min_eccenticity=0.05,
+                                                   max_eccentricity=0.6)
 
 _logger = logging.getLogger(__name__)
 
@@ -113,5 +120,6 @@ def get_photometric_constraint(binary_wocs_id):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    plot_rvk_constraint(get_observed_orbit(57004),
-                        get_photometric_constraint(57004))
+    plot_eccentricity_vs_period(get_binary_data(), eccentricity_envelope)
+#    plot_rvk_constraint(get_observed_orbit(57004),
+#                        get_photometric_constraint(57004))
