@@ -10,6 +10,9 @@
 # Vim lock files.
 .*.swp
 
+#Excell temp files
+~*.xlsx
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
