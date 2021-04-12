@@ -192,8 +192,9 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 evolve_parameters['initial_eccentricity'] -= 2e-2
                 logger.warning('Calculating evolution failed, trying e0 = %g.',
                                evolve_parameters['initial_eccentricity'])
-            except ValueError:
-                logger.error('Invalid parameter values encountered.')
+            except ValueError as error:
+                logger.error('Invalid parameter values encountered: %s',
+                             str(error))
                 return -numpy.inf
             else:
                 failed = False
