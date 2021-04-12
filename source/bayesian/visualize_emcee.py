@@ -18,6 +18,8 @@ from visuals import make_corner_plot
 def parse_command_line():
     """Parse the command line for what and how to plot."""
 
+    #Interface specified by argparse module.
+    #pylint: disable=too-few-public-methods
     class ParseGrid(ArgparseAction):
         """Action for parsing linspace arguments."""
 
@@ -29,6 +31,7 @@ def parse_command_line():
                     numpy.linspace(float(values[0]),
                                    float(values[1]),
                                    int(values[2])))
+    #pylint: enable=too-few-public-methods
 
     parser = ArgumentParser(
         description=__doc__,
@@ -37,8 +40,12 @@ def parse_command_line():
         ignore_unknown_config_file_keys=False
     )
     parser.add_argument(
-        'samples_fname',
-        help='The filename containing the stored emcee chain to plot.'
+        'samples_fnames',
+        nargs='+',
+        help='The filename(s) containing the stored emcee chain(s) to plot. For'
+        ' now only constraint plots support plotting multiple constraints on '
+        'top of each other. All other plots only plot the chain from the last '
+        'file.'
     )
     parser.add_argument(
         '--chain-name', '--chain',
@@ -90,6 +97,7 @@ def parse_command_line():
         '--constraint-plot-ptide-grid',
         nargs=3,
         default=numpy.linspace(1.0, 20.0, 100),
+        action=ParseGrid,
         metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES'),
         help='Set the range and resolution of the tidal period to include in '
         'the constraint plot (see --constraint-plot-fname argument).'
@@ -101,24 +109,27 @@ def parse_command_line():
     )
     return parser.parse_args()
 
-def get_backend(config):
+def get_backend(samples_fname, chain_name):
     """Return the chain to plot."""
 
-    if config.chain_name is None:
-        with h5py.File(config.samples_fname, 'r') as chain_file:
+    if chain_name is None:
+        with h5py.File(samples_fname, 'r') as chain_file:
             available_chains = list(chain_file.keys())
         longest_chain = 0
-        for chain_name in available_chains:
-            backend = emcee.backends.HDFBackend(config.samples_fname,
-                                                name=chain_name,
+        for try_chain_name in available_chains:
+            backend = emcee.backends.HDFBackend(samples_fname,
+                                                name=try_chain_name,
                                                 read_only=True)
             if backend.iteration > longest_chain:
                 selected_backend = backend
-        return selected_backend
-
-    return emcee.backends.HDFBackend(config.samples_fname,
-                                     name=config.chain_name,
-                                     read_only=True)
+                chain_name = try_chain_name
+    else:
+        selected_backend = emcee.backends.HDFBackend(samples_fname,
+                                                     name=chain_name,
+                                                     read_only=True)
+    with h5py.File(samples_fname, 'r') as chain_file:
+        system_name = chain_file[chain_name].attrs['system']
+    return selected_backend, system_name
 
 def save_corner_plot(samples, log_probability, config):
     """Create the corner plot specified on the command line."""
@@ -164,82 +175,111 @@ def save_trace_plot(samples, log_probability, config):
 
     pyplot.savefig(config.trace_plot_fname)
 
-def save_dissipation_constraint_plot(samples, config):
-    """Create a plot showing the constraint of lgQ vs tidal frequency."""
+class DissipationConstraintPlotter:
+    """
+    Create a plot showing the constraint of lgQ vs tidal frequency.
 
-    evaluated_lgq = (
-        samples['lgQ_min'].flatten()[None, :]
-        +
-        numpy.maximum(
-            0.0,
-            (
-                samples['lgQ_powerlaw'].flatten()[None, :]
-                *
-                numpy.log10(
-                    config.constraint_plot_ptide_grid[:, None]
-                    /
-                    samples['lgQ_break_period'].flatten()[None, :]
+    If multiple MCMC chain files are specified, all are overplotted on the same
+    axes.
+    """
+
+    def __init__(self, config):
+
+        self.config = config
+        self.transparency = 1.0 / (len(config.constraint_plot_confidence)
+                                   *
+                                   len(config.samples_fnames))
+
+    def add_chain(self, samples, label):
+        """Overplot another chain of samples."""
+
+        evaluated_lgq = (
+            samples['lgQ_min'].flatten()[None, :]
+            +
+            numpy.maximum(
+                0.0,
+                (
+                    samples['lgQ_powerlaw'].flatten()[None, :]
+                    *
+                    numpy.log10(
+                        self.config.constraint_plot_ptide_grid[:, None]
+                        /
+                        samples['lgQ_break_period'].flatten()[None, :]
+                    )
                 )
             )
         )
-    )
 
-    if not config.constraint_plot_no_lines:
-        pyplot.plot(
-            config.constraint_plot_ptide_grid,
-            evaluated_lgq[:,::1],
-            '-k',
-            linewidth=20,
-            alpha=0.01
-        )
-
-    evaluated_lgq.sort(1)
-
-    for confidence in config.constraint_plot_confidence:
-        num_exclude = int(
-            numpy.floor(
-                (1.0 - confidence) * evaluated_lgq.shape[1]
+        if not self.config.constraint_plot_no_lines:
+            pyplot.plot(
+                self.config.constraint_plot_ptide_grid,
+                evaluated_lgq[:, ::1],
+                '-k',
+                linewidth=5,
+                alpha=0.01,
+                zorder=0
             )
-        )
-        print('Excluding %d points' % num_exclude)
-        min_lgq = evaluated_lgq[:, :num_exclude + 1]
-        max_lgq = evaluated_lgq[:, -num_exclude-1:]
-        selected_indices = numpy.argmin(max_lgq - min_lgq, axis=1)
-        min_lgq = numpy.take_along_axis(min_lgq,
-                                        selected_indices[:, None],
-                                        axis=1)
-        max_lgq = numpy.take_along_axis(max_lgq,
-                                        selected_indices[:, None],
-                                        axis=1)
 
-        pyplot.plot(
-            config.constraint_plot_ptide_grid,
-            min_lgq,
-            '-b'
-        )
-        pyplot.plot(
-            config.constraint_plot_ptide_grid,
-            max_lgq,
-            '-r'
-        )
+        evaluated_lgq.sort(1)
 
-    pyplot.xlabel(r'Orbital Period [days]')
-    pyplot.ylabel(r"$\log_{10}Q_\star'$")
-    pyplot.ylim(5.0, 12.0)
-    pyplot.savefig(config.constraint_plot_fname)
+        for conf_index, confidence in enumerate(
+                self.config.constraint_plot_confidence
+        ):
+            num_exclude = int(
+                numpy.floor(
+                    (1.0 - confidence) * evaluated_lgq.shape[1]
+                )
+            )
+            print('Excluding %d points' % num_exclude)
+            min_lgq = evaluated_lgq[:, :num_exclude + 1]
+            max_lgq = evaluated_lgq[:, -num_exclude-1:]
+            selected_indices = numpy.argmin(max_lgq - min_lgq, axis=1)
+            min_lgq = numpy.take_along_axis(min_lgq,
+                                            selected_indices[:, None],
+                                            axis=1).flatten()
+            max_lgq = numpy.take_along_axis(max_lgq,
+                                            selected_indices[:, None],
+                                            axis=1).flatten()
+            plot_kwargs = dict(alpha=self.transparency,
+                               edgecolor='none',
+                               zorder=10)
+            if conf_index == 0:
+                plot_kwargs['label'] = label
+            else:
+                plot_kwargs['facecolor'] = color
+            color = pyplot.fill_between(
+                self.config.constraint_plot_ptide_grid,
+                min_lgq,
+                max_lgq,
+                **plot_kwargs
+            ).get_facecolor()
+
+    def save(self):
+        """Save the plot to the file sepecified by the init configuration."""
+
+        pyplot.xlabel(r'Orbital Period [days]')
+        pyplot.ylabel(r"$\log_{10}Q_\star'$")
+        pyplot.ylim(5.0, 12.0)
+        pyplot.legend()
+        pyplot.savefig(self.config.constraint_plot_fname)
 
 def main(config):
     """"Avoid polluting global namespace."""
 
-    backend = get_backend(config)
-    samples = backend.get_blobs(discard=config.burn_in)
-    log_probability = backend.get_log_prob(discard=config.burn_in)
-    if config.corner_plot_fname:
-        save_corner_plot(samples, log_probability, config)
-    if config.trace_plot_fname:
-        save_trace_plot(samples, log_probability, config)
+    constraint_plotter = DissipationConstraintPlotter(config)
+    for samples_fname in config.samples_fnames:
+        backend, system_name = get_backend(samples_fname, config.chain_name)
+        samples = backend.get_blobs(discard=config.burn_in)
+        log_probability = backend.get_log_prob(discard=config.burn_in)
+        if config.corner_plot_fname:
+            save_corner_plot(samples, log_probability, config)
+        if config.trace_plot_fname:
+            save_trace_plot(samples, log_probability, config)
+        if config.constraint_plot_fname:
+            constraint_plotter.add_chain(samples, system_name.replace('_', ' '))
+
     if config.constraint_plot_fname:
-        save_dissipation_constraint_plot(samples, config)
+        constraint_plotter.save()
 
 if __name__ == '__main__':
     main(parse_command_line())
