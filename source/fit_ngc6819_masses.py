@@ -72,15 +72,12 @@ def fit_milliman(single_lined_data,
                 )
 
             (m1_series[binary_ind], m2_series[binary_ind]) = fit_binary_masses(
-                photometry_interp=interpolator,
+                photometry_interpolators=[interpolator],
                 photometry=binary,
-                distance_modulus=distance_modulus,
                 min_mag_difference=(None if is_double_lined
                                     else {'V': 2.0}),
                 magnitude_template='%(filchar)cmag',
-                magnitude_error_template=('e_%(filchar)cmag'),
                 color_template='%(filchar1)c-%(filchar2)c',
-                color_error_template='e_%(filchar1)c-%(filchar2)c',
                 **rv_params
             ).x
             print('WOCS %d: m1 = %f, m2 = %f' % (binary['WOCS'],

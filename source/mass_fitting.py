@@ -379,7 +379,6 @@ def fit_binary_masses(photometry_interpolators,
                                                predicted=predicted,
                                                result=result)
                 if color_template is not None:
-                    assert color_error_template is not None
 
                     for rh_filter_name, rh_predicted in zip(
                             photometry_interp.available_filters[

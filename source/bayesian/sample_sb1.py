@@ -22,6 +22,10 @@ import update_search_paths
 #False positive
 #pylint: disable=import-error
 import ngc188_util
+import ngc6819_util
+from cluster_util import\
+    get_final_eccentricity_likelihood,\
+    get_rvk_constraint
 #pylint: enable=import-error
 from bayesian.sampling import setup_process
 from bayesian.prior_transform_cluster_sb1 import PriorTransformClusterSB1
@@ -153,7 +157,7 @@ def prepare_sampling(config):
         photometric_constraint = ngc188_util.get_photometric_constraint(
             binary_pkm_id
         )
-        rvk_constraint = ngc188_util.get_rvk_constraint(
+        rvk_constraint = get_rvk_constraint(
             observed_orbit=binary_orbit,
             num_parallel_processes=config.num_parallel_processes,
             interpolation_accuracy=config.rvk_interpolation_accuracy,
@@ -167,8 +171,9 @@ def prepare_sampling(config):
             ),
             rv_semiamplitude_constraint=rvk_constraint,
             interpolator=interpolator,
-            eccentricity_likelihood=(
-                ngc188_util.get_final_eccentricity_likelihood(binary_orbit)
+            eccentricity_likelihood=get_final_eccentricity_likelihood(
+                binary_orbit,
+                ngc188_util.eccentricity_envelope
             ),
             evolution_timeout=config.evolution_timeout,
             period_search_factor=config.initial_period_search_factor,
