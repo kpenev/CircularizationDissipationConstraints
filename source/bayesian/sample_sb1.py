@@ -4,7 +4,7 @@
 
 import logging
 import traceback
-from multiprocessing import set_start_method
+#from multiprocessing import set_start_method
 
 from astropy import units
 from scipy import stats
@@ -21,8 +21,12 @@ import update_search_paths
 #pylint: enable=unused-import
 #False positive
 #pylint: disable=import-error
+
+#False positive due to unusual access.
+#pylint: disable=unused-import
 import ngc188_util
 import ngc6819_util
+#pylint: enable=unused-import
 from cluster_util import\
     get_final_eccentricity_likelihood,\
     get_rvk_constraint
@@ -34,8 +38,23 @@ from bayesian.parse_command_line import parse_command_line
 from bayesian import mcmc_sampling
 #pylint: enable=wrong-import-order
 
-def get_independent_priors(config, observed_orbit):
-    """Return the independent parameters for the prior transform."""
+def get_independent_priors(config, observed_orbit, custom_util):
+    """
+    Return the independent parameters for the prior transform.
+
+    Args:
+        config:    The configuration with which sampling was invoked.
+
+        observed_orbit(pandas.Series):    The entry for the binary to
+            sample containing all system parameters.
+
+        custom_util(module):    The <cluster name>_util module corresponding to
+            the cluster the sampling binary is a member of.
+
+    Returns:
+        [(str, distrbibution, units), ...]:
+            The independent parameters that will be sampled for this binary.
+    """
 
     def get_uniform_distribution(parameter):
         """
@@ -121,12 +140,12 @@ def get_independent_priors(config, observed_orbit):
             ),
             (
                 'age',
-                ngc188_util.cluster_age_distribution,
+                custom_util.cluster_age_distribution,
                 units.Gyr
             ),
             (
                 'feh',
-                ngc188_util.cluster_feh_distribution,
+                custom_util.cluster_feh_distribution,
                 units.dimensionless_unscaled
             ),
             (
@@ -150,47 +169,54 @@ def prepare_sampling(config):
     )
 
 
-    if config.system.startswith('NGC188_'):
-        binary_pkm_id = int(config.system[len('NGC188_'):])
-        binary_orbit = ngc188_util.get_observed_orbit(binary_pkm_id)
+    for cluster in ['NGC188', 'NGC6819']:
+        if config.system.startswith(cluster + '_'):
+            binary_id = int(config.system[len(cluster) + 1:])
+            custom_util = globals()[cluster.lower() + '_util']
+            binary_orbit = custom_util.get_observed_orbit(binary_id)
 
-        photometric_constraint = ngc188_util.get_photometric_constraint(
-            binary_pkm_id
-        )
-        rvk_constraint = get_rvk_constraint(
-            observed_orbit=binary_orbit,
-            num_parallel_processes=config.num_parallel_processes,
-            interpolation_accuracy=config.rvk_interpolation_accuracy,
-            show_mismatch_plot=config.rvk_show_interpolation
-        )
-        log_likelihood = LogLikelihoodSB1(
-            powerlaw_dissipation=(
-                config.lgQ_break_period is not None
-                and
-                config.lgQ_powerlaw is not None
-            ),
-            rv_semiamplitude_constraint=rvk_constraint,
-            interpolator=interpolator,
-            eccentricity_likelihood=get_final_eccentricity_likelihood(
-                binary_orbit,
-                ngc188_util.eccentricity_envelope
-            ),
-            evolution_timeout=config.evolution_timeout,
-            period_search_factor=config.initial_period_search_factor,
-            scaled_period_guess=config.initial_period_scaled_guess
-        )
+            photometric_constraint = custom_util.get_photometric_constraint(
+                binary_id
+            )
+            rvk_constraint = get_rvk_constraint(
+                observed_orbit=binary_orbit,
+                num_parallel_processes=config.num_parallel_processes,
+                interpolation_accuracy=config.rvk_interpolation_accuracy,
+                show_mismatch_plot=config.rvk_show_interpolation
+            )
+            log_likelihood = LogLikelihoodSB1(
+                powerlaw_dissipation=(
+                    config.lgQ_break_period is not None
+                    and
+                    config.lgQ_powerlaw is not None
+                ),
+                rv_semiamplitude_constraint=rvk_constraint,
+                interpolator=interpolator,
+                eccentricity_likelihood=get_final_eccentricity_likelihood(
+                    binary_orbit,
+                    custom_util.eccentricity_envelope
+                ),
+                evolution_timeout=config.evolution_timeout,
+                period_search_factor=config.initial_period_search_factor,
+                scaled_period_guess=config.initial_period_scaled_guess
+            )
 
-        prior_transform = PriorTransformClusterSB1(
-            photometric_mass_constraint=photometric_constraint,
-            rv_semi_amplitude_constraint=rvk_constraint,
-            independent_parameter_distributions=get_independent_priors(
-                config,
-                binary_orbit
-            ),
-            model_parameter_order=log_likelihood.parameter_order
-        )
+            prior_transform = PriorTransformClusterSB1(
+                photometric_mass_constraint=photometric_constraint,
+                rv_semi_amplitude_constraint=rvk_constraint,
+                independent_parameter_distributions=get_independent_priors(
+                    config,
+                    binary_orbit,
+                    custom_util
+                ),
+                model_parameter_order=log_likelihood.parameter_order
+            )
 
-    return log_likelihood, prior_transform
+            return log_likelihood, prior_transform
+
+    raise RuntimeError('Target binary %s belongs to an unsupported cluster.'
+                       %
+                       config.system)
 
 def main(config):
     """Avoid polluting global namespace."""
