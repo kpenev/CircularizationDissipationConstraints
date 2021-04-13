@@ -17,6 +17,8 @@ for f in ${SLURM_DIR}/NGC*.slurm; do
     if [ \
             "$sys" == "NGC188_5601" \
             -o \
+            "$sys" == "NGC188_4618" \
+            -o \
             "$sys" == "NGC188_4999" \
             -o \
             "$sys" == "NGC188_8775"\
