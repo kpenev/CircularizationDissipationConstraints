@@ -251,3 +251,12 @@ def plot_eccentricity_vs_period(binaries, eccentricity_envelope):
     pyplot.ylabel('Eccentricity')
     pyplot.legend()
     pyplot.show()
+
+def plot_eccentricity_likelihood(observed_orbit, eccentricity_envelope):
+    """Plot the likelihood of the final ecc. for a given system."""
+
+    likelihood = get_final_eccentricity_likelihood(observed_orbit,
+                                                   eccentricity_envelope)
+    plot_e = numpy.linspace(0, 0.5, 1000)
+    pyplot.plot(plot_e, numpy.vectorize(likelihood)(plot_e))
+    pyplot.show()
