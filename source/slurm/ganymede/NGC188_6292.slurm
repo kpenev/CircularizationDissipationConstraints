@@ -3,9 +3,9 @@
 #SBATCH -J NGC188_6292
 #SBATCH -n 16 #Total number of tasks to run at one time
 #SBATCH -N 1  #Number of nodes on which to distribute the tasks evenly
-#SBATCH -o
-/home/kxp174430/scratch/open_cluster_circularization/sampling_output/NGC188_6292_slurm.out
+#SBATCH -o /home/kxp174430/scratch/open_cluster_circularization/sampling_output/NGC188_6292_slurm.out
 #SBATCH --mail-user=kxp174430@utdallas.edu
+#SBATCH --mail-type=all
 #SBATCH -t 4-00:00:00
 
 module load boost
