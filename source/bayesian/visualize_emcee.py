@@ -3,7 +3,9 @@
 """Create plots of emcee sampling results."""
 
 from abc import ABC, abstractmethod
+import logging
 
+import matplotlib
 from matplotlib import pyplot
 from configargparse import\
     ArgumentParser,\
@@ -54,7 +56,8 @@ def parse_command_line():
         '--chain-name', '--chain',
         default=None,
         help='Select which chain in the given file to plot. By default, plots '
-        'the longest chain in the input file.'
+        'the longest chain in the input file. Append ":<number>" after a '
+        'filename to specify a burn-in number of samples.'
     )
     parser.add_argument(
         '--corner-plot-fname', '--corner-plot', '--corner',
@@ -86,12 +89,6 @@ def parse_command_line():
         'evaluated from the chain to get confidence intervals (see '
         '--plot-confidence argument) and a plot of the results is saved under '
         'the given file name.'
-    )
-    parser.add_argument(
-        '--burn-in',
-        type=int,
-        default=0,
-        help='The number of samples to discard as burn-in.'
     )
     parser.add_argument(
         '--max-traces-per-plot',
@@ -140,6 +137,9 @@ def get_backend(samples_fname, chain_name):
             if backend.iteration > longest_chain:
                 selected_backend = backend
                 chain_name = try_chain_name
+                longest_chain = backend.iteration
+        if longest_chain == 0:
+            return None, None
     else:
         selected_backend = emcee.backends.HDFBackend(samples_fname,
                                                      name=chain_name,
@@ -358,9 +358,16 @@ def main(config):
 
     frequency_dependence_plotter = PowerlawLgQDependencePlotter(config)
     for samples_fname in config.samples_fnames:
+        burn_in = 0
+        if ':' in samples_fname:
+            samples_fname, burn_in = samples_fname.split(':')
+            burn_in = int(burn_in)
         backend, system_name = get_backend(samples_fname, config.chain_name)
-        samples = backend.get_blobs(discard=config.burn_in)
-        log_probability = backend.get_log_prob(discard=config.burn_in)
+        if backend is None:
+            print('Empty chain in %s, skipping!' % samples_fname)
+            continue
+        samples = backend.get_blobs(discard=burn_in)
+        log_probability = backend.get_log_prob(discard=burn_in)
         if config.corner_plot_fname:
             save_corner_plot(samples, log_probability, config)
         if config.trace_plot_fname:
@@ -379,4 +386,6 @@ def main(config):
         pyplot.savefig(config.errorbar_plot[0])
 
 if __name__ == '__main__':
+    matplotlib.use('Agg')
+    logging.basicConfig(level=logging.CRITICAL)
     main(parse_command_line())
