@@ -24,7 +24,8 @@ from bayesian.photometric_constraint import\
 from bayesian.cluster_util import\
     select_binary_data,\
     plot_rvk_constraint,\
-    plot_eccentricity_vs_period
+    plot_eccentricity_vs_period,\
+    plot_eccentricity_likelihood
 
 _logger = logging.getLogger(__name__)
 
@@ -281,5 +282,7 @@ def _test_rvk_constraint(binary_pkm_id):
 if __name__ == '__main__':
     set_start_method('forkserver')
     logging.basicConfig(level=logging.DEBUG)
+    plot_eccentricity_likelihood(get_observed_orbit(4965),
+                                 eccentricity_envelope)
     plot_eccentricity_vs_period(get_binary_data(), eccentricity_envelope)
     #_test_rvk_constraint(3732)
