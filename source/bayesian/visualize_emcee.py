@@ -241,9 +241,11 @@ class FrequencyDependencePlotterBase(ABC):
     def __init__(self, config):
 
         self.config = config
-        self.transparency = 1.0 / (len(config.plot_confidence)
+        self.transparency = 2.0 / (len(config.plot_confidence)
                                    *
                                    len(config.samples_fnames))
+        self._hatch_index = 0
+        self._hatch_list = ['\\\\', '//', '||', '--', 'oo', '+', 'x', '.', '*', 'O']
 
     @abstractmethod
     def evaluate_lgq(self, samples):
@@ -279,14 +281,20 @@ class FrequencyDependencePlotterBase(ABC):
         ):
             min_lgq, max_lgq = get_confidence_interval(evaluated_lgq,
                                                        confidence)
-            plot_kwargs = dict(alpha=self.transparency,
-                               edgecolor='none',
-                               zorder=10)
+            plot_kwargs = dict(
+                #alpha=self.transparency,
+                edgecolor='black',
+                facecolor='none',
+                zorder=10,
+                hatch=self._hatch_list[self._hatch_index
+                                       %
+                                       len(self._hatch_list)],
+                linewidth=0
+            )
+            self._hatch_index += 1
             if conf_index == 0:
                 plot_kwargs['label'] = label
-            else:
-                plot_kwargs['facecolor'] = color
-            color = pyplot.fill_between(
+            pyplot.fill_between(
                 self.config.ptide_grid,
                 min_lgq,
                 max_lgq,
@@ -298,8 +306,6 @@ class FrequencyDependencePlotterBase(ABC):
 
         pyplot.xlabel(r'Orbital Period [days]')
         pyplot.ylabel(r"$\log_{10}Q_\star'$")
-        pyplot.ylim(5.0, 12.0)
-        pyplot.legend()
         pyplot.savefig(self.config.frequency_dependence_plot_fname)
 
 class PowerlawLgQDependencePlotter(FrequencyDependencePlotterBase):
@@ -335,7 +341,7 @@ def add_errorbar(samples, config):
     x_samples = evaluate(x_expression)
     y_samples = evaluate(y_expression)
     print('X (%d): ' % x_samples.shape + repr(x_samples))
-    line_width=1
+    line_width = 1
     for confidence in reversed(sorted(config.plot_confidence)):
         x = numpy.median(x_samples)
         y = numpy.median(y_samples)
@@ -379,6 +385,10 @@ def main(config):
             )
         if config.errorbar_plot:
             add_errorbar(samples, config)
+
+    pyplot.ylim(5.0, 12.0)
+    pyplot.xlim(1, 20.0)
+    pyplot.legend()
 
     if config.frequency_dependence_plot_fname:
         frequency_dependence_plotter.save()
