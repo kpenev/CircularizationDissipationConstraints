@@ -200,7 +200,9 @@ def get_photometry_interpolators():
 def get_observed_orbit(binary_pkm_id):
     """Return pandas.DataFrames containing the orbital parameters of an SB1."""
 
-    return select_binary_data(*get_binary_data(), 'PKM', binary_pkm_id)
+    result = select_binary_data(*get_binary_data(), 'PKM', binary_pkm_id)
+    if binary_pkm_id == 5015:
+        return result.iloc[1]
 
 def get_photometric_constraint(binary_pkm_id):
     """Return a fully set-up photometric constraint for an NGC188 binary."""
