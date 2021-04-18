@@ -121,6 +121,11 @@ def parse_command_line():
         help='If passed, the frequency dependence plot will not include '
         'individual lines.'
     )
+    parser.add_argument(
+        '--log-x',
+        action='store_true',
+        help='Switch the x-axis to log-scale.'
+    )
     return parser.parse_args()
 
 def get_backend(samples_fname, chain_name):
@@ -245,7 +250,7 @@ class FrequencyDependencePlotterBase(ABC):
                                    *
                                    len(config.samples_fnames))
         self._hatch_index = 0
-        self._hatch_list = ['\\\\', '//', '||', '--', 'oo', '+', 'x', '.', '*', 'O']
+        self._hatch_list = ['\\\\', '//', '||', '--', '...', 'oo', '+', 'x', '*', 'O']
 
     @abstractmethod
     def evaluate_lgq(self, samples):
@@ -362,6 +367,9 @@ def add_errorbar(samples, config):
 def main(config):
     """"Avoid polluting global namespace."""
 
+    if config.log_x:
+        pyplot.gca().set_xscale('log')
+
     frequency_dependence_plotter = PowerlawLgQDependencePlotter(config)
     for samples_fname in config.samples_fnames:
         burn_in = 0
@@ -387,7 +395,6 @@ def main(config):
             add_errorbar(samples, config)
 
     pyplot.ylim(5.0, 12.0)
-    pyplot.xlim(1, 20.0)
     pyplot.legend()
 
     if config.frequency_dependence_plot_fname:

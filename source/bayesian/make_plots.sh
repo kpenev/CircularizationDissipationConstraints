@@ -66,6 +66,7 @@ bayesian/visualize_emcee.py\
     NGC188_5601_mcmc_powerlawlgQ_samples.h5:30\
     NGC188_6171_mcmc_powerlawlgQ_samples.h5:30\
     NGC188_4904_mcmc_powerlawlgQ_samples.h5:60\
+    --log-x\
     --frequency-dependence-plot frequency_dependent_constraints.png\
     --plot-confidence 0.9544997361036416 \
     --frequency-dependence-plot-no-lines
