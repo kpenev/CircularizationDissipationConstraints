@@ -15,6 +15,8 @@ for f in ${SLURM_DIR}/NGC*.slurm; do
     )
     echo -n "$sys ($nsamples): $(squeue -n $sys -o '%.15i %.9P %.15j %.2t %.10M %R'|grep NGC)" 
     if [ \
+            "$sys" == "NGC188_5463" \
+            -o \
             "$sys" == "NGC188_5601" \
             -o \
             "$sys" == "NGC188_4618" \
