@@ -37,7 +37,7 @@ if [ "$1" == "all" ]; then
 
     done
 
-    for f in NGC188_*_powerlawlgQ_samples.h5; do
+    for f in NGC188_*_powerlawlgQ_samples.h5 NGC6819_59003; do
 
         SYS=${f%_mcmc_powerlawlgQ_samples.h5}
 
@@ -71,15 +71,40 @@ bayesian/visualize_emcee.py\
     --plot-confidence 0.9544997361036416 \
     --frequency-dependence-plot-no-lines
 
-bayesian/visualize_emcee.py\
-    NGC188_4289_mcmc_samples.h5:60\
-    NGC188_4618_mcmc_samples.h5:60\
-    NGC188_4904_mcmc_samples.h5:60\
-    NGC188_5463_mcmc_samples.h5:60\
-    NGC188_5601_mcmc_samples.h5:60\
-    NGC188_5738_mcmc_samples.h5:60\
-    NGC188_6171_mcmc_samples.h5:60\
-    NGC188_6292_mcmc_samples.h5:60\
-    NGC6819_59003_mcmc_samples.h5:60\
-    --errorbar-plot test_errorbar_plot.eps 'orbital_period' 'lgQ_min'\
-    --plot-confidence 0.9544997361036416 0.6826894921370859
+for SYS in NGC188_4618 NGC188_5601 NGC188_6171 NGC188_4904; do
+    if [ "$SYS" == "NGC188_4618" -o "$SYS" == "NGC188_4904" ]; then
+        BURNIN=60
+    else
+        BURNIN=30
+    fi
+    bayesian/visualize_emcee.py\
+        ${SYS}_mcmc_powerlawlgQ_samples.h5:${BURNIN}\
+        ${SYS}_mcmc_samples.h5:60\
+        --log-x\
+        --frequency-dependence-plot ${SYS}_comparison.png\
+        --plot-confidence 0.6826894921370859\
+        --frequency-dependence-plot-no-lines
+done
+
+for xexpr in 'orbital_period' 'orbital_period/2.0'; do 
+    bayesian/visualize_emcee.py\
+        NGC188_4080_mcmc_samples.h5:60\
+        NGC188_4289_mcmc_samples.h5:60\
+        NGC188_4618_mcmc_samples.h5:60\
+        NGC188_4904_mcmc_samples.h5:60\
+        NGC188_4965_mcmc_samples.h5:60\
+        NGC188_5040_mcmc_samples.h5:60\
+        NGC188_5463_mcmc_samples.h5:60\
+        NGC188_5601_mcmc_samples.h5:60\
+        NGC188_5647_mcmc_samples.h5:60\
+        NGC188_5733_mcmc_samples.h5:60\
+        NGC188_5738_mcmc_samples.h5:60\
+        NGC188_5797_mcmc_samples.h5:60\
+        NGC188_6171_mcmc_samples.h5:60\
+        NGC188_6292_mcmc_samples.h5:60\
+        NGC188_880_mcmc_samples.h5:60\
+        NGC6819_57004_mcmc_samples.h5:60\
+        NGC6819_59003_mcmc_samples.h5:60\
+        --errorbar-plot constQ_errorbar_vs_period.eps "$xexpr" 'lgQ_min'\
+        --plot-confidence 0.9544997361036416 0.6826894921370859
+done
