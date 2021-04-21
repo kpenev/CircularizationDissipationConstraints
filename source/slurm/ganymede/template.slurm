@@ -28,8 +28,8 @@ OUTPUT_DIR=${OUTPUT_ROOT}/sampling_output
 python3 \
     ${SOURCE_DIR}/bayesian/sample_sb1.py @@SYSTEM@@ \
     -c ${SOURCE_DIR}/sampling_config/open_cluster_@@FLAVOR@@_nolock.cfg\
-    --std-out-err-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.outerr'\
-    --logging-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.log'\
+    --std-out-err-fname ${OUTPUT_DIR}'/%(system)s_@@FLAVOR@@_%(now)s_%(pid)d.outerr'\
+    --logging-fname ${OUTPUT_DIR}'/%(system)s_@@FLAVOR@@_%(now)s_%(pid)d.log'\
     --samples-fname '/home/kxp174430/%(system)s_%(sampling)s_@@FLAVOR@@_samples'\
     >\
     ${OUTPUT_DIR}/sample_@@SYSTEM@@_@@FLAVOR@@.outerr\
