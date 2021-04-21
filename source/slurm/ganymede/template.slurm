@@ -30,7 +30,7 @@ python3 \
     -c ${SOURCE_DIR}/sampling_config/open_cluster_@@FLAVOR@@_nolock.cfg\
     --std-out-err-fname ${OUTPUT_DIR}'/%(system)s_@@FLAVOR@@_%(now)s_%(pid)d.outerr'\
     --logging-fname ${OUTPUT_DIR}'/%(system)s_@@FLAVOR@@_%(now)s_%(pid)d.log'\
-    --samples-fname '/home/kxp174430/%(system)s_%(sampling)s_@@FLAVOR@@_samples'\
+    --samples-fname '/home/kxp174430/%(system)s_@@FLAVOR@@_%(sampling)s_samples'\
     >\
     ${OUTPUT_DIR}/sample_@@SYSTEM@@_@@FLAVOR@@.outerr\
     2>&1
