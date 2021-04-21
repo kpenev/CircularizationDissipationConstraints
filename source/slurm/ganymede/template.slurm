@@ -1,9 +1,9 @@
 #!/bin/bash
 
-#SBATCH -J @@SYSTEM@@
+#SBATCH -J @@SYSTEM@@_@@FLAVOR@@
 #SBATCH -n 16 #Total number of tasks to run at one time
 #SBATCH -N 1  #Number of nodes on which to distribute the tasks evenly
-#SBATCH -o /home/kxp174430/scratch/open_cluster_circularization/sampling_output/@@SYSTEM@@_slurm.out
+#SBATCH -o /home/kxp174430/scratch/open_cluster_circularization/sampling_output/@@SYSTEM@@_@@FLAVOR@@_slurm.out
 #SBATCH --mail-user=kxp174430@utdallas.edu
 #SBATCH --mail-type=all
 #SBATCH -t 4-00:00:00
@@ -27,10 +27,10 @@ OUTPUT_DIR=${OUTPUT_ROOT}/sampling_output
 
 python3 \
     ${SOURCE_DIR}/bayesian/sample_sb1.py @@SYSTEM@@ \
-    -c ${SOURCE_DIR}/sampling_config/open_cluster_constQ_nolock.cfg\
+    -c ${SOURCE_DIR}/sampling_config/open_cluster_@@FLAVOR@@_nolock.cfg\
     --std-out-err-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.outerr'\
     --logging-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.log'\
     --samples-fname '/home/kxp174430/%(system)s_%(sampling)s_samples'\
     >\
-    ${OUTPUT_DIR}/sample_@@SYSTEM@@_1.outerr\
+    ${OUTPUT_DIR}/sample_@@SYSTEM@@_@@FLAVOR@@.outerr\
     2>&1
