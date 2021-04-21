@@ -249,8 +249,27 @@ class FrequencyDependencePlotterBase(ABC):
         self.transparency = 2.0 / (len(config.plot_confidence)
                                    *
                                    len(config.samples_fnames))
-        self._hatch_index = 0
-        self._hatch_list = ['\\\\', '//', '||', '--', '...', 'oo', '+', 'x', '*', 'O']
+        self._constraint_index = 0
+        self._hatch_list = ['\\\\',
+                            '//',
+                            '||',
+                            '--',
+                            '..',
+                            'o',
+                            '+',
+                            'x',
+                            '*',
+                            'O']
+        self._color_list = ['tab:blue',
+                            'tab:orange',
+                            'tab:green',
+                            'tab:red',
+                            'tab:purple',
+                            'tab:brown',
+                            'tab:pink',
+                            'tab:gray',
+                            'tab:olive',
+                            'tab:cyan']
 
     @abstractmethod
     def evaluate_lgq(self, samples):
@@ -288,15 +307,17 @@ class FrequencyDependencePlotterBase(ABC):
                                                        confidence)
             plot_kwargs = dict(
                 #alpha=self.transparency,
-                edgecolor='black',
+                edgecolor=self._color_list[self._constraint_index
+                                           %
+                                           len(self._color_list)],
                 facecolor='none',
                 zorder=10,
-                hatch=self._hatch_list[self._hatch_index
+                hatch=self._hatch_list[self._constraint_index
                                        %
                                        len(self._hatch_list)],
                 linewidth=0
             )
-            self._hatch_index += 1
+            self._constraint_index += 1
             if conf_index == 0:
                 plot_kwargs['label'] = label
             pyplot.fill_between(
