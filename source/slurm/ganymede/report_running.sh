@@ -15,6 +15,8 @@ for f in ${SLURM_DIR}/NGC*.slurm; do
     )
     echo -n "$(awk -v sys="$sys" -v nsamples="$nsamples" 'BEGIN{printf("%23s (%3d):", sys, nsamples);}') $(squeue -n $sys -o '%.8i %.9P %.18j %.2t %.10M %R'|grep NGC)" 
     if [ \
+            "$sys" == "NGC188_4080" \
+            -o \
             "$sys" == "NGC188_4289" \
             -o \
             "$sys" == "NGC188_4618" \
@@ -29,6 +31,12 @@ for f in ${SLURM_DIR}/NGC*.slurm; do
             -o \
             "$sys" == "NGC188_5733"\
             -o \
+            "$sys" == "NGC188_5738"\
+            -o \
+            "$sys" == "NGC188_5797"\
+            -o \
+            "$sys" == "NGC188_6171"\
+            -o \
             "$sys" == "NGC188_6292"\
             -o \
             "$sys" == "NGC188_8775"\
@@ -38,6 +46,8 @@ for f in ${SLURM_DIR}/NGC*.slurm; do
             "$sys" == "NGC6819_33002"\
             -o \
             "$sys" == "NGC6819_57004"\
+            -o \
+            "$sys" == "NGC6819_59003"\
     ]; then
         echo "-----------------------------------------------------------------"
     else
