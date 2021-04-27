@@ -3,7 +3,7 @@
 #SBATCH -J NGC188_6171/5463/5601_pwrlaw
 #SBATCH -N 1  #Number of nodes on which to distribute the tasks evenly
 #SBATCH -n 1 #Total number of tasks to run at one time
-#SBATCH -o /work/05392/kpenev/stampede2/open_cluster_circularization/sampling_output/NGC188_6171_5463_5601_slurm.out
+#SBATCH -o /work2/05392/kpenev/stampede2/open_cluster_circularization/sampling_output/NGC188_6171_5463_5601_slurm.out
 #SBATCH --mail-user=kxp174430@utdallas.edu
 #SBATCH --mail-type=all
 #SBATCH -t 48:00:00
@@ -23,7 +23,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home1/05392/kpenev/lib
 export LIBRARY_PATH=$LIBRARY_PATH:/home1/05392/kpenev/lib
 
 SOURCE_DIR=/home1/05392/kpenev/projects/git/CircularizationDissipationConstraints/source
-OUTPUT_ROOT=/work/05392/kpenev/stampede2/open_cluster_circularization
+OUTPUT_ROOT=/work2/05392/kpenev/stampede2/open_cluster_circularization
 OUTPUT_DIR=${OUTPUT_ROOT}/sampling_output
 
 for PKM in 6171 5463 5601; do 
