@@ -81,6 +81,19 @@ def parse_command_line():
         'mode enhancement is ignored.'
     )
     parser.add_argument(
+        '--frequency-dependence-hatch',
+        default=False,
+        help='If specified frequency dependent plots use hatching as well as '
+        'color to distinguish between constraints from different systems.'
+    )
+    parser.add_argument(
+        '--frequency-dependence-bounds',
+        default=False,
+        action='store_true',
+        help='If specified frequency dependent plots draw lines to indicate the'
+        ' bounds of the specified confidence intervals.'
+    )
+    parser.add_argument(
         '--errorbar-plot',
         nargs=3,
         metavar=('FILENAME', 'XEXPR', 'YEXPR'),
@@ -246,11 +259,30 @@ class FrequencyDependencePlotterBase(ABC):
     def __init__(self, config):
 
         self.config = config
-        self.transparency = 2.0 / (len(config.plot_confidence)
+        self.transparency = 1.0 / (len(config.plot_confidence)
                                    *
                                    len(config.samples_fnames))
-        self._hatch_index = 0
-        self._hatch_list = ['\\\\', '//', '||', '--', '...', 'oo', '+', 'x', '*', 'O']
+        self._constraint_index = 0
+        self._hatch_list = ['\\\\',
+                            '//',
+                            '||',
+                            '--',
+                            '..',
+                            'o',
+                            '+',
+                            'x',
+                            '*',
+                            'O']
+        self._color_list = ['tab:blue',
+                            'tab:orange',
+                            'tab:green',
+                            'tab:red',
+                            'tab:purple',
+                            'tab:brown',
+                            'tab:pink',
+                            'tab:gray',
+                            'tab:olive',
+                            'tab:cyan']
 
     @abstractmethod
     def evaluate_lgq(self, samples):
@@ -286,25 +318,57 @@ class FrequencyDependencePlotterBase(ABC):
         ):
             min_lgq, max_lgq = get_confidence_interval(evaluated_lgq,
                                                        confidence)
-            plot_kwargs = dict(
-                #alpha=self.transparency,
-                edgecolor='black',
-                facecolor='none',
-                zorder=10,
-                hatch=self._hatch_list[self._hatch_index
-                                       %
-                                       len(self._hatch_list)],
-                linewidth=0
-            )
-            self._hatch_index += 1
-            if conf_index == 0:
-                plot_kwargs['label'] = label
+            color = self._color_list[self._constraint_index
+                                     %
+                                     len(self._color_list)]
+            if self.config.frequency_dependence_hatch:
+                plot_kwargs = dict(
+                    #alpha=self.transparency,
+                    edgecolor=color,
+                    facecolor='none',
+                    hatch=self._hatch_list[self._constraint_index
+                                           %
+                                           len(self._hatch_list)],
+                    linewidth=0
+                )
+            else:
+                plot_kwargs = dict(
+                    alpha=self.transparency,
+                    edgecolor='none',
+                    facecolor='black'
+                )
+
+            self._constraint_index += 1
             pyplot.fill_between(
                 self.config.ptide_grid,
                 min_lgq,
                 max_lgq,
+                zorder=10,
                 **plot_kwargs
-            ).get_facecolor()
+            )
+
+            if conf_index == 0:
+                pyplot.fill_between(
+                    [numpy.nan, numpy.nan],
+                    [numpy.nan, numpy.nan],
+                    [numpy.nan, numpy.nan],
+                    edgecolor=color,
+                    label=label
+                )
+
+            if self.config.frequency_dependence_bounds:
+                pyplot.plot(self.config.ptide_grid,
+                            max_lgq,
+                            '--',
+                            zorder=20,
+                            linewidth=5,
+                            color=color)
+                pyplot.plot(self.config.ptide_grid,
+                            min_lgq,
+                            ':',
+                            zorder=20,
+                            linewidth=5,
+                            color=color)
 
     def save(self):
         """Save the plot to the file sepecified by the init configuration."""
