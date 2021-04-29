@@ -29,6 +29,8 @@ for f in ${SLURM_DIR}/NGC*.slurm; do
             -o \
             "$sys" == "NGC188_5601" \
             -o \
+            "$sys" == "NGC188_5647" \
+            -o \
             "$sys" == "NGC188_5733"\
             -o \
             "$sys" == "NGC188_5738"\
@@ -48,6 +50,14 @@ for f in ${SLURM_DIR}/NGC*.slurm; do
             "$sys" == "NGC6819_57004"\
             -o \
             "$sys" == "NGC6819_59003"\
+            -o \
+            "$sys" == "NGC188_4618_powerlaw"\
+            -o \
+            "$sys" == "NGC188_5601_powerlaw"\
+            -o \
+            "$sys" == "NGC188_5738_powerlaw"\
+            -o \
+            "$sys" == "NGC6819_59003_powerlaw"\
     ]; then
         echo "-----------------------------------------------------------------"
     else
