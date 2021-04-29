@@ -23,6 +23,8 @@ for f in ${SLURM_DIR}/NGC*.slurm; do
             -o \
             "$sys" == "NGC188_4904"\
             -o \
+            "$sys" == "NGC188_4965"\
+            -o \
             "$sys" == "NGC188_4999" \
             -o \
             "$sys" == "NGC188_5463" \
@@ -56,6 +58,10 @@ for f in ${SLURM_DIR}/NGC*.slurm; do
             "$sys" == "NGC188_5601_powerlaw"\
             -o \
             "$sys" == "NGC188_5738_powerlaw"\
+            -o \
+            "$sys" == "NGC188_6171_powerlaw"\
+            -o \
+            "$sys" == "NGC188_8775_powerlaw"\
             -o \
             "$sys" == "NGC6819_59003_powerlaw"\
     ]; then
