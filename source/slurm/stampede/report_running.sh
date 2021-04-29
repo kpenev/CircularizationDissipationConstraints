@@ -13,10 +13,7 @@ for f in ${SLURM_DIR}/NGC*.slurm; do
         grep NGC
     )
 
-    for SYS_ID in $(egrep '^for (WOCS|PKM) in [0-9]* [0-9]* [0-9]*; do' $f\
-        | tr -d ';'\
-        | awk '{print $4, $5, $6;}'\
-    ); do
+    for SYS_ID in $(echo "$JOBNAME"|sed -e 's%NGC[0-9]*_\([0-9]*\)/\([0-9]*\)/\([0-9]*\)_.*$%\1 \2 \3%'); do
         NSAMPLES=$(\
             h5dump\
                 -a "${CHAIN}/iteration"\

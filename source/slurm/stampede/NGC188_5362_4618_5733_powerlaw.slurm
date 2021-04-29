@@ -26,13 +26,14 @@ SOURCE_DIR=/home1/05392/kpenev/projects/git/CircularizationDissipationConstraint
 OUTPUT_ROOT=/work2/05392/kpenev/stampede2/open_cluster_circularization
 OUTPUT_DIR=${OUTPUT_ROOT}/sampling_output
 
-for PKM in 5362 4618 5733; do 
+for PKM in 5362 ; do 
     python3 \
         ${SOURCE_DIR}/bayesian/sample_sb1.py NGC188_${PKM} \
         -c ${SOURCE_DIR}/sampling_config/open_cluster_powerlaw_nolock.cfg\
         --std-out-err-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.outerr'\
         --logging-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.log'\
         --samples-fname '/home1/05392/kpenev/%(system)s_%(sampling)s_powerlawlgQ_samples'\
+	--num-parallel-processes 48\
         >\
         ${OUTPUT_DIR}/sample_NGC188_${PKM}_1.outerr\
         2>&1\
