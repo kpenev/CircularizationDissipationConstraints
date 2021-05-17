@@ -11,6 +11,8 @@ from scipy.stats import norm
 from scipy.special import erf
 from scipy.optimize import fsolve
 from sympy import *
+from scipy.special import i0
+from scipy.integrate import nquad
 
 sys.path.append('/home/mmmahmud/poet/PythonPackage')
 sys.path.append('../scripts')
@@ -81,9 +83,7 @@ def test_Nasa_Exoplanet_data(interpolator,
                            metallicity[i] * u.dimensionless_unscaled,
                            orbital_period[i] * u.d,
                            obliquity[i] * u.deg,
-                           stellar_age[i] * u.Gyr,
-                           eccentricity[i] * u.dimensionless_unscaled,
-                           vsini[i] * u.kilometer / u.second)
+                           stellar_age[i] * u.Gyr)
 
                 a.printing()
                 print('eccentricity found in the NASA archive is ', eccentricity[i])
@@ -226,7 +226,7 @@ def constraints_are_satisfied(orbital_period,
 class SuperEccentricityDistribution(metaclass=ABCMeta):
 
     @abstractmethod
-    def create_probability_density_of_present_eccentricity(self):
+    def create_cumulative_density_function_of_present_eccentricity(self):
         pass
 
     @abstractmethod
@@ -239,11 +239,9 @@ class EccentricityDistribution(SuperEccentricityDistribution):
                  mean_e_now,
                  e_now_upper_uncertainty,
                  e_now_lower_uncertainty,
-                 mean_e_env,
+                 e_env,
                  percentile_for_e_now_upper_uncertainty=phi(1),
-                 percentile_for_e_now_lower_uncertainty=1 - phi(1),
-                 e_env_upper_uncertainty=0.0,
-                 e_env_lower_uncertainty=0.0
+                 percentile_for_e_now_lower_uncertainty=1 - phi(1)
                  ):
 
         self.mean_e_now = mean_e_now
@@ -251,10 +249,9 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         self.e_now_lower_uncertainty = e_now_lower_uncertainty
         self.percentile_for_e_now_upper_uncertainty = percentile_for_e_now_upper_uncertainty
         self.percentile_for_e_now_lower_uncertainty = percentile_for_e_now_lower_uncertainty
-        self.probability_density_of_present_eccentricity, self.roots = self.create_probability_density_of_present_eccentricity()
-        self.mean_e_env = mean_e_env
-        self.e_env_upper_uncertainty = e_env_upper_uncertainty
-        self.e_env_lower_uncertainty = e_env_lower_uncertainty
+        self.cumulative_density_function_of_present_eccentricity = self.create_cumulative_density_function_of_present_eccentricity()
+
+        self.e_env = e_env
 
     def equations_to_be_solved_for_Rice_distribution_parameters(self, x):
         return [rice.cdf((self.mean_e_now+self.e_now_upper_uncertainty), x[0], scale = x[1]) - self.percentile_for_e_now_upper_uncertainty,
@@ -266,34 +263,28 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         roots = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, np.asarray([estimated_b, estimated_s]))
         return roots
 
-    def create_probability_density_of_present_eccentricity(self):
+    def create_cumulative_density_function_of_present_eccentricity(self):
         roots = self.roots_for_Rice_parameters()
-        def probability_density_of_present_eccentricity(e_now):
-            return rice.pdf(e_now, roots[0], scale = roots[1])
-        return probability_density_of_present_eccentricity, roots
-
-    def probability_density_of_envelope_eccentricity(self, e_env):
-        e_env_stdev = (self.e_env_upper_uncertainty-self.e_env_lower_uncertainty)/2
-        value = norm.pdf(e_env, loc = self.mean_e_env, scale = e_env_stdev)
-        return value
+        b = roots[0]
+        s = roots[1]
+        def pdf(e):
+            return math.exp(-((e/s)**2+b**2)/2)*i0((e/s)*b)
+        def cdf(e_now):
+            value = nquad(pdf, [[0, e_now]])
+            return value[0]
+        norm = 1/cdf(1.0)
+        def cumulative_density_function_of_present_eccentricity(e_now):
+            value = norm * cdf(e_now)
+            return value
+        return cumulative_density_function_of_present_eccentricity
 
 
     def probability_density_of_eccentricity(self, e):
         if e > 1 or e < 0:
             return 0
-        def cdf_e_now(e):
-            value = rice.cdf(e, b=self.roots[0], loc=0, scale=self.roots[1])
-            return value
-        def cdf_e_env(e):
-            if (self.e_env_upper_uncertainty == 0 or self.e_env_lower_uncertainty == 0):
-                if e > self.mean_e_env:
-                    return 1
-                if e == self.mean_e_env:
-                    return 0.5
-                return 0
-            value = norm.cdf(e, loc=self.mean_e_env, scale=(self.e_env_upper_uncertainty-self.e_env_lower_uncertainty)/2)
-            return value
-        return cdf_e_now(e)*(1-cdf_e_env(e))
+        if e<self.e_env:
+            return self.cumulative_density_function_of_present_eccentricity(e)
+        return 0
 
     def plot_probability_density_of_eccentricity_vs_eccentricity_graph(self):
         eccentricity = np.linspace(0, 1, 100)
@@ -521,9 +512,9 @@ class EnvelopeEccentricityDistribution:
         # naming the x axis
         plt.xlabel('log(Period)')
         # naming the y axis
-        plt.ylabel('Present Envelope Eccentricity')
+        plt.ylabel('Present Eccentricity')
         # giving a title to my graph
-        plt.title('Present Envelope Eccentricity vs log(Period)')
+        plt.title('Present Eccentricity vs log(Period)')
         # function to show the plot
         plt.plot(log_orbital_period_on_envelope, eccentricity_now_on_envelope, 'o',
                  label="Envelope Eccentricities vs. log(Periods)")
@@ -622,6 +613,10 @@ class SamplingPropertiesOfSystem:
                  max_initial_stellar_spin=5,
                  min_initial_stellar_spin=15,
                  constraints = constraints(),
+                 tidal_frequency_breaks_for_planet = np.array([2*math.pi/20]),
+                 tidal_frequency_powers_for_planet = np.array([1.0, 0.0]),
+                 spin_frequency_breaks_for_planet = None,
+                 spin_frequency_powers_for_planet = np.array([0.0]),
                  find_argument_of_phase_lag_function_for_planet_range_auto = False):
 
         self.initial_eccentricity = initial_eccentricity
@@ -629,6 +624,11 @@ class SamplingPropertiesOfSystem:
         self.min_argument_of_phase_lag_function_for_planet = min_argument_of_phase_lag_function_for_planet
         self.max_initial_stellar_spin = max_initial_stellar_spin
         self.min_initial_stellar_spin = min_initial_stellar_spin
+
+        self.tidal_frequency_breaks_for_planet = tidal_frequency_breaks_for_planet
+        self.tidal_frequency_powers_for_planet = tidal_frequency_powers_for_planet
+        self.spin_frequency_breaks_for_planet= spin_frequency_breaks_for_planet
+        self.spin_frequency_powers_for_planet= spin_frequency_powers_for_planet
 
 
 
@@ -655,17 +655,18 @@ class SamplingPropertiesOfSystem:
 
             self.means['obliquity'] = 0
 
-            self.mean_e_env = self.envelope_eccentricity_function(orbital_period=self.means['orbital period'])
+            self.e_env = self.envelope_eccentricity_function(orbital_period=self.means['orbital period'])
             eccentricity_distribution_object = EccentricityDistribution(self.means['present eccentricity'],
                                                                         self.standard_deviations['eccentricity_now_upper_uncertainty'],
                                                                         self.standard_deviations['eccentricity_now_lower_uncertainty'],
-                                                                        self.mean_e_env)
+                                                                        self.e_env)
             self.probability_density_of_eccentricity = eccentricity_distribution_object.probability_density_of_eccentricity
 
             if find_argument_of_phase_lag_function_for_planet_range_auto:
                 min_Qpl, max_Qpl = self.determine_a_suitable_range_of_argument_of_phase_lag_function_for_planet()
                 self.max_argument_of_phase_lag_function_for_planet = min_Qpl
                 self.min_argument_of_phase_lag_function_for_planet = max_Qpl
+                print('minimum Qpl = ', min_Qpl, ' maximum Qpl = ', max_Qpl)
 
     def pick_a_tuple_from_the_multi_variable_Gaussian_distribution(self, mean, standard_deviation):
         n_cross_n_dimensional_array_of_standard_deviations = np.diag(
@@ -752,14 +753,15 @@ class SamplingPropertiesOfSystem:
         dissipation = dict(
             primary=None,
             secondary=dict(
-                tidal_frequency_breaks=None,
-                spin_frequency_breaks=None,
-                tidal_frequency_powers=np.array([0.0]),
-                spin_frequency_powers=np.array([0.0]),
+                tidal_frequency_breaks=self.tidal_frequency_breaks_for_planet,
+                spin_frequency_breaks=self.spin_frequency_breaks_for_planet,
+                tidal_frequency_powers=self.tidal_frequency_powers_for_planet,
+                spin_frequency_powers=self.spin_frequency_powers_for_planet,
                 reference_phase_lag=phase_lag(argument_of_phase_lag_function_for_planet)
             )
         )
 
+        print(dissipation)
         evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
                                               interpolator=self.interpolator,
                                               dissipation=dissipation,
@@ -770,10 +772,10 @@ class SamplingPropertiesOfSystem:
                                               disk_dissipation_age=2e-3 * u.Gyr,
                                               primary_wind_strength=0.17,
                                               primary_wind_saturation=2.78,
-                                              primary_core_envelope_coupling_timescale=0.05,
+                                              primary_core_envelope_coupling_timescale=0.05 * u.Gyr,
                                               secondary_wind_strength=0.0,
                                               secondary_wind_saturation=100.0,
-                                              secondary_core_envelope_coupling_timescale=0.05,
+                                              secondary_core_envelope_coupling_timescale=0.05 * u.Gyr,
                                               orbital_period_tolerance=1e-6,
                                               solve=True,
                                               secondary_is_star=False)
@@ -781,12 +783,16 @@ class SamplingPropertiesOfSystem:
 
         calculated_eccentricity_now = evolutionary_history.eccentricity[- 1]
         self.calculated_eccentricity_now = calculated_eccentricity_now
-        print('Calculated eccentricity_now = ',
+        print('Calculated eccentricity due to tidal dissipation = ',
               calculated_eccentricity_now,
-              ' present eccentricity recorded in the archive = ',
+              ' actual present eccentricity = ',
               self.means['present eccentricity'],
-              ' at calculated age = ', evolutionary_history.age[- 1],
-              ', where age of the star recorded in the archive = ', stellar_age)
+              ' where the envelope eccentricity = ',
+              self.e_env,
+              ' argument of the phase lag function for planet = ',
+              argument_of_phase_lag_function_for_planet,
+              ' probability density of calculated eccentricity',
+              self.probability_density_of_eccentricity(calculated_eccentricity_now))
 
         #       print(repr(dir(b)))
         if calculated_eccentricity_now >= 0 and calculated_eccentricity_now <= 1:
@@ -959,7 +965,7 @@ class SamplingPropertiesOfSystem:
                                            self.initial_eccentricity,
                                            ' for orbital period = ', self.means['orbital period'],
                                            ' present eccentricity = ', self.means['present eccentricity'],
-                                           ' envelope eccentricity = ', self.mean_e_env))
+                                           ' envelope eccentricity = ', self.e_env))
         # naming the x axis
         plt.xlabel('Qpl')
         # naming the y axis
@@ -980,9 +986,7 @@ if __name__ == '__main__':
     test1 = EccentricityDistribution(mean_e_now=0.059,
                                      e_now_upper_uncertainty=0.05,
                                      e_now_lower_uncertainty=-0.037,
-                                     mean_e_env=0.46887,
-                                     e_env_lower_uncertainty=0.0,
-                                     e_env_upper_uncertainty=0.0)
+                                     e_env=0.46887)
     test1.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
     print('*********************************************************')
     test2 = EnvelopeEccentricityDistribution()
@@ -997,8 +1001,8 @@ if __name__ == '__main__':
                                        planet_name=planet_name,
                                        envelope_eccentricity_function=test2.envelope_eccentricity_function
                                        )
-    #test3.testing_log_prob()
-    test3.MCMC()
+    test3.testing_log_prob()
+    #test3.MCMC()
 
 
 
