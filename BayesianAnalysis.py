@@ -249,7 +249,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         self.e_now_lower_uncertainty = e_now_lower_uncertainty
         self.percentile_for_e_now_upper_uncertainty = percentile_for_e_now_upper_uncertainty
         self.percentile_for_e_now_lower_uncertainty = percentile_for_e_now_lower_uncertainty
-        self.cumulative_density_function_of_present_eccentricity = self.create_cumulative_density_function_of_present_eccentricity()
+        self.cumulative_density_function_of_present_eccentricity, self.cumulative_density_function_of_present_eccentricity_old = self.create_cumulative_density_function_of_present_eccentricity()
 
         self.e_env = e_env
 
@@ -269,6 +269,11 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         s = roots[1]
         def pdf(e):
             return math.exp(-((e/s)**2+b**2)/2)*i0((e/s)*b)
+        self.M = pdf
+        def pdf_old(e):
+            return rice.pdf(e, b, loc=0, scale=s)
+        self.M_old = pdf_old
+
         def cdf(e_now):
             value = nquad(pdf, [[0, e_now]])
             return value[0]
@@ -276,23 +281,50 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         def cumulative_density_function_of_present_eccentricity(e_now):
             value = norm * cdf(e_now)
             return value
-        return cumulative_density_function_of_present_eccentricity
+        def cumulative_density_function_of_present_eccentricity_old(e_now):
+            value = rice.cdf(e_now, b, loc=0, scale=s)
+            return value
+
+        return cumulative_density_function_of_present_eccentricity, cumulative_density_function_of_present_eccentricity_old
 
 
     def probability_density_of_eccentricity(self, e):
         if e > 1 or e < 0:
             return 0
-        if e<self.e_env:
+        if e <= self.e_env:
             return self.cumulative_density_function_of_present_eccentricity(e)
+        return 0
+
+    def probability_density_of_eccentricity_old(self, e):
+        if e > 1 or e < 0:
+            return 0
+        if e <= self.e_env:
+            return self.cumulative_density_function_of_present_eccentricity_old(e)
         return 0
 
     def plot_probability_density_of_eccentricity_vs_eccentricity_graph(self):
         eccentricity = np.linspace(0, 1, 100)
         probability_density_of_eccentricity = []
+        probability_density_of_eccentricity_old = []
+
         for i in range(0, len(eccentricity)):
             probability_density_of_eccentricity = probability_density_of_eccentricity + [self.probability_density_of_eccentricity(eccentricity[i])]
+            probability_density_of_eccentricity_old = probability_density_of_eccentricity_old + [self.probability_density_of_eccentricity_old(eccentricity[i])]
+
+        M_cdf = []
+        M_cdf_old = []
+        for i in range(0, len(eccentricity)):
+            M_cdf = M_cdf + [self.cumulative_density_function_of_present_eccentricity(eccentricity[i])]
+            M_cdf_old = M_cdf_old + [self.cumulative_density_function_of_present_eccentricity_old(eccentricity[i])]
+
+        M_pdf = []
+        M_pdf_old = []
+        for i in range(0, len(eccentricity)):
+            M_pdf = M_pdf + [self.M(eccentricity[i])]
+            M_pdf_old = M_pdf_old + [self.M_old(eccentricity[i])]
 
         plt.plot(eccentricity, probability_density_of_eccentricity, label="Probality density of eccentricity (f(e)) vs. eccentricity (e)")
+        plt.plot(eccentricity, probability_density_of_eccentricity_old, 'x')
         # naming the x axis
         plt.xlabel('Eccentricity (e)')
         # naming the y axis
@@ -301,6 +333,29 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         plt.title('Probability density of eccentricity vs eccentricity')
         # function to show the plot
         plt.show()
+
+        plt.plot(eccentricity, M_cdf, label="cdf of M(e) vs. eccentricity (e)")
+        plt.plot(eccentricity, M_cdf_old, 'x')
+        # naming the x axis
+        plt.xlabel('Eccentricity (e)')
+        # naming the y axis
+        plt.ylabel('M_cdf ')
+        # giving a title to my graph
+        plt.title('cdf of M(e) vs eccentricity')
+        # function to show the plot
+        plt.show()
+
+        plt.plot(eccentricity, M_pdf, label="pdf of M(e) vs. eccentricity (e)")
+        plt.plot(eccentricity, M_pdf_old, 'x')
+        # naming the x axis
+        plt.xlabel('Eccentricity (e)')
+        # naming the y axis
+        plt.ylabel('M_pdf ')
+        # giving a title to my graph
+        plt.title('M_pdf of eccentricity vs eccentricity')
+        # function to show the plot
+        plt.show()
+
         return
 
 
@@ -607,7 +662,7 @@ class SamplingPropertiesOfSystem:
                  planet_name='Exo Planet',
                  serialized_directory='/home/mmmahmud/poet/stellar_evolution_interpolators',
                  envelope_eccentricity_function=None,
-                 initial_eccentricity = 0.5,
+                 initial_eccentricity = 0.4,
                  max_argument_of_phase_lag_function_for_planet=5,
                  min_argument_of_phase_lag_function_for_planet=10,
                  max_initial_stellar_spin=5,
@@ -762,6 +817,7 @@ class SamplingPropertiesOfSystem:
         )
 
         print(dissipation)
+        print('start evolution')
         evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
                                               interpolator=self.interpolator,
                                               dissipation=dissipation,
@@ -779,6 +835,7 @@ class SamplingPropertiesOfSystem:
                                               orbital_period_tolerance=1e-6,
                                               solve=True,
                                               secondary_is_star=False)
+        print('end evolution')
 
 
         calculated_eccentricity_now = evolutionary_history.eccentricity[- 1]
@@ -983,10 +1040,10 @@ class SamplingPropertiesOfSystem:
 if __name__ == '__main__':
     # analysis_on_Nasa_exoplanet_data()
     print('**********************************************************')
-    test1 = EccentricityDistribution(mean_e_now=0.059,
-                                     e_now_upper_uncertainty=0.05,
-                                     e_now_lower_uncertainty=-0.037,
-                                     e_env=0.46887)
+    test1 = EccentricityDistribution(mean_e_now=0.09,
+                                     e_now_upper_uncertainty=0.08,
+                                     e_now_lower_uncertainty=-0.08,
+                                     e_env=0.45)
     test1.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
     print('*********************************************************')
     test2 = EnvelopeEccentricityDistribution()
