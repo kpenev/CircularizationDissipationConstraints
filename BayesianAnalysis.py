@@ -14,6 +14,22 @@ from sympy import *
 from scipy.special import i0
 from scipy.integrate import nquad
 
+if not sys.warnoptions:
+    import warnings
+
+    from sqlalchemy.exc import SAWarning
+
+    warnings.filterwarnings('ignore',
+                            r"^Dialect sqlite\+pysqlite does \*not\* support Decimal objects natively\, "
+                            "and SQLAlchemy must convert from floating point - rounding errors and other "
+                            "issues may occur\. Please consider storing Decimal numbers as strings or "
+                            "integers on this platform for lossless storage\.$",
+                            SAWarning, r'^sqlalchemy\.sql\.type_api$')
+
+    #warnings.filterwarnings('ignore', r".*support Decimal objects natively", SAWarning, r'^sqlalchemy\.sql\.sqltypes$')
+
+    #warnings.simplefilter("error")
+
 sys.path.append('/home/mmmahmud/poet/PythonPackage')
 sys.path.append('../scripts')
 
@@ -76,7 +92,7 @@ def test_Nasa_Exoplanet_data(interpolator,
             if orbital_period[i] <= 10000 and (primary_mass[i] > 0.4 and primary_mass[i] < 1.2) and (
                     metallicity[i] > -1.014 and metallicity[i] < 0.537):
                 j = j + 1
-                print(primary_mass[i], (primary_mass[i] > 0.4 and primary_mass[i] < 1.2))
+
                 a = System(primary_mass[i] * u.solMass,
                            secondary_mass[i] * u.earthMass,
                            secondary_radius[i] * u.earthRad,
@@ -91,30 +107,43 @@ def test_Nasa_Exoplanet_data(interpolator,
                 dissipation = dict(
                     primary=None,
                     secondary=dict(
-                        tidal_frequency_breaks=None,
+                        #tidal_frequency_breaks=None,
+                        tidal_frequency_breaks=np.array([2 * math.pi / 20]),
                         spin_frequency_breaks=None,
-                        tidal_frequency_powers=np.array([0.0]),
+                        #tidal_frequency_powers=np.array([0.0]),
+                        tidal_frequency_powers=np.array([1.0, 0.0]),
                         spin_frequency_powers=np.array([0.0]),
                         reference_phase_lag=phase_lag(5)
                     )
                 )
+
+
+
+
+
                 final_age = stellar_age[i]
                 print(repr(interpolator))
+
+
+
+
+
+
 
                 b = find_evolution(system=a,
                                    interpolator=interpolator,
                                    dissipation=dissipation,
                                    max_age=stellar_age[i] * u.Gyr,
-                                   initial_eccentricity=0.5,
+                                   initial_eccentricity=0.5 * u.dimensionless_unscaled,
                                    initial_obliquity=0.0,
-                                   disk_period=None,
-                                   disk_dissipation_age=2e-3 * units.Gyr,
+                                   disk_period=10 * u.d,
+                                   disk_dissipation_age=2e-3 * u.Gyr,
                                    primary_wind_strength=0.17,
                                    primary_wind_saturation=2.78,
-                                   primary_core_envelope_coupling_timescale=0.05,
+                                   primary_core_envelope_coupling_timescale=0.05 * u.Gyr,
                                    secondary_wind_strength=0.0,
                                    secondary_wind_saturation=100.0,
-                                   secondary_core_envelope_coupling_timescale=0.05,
+                                   secondary_core_envelope_coupling_timescale=0.05 * u.Gyr,
                                    orbital_period_tolerance=1e-6,
                                    solve=True,
                                    secondary_is_star=False)
@@ -179,6 +208,9 @@ def test_Nasa_Exoplanet_data(interpolator,
 def phi(z):
     return 0.5 * (1 + erf(z / math.sqrt(2)))
 
+def alpha(ci):
+    return 1-ci/100.0
+
 def constraints(smallest_acceptable_value_of_orbital_period = 0,
                 largest_acceptable_value_of_orbital_period = 10,
                 smallest_acceptable_value_of_primary_mass = 0.4,
@@ -242,6 +274,8 @@ class EccentricityDistribution(SuperEccentricityDistribution):
                  e_env,
                  percentile_for_e_now_upper_uncertainty=phi(1),
                  percentile_for_e_now_lower_uncertainty=1 - phi(1)
+                 #percentile_for_e_now_upper_uncertainty = 1 - alpha(68.0)/2,
+                 #percentile_for_e_now_lower_uncertainty = alpha(68.0)/2
                  ):
 
         self.mean_e_now = mean_e_now
@@ -250,111 +284,181 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         self.percentile_for_e_now_upper_uncertainty = percentile_for_e_now_upper_uncertainty
         self.percentile_for_e_now_lower_uncertainty = percentile_for_e_now_lower_uncertainty
         self.cumulative_density_function_of_present_eccentricity, self.cumulative_density_function_of_present_eccentricity_old = self.create_cumulative_density_function_of_present_eccentricity()
-
+        self.rice_parameters_are_found = True
         self.e_env = e_env
 
     def equations_to_be_solved_for_Rice_distribution_parameters(self, x):
-        return [rice.cdf((self.mean_e_now+self.e_now_upper_uncertainty), x[0], scale = x[1]) - self.percentile_for_e_now_upper_uncertainty,
-                rice.cdf((self.mean_e_now+self.e_now_lower_uncertainty), x[0], scale = x[1]) - self.percentile_for_e_now_lower_uncertainty]
+        b = x[0]
+        s = x[1]
+        first = rice.cdf((self.mean_e_now+self.e_now_upper_uncertainty), b, scale = s) - self.percentile_for_e_now_upper_uncertainty
+        second = rice.cdf((self.mean_e_now+self.e_now_lower_uncertainty), b, scale = s) - self.percentile_for_e_now_lower_uncertainty
+        print('b = ', b, 's = ', s)
+        if math.isnan(first) or math.isnan(second):
+            print('Iteration does not converge.')
+            self.rice_parameters_are_found = False
+        return [first, second]
+    def equation_to_be_solved_for_Rice_distribution_parameter_s_when_b_zero(self, x):
+        s = x[0]
+        print('s = ', s)
+        eqn = rice.cdf((self.mean_e_now + self.e_now_upper_uncertainty), 0,
+                         scale=s) - self.percentile_for_e_now_upper_uncertainty
+
+        if math.isnan(eqn):
+            print('Iteration does not converge.')
+            self.rice_parameters_are_found = False
+        return [eqn]
 
     def roots_for_Rice_parameters(self):
         estimated_s = self.e_now_upper_uncertainty
+        if self.mean_e_now == 0:
+            try:
+                s = fsolve(self.equation_to_be_solved_for_Rice_distribution_parameter_s_when_b_zero,
+                           np.asarray([estimated_s]))
+                print('s = ', s[0])
+            except:
+                print('Rice parameters cannot be worked out')
+                self.rice_parameters_are_found = False
+                return [math.nan, math.nan]
+            else:
+                self.rice_parameters_are_found = True
+                print('s = ', s[0])
+                return [0, s[0]]
+
+
+
         estimated_b = self.mean_e_now/self.e_now_upper_uncertainty
-        roots = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, np.asarray([estimated_b, estimated_s]))
+        roots = [math.nan, math.nan]
+
+
+        try:
+            roots = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters, np.asarray([estimated_b, estimated_s]))
+            print('b = ', roots[0], ' s = ', roots[1])
+        except:
+            print('Rice parameters cannot be worked out')
+            self.rice_parameters_are_found = False
+        else:
+            self.rice_parameters_are_found = True
+            print('b = ', roots[0], ' s = ', roots[1])
         return roots
+
+
 
     def create_cumulative_density_function_of_present_eccentricity(self):
         roots = self.roots_for_Rice_parameters()
-        b = roots[0]
-        s = roots[1]
-        def pdf(e):
-            return math.exp(-((e/s)**2+b**2)/2)*i0((e/s)*b)
-        self.M = pdf
-        def pdf_old(e):
-            return rice.pdf(e, b, loc=0, scale=s)
-        self.M_old = pdf_old
 
-        def cdf(e_now):
-            value = nquad(pdf, [[0, e_now]])
-            return value[0]
-        norm = 1/cdf(1.0)
-        def cumulative_density_function_of_present_eccentricity(e_now):
-            value = norm * cdf(e_now)
-            return value
-        def cumulative_density_function_of_present_eccentricity_old(e_now):
-            value = rice.cdf(e_now, b, loc=0, scale=s)
-            return value
+        if not(math.isnan(roots[0]) or math.isnan(roots[1])):
+            s = roots[1]
+            b = roots[0]
+            print('s ', s)
+            print('b ', b)
+            print('e median =  ', self.mean_e_now)
+            print(' rice.cdf up to e_median = ', rice.cdf(self.mean_e_now, b, scale=s))
+            def pdf(e):
+                val = i0((e / s) * b)
+                if val == math.inf:
+                    return 0  # Then math.exp(-((e/s)**2+b**2)/2) = 0
+                return math.exp(-((e / s) ** 2 + b ** 2) / 2) * val
 
-        return cumulative_density_function_of_present_eccentricity, cumulative_density_function_of_present_eccentricity_old
+            self.M = pdf
+
+            def pdf_old(e):
+                return rice.pdf(e, b, loc=0, scale=s)
+
+            self.M_old = pdf_old
+
+            def cdf(e_now):
+                value = nquad(pdf, [[0, e_now]])
+                return value[0]
+
+            inv_norm = cdf(1.0)
+
+            def cumulative_density_function_of_present_eccentricity(e_now):
+                if inv_norm == 0:
+                    return math.inf
+                value = cdf(e_now)/inv_norm
+                return value
+
+            def cumulative_density_function_of_present_eccentricity_old(e_now):
+                value = rice.cdf(e_now, b, loc=0, scale=s)
+                return value
+            return cumulative_density_function_of_present_eccentricity, cumulative_density_function_of_present_eccentricity_old
+        return None, None
 
 
     def probability_density_of_eccentricity(self, e):
         if e > 1 or e < 0:
             return 0
-        if e <= self.e_env:
+        if e <= self.e_env and not(self.cumulative_density_function_of_present_eccentricity == None):
             return self.cumulative_density_function_of_present_eccentricity(e)
         return 0
 
     def probability_density_of_eccentricity_old(self, e):
         if e > 1 or e < 0:
             return 0
-        if e <= self.e_env:
+        if e <= self.e_env and not(self.cumulative_density_function_of_present_eccentricity_old == None):
             return self.cumulative_density_function_of_present_eccentricity_old(e)
         return 0
 
     def plot_probability_density_of_eccentricity_vs_eccentricity_graph(self):
-        eccentricity = np.linspace(0, 1, 100)
-        probability_density_of_eccentricity = []
-        probability_density_of_eccentricity_old = []
+        if not(self.cumulative_density_function_of_present_eccentricity == None or self.cumulative_density_function_of_present_eccentricity_old == None):
+            eccentricity = np.linspace(0, 1, 100)
+            probability_density_of_eccentricity = []
+            probability_density_of_eccentricity_old = []
 
-        for i in range(0, len(eccentricity)):
-            probability_density_of_eccentricity = probability_density_of_eccentricity + [self.probability_density_of_eccentricity(eccentricity[i])]
-            probability_density_of_eccentricity_old = probability_density_of_eccentricity_old + [self.probability_density_of_eccentricity_old(eccentricity[i])]
+            for i in range(0, len(eccentricity)):
+                probability_density_of_eccentricity = probability_density_of_eccentricity + [
+                    self.probability_density_of_eccentricity(eccentricity[i])]
+                probability_density_of_eccentricity_old = probability_density_of_eccentricity_old + [
+                    self.probability_density_of_eccentricity_old(eccentricity[i])]
 
-        M_cdf = []
-        M_cdf_old = []
-        for i in range(0, len(eccentricity)):
-            M_cdf = M_cdf + [self.cumulative_density_function_of_present_eccentricity(eccentricity[i])]
-            M_cdf_old = M_cdf_old + [self.cumulative_density_function_of_present_eccentricity_old(eccentricity[i])]
+            M_cdf = []
+            M_cdf_old = []
+            for i in range(0, len(eccentricity)):
+                M_cdf = M_cdf + [self.cumulative_density_function_of_present_eccentricity(eccentricity[i])]
+                M_cdf_old = M_cdf_old + [self.cumulative_density_function_of_present_eccentricity_old(eccentricity[i])]
 
-        M_pdf = []
-        M_pdf_old = []
-        for i in range(0, len(eccentricity)):
-            M_pdf = M_pdf + [self.M(eccentricity[i])]
-            M_pdf_old = M_pdf_old + [self.M_old(eccentricity[i])]
+            M_pdf = []
+            M_pdf_old = []
+            for i in range(0, len(eccentricity)):
+                M_pdf = M_pdf + [self.M(eccentricity[i])]
+                M_pdf_old = M_pdf_old + [self.M_old(eccentricity[i])]
 
-        plt.plot(eccentricity, probability_density_of_eccentricity, label="Probality density of eccentricity (f(e)) vs. eccentricity (e)")
-        plt.plot(eccentricity, probability_density_of_eccentricity_old, 'x')
-        # naming the x axis
-        plt.xlabel('Eccentricity (e)')
-        # naming the y axis
-        plt.ylabel('probability density of eccentricity (f(e))')
-        # giving a title to my graph
-        plt.title('Probability density of eccentricity vs eccentricity')
-        # function to show the plot
-        plt.show()
+            plt.plot(eccentricity, probability_density_of_eccentricity,
+                     label="Probality density of eccentricity (f(e)) vs. eccentricity (e)")
+            plt.plot(eccentricity, probability_density_of_eccentricity_old, 'x')
+            # naming the x axis
+            plt.xlabel('Eccentricity (e)')
+            # naming the y axis
+            plt.ylabel('probability density of eccentricity (f(e))')
+            # giving a title to my graph
+            plt.title('Probability density of eccentricity vs eccentricity')
+            # function to show the plot
+            plt.show()
 
-        plt.plot(eccentricity, M_cdf, label="cdf of M(e) vs. eccentricity (e)")
-        plt.plot(eccentricity, M_cdf_old, 'x')
-        # naming the x axis
-        plt.xlabel('Eccentricity (e)')
-        # naming the y axis
-        plt.ylabel('M_cdf ')
-        # giving a title to my graph
-        plt.title('cdf of M(e) vs eccentricity')
-        # function to show the plot
-        plt.show()
+            plt.plot(eccentricity, M_cdf, label="cdf of M(e) vs. eccentricity (e)")
+            plt.plot(eccentricity, M_cdf_old, 'x')
+            # naming the x axis
+            plt.xlabel('Eccentricity (e)')
+            # naming the y axis
+            plt.ylabel('M_cdf ')
+            # giving a title to my graph
+            plt.title('cdf of M(e) vs eccentricity')
+            # function to show the plot
+            plt.show()
 
-        plt.plot(eccentricity, M_pdf, label="pdf of M(e) vs. eccentricity (e)")
-        plt.plot(eccentricity, M_pdf_old, 'x')
-        # naming the x axis
-        plt.xlabel('Eccentricity (e)')
-        # naming the y axis
-        plt.ylabel('M_pdf ')
-        # giving a title to my graph
-        plt.title('M_pdf of eccentricity vs eccentricity')
-        # function to show the plot
-        plt.show()
+            plt.plot(eccentricity, M_pdf, label="pdf of M(e) vs. eccentricity (e)")
+            plt.plot(eccentricity, M_pdf_old, 'x')
+            # naming the x axis
+            plt.xlabel('Eccentricity (e)')
+            # naming the y axis
+            plt.ylabel('M_pdf ')
+            # giving a title to my graph
+            plt.title('M_pdf of eccentricity vs eccentricity')
+            # function to show the plot
+            plt.show()
+            return
+        print('Probability density distributions of eccentricity according to given mean_e_now and its uncertainties do not exist')
+
 
         return
 
@@ -402,6 +506,8 @@ class EnvelopeEccentricityDistribution:
                  constraints = constraints(),
                  largest_acceptable_value_of_envelope_eccentricity=0.5
                  ):
+
+
         self.path = path
         self.file_name = file_name
         self.serialized_directory = serialized_directory
@@ -647,6 +753,9 @@ class EnvelopeEccentricityDistribution:
                 k = k + 1
                 print('k = ', k)
                 print('means = ', means, 'standard deviations = ', standard_deviations, ' planet name = ', planet_name)
+                print('e_mean ', means['present eccentricity'])
+                print('e_now_upper_uncertainty ', standard_deviations['eccentricity_now_upper_uncertainty'])
+                print('e_now_lower_uncertainty ', standard_deviations['eccentricity_now_lower_uncertainty'])
                 print('log of orbital period = ', math.log(means['orbital period'], 10))
                 print('Envelope eccentricity for orbital period = ', means['orbital period'], ' is = ',
                       self.envelope_eccentricity_function(means['orbital period']))
@@ -685,7 +794,10 @@ class SamplingPropertiesOfSystem:
         self.spin_frequency_breaks_for_planet= spin_frequency_breaks_for_planet
         self.spin_frequency_powers_for_planet= spin_frequency_powers_for_planet
 
-
+        eccentricity_expansion_fname = b"/home/mmmahmud/poet/scripts/eccentricity_expansion_coef.txt"
+        orbital_evolution_library.read_eccentricity_expansion_coefficients(
+            eccentricity_expansion_fname
+        )
 
         self.serialized_directory = serialized_directory
         manager = StellarEvolutionManager(serialized_directory)
@@ -699,6 +811,7 @@ class SamplingPropertiesOfSystem:
 
         self.standard_deviations = standard_deviations
 
+
         if (constraints_are_satisfied(orbital_period=means['orbital period'],
                                       primary_mass=means['primary mass'],
                                       secondary_mass=means['secondary mass'],
@@ -711,10 +824,15 @@ class SamplingPropertiesOfSystem:
             self.means['obliquity'] = 0
 
             self.e_env = self.envelope_eccentricity_function(orbital_period=self.means['orbital period'])
+            print(self.means['present eccentricity'],
+                  self.standard_deviations['eccentricity_now_upper_uncertainty'],
+                  self.standard_deviations['eccentricity_now_lower_uncertainty'],
+                  self.e_env)
             eccentricity_distribution_object = EccentricityDistribution(self.means['present eccentricity'],
                                                                         self.standard_deviations['eccentricity_now_upper_uncertainty'],
                                                                         self.standard_deviations['eccentricity_now_lower_uncertainty'],
                                                                         self.e_env)
+            eccentricity_distribution_object.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
             self.probability_density_of_eccentricity = eccentricity_distribution_object.probability_density_of_eccentricity
 
             if find_argument_of_phase_lag_function_for_planet_range_auto:
@@ -808,9 +926,11 @@ class SamplingPropertiesOfSystem:
         dissipation = dict(
             primary=None,
             secondary=dict(
-                tidal_frequency_breaks=self.tidal_frequency_breaks_for_planet,
+                #tidal_frequency_breaks=self.tidal_frequency_breaks_for_planet,
+                tidal_frequency_breaks=None,
                 spin_frequency_breaks=self.spin_frequency_breaks_for_planet,
-                tidal_frequency_powers=self.tidal_frequency_powers_for_planet,
+                #tidal_frequency_powers=self.tidal_frequency_powers_for_planet,
+                tidal_frequency_powers=np.array([0.0]),
                 spin_frequency_powers=self.spin_frequency_powers_for_planet,
                 reference_phase_lag=phase_lag(argument_of_phase_lag_function_for_planet)
             )
@@ -1038,27 +1158,28 @@ class SamplingPropertiesOfSystem:
 
 
 if __name__ == '__main__':
-    # analysis_on_Nasa_exoplanet_data()
+    #analysis_on_Nasa_exoplanet_data()
     print('**********************************************************')
-    test1 = EccentricityDistribution(mean_e_now=0.09,
-                                     e_now_upper_uncertainty=0.08,
-                                     e_now_lower_uncertainty=-0.08,
-                                     e_env=0.45)
+    test1 = EccentricityDistribution(mean_e_now=0.39,
+                                     e_now_upper_uncertainty=0.2,
+                                     e_now_lower_uncertainty=-0.2,
+                                     e_env=0.40)
     test1.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
     print('*********************************************************')
     test2 = EnvelopeEccentricityDistribution()
     print('Binary systems whose probability density of eccentricity can be figured out:')
     index = test2.print_properties_of_binary_systems_satisfying_constraints()
-    means, standard_deviations, planet_name = test2.properties_of_ith_binary_system_if_satisfies_constraints(index[12])
+    means, standard_deviations, planet_name = test2.properties_of_ith_binary_system_if_satisfies_constraints(index[20])
     print('Print properties of the chosen binary system: means = ', means, ' standard deviations = ',
           standard_deviations, ' planet name = ', planet_name)
-    print('*********************************************************')
+    print('*********************************************************HHHHHHHHHHHHHHH')
     test3 = SamplingPropertiesOfSystem(means,
                                        standard_deviations,
                                        planet_name=planet_name,
                                        envelope_eccentricity_function=test2.envelope_eccentricity_function
                                        )
-    test3.testing_log_prob()
+
+    #test3.testing_log_prob()
     #test3.MCMC()
 
 
