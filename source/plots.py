@@ -939,19 +939,23 @@ def get_lgQ_constraints(lgQ_x_axes,
     return result
 #pylint: enable=too-many-locals
 
-def set_x_axis(quantity, planets):
+def set_x_axis(quantity, planets, plot_axes=None):
     """Set the x axis appropriately for the givne quantity."""
 
-    if quantity == 'orbital_period':
-        if planets:
-            pyplot.xscale('linear')
-            pyplot.xlim(1, 4.5)
+    if plot_axes is None:
+        plot_axes = [pyplot.gca()]
+
+    for axis in plot_axes:
+        if quantity == 'orbital_period':
+            if planets:
+                axis.set_xscale('linear')
+                axis.set_xlim(1, 5)
+            else:
+                axis.set_xscale('log')
+                axis.set_xlim(1, 50)
         else:
-            pyplot.xscale('log')
-            pyplot.xlim(1, 50)
-    else:
-        pyplot.xscale('log')
-        pyplot.autoscale()
+            axis.set_xscale('log')
+            axis.set_autoscale_on()
 
 #TODO: look into simplifying
 #pylint: disable=too-many-statements
@@ -977,6 +981,9 @@ def plot_lgQ_vs(lgQ_x_axes,
 
     if not hasattr(plot_lgQ_vs, "color_index"):
         plot_lgQ_vs.color_index = cmdline_args.color_index_offset
+
+    plot_axes = pyplot.subplots(1, 2, sharey=True)[1]
+    pyplot.subplots_adjust(wspace=0.07)
 
     def add_points(*,
                    plot_x,
@@ -1030,9 +1037,8 @@ def plot_lgQ_vs(lgQ_x_axes,
             ] if fill_limit_markers or (not limit) else 'none'
 
 
-            for sub_include in sub_include_list:
-
-                pyplot.errorbar(
+            for sub_include, axis in zip(sub_include_list, plot_axes):
+                axis.errorbar(
                     x=plot_x[sub_include],
                     y=plot_y[sub_include],
                     yerr=[err[sub_include] for err in plot_errors],
@@ -1114,7 +1120,7 @@ def plot_lgQ_vs(lgQ_x_axes,
     lgQ_range = (3, 9)
     for x_index in range(plot_x.shape[0]):
         print('Plotting lgQ vs ' + repr(lgQ_x_axes[x_index]))
-        set_x_axis(lgQ_x_axes[x_index][0], cmdline_args.nasa_data)
+        set_x_axis(lgQ_x_axes[x_index][0], cmdline_args.nasa_data, plot_axes)
 
         add_points(
             plot_x=plot_x[x_index, limit_flags['upper']],
@@ -1176,12 +1182,14 @@ def plot_lgQ_vs(lgQ_x_axes,
             distinguish=is_giant[selected]
         )
 
-        pyplot.xlabel(
-            get_axis_label(*lgQ_x_axes[x_index], cmdline_args.nasa_data)
-        )
-        pyplot.ylabel(get_axis_label('lgQ', '', cmdline_args.nasa_data))
+        for axis in plot_axes:
+            axis.set_xlabel(
+                get_axis_label(*lgQ_x_axes[x_index], cmdline_args.nasa_data)
+            )
+        plot_axes[0].set_ylabel(get_axis_label('lgQ', '', cmdline_args.nasa_data))
         if cmdline_args.nasa_data:
-            pyplot.axhspan(6, 7, color='lightgrey', zorder=-100)
+            for axis in plot_axes:
+                axis.axhspan(6, 7, color='lightgrey', zorder=-100)
 
 
         if cmdline_args.nasa_data is None:
@@ -1480,14 +1488,12 @@ def main():
 
     rcParams['font.size'] = cmdline_args.font_size
     rcParams['figure.dpi'] = 300
-    figure = pyplot.figure(figsize=cmdline_args.figure_size)
-    #The axes become the default axes so they do get used.
-    #pylint: disable=unused-variable
-    axes = figure.add_axes([cmdline_args.axes_hshift,
-                            cmdline_args.axes_vshift,
-                            cmdline_args.axes_hspan - cmdline_args.axes_hshift,
-                            cmdline_args.axes_vspan - cmdline_args.axes_vshift])
-    #pylint: enable=unused-variable
+    rcParams['figure.figsize'] = cmdline_args.figure_size
+    rcParams['figure.subplot.left'] = cmdline_args.axes_hshift
+    rcParams['figure.subplot.bottom'] = cmdline_args.axes_vshift
+    rcParams['figure.subplot.right'] = cmdline_args.axes_hspan
+    rcParams['figure.subplot.top'] = cmdline_args.axes_vspan
+    rcParams['figure.subplot.hspace'] = 0.1
 
     pickled_cmdline_args = (
         load_progress(cmdline_args.first_progress_pickle[0])[0]
@@ -1553,6 +1559,7 @@ def main():
                 ),
                 **arguments
             )
+    pyplot.gcf().tight_layout()
 
 if __name__ == '__main__':
     main()

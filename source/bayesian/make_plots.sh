@@ -72,8 +72,6 @@ if [ "$1" == "all" ]; then
     done
 fi
 
-#NGC188_4965_mcmc_powerlawlgQ_samples.h5:30\
-#NGC188_5797_mcmc_powerlawlgQ_samples.h5:30\
 bayesian/visualize_emcee.py\
     NGC188_4289_mcmc_powerlawlgQ_samples.h5:40\
     NGC188_4618_mcmc_powerlawlgQ_samples.h5:125\
@@ -88,6 +86,7 @@ bayesian/visualize_emcee.py\
     NGC188_6171_mcmc_powerlawlgQ_samples.h5:100\
     NGC188_6292_mcmc_powerlawlgQ_samples.h5:30\
     NGC188_8775_mcmc_powerlawlgQ_samples.h5:75\
+    NGC6819_13001_mcmc_powerlawlgQ_samples.h5:45\
     NGC6819_57004_mcmc_powerlawlgQ_samples.h5:45\
     NGC6819_59003_mcmc_powerlawlgQ_samples.h5:30\
     NGC6819_66004_mcmc_powerlawlgQ_samples.h5:30\

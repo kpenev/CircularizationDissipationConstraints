@@ -18,6 +18,8 @@ import pandas
 from scipy import stats
 from asteval import Interpreter
 
+from combined_mcmc_constraint import CombinedMCMCConstraint
+
 from visuals import make_corner_plot
 
 def parse_command_line():
@@ -92,6 +94,30 @@ def parse_command_line():
         action='store_true',
         help='If specified frequency dependent plots draw lines to indicate the'
         ' bounds of the specified confidence intervals.'
+    )
+    parser.add_argument(
+        '--combined-constraint-lgQ-grid',
+        default=numpy.linspace(5, 12, 100),
+        action=ParseGrid,
+        metavar=('MIN_LGQ', 'MAX_LGQ', 'RES'),
+        help='Set the range and resolution in log10(Q) on which to calculate '
+        'cobined constraints.'
+    )
+    parser.add_argument(
+        '--combined-constraint-heat-map',
+        default=False,
+        action='store_true',
+        help='Plot a heat map of the combined log-likelihood in the frequnecy '
+        'dependence plot. If enabled, the confidence interval is shown using '
+        'lines only (not filled).'
+    )
+
+    parser.add_argument(
+        '--combined-constraint-kernel-scale',
+        default=1.0,
+        type=float,
+        help='A scaling to apply to the width of the kernel that gets convolved'
+        ' with the samples for calculating combined constraints.'
     )
     parser.add_argument(
         '--errorbar-plot',
@@ -283,6 +309,10 @@ class FrequencyDependencePlotterBase(ABC):
                             'tab:gray',
                             'tab:olive',
                             'tab:cyan']
+        self.combined_pdf = CombinedMCMCConstraint(
+            config.combined_constraint_lgQ_grid,
+            config.combined_constraint_kernel_scale
+        )
 
     @abstractmethod
     def evaluate_lgq(self, samples):
@@ -332,20 +362,9 @@ class FrequencyDependencePlotterBase(ABC):
                     linewidth=0
                 )
             else:
-                plot_kwargs = dict(
-                    alpha=self.transparency,
-                    edgecolor='none',
-                    facecolor='black'
-                )
+                self.combined_pdf.add_samples(evaluated_lgq)
 
             self._constraint_index += 1
-            pyplot.fill_between(
-                self.config.ptide_grid,
-                min_lgq,
-                max_lgq,
-                zorder=10,
-                **plot_kwargs
-            )
 
             if conf_index == 0:
                 pyplot.fill_between(
@@ -361,19 +380,111 @@ class FrequencyDependencePlotterBase(ABC):
                             max_lgq,
                             '--',
                             zorder=20,
-                            linewidth=5,
+                            linewidth=1,
                             color=color)
                 pyplot.plot(self.config.ptide_grid,
                             min_lgq,
                             ':',
                             zorder=20,
-                            linewidth=5,
+                            linewidth=1,
                             color=color)
+
+    def plot_combined_constraint(self, label=None, color_list=None):
+        """Add a plot of the cobmined constraint collected so far."""
+
+        def get_interval(cdf_slice, confidence):
+            """Return shortest lgQ confidence interval for fix P slice."""
+
+            lower_indices = numpy.arange(numpy.searchsorted(cdf_slice,
+                                                            1.0 - confidence))
+            upper_indices = numpy.searchsorted(
+                cdf_slice,
+                cdf_slice[:lower_indices[-1] + 1]+ confidence
+            )
+            selected = numpy.argmin(upper_indices - lower_indices)
+            lower_bound, upper_bound = self.config.combined_constraint_lgQ_grid[
+                [lower_indices[selected], upper_indices[selected]]
+            ]
+            return (lower_bound - max(0, (5.8 - lower_bound)),
+                    upper_bound + max(0, (upper_bound - 7.0)))
+
+        pdf = self.combined_pdf()
+        cdf = numpy.cumsum(pdf, 0) - 0.5 * pdf
+
+        if self.config.combined_constraint_heat_map:
+            logpdf = numpy.log(pdf)
+            pyplot.pcolormesh(self.config.ptide_grid,
+                              self.config.combined_constraint_lgQ_grid,
+                              logpdf,
+                              vmax=logpdf.max(),
+                              vmin=max(logpdf.max()-10, logpdf.min()),
+                              zorder=10)
+
+        for color_index, confidence in enumerate(
+                self.config.plot_confidence
+        ):
+            combined_bounds = numpy.empty(
+                shape=(2, self.config.ptide_grid.size),
+                dtype=float
+            )
+            print(80*'=')
+            print('%f%% confidence interval: ' % (100.0 * confidence))
+            for ptide_index in range(self.config.ptide_grid.size):
+                combined_bounds[:, ptide_index] = get_interval(
+                    cdf[:, ptide_index],
+                    confidence
+                )
+                print(
+                    '%25.16e %25.16e'
+                    %
+                    (
+                        self.config.ptide_grid[ptide_index],
+                        (
+                            combined_bounds[1][ptide_index]
+                            -
+                            combined_bounds[0][ptide_index]
+                        )
+                    )
+                )
+
+            if color_list is None:
+                color_list = self._color_list
+            color = color_list[color_index % len(color_list)]
+
+            if self.config.combined_constraint_heat_map:
+                pyplot.plot(self.config.ptide_grid,
+                            combined_bounds[1],
+                            '--',
+                            zorder=30,
+                            linewidth=4,
+                            color=color,
+                            label=label)
+                pyplot.plot(self.config.ptide_grid,
+                            combined_bounds[0],
+                            ':',
+                            zorder=30,
+                            linewidth=4,
+                            color=color)
+            else:
+                pyplot.fill_between(self.config.ptide_grid,
+                                    combined_bounds[0],
+                                    combined_bounds[1],
+                                    zorder=30,
+                                    facecolor=color,
+                                    edgecolor='none',
+                                    alpha=0.7,
+                                    label=label)
+
+
+
+        if self.config.combined_constraint_heat_map:
+            pyplot.colorbar()
 
     def save(self):
         """Save the plot to the file sepecified by the init configuration."""
 
-        pyplot.xlabel(r'Orbital Period [days]')
+        self.plot_combined_constraint()
+        pyplot.xlabel(r'$P_{tide}$ [days]')
         pyplot.ylabel(r"$\log_{10}Q_\star'$")
         pyplot.savefig(self.config.frequency_dependence_plot_fname)
 
@@ -399,6 +510,8 @@ class PowerlawLgQDependencePlotter(FrequencyDependencePlotterBase):
             )
         )
 
+#Simplifying would make things less readable
+#pylint: disable=too-many-locals
 def add_errorbar(samples, config):
     """Add a single error bar per --errorbar-plot configuration argument."""
 
@@ -427,6 +540,7 @@ def add_errorbar(samples, config):
             color='black'
         )
         line_width += 2
+#pylint: enable=too-many-locals
 
 def main(config):
     """"Avoid polluting global namespace."""

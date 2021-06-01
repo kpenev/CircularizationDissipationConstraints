@@ -174,8 +174,8 @@ def get_final_eccentricity_likelihood(observed_orbit, eccentricity_envelope):
     """Return :class:`EccentricityLikelihood` instance per the given orbit."""
 
     return EccentricityLikelihood(
-        observed_eccentricity=stats.rice(
-            b=float(observed_orbit['e']) / float(observed_orbit['e_e']),
+        observed_eccentricity=stats.norm(
+            loc=float(observed_orbit['e']),
             scale=float(observed_orbit['e_e'])
         ),
         envelope_eccentricity=eccentricity_envelope(
@@ -231,26 +231,29 @@ def plot_eccentricity_vs_period(binaries, eccentricity_envelope):
         color = pyplot.errorbar(binary_class['Per'],
                                 binary_class['e'],
                                 binary_class['e_e'],
-                                fmt='o',
+                                fmt='ok',
                                 label=label)[0].get_color()
 
-        if 'M1' in binary_class:
-            add_shifted_periods(binary_class)
-            pyplot.errorbar(binary_class['ShiftedPer'],
-                            binary_class['e'],
-                            binary_class['e_e'],
-                            fmt='o',
-                            markeredgecolor=color,
-                            markerfacecolor='none')
+#        if 'M1' in binary_class:
+#            add_shifted_periods(binary_class)
+#            pyplot.errorbar(binary_class['ShiftedPer'],
+#                            binary_class['e'],
+#                            binary_class['e_e'],
+#                            fmt='o',
+#                            markeredgecolor=color,
+#                            markerfacecolor='none')
     envelope_x = 2.0**numpy.linspace(1, 6, 1000)
-    pyplot.plot(envelope_x, eccentricity_envelope(envelope_x), '-k')
-    pyplot.axhline(0.5)
-    pyplot.ylim(0, 1.0)
-    pyplot.xlim(2, 64)
+#    pyplot.plot(envelope_x,
+#                numpy.maximum(eccentricity_envelope(envelope_x), 0.05),
+#                '-k')
+#    pyplot.axhline(0.5)
+    pyplot.axvspan(9, 16, color='red', alpha=0.3, zorder=-10)
+    pyplot.ylim(0, 0.7)
+    pyplot.xlim(2, 100)
     pyplot.xlabel('Orbital Period [d]')
     pyplot.ylabel('Eccentricity')
-    pyplot.legend()
-    pyplot.show()
+#    pyplot.legend()
+#    pyplot.show()
 
 def plot_eccentricity_likelihood(observed_orbit, eccentricity_envelope):
     """Plot the likelihood of the final ecc. for a given system."""

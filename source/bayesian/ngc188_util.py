@@ -6,6 +6,7 @@ import os.path
 import logging
 from multiprocessing import set_start_method
 
+from matplotlib import pyplot, rcParams
 import pandas
 import numpy
 from scipy import stats
@@ -288,5 +289,25 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     plot_eccentricity_likelihood(get_observed_orbit(4965),
                                  eccentricity_envelope)
-    plot_eccentricity_vs_period(get_binary_data(), eccentricity_envelope)
+    rcParams['font.size'] = 18
+    rcParams['figure.figsize'] = [6.5, 4.8]
+    rcParams['figure.subplot.bottom'] = 0.15
+    rcParams['figure.subplot.top'] = 0.98
+    rcParams['figure.subplot.left'] = 0.13
+    rcParams['figure.subplot.right'] = 0.965
+
+    plot_eccentricity_vs_period(
+        get_binary_data(),
+        LinearEccentricityEnvelope(min_period=7.0,
+                                   max_period=45.0,
+                                   max_eccentricity=0.71)
+#        eccentricity_envelope
+    )
+    pyplot.text(s='NGC 188',
+                x=2.2, y=0.68,
+                fontsize='large',
+                ha='left',
+                va='top',
+                fontweight='semibold')
+    pyplot.savefig('ngc188_period_eccentricity.pdf')
     #_test_rvk_constraint(3732)
