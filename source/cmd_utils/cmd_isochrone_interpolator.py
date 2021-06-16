@@ -97,12 +97,6 @@ class CMDInterpolator:
 
         for section_data in self.data:
             assert scipy.unique(section_data['MH']).size == 1
-            negative =(
-                (section_data['Mini'][1:] - section_data['Mini'][:-1])
-                <
-                0
-            )
-            print(section_data['Mini'][:-1][negative])
             assert (
                 (section_data['Mini'][1:] - section_data['Mini'][:-1])
                 >=
