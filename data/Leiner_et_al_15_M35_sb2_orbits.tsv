@@ -1,0 +1,101 @@
+#
+#   VizieR Astronomical Server vizier.u-strasbg.fr
+#    Date: 2021-06-16T12:06:36 [V1.99+ (14-Oct-2013)]
+#   In case of problem, please report to:	cds-question@unistra.fr
+#
+#
+#Coosys	J2000:	eq_FK5 J2000
+#INFO	votable-version=1.99+ (14-Oct-2013)	
+#INFO	-ref=VIZ60c9e93f24522f	
+#INFO	-out.max=unlimited	
+#INFO	queryParameters=28	
+#-oc.form=dec
+#-out.max=unlimited
+#-out.all=2
+#-nav=cat:J/AJ/150/10&tab:{J/AJ/150/10/sb2}&key:source=J/AJ/150/10/sb1&HTTPPRM:&
+#-source=J/AJ/150/10/sb2
+#-order=I
+#-out=Region
+#-out=WOCS
+#-out=Per
+#-out=Ncyc
+#-out=RV
+#-out=K1
+#-out=K2
+#-out=e
+#-out=omega
+#-out=T0
+#-out=asini1
+#-out=asini2
+#-out=msini1
+#-out=msini2
+#-out=q
+#-out=sig1
+#-out=sig2
+#-out=N1
+#-out=N2
+#-out=VC
+#VC=VC
+#-out.all=2
+#
+
+#RESOURCE=yCat_51500010
+#Name: J/AJ/150/10
+#Title: WOCS. LXVI. Radial velocity survey in M35 (Leiner+, 2015)
+#Table	J_AJ_150_10_sb2:
+#Name: J/AJ/150/10/sb2
+#Title: Orbital parameters for double-lined binaries:  in M35 , and in the field
+#Column	Region	(A5)	Simbad column added by the CDS	[ucd=meta.id.parent]
+#Column	WOCS	(I6)	[9033/127048] WIYN Open Cluster Study number (G1)	[ucd=meta.id;meta.main]
+#Column	Per	(F9.6)	[2.22916/75.038] Orbital period	[ucd=time.period]
+#Column	e_Per	(F9.6)	Error in Per	[ucd=stat.error]
+#Column	Ncyc	(F6.1)	[18.1/1243] Number of orbital cycles encompassed by our measurements	[ucd=meta.number]
+#Column	RV	(F6.2)	[-52.53/44.6] Center-of-mass velocity ({gamma})	[ucd=spect.dopplerVeloc;pos.heliocentric]
+#Column	e_RV	(F5.2)	[0.12/0.7] Error in RV	[ucd=stat.error]
+#Column	K1	(F5.2)	[22/87] Orbital amplitude of the primary	[ucd=src.var.amplitude]
+#Column	e_K1	(F5.2)	[0.2/2] Error in K1	[ucd=stat.error]
+#Column	K2	(F6.2)	[0.1/103] Orbital amplitude of the secondary	[ucd=src.var.amplitude]
+#Column	e_K2	(F5.2)	[0.2/1.6] Error in K2	[ucd=stat.error]
+#Column	e	(F6.3)	[0/0.55] Eccentricity	[ucd=src.orbital.eccentricity]
+#Column	e_e	(F6.3)	[0.003/0.02] Error in eccentricity	[ucd=stat.error]
+#Column	omega	(F5.1)	[0/360] Longitude of periastron ({omega})	[ucd=src.orbital.periastron]
+#Column	e_omega	(F4.1)	[1.2] Error in omega	[ucd=stat.error]
+#Column	T0	(F8.2)	[51812/55773] Heliocentric Julian Date of periastron (HJD-2400000)	[ucd=src.orbital.periastron]
+#Column	e_T0	(F5.2)	[0.06/0.3] Error in T0	[ucd=stat.error]
+#Column	asini1	(F6.3)	[2.235/24.4] Projected primary semi-major axis (a sin i)	[ucd=phys.angSize.smajAxis]
+#Column	e_asini1	(F6.3)	[0.007/0.5] Error in asini1	[ucd=stat.error]
+#Column	asini2	(F6.3)	[3.06/24.5]? Projected secondary semi-major axis (a sin i)	[ucd=phys.angSize.smajAxis]
+#Column	e_asini2	(F6.3)	[0.024/0.5]? Error in asini2	[ucd=stat.error]
+#Column	msini1	(F6.3)	[0.098/1.5]? Projected primary mass (m sin^3^ i)	[ucd=phys.mass]
+#Column	e_msini1	(F6.3)	[0.003/0.06]? Error in msini1	[ucd=stat.error]
+#Column	msini2	(F6.3)	[0.085/1.34]? Projected secondary mass (m sin^3^ i)	[ucd=phys.mass]
+#Column	e_msini2	(F6.3)	[0.003/0.07]? Error in msini2	[ucd=stat.error]
+#Column	q	(F6.3)	[0.653/0.998]? Mass ratio	[ucd=phys.mass]
+#Column	e_q	(F6.3)	[0.007/0.03]? Error in q	[ucd=stat.error]
+#Column	sig1	(F5.2)	[0.70/4.47] The rms residual velocity for the primary from the orbital solution ({sigma})	[ucd=phys.veloc.dispersion]
+#Column	sig2	(F5.2)	[0.42/2.98] The rms residual velocity for the secondary from the orbital solution ({sigma})	[ucd=phys.veloc.dispersion]
+#Column	N1	(I2)	[12/42] Number of radial velocity measurements for the primary	[ucd=meta.number]
+#Column	N2	(I2)	[9/38] Number of radial velocity measurements for the secondary	[ucd=meta.number]
+#Column	VC	(A2)	Show the radial Velocity Curve	[ucd=meta.ref.url]
+Region|WOCS|Per|e_Per|Ncyc|RV|e_RV|K1|e_K1|K2|e_K2|e|e_e|omega|e_omega|T0|e_T0|asini1|e_asini1|asini2|e_asini2|msini1|e_msini1|msini2|e_msini2|q|e_q|sig1|sig2|N1|N2|VC
+ | |d|d| |km/s|km/s|km/s|km/s|km/s|km/s| | |deg|deg|d|d|Gm|Gm|Gm|Gm|Msun|Msun|Msun|Msun| | |km/s|km/s| | |
+-----|------|---------|---------|------|------|-----|-----|-----|------|-----|------|------|-----|----|--------|-----|------|------|------|------|------|------|------|------|------|------|-----|-----|--|--|--
+M35  | 11017| 4.441654| 0.000006|1243.0| -8.96| 0.23|75.80| 0.80| 85.50| 0.40| 0.003| 0.003|344.5| 1.2|51812.61| 0.06| 4.630| 0.060| 5.222| 0.024| 1.024| 0.015| 0.908| 0.022| 0.887| 0.012| 2.69| 1.04|25|21|VC
+M35  | 15034|16.491820| 0.000240| 361.2| -7.22| 0.16|22.10| 0.30| 25.40| 0.30| 0.009| 0.010|340.8| 1.2|52974.98| 0.06| 5.010| 0.080| 5.760| 0.070| 0.098| 0.003| 0.085| 0.003| 0.871| 0.016| 1.53| 1.17|41|34|VC
+M35  | 18018|35.387100| 0.001900| 138.5| -7.60| 0.40|33.70| 0.80| 51.60| 0.90| 0.272| 0.020|227.5| 1.2|52812.01| 0.06|15.800| 0.400|24.100| 0.500| 1.220| 0.060| 0.800| 0.040| 0.653| 0.021| 2.17| 2.13|24| 9|VC
+M35  | 21019|75.038000| 0.006000|  69.5| -8.13| 0.15|28.20| 0.60| 28.30| 0.60| 0.543| 0.010|329.0| 1.2|52702.20| 0.06|24.400| 0.500|24.500| 0.500| 0.414| 0.020| 0.413| 0.019| 0.998| 0.023| 1.23| 1.29|42|38|VC
+M35  | 24008|24.120100| 0.000800| 211.3| -7.12| 0.22|36.80| 0.30| 41.00| 0.70| 0.195| 0.009| 89.2| 1.2|52059.53| 0.06|11.970| 0.120|13.330| 0.230| 0.584| 0.022| 0.525| 0.014| 0.898| 0.018| 1.07| 2.27|21|20|VC
+M35  | 31012|43.437400| 0.001400|  77.4| -6.22| 0.16|36.80| 0.40| 38.40| 0.60| 0.515| 0.006|204.3| 1.2|52758.81| 0.06|18.870| 0.210|19.700| 0.300| 0.616| 0.020| 0.591| 0.016| 0.960| 0.016| 1.01| 1.41|27|26|VC
+M35  | 41018|18.586940| 0.000110| 291.7| -9.55| 0.12|54.80| 0.30| 59.30| 0.30| 0.431| 0.004|329.2| 1.2|52736.33| 0.06|12.650| 0.060|13.680| 0.080| 1.093| 0.015| 1.010| 0.012| 0.925| 0.007| 0.73| 1.03|27|25|VC
+M35  | 56055|15.645400| 0.000400| 188.6| -8.78| 0.13|46.60| 0.60| 50.19| 0.25| 0.051| 0.004| 93.6| 1.2|55686.32| 0.06|10.020| 0.160|10.780| 0.060| 0.760| 0.015| 0.706| 0.023| 0.929| 0.014| 1.64| 0.42|16|13|VC
+M35  | 65030|42.640000| 0.003000| 103.9| -7.00| 0.30|27.50| 0.90| 31.10| 0.90| 0.383| 0.019|356.5| 1.2|53572.93| 0.06|14.900| 0.500|16.800| 0.500| 0.370| 0.030| 0.330| 0.030| 0.890| 0.030| 2.18| 1.56|30|21|VC
+Field|  9033|23.147000| 0.007000|  18.1|-52.53| 0.24|48.30| 0.50| 55.10| 0.90| 0.394| 0.013| 24.9| 1.2|55322.16| 0.06|14.120| 0.140|16.100| 0.300| 1.100| 0.040| 0.960| 0.030| 0.876| 0.017| 0.77| 1.68|12|12|VC
+Field| 13057| 3.873580| 0.000040| 190.5|  2.66| 0.20|86.20| 0.40|102.90| 0.60| 0.006| 0.005|217.8| 1.2|54349.39| 0.06| 4.591| 0.022| 5.480| 0.040| 1.477| 0.022| 1.237| 0.015| 0.837| 0.007| 0.78| 1.42|14|14|VC
+Field| 16047|15.118300| 0.000700| 117.4|  0.10| 0.30|38.20| 0.50|  0.10| 0.90| 0.492| 0.019| 63.2| 1.2|52903.45| 0.06| 6.910| 0.100|      |      |      |      |      |      |      |      | 1.17| 2.23|18|10|VC
+Field| 18058| 4.923160| 0.000050| 174.2|  6.36| 0.21|84.90| 1.70| 91.20| 0.50| 0.009| 0.004|285.4| 1.2|55612.09| 0.06| 5.740| 0.140| 6.170| 0.040| 1.440| 0.040| 1.340| 0.070| 0.931| 0.023| 4.47| 0.65|12|11|VC
+Field| 22026|16.409600| 0.000700| 109.5|  3.40| 0.25|45.80| 0.80| 53.60| 1.60| 0.436| 0.012| 56.3| 1.2|55772.56| 0.06| 9.300| 0.140|10.900| 0.300| 0.660| 0.050| 0.560| 0.030| 0.860| 0.030| 0.84| 2.80|17|15|VC
+Field| 29056| 2.229169| 0.000005| 878.2| 44.40| 0.17|72.92| 0.21| 99.90| 1.00| 0.004| 0.003|165.2| 1.2|55110.15| 0.06| 2.235| 0.007| 3.060| 0.030| 0.690| 0.016| 0.503| 0.007| 0.730| 0.008| 0.70| 2.98|19|14|VC
+Field| 53026|37.008400| 0.001300| 127.6|-15.40| 0.17|39.70| 0.40| 40.80| 0.40| 0.540| 0.007|220.2| 1.2|52537.86| 0.06|17.030| 0.190|17.460| 0.150| 0.604| 0.013| 0.589| 0.014| 0.975| 0.013| 1.03| 0.83|19|15|VC
+Field|109047| 9.837310| 0.000250| 226.3|-12.20| 0.30|44.00| 0.90| 50.40| 0.70| 0.020| 0.010| 87.7| 1.2|55003.87| 0.06| 5.950| 0.140| 6.820| 0.100| 0.457| 0.020| 0.399| 0.020| 0.873| 0.020| 1.89| 1.11|18|12|VC
+Field|127048|14.783800| 0.000500| 200.3| 44.60| 0.30|52.70| 0.60| 56.40| 0.60| 0.352| 0.006| 89.8| 1.2|55365.11| 0.06|10.030| 0.150|10.740| 0.150| 0.840| 0.030| 0.790| 0.030| 0.934| 0.018| 1.41| 1.38|12|12|VC
+
