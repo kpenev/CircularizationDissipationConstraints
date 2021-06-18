@@ -14,6 +14,7 @@ from planetary_system_io import read_cds_pipe_table
 import praesepe_binaries
 import hyades_binaries
 from command_line_utilities import data_dir
+from bayesian import m35_util
 #pylint: enable=import-error
 
 
@@ -88,7 +89,7 @@ def add_dissipation_args(parser):
 def add_cluster_args(parser):
     """Add arguments for selecting a cluster and specifying its properties."""
 
-    open_clusters = ['NGC188', 'NGC6819', 'Praesepe/Hyades']
+    open_clusters = ['NGC188', 'NGC6819', 'Praesepe/Hyades', 'M35']
 
     cluster = parser.add_argument_group(
         title='Open cluster',
@@ -258,6 +259,12 @@ def add_binary_selection_args(parser):
         +
         [system['ID'] for system in hyades_binaries.systems]
     )
+
+    binaries['M35'] = numpy.concatenate([
+        systems['WOCS'].to_numpy()
+        for systems in m35_util.get_binary_data()
+    ])
+
     parser.add_argument(
         'system',
         choices=list(

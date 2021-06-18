@@ -26,6 +26,7 @@ import update_search_paths
 #pylint: disable=unused-import
 import ngc188_util
 import ngc6819_util
+import m35_util
 #pylint: enable=unused-import
 from cluster_util import\
     get_final_eccentricity_likelihood,\
