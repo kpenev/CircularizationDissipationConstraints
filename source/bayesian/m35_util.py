@@ -10,20 +10,32 @@ import pandas
 import numpy
 from scipy import stats
 
-from planetary_system_io import read_cds_pipe_table
+from planetary_system_io import read_pipe_table_to_pandas
 from command_line_utilities import data_dir
 from cmd_utils import CMDPhotometryInterpolator
+from process_e_Q_grid import LinearEccentricityEnvelope
+from bayesian.cluster_util import\
+    select_binary_data,\
+    plot_eccentricity_vs_period,\
+    plot_rvk_constraint
+from bayesian.photometric_constraint import\
+    PhotometricConstraint,\
+    plot_joint_pdf,\
+    plot_m1_cdf,\
+    plot_m2_cdf
 
+
+eccentricity_envelope = LinearEccentricityEnvelope(min_period=7.5,
+                                                   max_period=24.0,
+                                                   max_eccentricity=0.6)
 
 def get_photometry():
     """Return a pandas DataFrame containing M35 V and B-V photometry."""
 
-    return pandas.DataFrame(
-        read_cds_pipe_table(
-            os.path.join(
-                data_dir,
-                'Leiner_et_al_15_M35_rv_photometry.tsv'
-            )
+    return read_pipe_table_to_pandas(
+        os.path.join(
+            data_dir,
+            'Leiner_et_al_15_M35_rv_photometry.tsv'
         )
     )
 
@@ -43,9 +55,18 @@ def get_binary_data(
 ):
     """Return M35 SB1 and SB2 systems as :class:`pandas.DataFrame`s."""
 
+    photometry = get_photometry()
     return (
-        pandas.DataFrame(read_cds_pipe_table(single_lined_orbits_fname)),
-        pandas.DataFrame(read_cds_pipe_table(double_lined_orbits_fname))
+        pandas.merge(
+            read_pipe_table_to_pandas(single_lined_orbits_fname),
+            photometry,
+            on='WOCS'
+        ),
+        pandas.merge(
+            read_pipe_table_to_pandas(double_lined_orbits_fname),
+            photometry,
+            on='WOCS'
+        )
     )
 
 def get_photometry_interpolator():
@@ -54,9 +75,33 @@ def get_photometry_interpolator():
     return CMDPhotometryInterpolator(
         os.path.join(
             data_dir,
-            'CMD_150Myr_FeH-0.21dex_isochrone_Av0.62_UBVRIJHK.dat'
+            'CMD_150Myr_FeH-0.18dex_isochrone_Av0.62_UBVRIJHK.dat'
         ),
-        9.8
+        9.53
+    )
+
+def get_photometric_constraint(binary_wocs_id):
+    """Return a fully set-up photometric constraint for an M35 binary."""
+
+    selected_photometry = get_observed_orbit(binary_wocs_id).squeeze()
+    print('Selected photometry: ' + repr(selected_photometry))
+    selected_photometry = {
+        'V': stats.norm(
+            loc=selected_photometry['Vmag'],
+            scale=(0.06 if selected_photometry['r_B-V'] == 1 else 0.03)
+        ),
+        'B': stats.norm(
+            loc=(selected_photometry['B-V'] + selected_photometry['Vmag']),
+            scale=(0.08 if selected_photometry['r_B-V'] == 1 else 0.04)
+        )
+    }
+
+    interpolator = get_photometry_interpolator()
+    return PhotometricConstraint(
+        [interpolator],
+        selected_photometry,
+        'photometric_constraints.pkl',
+        min_magnitude_difference=dict(V=1.0)
     )
 
 def plot_color_magnitude_diagram():
@@ -66,12 +111,9 @@ def plot_color_magnitude_diagram():
 
     measured_photometry = get_photometry()
 
-    single_photometry = measured_photometry[measured_photometry['Mm'] == 'SM ']
+    single_photometry = measured_photometry[measured_photometry['Mm'] == 'SM']
 
-    sb1_orbits, sb2_orbits = get_binary_data()
-
-    sb1_data = pandas.merge(sb1_orbits, measured_photometry, on='WOCS')
-    sb2_data = pandas.merge(sb2_orbits, measured_photometry, on='WOCS')
+    sb1_data, sb2_data = get_binary_data()
 
     interp_masses = interpolator.data[0]['Mini']
     predicted_photometry = interpolator(interp_masses)
@@ -88,7 +130,7 @@ def plot_color_magnitude_diagram():
                 -marker_phot[3],
                 'or',
                 zorder=20,
-                label='M=0.8, 1.6, 4.0 $M_\odot$')
+                label=r'M=0.8, 1.6, 4.0 $M_\odot$')
 
     pyplot.plot(single_photometry['B-V'],
                 -single_photometry['Vmag'],
@@ -110,7 +152,35 @@ def plot_color_magnitude_diagram():
     pyplot.ylabel('-V [mag]')
     pyplot.legend()
 
-    pyplot.show()
+def get_observed_orbit(binary_wocs_id):
+    """Return pandas.DataFrames containing the orbital parameters of an SB1."""
+
+    result = select_binary_data(*get_binary_data(), 'WOCS', binary_wocs_id)
+    return  result
+
+def _test_photometric_constraint(binary_wocs_id):
+    """Display plots showing the photometry based constraint."""
+
+    constraint = get_photometric_constraint(binary_wocs_id)
+
+    plot_joint_pdf(constraint, (1.04939401, 0.577582))
+
+def _test_rvk_constraint(binary_wocs_id):
+    """Display plots showing the RV based constraint."""
+
+    observed_orbit = get_observed_orbit(binary_wocs_id)
+
+    photometric_constraint = get_photometric_constraint(binary_wocs_id)
+    plot_rvk_constraint(observed_orbit, photometric_constraint)
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    pandas.set_option('display.max_rows', None)
     plot_color_magnitude_diagram()
+    pyplot.show()
+    plot_eccentricity_vs_period(get_binary_data(), eccentricity_envelope)
+    pyplot.show()
+    _test_photometric_constraint(23043)
+    pyplot.show()
+    _test_rvk_constraint(23043)
+    pyplot.show()

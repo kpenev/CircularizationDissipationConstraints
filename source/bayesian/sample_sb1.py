@@ -169,7 +169,7 @@ def prepare_sampling(config):
     )
 
 
-    for cluster in ['NGC188', 'NGC6819']:
+    for cluster in ['NGC188', 'NGC6819', 'M35']:
         if config.system.startswith(cluster + '_'):
             binary_id = int(config.system[len(cluster) + 1:])
             custom_util = globals()[cluster.lower() + '_util']

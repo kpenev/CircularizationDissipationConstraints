@@ -69,7 +69,7 @@ def plot_rvk_constraint(observed_orbit, photometric_constraint):
         observed_orbit=observed_orbit,
         num_parallel_processes=4,
         interpolation_accuracy=(1e-8, 1e-4),
-        show_mismatch_plot=True
+        show_mismatch_plot=False
     )
 
     plots = dict(
@@ -215,8 +215,22 @@ def plot_eccentricity_vs_period(binaries, eccentricity_envelope):
     binaries = [
         binary_class[
             numpy.logical_and(
-                binary_class.get('Prv', binary_class.get('PRV')) > 50,
-                binary_class.get('Ppm', binary_class.get('PPM')) > 50
+                numpy.logical_not(
+                    binary_class.get('Prv', binary_class.get('PRV'))
+                    <=
+                    50
+                ),
+                numpy.logical_not(
+                    binary_class.get(
+                        'Ppm',
+                        binary_class.get(
+                            'PPM',
+                            binary_class.get('PPM1')
+                        )
+                    )
+                    <=
+                    50
+                )
             )
         ]
         for binary_class in binaries
@@ -243,12 +257,12 @@ def plot_eccentricity_vs_period(binaries, eccentricity_envelope):
 #                            markeredgecolor=color,
 #                            markerfacecolor='none')
     envelope_x = 2.0**numpy.linspace(1, 6, 1000)
-#    pyplot.plot(envelope_x,
-#                numpy.maximum(eccentricity_envelope(envelope_x), 0.05),
-#                '-k')
+    pyplot.plot(envelope_x,
+                numpy.maximum(eccentricity_envelope(envelope_x), 0.05),
+                '-k')
 #    pyplot.axhline(0.5)
-    pyplot.axvspan(9, 16, color='red', alpha=0.3, zorder=-10)
-    pyplot.ylim(0, 0.7)
+#    pyplot.axvspan(9, 16, color='red', alpha=0.3, zorder=-10)
+#    pyplot.ylim(0, 0.7)
     pyplot.xlim(2, 100)
     pyplot.xlabel('Orbital Period [d]')
     pyplot.ylabel('Eccentricity')

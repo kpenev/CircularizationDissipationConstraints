@@ -456,11 +456,11 @@ def plot_joint_pdf(constraint, literature_masses=None):
     """Display a 3-D plot of the PDF(m1, m2)."""
 
     plot_x, plot_y = numpy.meshgrid(
-        numpy.linspace(1.06,
-                       1.12,
+        numpy.linspace(0.9,
+                       1.1,
                        300),
-        numpy.linspace(0.7,
-                       0.85,
+        numpy.linspace(0.05,
+                       1.0,
                        300)
     )
 
