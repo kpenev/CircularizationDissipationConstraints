@@ -4,7 +4,7 @@
 import os.path
 
 from matplotlib import pyplot
-import scipy
+import numpy
 import scipy.interpolate
 
 #False positive (handled in __init__.py)
@@ -81,9 +81,9 @@ class CMDInterpolator:
         header([str]):    The comment lines in the beginning of the isochrone
             file.
 
-        data([scipy field array]):    A the data contained in the isochrone
+        data([numpy field array]):    A the data contained in the isochrone
             file downloaded from the CMD interface, organized as a list of
-            scipy field arrays, one for each section (corresponding to a
+            numpy field arrays, one for each section (corresponding to a
             single [Fe/H] value)
     """
 
@@ -91,12 +91,33 @@ class CMDInterpolator:
         """Interpolate within the given isochrone grid."""
 
         with IsochroneFileIterator(isochrone_fname) as isochrone:
-            self.data = [scipy.genfromtxt(section, names=True)
+            self.data = [numpy.genfromtxt(section, names=True)
                          for section in isochrone]
             self.header = isochrone.header
 
         for section_data in self.data:
-            assert scipy.unique(section_data['MH']).size == 1
+            assert numpy.unique(section_data['MH']).size == 1
+            invalid = (
+                (section_data['Mini'][1:] - section_data['Mini'][:-1])
+                <
+                0
+            )
+            if invalid.any():
+                message = ('Non-monotonic initial mass in isochrone %s: '
+                           %
+                           isochrone_fname)
+                for bad_index in numpy.nonzero(invalid):
+                    message += (
+                        'm[%d] = %s, m[%d] = %s'
+                        %
+                        (
+                            bad_index,
+                            section_data['Mini'][bad_index],
+                            bad_index + 1,
+                            section_data['Mini'][bad_index + 1]
+                        )
+                    )
+                raise RuntimeError(message)
             assert (
                 (section_data['Mini'][1:] - section_data['Mini'][:-1])
                 >=
@@ -165,7 +186,7 @@ def plot_isochrone():
     print('2.5Gyr Sun Teff = '
           +
           repr(10.0**interpolator.get_interpolated('logTe',
-                                                   scipy.linspace(0.5, 1.0, 10),
+                                                   numpy.linspace(0.5, 1.0, 10),
                                                    [-0.1, 0.0, 0.1])))
 
     for section_data in interpolator.data:
