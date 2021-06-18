@@ -24,6 +24,8 @@ from bayesian.photometric_constraint import\
     plot_m1_cdf,\
     plot_m2_cdf
 
+cluster_age_distribution = stats.norm(0.15, 0.03)
+cluster_feh_distribution = stats.norm(-0.18, 0.03)
 
 eccentricity_envelope = LinearEccentricityEnvelope(min_period=7.5,
                                                    max_period=24.0,
