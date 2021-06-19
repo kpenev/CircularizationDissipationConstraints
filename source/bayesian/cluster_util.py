@@ -258,7 +258,7 @@ def plot_eccentricity_vs_period(binaries, eccentricity_envelope):
 #                            markerfacecolor='none')
     envelope_x = 2.0**numpy.linspace(1, 6, 1000)
     pyplot.plot(envelope_x,
-                numpy.maximum(eccentricity_envelope(envelope_x), 0.05),
+                eccentricity_envelope(envelope_x),
                 '-k')
 #    pyplot.axhline(0.5)
 #    pyplot.axvspan(9, 16, color='red', alpha=0.3, zorder=-10)
