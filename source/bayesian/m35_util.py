@@ -29,6 +29,7 @@ cluster_feh_distribution = stats.norm(-0.18, 0.03)
 
 eccentricity_envelope = LinearEccentricityEnvelope(min_period=8.0,
                                                    max_period=12.0,
+                                                   min_eccenticity=0.05,
                                                    max_eccentricity=0.6)
 
 def get_photometry():
