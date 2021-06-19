@@ -27,8 +27,8 @@ from bayesian.photometric_constraint import\
 cluster_age_distribution = stats.norm(0.15, 0.03)
 cluster_feh_distribution = stats.norm(-0.18, 0.03)
 
-eccentricity_envelope = LinearEccentricityEnvelope(min_period=7.5,
-                                                   max_period=24.0,
+eccentricity_envelope = LinearEccentricityEnvelope(min_period=8.0,
+                                                   max_period=12.0,
                                                    max_eccentricity=0.6)
 
 def get_photometry():
@@ -178,11 +178,11 @@ def _test_rvk_constraint(binary_wocs_id):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     pandas.set_option('display.max_rows', None)
-    plot_color_magnitude_diagram()
-    pyplot.show()
+#    plot_color_magnitude_diagram()
+#    pyplot.show()
     plot_eccentricity_vs_period(get_binary_data(), eccentricity_envelope)
     pyplot.show()
-    _test_photometric_constraint(23043)
-    pyplot.show()
-    _test_rvk_constraint(23043)
-    pyplot.show()
+#    _test_photometric_constraint(23043)
+#    pyplot.show()
+#    _test_rvk_constraint(23043)
+#    pyplot.show()
