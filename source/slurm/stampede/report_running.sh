@@ -2,18 +2,20 @@ SLURM_DIR=~/projects/git/CircularizationDissipationConstraints/source/slurm/stam
 
 DUMMY="........................................................................"
 
-for f in ${SLURM_DIR}/NGC*.slurm; do
-    CLUSTER=$(echo $(basename $f)|sed -e 's%\(NGC[0-9]*\)_.*%\1%')
+for f in ${SLURM_DIR}/NGC*.slurm ${SLURM_DIR}/M35*.slurm; do
+    CLUSTER=$(echo $(basename $f)|sed -e 's%\(NGC[0-9]*\)_.*%\1%' -e 's%\(M35\)_.*%\1%')
     CHAIN='chain00000'
     JOBNAME=$(grep '^#SBATCH -J' $f|awk '{print $3;}')
 
     JOB_INFO=$(
         squeue -n $JOBNAME -o '%.15i %.9P %.15j %.2t %.10M %R'\
         |\
-        grep NGC
+        egrep 'NGC|M35'
     )
 
-    for SYS_ID in $(echo "$JOBNAME"|sed -e 's%NGC[0-9]*_\([0-9]*\)/\([0-9]*\)/\([0-9]*\)_.*$%\1 \2 \3%'); do
+    echo $JOBNAME
+
+    for SYS_ID in $(echo "$JOBNAME"|sed -e 's%NGC[0-9]*_\([0-9]*\)/\([0-9]*\)/\([0-9]*\)_.*$%\1 \2 \3%' -e 's%M35_\([0-9]*\)/\([0-9]*\)/\([0-9]*\)_.*$%\1 \2 \3%'); do
         NSAMPLES=$(\
             h5dump\
                 -a "${CHAIN}/iteration"\
