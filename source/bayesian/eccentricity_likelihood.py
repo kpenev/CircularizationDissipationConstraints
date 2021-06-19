@@ -34,6 +34,11 @@ class EccentricityLikelihood():
 
         self.envelope_eccentricity = envelope_eccentricity
         self.observed_eccentricity = observed_eccentricity
+        self._logger.info(
+            'Eccentricity likelihood based on e_env = %s, e_obs = %s'
+            %
+            (repr(envelope_eccentricity), repr(self.observed_eccentricity))
+        )
 
     def __call__(self, e_predicted):
         """Return the likelihood evaluated at specified present day eccen."""
