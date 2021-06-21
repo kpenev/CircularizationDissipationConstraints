@@ -11,7 +11,6 @@ def add_star_sampler_config_args(parser):
     """Add arguments to parser specifying the sampler configuration."""
 
     debug_plots = StarSampler.list_debug_plots()
-
     def parse_debug_plot(value_str):
         """Parse a debug plot argument (see help message for format)."""
 

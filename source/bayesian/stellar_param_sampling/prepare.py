@@ -11,6 +11,14 @@ from numpy.random import rand
 
 from stellar_evolution.manager import StellarEvolutionManager
 
+import sys
+#print(sys.path)
+
+sys.path.append('/home/mmmahmud/CircularizationDissipationConstraints/source')
+sys.path.append('/home/mmmahmud/general_purpose_python_modules')
+sys.path.append('/home/mmmahmud/CircularizationDissipationConstraints/data')
+
+
 from bayesian.stellar_param_sampling.config_util import\
     add_star_sampler_config_args
 #False positive
@@ -65,7 +73,20 @@ def parse_configuration():
         'its estimated standard deviation(s), possibly asymmetric.'
     )
 
+    parser.add_argument(
+        '--lum', '--stellar-luminosity',
+        type=parse_quantity_with_errors,
+        help='If known, the mesured luminosity, as well as '
+             'its estimated standard deviation(s).'
+    )
+
+
+
     add_star_sampler_config_args(parser)
+
+    print('parser args ',parser.parse_args())
+    #parser.parse_args().feh = '-1.014 +- 0.01'
+
 
     return parser.parse_args()
 
@@ -190,6 +211,8 @@ def serialize_poet_likelihood(config, interpolator):
         constraints['teff'] = config.Teff
     if config.mean_density is not None:
         constraints['rho'] = config.mean_density
+    if config.lum is not None:
+        constraints['lum'] = config.lum
 
     likelihood = POETInterpLikelihood(
         **constraints,
@@ -213,13 +236,17 @@ def main(config):
         'default'
     )
 
+    print('interpolator ', interpolator)
+
+
     matplotlib.rcParams['figure.dpi'] = config.debug_plot_dpi
     matplotlib.rcParams['figure.autolayout'] = True
 
-    FeHConditionalLikelihoodBase.set_interpolator(interpolator)
 
+    FeHConditionalLikelihoodBase.set_interpolator(interpolator)
 #    test_marginalized_pdfs(config, interpolator)
     serialize_poet_likelihood(config, interpolator)
+    test_marginalized_pdfs(config, interpolator)
 
 if __name__ == '__main__':
     main(parse_configuration())

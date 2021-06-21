@@ -1,4 +1,6 @@
 import math
+import sys
+print(sys.path)
 import planetary_system_io
 import numpy as np
 import matplotlib.pyplot as plt
@@ -46,6 +48,7 @@ def analysis_on_Nasa_exoplanet_data():
     serialized_dir = '/home/mmmahmud/poet/stellar_evolution_interpolators'
     manager = StellarEvolutionManager(serialized_dir)
     interpolator = manager.get_interpolator_by_name('default')
+    print('ddddd = ', interpolator)
     evolutionary_data = test_Nasa_Exoplanet_data(interpolator=(interpolator, interpolator))
     return evolutionary_data
 
@@ -326,7 +329,8 @@ class EccentricityDistribution(SuperEccentricityDistribution):
 
 
 
-        estimated_b = self.mean_e_now/self.e_now_upper_uncertainty
+        estimated_b = self.mean_e_now/(self.e_now_upper_uncertainty)
+
         roots = [math.nan, math.nan]
 
 
@@ -771,7 +775,7 @@ class SamplingPropertiesOfSystem:
                  planet_name='Exo Planet',
                  serialized_directory='/home/mmmahmud/poet/stellar_evolution_interpolators',
                  envelope_eccentricity_function=None,
-                 initial_eccentricity = 0.4,
+                 initial_eccentricity = 0.5,
                  max_argument_of_phase_lag_function_for_planet=5,
                  min_argument_of_phase_lag_function_for_planet=10,
                  max_initial_stellar_spin=5,
@@ -822,6 +826,8 @@ class SamplingPropertiesOfSystem:
             self.means = means
 
             self.means['obliquity'] = 0
+
+            print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&  orbital period = ',  means['orbital period'])
 
             self.e_env = self.envelope_eccentricity_function(orbital_period=self.means['orbital period'])
             print(self.means['present eccentricity'],
@@ -945,7 +951,7 @@ class SamplingPropertiesOfSystem:
                                               initial_eccentricity=initial_eccentricity * u.dimensionless_unscaled,
                                               initial_obliquity=0.0,
                                               disk_period=initial_stellar_spin * u.d,
-                                              disk_dissipation_age=2e-3 * u.Gyr,
+                                              disk_dissipation_age=2e-2 * u.Gyr,
                                               primary_wind_strength=0.17,
                                               primary_wind_saturation=2.78,
                                               primary_core_envelope_coupling_timescale=0.05 * u.Gyr,
@@ -1083,20 +1089,21 @@ class SamplingPropertiesOfSystem:
         min_value_found = False
         max_value_found = False
         i=0
+        init = 2
         while not min_value_found:
-            theta0[6] = 5 + i * 0.25
+            theta0[6] = init + i * 0.25
             prob = self.log_prob(theta0)
             if prob <0.01:
                 min_value_found = True
             i = i+1
-        min_argument_of_phase_lag_function_for_planet = 5 + (i-1)*0.25
+        min_argument_of_phase_lag_function_for_planet = init + (i-1)*0.25
         while not max_value_found:
-            theta0[6] = 5 + i * 0.25
+            theta0[6] = init + i * 0.25
             prob = self.log_prob(theta0)
             if prob == - math.inf:
                 max_value_found = True
             i = i+1
-        max_argument_of_phase_lag_function_for_planet = 5 + (i - 1) * 0.25
+        max_argument_of_phase_lag_function_for_planet = init + (i - 1) * 0.25
 
         return min_argument_of_phase_lag_function_for_planet, max_argument_of_phase_lag_function_for_planet
 
@@ -1117,10 +1124,11 @@ class SamplingPropertiesOfSystem:
         Qpl = []
         eccentricity = []
         k = -1
+        init = 6.95
         for i in range(0, 20):
-            theta0[6] = 5 + i * 0.25
+            theta0[6] = init + i * 0.001
             k = k + 1
-            Qpl = Qpl + [5 + i * 0.25]
+            Qpl = Qpl + [init + i * 0.001]
             prob = prob + [self.log_prob(theta0)]
             eccentricity = eccentricity + [self.calculated_eccentricity_now]
             print('Qpl = ', Qpl[k], ' log prob = ', prob[k])
@@ -1169,17 +1177,17 @@ if __name__ == '__main__':
     test2 = EnvelopeEccentricityDistribution()
     print('Binary systems whose probability density of eccentricity can be figured out:')
     index = test2.print_properties_of_binary_systems_satisfying_constraints()
-    means, standard_deviations, planet_name = test2.properties_of_ith_binary_system_if_satisfies_constraints(index[20])
+    means, standard_deviations, planet_name = test2.properties_of_ith_binary_system_if_satisfies_constraints(index[9])
     print('Print properties of the chosen binary system: means = ', means, ' standard deviations = ',
           standard_deviations, ' planet name = ', planet_name)
-    print('*********************************************************HHHHHHHHHHHHHHH')
+    print('*********************************************************')
     test3 = SamplingPropertiesOfSystem(means,
                                        standard_deviations,
                                        planet_name=planet_name,
                                        envelope_eccentricity_function=test2.envelope_eccentricity_function
                                        )
 
-    #test3.testing_log_prob()
+    test3.testing_log_prob()
     #test3.MCMC()
 
 

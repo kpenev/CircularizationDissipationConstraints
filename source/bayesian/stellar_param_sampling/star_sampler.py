@@ -44,12 +44,13 @@ class StarSampler:
         #pylint: enable=undefined-loop-variable
 
         filename = (
-            self._debug_plots[caller[len('_plot_'):]]
-            %
-            dict(
-                fname_substitutions,
-                grid_refinement_i=self._grid_refinement_iteration
-            )
+
+                self._debug_plots[caller[len('_plot_'):]]
+                %
+                dict(
+                    fname_substitutions,
+                    grid_refinement_i=self._grid_refinement_iteration
+                )
         )
         if filename:
             pyplot.savefig(filename)
@@ -57,11 +58,14 @@ class StarSampler:
         else:
             pyplot.show()
 
+
+
+
     def _plot_initial_feh_grid(self):
         """Display plots showing initial [Fe/H] grid was correctly generated."""
-
-        if 'initial_feh_grid' not in self._debug_plots:
-            return
+        if self._debug_plots is not None:
+            if 'initial_feh_grid' not in self._debug_plots:
+                return
 
         pyplot.plot(self._feh_grid, '.')
         x_range = numpy.array([0, self._feh_grid.size - 1])
@@ -92,8 +96,8 @@ class StarSampler:
         pyplot.plot(x_range,
                     0.5 + (x_range - x_med) * self.config.feh_max_cdf_step,
                     '-')
-
-        self._handle_debug_plot()
+        if self._debug_plots is not None:
+            self._handle_debug_plot()
 
     #Sufficient structure provided by sub-functions.
     #pylint: disable=too-many-statements
@@ -107,8 +111,9 @@ class StarSampler:
                                         title):
         """Show plot of how the interpolation performs as grid is refined."""
 
-        if 'interpolation_performance' not in self._debug_plots:
-            return
+        if self._debug_plots is not None:
+            if 'interpolation_performance' not in self._debug_plots:
+                return
 
         def get_plot_grid(grid):
             """Return a new grid with point 1/2 between input grid."""
@@ -185,19 +190,22 @@ class StarSampler:
                 difference[plot_slice],
                 '.k'
             )
-            self._handle_debug_plot(
-                title=(
-                    title
-                    +
-                    '_interp_vs_calc_'
-                    +
-                    (
-                        'vM_FeH=%g' % feh_grid[max_discrepancy_ind[0]]
-                        if direction == 'mass' else
-                        'vFeH_M=%g' % mass_grid[max_discrepancy_ind[1]]
+            if self._debug_plots is not None:
+                self._handle_debug_plot(
+                    title=(
+                            title
+                            +
+                            '_interp_vs_calc_'
+                            +
+                            (
+                                'vM_FeH=%g' % feh_grid[max_discrepancy_ind[0]]
+                                if direction == 'mass' else
+                                'vFeH_M=%g' % mass_grid[max_discrepancy_ind[1]]
+                            )
                     )
                 )
-            )
+
+
 
         def plot_interp_performance(difference, max_discrepancy_ind):
             """Create multi-panel plot showing the current interpolation."""
@@ -249,7 +257,8 @@ class StarSampler:
 
             pyplot.suptitle(title)
 
-            self._handle_debug_plot(title=title)
+            if self._debug_plots is not None:
+                self._handle_debug_plot(title=title)
 
         difference = calculated_values - interpolated_values
         max_discrepancy_ind = numpy.unravel_index(
@@ -268,16 +277,17 @@ class StarSampler:
 
     def _plot_feh_cdf(self):
         """Plot CDF([Fe/H])."""
-
-        if 'feh_cdf' not in self._debug_plots:
-            return
+        if self._debug_plots is not None:
+            if 'feh_cdf' not in self._debug_plots:
+                return
 
         feh = numpy.linspace(self._feh_grid[0], self._feh_grid[-1], 1000)
         cdf = self._feh_cdf(feh)
         pyplot.plot(feh, cdf)
         pyplot.xlabel('CDF([Fe/H])')
         pyplot.ylabel('[Fe/H]')
-        self._handle_debug_plot()
+        if self._debug_plots is not None:
+            self._handle_debug_plot()
 
     @classmethod
     def list_debug_plots(cls):
@@ -383,7 +393,6 @@ class StarSampler:
         """
         Create the initial [Fe/H] grid to start deriving the interpolation from.
         """
-
         tail = self.config.max_discarded_feh_probability / 2.0
         feh = max(self.config.feh.ppf(tail), min_feh)
 
@@ -726,7 +735,6 @@ class StarSampler:
         Returns:
             None
         """
-
         self._feh_grid = self._get_initial_feh_grid(
             *self.likelihood.interpolator.feh_range()
         )
@@ -805,7 +813,7 @@ class StarSampler:
 
             return pickled_cfg_dict == input_cfg_dict
 
-
+        print('star sampler pickle file name ', self.config.star_sampler_pickle_fname)
         if not os.path.exists(self.config.star_sampler_pickle_fname):
             open(self.config.star_sampler_pickle_fname, 'wb').close()
             return False
@@ -824,6 +832,7 @@ class StarSampler:
                         nobjects -= 1
                         if compare_config(unpickler.load()):
                             nobjects -= 1
+
                             if self.likelihood == unpickler.load():
                                 self._logger.info(
                                     'Matching pickled star sampler found.'
@@ -883,12 +892,16 @@ class StarSampler:
         self._mass_grid = None
         self._grid_refinement_iteration = None
         self._feh_cdf = None
-        self._debug_plots = dict(self.config.debug_plot)
+
+        if config.debug_plot is not None:
+            self._debug_plots = dict(self.config.debug_plot)
+        else:
+            self._debug_plots = None
+
 
         if not self._check_for_pickled():
             self._prepare_new_sampler()
             self._add_to_pickle_file()
-
         self._update_feh_cdf()
 
         self._plot_feh_cdf()
