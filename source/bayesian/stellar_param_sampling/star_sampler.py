@@ -44,22 +44,18 @@ class StarSampler:
         #pylint: enable=undefined-loop-variable
 
         filename = (
-
-                self._debug_plots[caller[len('_plot_'):]]
-                %
-                dict(
-                    fname_substitutions,
-                    grid_refinement_i=self._grid_refinement_iteration
-                )
+            self._debug_plots[caller[len('_plot_'):]]
+            %
+            dict(
+                fname_substitutions,
+                grid_refinement_i=self._grid_refinement_iteration
+            )
         )
         if filename:
             pyplot.savefig(filename)
             pyplot.clf()
         else:
             pyplot.show()
-
-
-
 
     def _plot_initial_feh_grid(self):
         """Display plots showing initial [Fe/H] grid was correctly generated."""
@@ -204,8 +200,6 @@ class StarSampler:
                             )
                     )
                 )
-
-
 
         def plot_interp_performance(difference, max_discrepancy_ind):
             """Create multi-panel plot showing the current interpolation."""
@@ -393,6 +387,7 @@ class StarSampler:
         """
         Create the initial [Fe/H] grid to start deriving the interpolation from.
         """
+
         tail = self.config.max_discarded_feh_probability / 2.0
         feh = max(self.config.feh.ppf(tail), min_feh)
 
@@ -735,6 +730,7 @@ class StarSampler:
         Returns:
             None
         """
+
         self._feh_grid = self._get_initial_feh_grid(
             *self.likelihood.interpolator.feh_range()
         )
@@ -813,7 +809,7 @@ class StarSampler:
 
             return pickled_cfg_dict == input_cfg_dict
 
-        print('star sampler pickle file name ', self.config.star_sampler_pickle_fname)
+
         if not os.path.exists(self.config.star_sampler_pickle_fname):
             open(self.config.star_sampler_pickle_fname, 'wb').close()
             return False
@@ -832,7 +828,6 @@ class StarSampler:
                         nobjects -= 1
                         if compare_config(unpickler.load()):
                             nobjects -= 1
-
                             if self.likelihood == unpickler.load():
                                 self._logger.info(
                                     'Matching pickled star sampler found.'
@@ -858,7 +853,7 @@ class StarSampler:
         """Append the current sampler to the pickle file specified in config."""
 
         with open(self.config.star_sampler_pickle_fname, 'ab') as pickle_file:
-            pickler = Pickler(pickle_file)
+            pickler = Pickler(pickle_file, protocol=3)
             pickler.dump(('StarSampler', 6))
             pickler.dump(self.config)
             pickler.dump(self.likelihood)
@@ -902,6 +897,7 @@ class StarSampler:
         if not self._check_for_pickled():
             self._prepare_new_sampler()
             self._add_to_pickle_file()
+
         self._update_feh_cdf()
 
         self._plot_feh_cdf()

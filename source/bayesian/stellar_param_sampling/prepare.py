@@ -94,7 +94,7 @@ def marginalized_plots(config,
                        star_sampler,
                        interpolator,
                        marginalized_distribution=None,
-                       fast=False):
+                       fast=True):
     """Make fig showing marginaziled PDF and CDF of sampled stellar params."""
 
     star_sampler.likelihood.disable_caching()
@@ -223,7 +223,7 @@ def serialize_poet_likelihood(config, interpolator):
 
     star_sampler = StarSampler(likelihood, config)
 
-    marginalized_plots(config, star_sampler, interpolator, fast=False)
+    marginalized_plots(config, star_sampler, interpolator, fast=True)
 
 def main(config):
     """Avoid polluting the global namespace."""
@@ -242,11 +242,11 @@ def main(config):
     matplotlib.rcParams['figure.dpi'] = config.debug_plot_dpi
     matplotlib.rcParams['figure.autolayout'] = True
 
-
     FeHConditionalLikelihoodBase.set_interpolator(interpolator)
+
 #    test_marginalized_pdfs(config, interpolator)
     serialize_poet_likelihood(config, interpolator)
-    test_marginalized_pdfs(config, interpolator)
+    #test_marginalized_pdfs(config, interpolator)
 
 if __name__ == '__main__':
     main(parse_configuration())
