@@ -44,12 +44,13 @@ class StarSampler:
         #pylint: enable=undefined-loop-variable
 
         filename = (
-            self._debug_plots[caller[len('_plot_'):]]
-            %
-            dict(
-                fname_substitutions,
-                grid_refinement_i=self._grid_refinement_iteration
-            )
+
+                self._debug_plots[caller[len('_plot_'):]]
+                %
+                dict(
+                    fname_substitutions,
+                    grid_refinement_i=self._grid_refinement_iteration
+                )
         )
         if filename:
             pyplot.savefig(filename)
@@ -576,7 +577,6 @@ class StarSampler:
 
         def get_new_grid_points(mismatch_indices, current_grid):
             """Return new values to add per the given mismatch indices."""
-
             if mismatch_indices.size == 0:
                 return numpy.array([], dtype=float), numpy.array([], dtype=int)
 
@@ -594,12 +594,19 @@ class StarSampler:
                     ) - 1
                 ))
             )
-            return (
-                0.5 * (current_grid[below_indices]
-                       +
-                       current_grid[below_indices + 1]),
-                below_indices + 1
+            proposed_new_grid = 0.5 * (current_grid[below_indices] + current_grid[below_indices + 1])
+            accepted_points_indices = numpy.logical_and(
+                proposed_new_grid != current_grid[below_indices],
+                proposed_new_grid != current_grid[below_indices + 1]
             )
+            new_grid = proposed_new_grid[accepted_points_indices]
+            new_indices = below_indices[accepted_points_indices] + 1
+
+            return (
+                new_grid,
+                new_indices
+            )
+
 
         mismatch_indices = list(
             self._get_mismatch_indices(
@@ -608,9 +615,7 @@ class StarSampler:
                 'CDF(M)'
             )
         )
-
         self._logger.debug('Mismatch indices: %s', repr(mismatch_indices))
-
         return [
             get_new_grid_points(*args)
             for args in zip(mismatch_indices, [self._feh_grid, self._mass_grid])
@@ -717,7 +722,6 @@ class StarSampler:
 
             self._mass_grid = new_mass_grid
             self._feh_grid = new_feh_grid
-
             self._update_mass_cdfs()
 
     def _prepare_new_sampler(self):
@@ -737,6 +741,7 @@ class StarSampler:
         self._mass_grid = self._get_initial_mass_grid(
             *self.likelihood.interpolator.mass_range()
         )
+
         self._plot_initial_feh_grid()
 
 
@@ -893,7 +898,6 @@ class StarSampler:
         else:
             self._debug_plots = None
 
-
         if not self._check_for_pickled():
             self._prepare_new_sampler()
             self._add_to_pickle_file()
@@ -934,4 +938,6 @@ class StarSampler:
             age_cdf.t_max
         )
         return feh, mass, age
+
+
 #pylint: enable=too-many-instance-attributes

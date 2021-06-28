@@ -8,7 +8,7 @@ from matplotlib import pyplot
 from configargparse import ArgumentParser, DefaultsFormatter
 import numpy
 from numpy.random import rand
-
+import logging
 from stellar_evolution.manager import StellarEvolutionManager
 
 import sys
@@ -249,4 +249,5 @@ def main(config):
     #test_marginalized_pdfs(config, interpolator)
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
     main(parse_configuration())
