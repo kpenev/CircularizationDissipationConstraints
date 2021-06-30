@@ -364,7 +364,6 @@ class StarSampler:
 
     def _get_mass(self, feh, mass_random_variable):
         """Return the inverse of CDF(M*|[Fe/H])."""
-
         mass_cdf = self._interpolate(
             self._feh_grid,
             self._mass_grid,
@@ -373,10 +372,13 @@ class StarSampler:
             self._mass_grid
         ).flatten()
 
+        first = numpy.where(mass_cdf == 0)[0][-1]
+        last = numpy.where(mass_cdf == mass_cdf[-1])[0][0]+1
+
         return float(
             InterpolatedUnivariateSpline(
-                mass_cdf / mass_cdf[-1],
-                self._mass_grid,
+                mass_cdf[first:last] / mass_cdf[-1],
+                self._mass_grid[first:last],
                 k=1,
                 ext=2
             )(
