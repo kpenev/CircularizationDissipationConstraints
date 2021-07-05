@@ -7,6 +7,10 @@ import os.path
 from multiprocessing import Pool
 from functools import partial
 import logging
+from random import random
+import math
+
+import corner
 
 from matplotlib import pyplot
 import numpy
@@ -375,9 +379,48 @@ class StarSampler:
         first = numpy.where(mass_cdf == 0)[0][-1]
         last = numpy.where(mass_cdf == mass_cdf[-1])[0][0]+1
 
+        smallest_number = 10**-10
+        first = 0
+        i = 1
+        if mass_cdf.size-1 >= i:
+            a = mass_cdf[first]
+            b = mass_cdf[i]
+            while math.fabs(b-a) <= smallest_number or (a<smallest_number and b<smallest_number):
+                i = i + 1
+                first = first + 1
+                if i>mass_cdf.size-1:
+                    break
+                a = mass_cdf[first]
+                b = mass_cdf[i]
+
+        last = mass_cdf.size-1
+        i = mass_cdf.size-2
+        if 0<=i:
+            a = mass_cdf[last]
+            b = mass_cdf[i]
+            while math.fabs(b - a) <= smallest_number or (a<smallest_number and b<smallest_number):
+                i=i-1
+                last = last-1
+                if i<0:
+                    break
+                a = mass_cdf[last]
+                b = mass_cdf[i]
+        last = last +1
+
+        print('first ', first, ' last ', last)
+
+        first = numpy.where(mass_cdf <= smallest_number)[0][-1]
+        last = numpy.where(numpy.array([math.fabs(mass_cdf[j] - mass_cdf[-1]) <= smallest_number for j in range(0, mass_cdf.size)]))[0][0] + 1
+        print('new first ', first, ' new last ', last)
+
+
+
+        print('mass_cdf *********** ', mass_cdf[first:last])
+        print('mass_cdf last ', mass_cdf[last-1])
+
         return float(
             InterpolatedUnivariateSpline(
-                mass_cdf[first:last] / mass_cdf[-1],
+                mass_cdf[first:last] / mass_cdf[last-1],
                 self._mass_grid[first:last],
                 k=1,
                 ext=2
@@ -908,6 +951,30 @@ class StarSampler:
 
         self._plot_feh_cdf()
 
+        self._corner_plot_of_mass_feh_age(5000)
+
+
+    def _corner_plot_of_mass_feh_age(self, number_of_samples):
+        unit_cube = numpy.array([random(), random(), random()])
+        _feh, _mass, _age = self.__call__(unit_cube)
+        print('feh ', _feh, ' mass ', _mass, ' age ', _age)
+        samples = numpy.array([_feh, _mass, _age])
+
+        for i in range(1, number_of_samples):
+            unit_cube = numpy.array([random(), random(), random()])
+            _feh, _mass, _age = self.__call__(unit_cube)
+            print('feh ', _feh, ' mass ', _mass, ' age ', _age)
+            new_sample = numpy.array([_feh, _mass, _age])
+            samples = numpy.vstack((samples, new_sample))
+            print('samples = ', samples)
+
+        figure = corner.corner(samples, labels=[r"$feh$", r"$mass$", r"$age$"],
+                               quantiles=[0.16, 0.5, 0.84],
+                               show_titles=True, title_kwargs={"fontsize": 12})
+        pyplot.show()
+        return
+
+
     def __call__(self, unit_cube):
         """
         Map unit cube to stellar [Fe/H], mass, age with proper distribution.
@@ -939,6 +1006,7 @@ class StarSampler:
             age_cdf.t_min,
             age_cdf.t_max
         )
+
         return feh, mass, age
 
 
