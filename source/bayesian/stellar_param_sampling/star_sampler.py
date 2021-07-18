@@ -29,6 +29,10 @@ from bayesian.stellar_param_sampling.feh_conditional_likelihood_base import\
 
 #Could not find reasonable way to reduce attributes.
 #pylint: disable=too-many-instance-attributes
+
+from stellar_evolution.change_variables import QuantityEvaluator
+
+
 class StarSampler:
     """Implenet calculation, saving, and loading of star parameter sampling."""
 
@@ -951,7 +955,8 @@ class StarSampler:
 
         self._plot_feh_cdf()
 
-        self._corner_plot_of_mass_feh_age(5000)
+
+        #self._corner_plot_of_mass_feh_age(5000)
 
 
     def _corner_plot_of_mass_feh_age(self, number_of_samples):

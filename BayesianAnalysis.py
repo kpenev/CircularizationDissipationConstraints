@@ -15,7 +15,10 @@ from scipy.optimize import fsolve
 from sympy import *
 from scipy.special import i0
 from scipy.integrate import nquad
-
+##########################
+from manual_exoplanet_data import data as manual_data
+from astropy.units import Unit, Quantity
+#######################
 if not sys.warnoptions:
     import warnings
 
@@ -240,6 +243,16 @@ def constraints(smallest_acceptable_value_of_orbital_period = 0,
                 'present eccentricity': largest_acceptable_value_of_eccentricity_now}
     return smallest, largest
 
+def constraints_for_eccentricity_envelope(smallest_acceptable_value_of_secondary_radius = 8,
+                                          largest_acceptable_value_of_secondary_radius = math.inf,
+                                          smallest_acceptable_value_of_planet_mass_sin_i = 50,
+                                          largest_acceptable_value_of_planet_mass_sin_i = math.inf):
+    smallest = {'secondary radius': smallest_acceptable_value_of_secondary_radius,
+                'planet mass times sin i': smallest_acceptable_value_of_planet_mass_sin_i}
+    largest = {'secondary radius': largest_acceptable_value_of_secondary_radius,
+               'planet mass times sin i': largest_acceptable_value_of_planet_mass_sin_i}
+    return smallest, largest
+
 def constraints_are_satisfied(orbital_period,
                               primary_mass,
                               secondary_mass,
@@ -256,6 +269,18 @@ def constraints_are_satisfied(orbital_period,
             and (eccentricity_now >= smallest['present eccentricity'] and eccentricity_now <= largest['present eccentricity'])
             and (stellar_age >= smallest['stellar age'] and stellar_age <= largest['stellar age'])):
         return True
+    return False
+
+def constraints_for_eccentricity_envelope_are_satisfied(secondary_radius,
+                                                        planet_mass_sin_i,
+                                                        constraints = constraints_for_eccentricity_envelope()):
+    smallest = constraints[0]
+    largest = constraints[1]
+    if secondary_radius <= largest['secondary radius'] and secondary_radius > smallest['secondary radius']:
+        return True
+    if planet_mass_sin_i <= largest['planet mass times sin i'] and planet_mass_sin_i > smallest['planet mass times sin i']:
+        return True
+
     return False
 
 class SuperEccentricityDistribution(metaclass=ABCMeta):
@@ -497,17 +522,57 @@ class System:
         print('Orbital period = ', self.orbital_period, '=', self.orbital_period.to(u.s))
         print('Obliquity = ', self.obliquity.to(u.deg))
         print('Age = ', self.age, '=', self.age.to(u.s))
+############################################################
+class Structure:
+    """An empty class used only to hold user defined attributes."""
 
+    def __init__(self, **initial_attributes):
+        """Create a class with (optionally) initial attributes."""
 
+        for attribute_name, attribute_value in initial_attributes.items():
+            setattr(self, attribute_name, attribute_value)
+
+    def format(self, prefix=''):
+        """Generate a tree-like representation of self."""
+
+        result = ''
+        for attr_name in dir(self):
+            if attr_name[0] != '_':
+                attribute = getattr(self, attr_name)
+                if isinstance(attribute, Structure):
+                    result += (prefix
+                               +
+                               '|-'
+                               +
+                               attr_name
+                               +
+                               '\n'
+                               +
+                               attribute.format(prefix + '| '))
+                else:
+                    result += (prefix
+                               +
+                               '|-'
+                               +
+                               attr_name
+                               +
+                               ': '
+                               +
+                               str(attribute)
+                               +
+                               '\n')
+        return result
+########################################################
 class EnvelopeEccentricityDistribution:
 
     def __init__(self,
-                 path='/home/mmmahmud/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv',
+                 #path='/home/mmmahmud/CircularizationDissipationConstraints/data/planets_2020.04.10_14.52.24.csv',
+                 path='/home/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv',
                  file_name=b"/home/mmmahmud/poet/scripts/eccentricity_expansion_coef.txt",
                  serialized_directory='/home/mmmahmud/poet/stellar_evolution_interpolators',
-                 maximum_number_of_data_points=5000,
+                 maximum_number_of_data_points=math.inf,
                  threshold_value_of_envelope_eccentricity=0.001,
-                 constraints = constraints(),
+                 constraints = constraints_for_eccentricity_envelope(),
                  largest_acceptable_value_of_envelope_eccentricity=0.5
                  ):
 
@@ -523,14 +588,186 @@ class EnvelopeEccentricityDistribution:
         manager = StellarEvolutionManager(serialized_directory)
 
         self.interpolator = manager.get_interpolator_by_name('default')
+        ##############################################################################
+        def read_nasa_planets(csv_filename,
+                              eliminate=('SWEEPS-11',
+                                         'HD 41004 B',
+                                         'PSR J1719-1438',
+                                         'K2-22',
+                                         'WASP-19 B',
+                                         'HATS-18'),
+                              fill_missing=manual_data,
+                              need_ages=True,
+                              add_units=False):
+            """
+            Read a CSV file downloaded from the NASA Exoplanet Archive to a dict.
 
-        readPlanet = planetary_system_io.read_nasa_planets(self.path,
-                                                           eliminate=('SWEEPS-11',
-                                                                      'HD 41004 B',
-                                                                      'PSR J1719-1438',
-                                                                      'K2-22'),
-                                                           need_ages=False,
-                                                           )
+            Args:
+                csv_filename:    The name of the comma separated file downloaded from
+                    http://exoplanetarchive.ipac.caltech.edu.
+
+            Returns:
+                A structure with the column names as attributes containing the
+                corresponding values properly formatted.
+            """
+
+            def do_eliminate():
+                """Eliminate the systems listed in eliminate."""
+                system_names = []
+                for i in range(1, len(data)):
+                    name = data[i][0]
+                    if type(name) is numpy.bytes_:
+                        system_names = system_names + [name.decode()]
+                #system_names = [name.decode() for name in data[:, 1]]
+                #The above for loop is written instead of the code system_names = [name.decode() for name in data[:, 1]]
+                #couple of name in data[:, 1] were not decoded by decode() method, since they were not numpy.bytes_
+                #object. So, I have included a checking command: if type(name) is numpy.bytes_
+
+                delete_indices = []
+                for system in eliminate:
+                    if system in system_names:
+                        delete_indices.append(system_names.index(system))
+                a = numpy.delete(data,delete_indices,0)
+                return a
+
+            def do_fill_missing(result):
+                """Add the data from fill_missing to result."""
+
+                system_names = list(
+                    getattr(
+                        result,
+                        (
+                            'hostname' if hasattr(result, 'hostname')
+                            else 'fpl_hostname'
+                        )
+                    )
+                )
+                for fill_system in fill_missing:
+                    try:
+                        fill_index = system_names.index(fill_system['pl_hostname'])
+                    except ValueError:
+                        continue
+                    for quantity, value in fill_system.items():
+                        if hasattr(result, quantity):
+                            target_column = getattr(result, quantity)
+                            if isinstance(target_column, Quantity):
+                                unit = target_column.unit
+                            else:
+                                unit = 1
+                            target_column[fill_index] = (value * unit)
+
+            with open(csv_filename, 'r') as csv_file:
+                while csv_file.readline()[0] == '#':
+                    data_start = csv_file.tell()
+                csv_file.seek(data_start)
+                data = numpy.genfromtxt(csv_file,
+                                        delimiter=',',
+                                        dtype=None,
+                                        comments=None)
+            data_columns = []
+            for i in data[0]:
+                if type(i) is numpy.bytes_:
+                    data_columns = data_columns + [i.decode()]
+
+            #data_columns = [col.decode() for col in data[0]]
+            #the above loop was written instead of data_columns = [col.decode() for col in data[0]]
+
+
+            if eliminate:
+                data = do_eliminate()
+
+            result = Structure()
+            string_columns = ['pl_hostname',
+                              'hostname',
+                              'pl_name',
+                              'pl_discmethod',
+                              'discoverymethod',
+                              'rastr',
+                              'decstr',
+                              'pl_bmassprov',
+                              'st_optband',
+                              'rowupdate',
+                              'pl_letter',
+                              'pl_tsystemref',
+                              'pl_locale',
+                              'pl_facility',
+                              'pl_telescope',
+                              'pl_instrument',
+                              'pl_publ_date',
+                              'hd_name',
+                              'hip_name',
+                              'st_spstr',
+                              'st_metratio',
+                              'st_optmagband',
+                              'st_nirmagband',
+                              'st_spt',
+                              'swasp_id']
+            column_name_list = []
+            with open(csv_filename, 'r') as csv_file:
+                for line in csv_file:
+                    if line[0] != '#':
+                        continue
+                    entries = line.strip().rstrip(')').split()
+                    if len(entries) < 4 or entries[1] != 'COLUMN':
+                        continue
+                    column_name = entries[2].strip(':')
+                    column_index = data_columns.index(column_name)
+                    column_values = data[:, column_index][1:]
+                    if add_units:
+                        if entries[-1][-1] == ']':
+                            column_units = convert_nasa_unit_to_astropy(
+                                line.strip().rstrip(')').rsplit('[', 1)[-1][:-1]
+                            )
+                        else:
+                            column_units = None
+                    if (
+                            column_name in string_columns
+                            or
+                            column_name[0] == 'f' and column_name[1:] in string_columns
+                            or
+                            column_name.endswith('_str')
+                            or
+                            column_name.endswith('link')
+                    ):
+                        column_values = [v.decode() for v in column_values]
+                    else:
+                        print('column_name: ' + repr(column_name))
+                        print('data [...]', data[:, column_index][1:])
+                        column_values = [
+                            numpy.nan if v == b'' else float(v)
+                            for v in data[:, column_index][1:]
+                        ]
+                    column_values = numpy.array(column_values)
+
+                    if add_units and column_units is not None:
+                        print(column_name + ' units: ' + repr(column_units))
+                        column_values *= column_units
+                    setattr(
+                        result,
+                        column_name,
+                        column_values
+                    )
+                    column_name_list.append(column_name)
+
+            if fill_missing:
+                do_fill_missing(result)
+
+            if need_ages:
+                read_ages(result)
+
+            for column_name in column_name_list:
+                if column_name.endswith('err2'):
+                    column = getattr(result, column_name)
+                    nan_indices = numpy.isnan(column)
+                    column[nan_indices] = -getattr(result,
+                                                   column_name[:-1] + '1')[nan_indices]
+
+            return result
+
+        readPlanet = read_nasa_planets(self.path, eliminate=('SWEEPS-11', 'HD 41004 B', 'PSR J1719-1438', 'K2-22'), need_ages=False,)
+        ###########################################################################################
+
+        #readPlanet = planetary_system_io.read_nasa_planets(self.path, eliminate=('SWEEPS-11','HD 41004 B','PSR J1719-1438','K2-22'), need_ages=False,)
 
         self.planet_name = readPlanet.pl_name
         self.orbital_period = readPlanet.pl_orbper  # days
@@ -542,9 +779,16 @@ class EnvelopeEccentricityDistribution:
         self.secondary_mass = readPlanet.pl_masse  # Earth mass
         self.secondary_mass_upper_uncertainty = readPlanet.pl_masseerr1
         self.secondary_mass_lower_uncertainty = readPlanet.pl_masseerr2
-        self.metallicity = readPlanet.st_metfe
-        self.metallicity_upper_uncertainty = readPlanet.st_metfeerr1
-        self.metallicity_lower_uncertainty = readPlanet.st_metfeerr2
+        #self.metallicity = readPlanet.st_metfe
+        #self.metallicity_upper_uncertainty = readPlanet.st_metfeerr1
+        #self.metallicity_lower_uncertainty = readPlanet.st_metfeerr2
+        self.metallicity = readPlanet.st_met
+        self.metallicity_upper_uncertainty = readPlanet.st_meterr1
+        self.metallicity_lower_uncertainty = readPlanet.st_meterr2
+        self.semi_major_axis = readPlanet.pl_orbsmax
+        self.semi_major_axis_upper_uncertainty = readPlanet.pl_orbsmaxerr1
+        self.semi_major_axis_lower_uncertainty = readPlanet.pl_orbsmaxerr2
+        self.semi_major_axis_flag_limit = readPlanet.pl_orbsmaxlim
         self.primary_radius = readPlanet.st_rad  # solar radius
         self.primary_radius_upper_uncertainty = readPlanet.st_raderr1
         self.primary_radius_lower_uncertainty = readPlanet.st_raderr2
@@ -561,9 +805,15 @@ class EnvelopeEccentricityDistribution:
         self.obliquity = readPlanet.pl_orbincl  # degrees
         self.obliquity_upper_uncertainty = readPlanet.pl_orbinclerr1
         self.obliquity_lower_uncertainty = readPlanet.pl_orbinclerr2
-        self.vsini = readPlanet.st_vsini  # km/s
-        self.vsini_upper_uncertainty = readPlanet.st_vsinierr1
-        self.vsini_lower_uncertainty = readPlanet.st_vsinierr2
+        #self.vsini = readPlanet.st_vsini  # km/s
+        #self.vsini_upper_uncertainty = readPlanet.st_vsinierr1
+        #self.vsini_lower_uncertainty = readPlanet.st_vsinierr2
+        self.vsini = readPlanet.st_vsin  # km/s
+        self.vsini_upper_uncertainty = readPlanet.st_vsinerr1
+        self.vsini_lower_uncertainty = readPlanet.st_vsinerr2
+        self.planet_mass_sin_i = readPlanet.pl_msinie # Earth mass
+        self.planet_mass_sin_i_upper_uncertainty = readPlanet.pl_msinieerr1
+        self.planet_mass_sin_i_lower_uncertainty = readPlanet.pl_msinieerr2
 
         self.envelope_eccentricity_function = self.create_envelope_eccentricity_function(maximum_number_of_data_points,
                                                                                          threshold_value_of_envelope_eccentricity,
@@ -574,40 +824,109 @@ class EnvelopeEccentricityDistribution:
                                      maximum_number_of_data_points,
                                      threshold_value_of_envelope_eccentricity,
                                      largest_acceptable_value_of_envelope_eccentricity,
-                                     constraints = constraints()):
+                                     constraints = constraints_for_eccentricity_envelope()):
 
+
+        #For present eccentricity vs. log of orbital period plot:
         records_of_log_orbital_period_and_eccentricity_now = []
-
         j = -1
         for i in range(0, len(self.orbital_period)):
             if not (math.isnan(self.orbital_period[i])
                     or math.isnan(self.eccentricity_now[i])
-            ):
-                if (constraints_are_satisfied(orbital_period=self.orbital_period[i],
-                                              primary_mass=self.primary_mass[i],
-                                              secondary_mass=self.secondary_mass[i],
-                                              metallicity=self.metallicity[i],
-                                              eccentricity_now=self.eccentricity_now[i],
-                                              stellar_age=self.stellar_age[i],
+            ) and self.eccentricity_now_limit_flag[i] == 0:
+                if (constraints_for_eccentricity_envelope_are_satisfied(
+                                              secondary_radius=self.secondary_radius[i],
+                                              planet_mass_sin_i=self.planet_mass_sin_i[i],
                                               constraints=constraints)):
 
                     records_of_log_orbital_period_and_eccentricity_now = (records_of_log_orbital_period_and_eccentricity_now
                                                                           + [{'log of orbital period': math.log(self.orbital_period[i], 10),
                                                                               'present eccentricity': self.eccentricity_now[i],
-                                                                              'planet name': self.planet_name[i]}])
+                                                                              'planet name': self.planet_name[i],
+                                                                              'primary mass': self.primary_mass[i],
+                                                                              'orbital eccentricity limit flag': self.eccentricity_now_limit_flag[i]}])
                     j = j+1
-
 
             if j >= maximum_number_of_data_points-1:
                 break
 
+
+        ##############################For a/Rpl
+        records_of_semi_major_axis_over_planetary_radius_vs_eccentricity_now = []
+        j = -1
+
+        for i in range(0, len(self.semi_major_axis)):
+            if not (math.isnan(self.semi_major_axis[i])
+                    or math.isnan(self.secondary_radius[i])
+                    or math.isnan(self.eccentricity_now[i])
+            ) and self.eccentricity_now_limit_flag[i] != 1 and self.semi_major_axis_flag_limit[i] == 0:
+                if (constraints_for_eccentricity_envelope_are_satisfied(
+                        secondary_radius=self.secondary_radius[i],
+                        planet_mass_sin_i=self.planet_mass_sin_i[i],
+                        constraints=constraints)):
+                    records_of_semi_major_axis_over_planetary_radius_vs_eccentricity_now = (records_of_semi_major_axis_over_planetary_radius_vs_eccentricity_now
+                    + [{'semi major axis over planetary radius': (self.semi_major_axis[i]/self.secondary_radius[i]),
+                        'present eccentricity': self.eccentricity_now[i],
+                        'planet name': self.planet_name[i],
+                        'primary mass': self.primary_mass[i],
+                        'orbital eccentricity limit flag': self.eccentricity_now_limit_flag[i]}])
+
+                    j = j + 1
+
+            if j >= maximum_number_of_data_points - 1:
+                break
+
+        ##############################
+
         # Sorting
         records_of_log_orbital_period_and_eccentricity_now = sorted(records_of_log_orbital_period_and_eccentricity_now,
                                                                     key=lambda key_attribute_for_sorting: key_attribute_for_sorting['log of orbital period'])
+        records_of_semi_major_axis_over_planetary_radius_vs_eccentricity_now = sorted(records_of_semi_major_axis_over_planetary_radius_vs_eccentricity_now,
+                                                                    key=lambda key_attribute_for_sorting:
+                                                                    key_attribute_for_sorting['semi major axis over planetary radius'])
 
-
+        def find_records_of_the_points_on_envelope(records_of_certain_attribute_and_eccentricity_now):
+            records_of_the_points_on_envelope = []
+            maximum_eccentricity_now = threshold_value_of_envelope_eccentricity
+            starting_point_of_the_significant_tidal_dissipation_region_found = False
+            end_point_of_the_significant_tidal_dissipation_region_found = False
+            for i in range(0, len(records_of_certain_attribute_and_eccentricity_now)):
+                present_eccentricity_of_ith_element = records_of_certain_attribute_and_eccentricity_now[i][
+                    'present eccentricity']
+                if present_eccentricity_of_ith_element > maximum_eccentricity_now:
+                    if (not starting_point_of_the_significant_tidal_dissipation_region_found) and i > 0:
+                        records_of_the_points_on_envelope = records_of_the_points_on_envelope + [{'log of orbital period': records_of_log_orbital_period_and_eccentricity_now[i - 1]['log of orbital period'],
+                                                                                                  'envelope eccentricity': threshold_value_of_envelope_eccentricity}]
+                        print('Name of the planet belongs to the binary system on the envelope ',
+                              records_of_certain_attribute_and_eccentricity_now[i - 1]['planet name'],
+                              'log of orbital period = ',
+                              records_of_certain_attribute_and_eccentricity_now[i - 1]['log of orbital period'],
+                              'envelope eccentricity = ', threshold_value_of_envelope_eccentricity,
+                              'orbital eccentricity limit flag = ',
+                              records_of_certain_attribute_and_eccentricity_now[i - 1][
+                                  'orbital eccentricity limit flag'])
+                    if present_eccentricity_of_ith_element <= largest_acceptable_value_of_envelope_eccentricity:
+                        maximum_eccentricity_now = present_eccentricity_of_ith_element
+                    if present_eccentricity_of_ith_element > largest_acceptable_value_of_envelope_eccentricity:
+                        maximum_eccentricity_now = largest_acceptable_value_of_envelope_eccentricity
+                        end_point_of_the_significant_tidal_dissipation_region_found = True
+                    starting_point_of_the_significant_tidal_dissipation_region_found = True
+                    records_of_the_points_on_envelope = records_of_the_points_on_envelope + [{'log of orbital period':
+                                                                                                  records_of_log_orbital_period_and_eccentricity_now[
+                                                                                                      i][
+                                                                                                      'log of orbital period'],
+                                                                                              'envelope eccentricity': maximum_eccentricity_now}]
+                    print('Name of the planet belongs to the binary system on the envelope ',
+                          records_of_log_orbital_period_and_eccentricity_now[i]['planet name'],
+                          'log of orbital period = ',
+                          records_of_log_orbital_period_and_eccentricity_now[i]['log of orbital period'],
+                          'envelope eccentricity = ', maximum_eccentricity_now,
+                          'orbital eccentricity limit flag = ',
+                          records_of_log_orbital_period_and_eccentricity_now[i]['orbital eccentricity limit flag'])
+                    if end_point_of_the_significant_tidal_dissipation_region_found:
+                        break
+            return
         records_of_the_points_on_envelope = []
-
         maximum_eccentricity_now = threshold_value_of_envelope_eccentricity
         starting_point_of_the_significant_tidal_dissipation_region_found = False
         end_point_of_the_significant_tidal_dissipation_region_found = False
@@ -617,6 +936,10 @@ class EnvelopeEccentricityDistribution:
                 if (not starting_point_of_the_significant_tidal_dissipation_region_found) and i>0:
                     records_of_the_points_on_envelope = records_of_the_points_on_envelope + [{'log of orbital period': records_of_log_orbital_period_and_eccentricity_now[i-1]['log of orbital period'],
                                                                                               'envelope eccentricity': threshold_value_of_envelope_eccentricity}]
+                    print('Name of the planet belongs to the binary system on the envelope ',records_of_log_orbital_period_and_eccentricity_now[i-1]['planet name'],
+                          'log of orbital period = ', records_of_log_orbital_period_and_eccentricity_now[i-1]['log of orbital period'],
+                          'envelope eccentricity = ', threshold_value_of_envelope_eccentricity,
+                          'orbital eccentricity limit flag = ', records_of_log_orbital_period_and_eccentricity_now[i-1]['orbital eccentricity limit flag'])
                 if present_eccentricity_of_ith_element<=largest_acceptable_value_of_envelope_eccentricity:
                     maximum_eccentricity_now = present_eccentricity_of_ith_element
                 if present_eccentricity_of_ith_element>largest_acceptable_value_of_envelope_eccentricity:
@@ -625,6 +948,10 @@ class EnvelopeEccentricityDistribution:
                 starting_point_of_the_significant_tidal_dissipation_region_found = True
                 records_of_the_points_on_envelope = records_of_the_points_on_envelope + [{'log of orbital period': records_of_log_orbital_period_and_eccentricity_now[i]['log of orbital period'],
                                                                                           'envelope eccentricity': maximum_eccentricity_now}]
+                print('Name of the planet belongs to the binary system on the envelope ', records_of_log_orbital_period_and_eccentricity_now[i]['planet name'],
+                      'log of orbital period = ', records_of_log_orbital_period_and_eccentricity_now[i]['log of orbital period'],
+                      'envelope eccentricity = ', maximum_eccentricity_now,
+                      'orbital eccentricity limit flag = ', records_of_log_orbital_period_and_eccentricity_now[i]['orbital eccentricity limit flag'])
                 if end_point_of_the_significant_tidal_dissipation_region_found:
                     break
 
@@ -650,13 +977,84 @@ class EnvelopeEccentricityDistribution:
             print('This situation is not possible')
             return
 
-        self.plot_present_eccentricity_vs_log_period(records_of_log_orbital_period_and_eccentricity_now,
-                                                     records_of_the_points_on_envelope,
-                                                     envelope_eccentricity_function)
+        def envelope_eccentricity_function_manual(orbital_period):
+            log_of_orbital_period = math.log(orbital_period,10)
+            crit1 = -0.11
+            crit2 = 0.7
+            if log_of_orbital_period <=crit1:
+                return threshold_value_of_envelope_eccentricity
+            if log_of_orbital_period > crit2:
+                return largest_acceptable_value_of_envelope_eccentricity
+            if log_of_orbital_period>crit1 and log_of_orbital_period <= crit2:
+                return threshold_value_of_envelope_eccentricity + (log_of_orbital_period-crit1) * (largest_acceptable_value_of_envelope_eccentricity - threshold_value_of_envelope_eccentricity)/(crit2-crit1)
+            print('This situation is not possible')
+            return
+
+        def envelope_eccentricity_function_for_eccentricity_vs_semi_major_axis_over_planetary_radius_manual(x):
+            crit1 = -0.11
+            crit2 = 0.7
+            if x <=crit1:
+                return threshold_value_of_envelope_eccentricity
+            if x > crit2:
+                return largest_acceptable_value_of_envelope_eccentricity
+            if x>crit1 and x <= crit2:
+                return threshold_value_of_envelope_eccentricity + (x-crit1) * (largest_acceptable_value_of_envelope_eccentricity - threshold_value_of_envelope_eccentricity)/(crit2-crit1)
+            print('This situation is not possible')
+
+            return
+
+        #self.plot_present_eccentricity_vs_log_period(records_of_log_orbital_period_and_eccentricity_now,
+                                                     #records_of_the_points_on_envelope,
+                                                     #envelope_eccentricity_function_manual)
+        self.plot_present_eccentricity_vs_semi_major_axis_over_planetary_radius(records_of_semi_major_axis_over_planetary_radius_vs_eccentricity_now,
+                                                     envelope_eccentricity_function_for_eccentricity_vs_semi_major_axis_over_planetary_radius_manual)
 
 
 
         return envelope_eccentricity_function
+
+    def plot_present_eccentricity_vs_semi_major_axis_over_planetary_radius(self,
+                                                                           records_of_semi_major_axis_over_planetary_radius_vs_eccentricity_now,
+                                                                           envelope_eccentricity_function):
+        log_semi_major_axis_over_planetary_radius = [math.log(element['semi major axis over planetary radius'], 10) for element in records_of_semi_major_axis_over_planetary_radius_vs_eccentricity_now]
+        eccentricity_now = [element['present eccentricity'] for element in records_of_semi_major_axis_over_planetary_radius_vs_eccentricity_now]
+        primary_mass = [element['primary mass'] for element in records_of_semi_major_axis_over_planetary_radius_vs_eccentricity_now]
+
+        xdata = np.linspace(math.log(records_of_semi_major_axis_over_planetary_radius_vs_eccentricity_now[0]['semi major axis over planetary radius'], 10),
+                            math.log(records_of_semi_major_axis_over_planetary_radius_vs_eccentricity_now[-1]['semi major axis over planetary radius'], 10),
+                            50)
+        ydata = []
+
+        for i in range(0, len(xdata)):
+            ydata = ydata + [envelope_eccentricity_function(xdata[i])]
+        log_semi_major_axis_over_planetary_radius_1 = []
+        eccentricity_now_1 = []
+        log_semi_major_axis_over_planetary_radius_2 = []
+        eccentricity_now_2 = []
+        for i in range(0, len(records_of_semi_major_axis_over_planetary_radius_vs_eccentricity_now)):
+            if primary_mass[i] < 1.2:
+                log_semi_major_axis_over_planetary_radius_1 = log_semi_major_axis_over_planetary_radius_1 + [log_semi_major_axis_over_planetary_radius[i]]
+                eccentricity_now_1 = eccentricity_now_1 + [eccentricity_now[i]]
+
+            else:
+                log_semi_major_axis_over_planetary_radius_2 = log_semi_major_axis_over_planetary_radius_2 + [log_semi_major_axis_over_planetary_radius[i]]
+                eccentricity_now_2 = eccentricity_now_2 + [eccentricity_now[i]]
+
+
+        plt.plot(log_semi_major_axis_over_planetary_radius_1, eccentricity_now_1, 'x')
+        plt.plot(log_semi_major_axis_over_planetary_radius_2, eccentricity_now_2, 'o')
+        #plt.plot(xdata, ydata)
+        # naming the x axis
+        plt.xlabel('log of semi major axis over planetary radius')
+        # naming the y axis
+        plt.ylabel('Present Eccentricity')
+        # giving a title to my graph
+        plt.title('Present Eccentricity vs log of semi major axis over planetary radius')
+        # function to show the plot
+        #plt.plot(log_orbital_period_on_envelope, eccentricity_now_on_envelope, 'b',
+                 #label="Envelope Eccentricities vs. log(Periods)")
+        plt.show()
+        return
 
     def plot_present_eccentricity_vs_log_period(self,
                                                 records_of_log_orbital_period_and_eccentricity_now,
@@ -664,6 +1062,7 @@ class EnvelopeEccentricityDistribution:
                                                 envelope_eccentricity_function):
         log_orbital_period = [element['log of orbital period'] for element in records_of_log_orbital_period_and_eccentricity_now]
         eccentricity_now = [element['present eccentricity'] for element in records_of_log_orbital_period_and_eccentricity_now]
+        primary_mass = [element['primary mass'] for element in records_of_log_orbital_period_and_eccentricity_now]
         log_orbital_period_on_envelope = [element['log of orbital period'] for element in records_of_the_points_on_envelope]
         eccentricity_now_on_envelope = [element['envelope eccentricity'] for element in records_of_the_points_on_envelope]
         xdata = np.linspace(records_of_log_orbital_period_and_eccentricity_now[0]['log of orbital period'],
@@ -672,7 +1071,22 @@ class EnvelopeEccentricityDistribution:
         ydata = []
         for i in range(0, len(xdata)):
             ydata = ydata + [envelope_eccentricity_function(10 ** xdata[i])]
-        plt.plot(log_orbital_period, eccentricity_now, 'x')
+        log_orbital_period_1 = []
+        eccentricity_now_1 = []
+        log_orbital_period_2 = []
+        eccentricity_now_2 = []
+        for i in range(0, len(records_of_log_orbital_period_and_eccentricity_now)):
+            if primary_mass[i] < 1.2:
+                log_orbital_period_1 = log_orbital_period_1 + [log_orbital_period[i]]
+                eccentricity_now_1 = eccentricity_now_1 + [eccentricity_now[i]]
+
+            else:
+                log_orbital_period_2 = log_orbital_period_2 + [log_orbital_period[i]]
+                eccentricity_now_2 = eccentricity_now_2 + [eccentricity_now[i]]
+
+
+        plt.plot(log_orbital_period_1, eccentricity_now_1, 'x')
+        plt.plot(log_orbital_period_2, eccentricity_now_2, 'o')
         plt.plot(xdata, ydata)
         # naming the x axis
         plt.xlabel('log(Period)')
@@ -681,8 +1095,8 @@ class EnvelopeEccentricityDistribution:
         # giving a title to my graph
         plt.title('Present Eccentricity vs log(Period)')
         # function to show the plot
-        plt.plot(log_orbital_period_on_envelope, eccentricity_now_on_envelope, 'o',
-                 label="Envelope Eccentricities vs. log(Periods)")
+        #plt.plot(log_orbital_period_on_envelope, eccentricity_now_on_envelope, 'b',
+                 #label="Envelope Eccentricities vs. log(Periods)")
         plt.show()
         return
 
@@ -827,7 +1241,7 @@ class SamplingPropertiesOfSystem:
 
             self.means['obliquity'] = 0
 
-            print('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&  orbital period = ',  means['orbital period'])
+            print('orbital period = ',  means['orbital period'])
 
             self.e_env = self.envelope_eccentricity_function(orbital_period=self.means['orbital period'])
             print(self.means['present eccentricity'],
@@ -943,7 +1357,6 @@ class SamplingPropertiesOfSystem:
         )
 
         print(dissipation)
-        print('start evolution')
         evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
                                               interpolator=self.interpolator,
                                               dissipation=dissipation,
@@ -961,7 +1374,6 @@ class SamplingPropertiesOfSystem:
                                               orbital_period_tolerance=1e-6,
                                               solve=True,
                                               secondary_is_star=False)
-        print('end evolution')
 
 
         calculated_eccentricity_now = evolutionary_history.eccentricity[- 1]
@@ -1024,8 +1436,6 @@ class SamplingPropertiesOfSystem:
                                - self.standard_deviations['metallicity_lower_uncertainty'])/2,
                               (self.standard_deviations['stellar_age_upper_uncertainty']
                                - self.standard_deviations['stellar_age_lower_uncertainty'])/2]
-
-
 
         print('p0 initial = ', p0)
 

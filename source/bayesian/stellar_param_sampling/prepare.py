@@ -10,8 +10,10 @@ import numpy
 from numpy.random import rand
 import logging
 from stellar_evolution.manager import StellarEvolutionManager
-
+from stellar_evolution.change_variables import QuantityEvaluator
+from random import random
 import sys
+import corner
 #print(sys.path)
 
 sys.path.append('/home/mmmahmud/CircularizationDissipationConstraints/source')
@@ -224,6 +226,72 @@ def serialize_poet_likelihood(config, interpolator):
     star_sampler = StarSampler(likelihood, config)
 
     marginalized_plots(config, star_sampler, interpolator, fast=True)
+    _corner_plot_of_mass_feh_age(number_of_samples=10000, star_sampler=star_sampler, interpolator=interpolator, config=config)
+
+def _corner_plot_of_mass_feh_age(number_of_samples,
+                                 star_sampler,
+                                 interpolator,
+                                 config):
+    unit_cube = numpy.array([random(), random(), random()])
+    _feh, _mass, _age = star_sampler.__call__(unit_cube)
+    quantity_evaluator_object = QuantityEvaluator(interpolator=interpolator,
+                                                  feh=_feh)#,
+                                                  #teff = config.Teff,
+                                                  #logg = config.logg,
+                                                  #lum = config.lum,
+                                                  #rho = config.mean_density)
+    _teff = quantity_evaluator_object.teff(_mass, _age)
+    _logg = quantity_evaluator_object.logg(_mass, _age)
+    _lum = quantity_evaluator_object.lum(_mass, _age)
+    _rho = quantity_evaluator_object.rho(_mass, _age)
+    print('feh ', _feh, ' mass ', _mass, ' age ', _age, ' teff ', _teff, ' logg ', _logg, ' lum ', _lum, ' rho ', _rho)
+    #samples = numpy.array([_feh, _mass, _age, _teff, _logg, _lum, _rho])
+    samples1 = numpy.array([_feh, _mass, _age])
+    samples2 = numpy.array([_feh, _teff, _logg, _lum, _rho])
+
+
+    for i in range(1, number_of_samples):
+        unit_cube = numpy.array([random(), random(), random()])
+        _feh, _mass, _age = star_sampler.__call__(unit_cube)
+        quantity_evaluator_object = QuantityEvaluator(interpolator=interpolator,
+                                                      feh=_feh)#,
+                                                      #teff=config.Teff,
+                                                      #logg=config.logg,
+                                                      #lum=config.lum,
+                                                      #rho=config.rho)
+        _teff = quantity_evaluator_object.teff(_mass, _age)
+        _logg = quantity_evaluator_object.logg(_mass, _age)
+        _lum = quantity_evaluator_object.lum(_mass, _age)
+        _rho = quantity_evaluator_object.rho(_mass, _age)
+        print('feh ', _feh, ' mass ', _mass, ' age ', _age, ' teff ', _teff, ' logg ', _logg, ' lum ', _lum, ' rho ',
+              _rho)
+        #new_sample = numpy.array([_feh, _mass, _age, _teff, _logg, _lum, _rho])
+        new_sample1 = numpy.array([_feh, _mass, _age])
+        new_sample2 = numpy.array([_feh, _teff, _logg, _lum, _rho])
+        #samples = numpy.vstack((samples, new_sample))
+        samples1 = numpy.vstack((samples1, new_sample1))
+        samples2 = numpy.vstack((samples2, new_sample2))
+        print('samples = ', samples1, samples2)
+
+    #figure = corner.corner(samples1, labels=[r"$feh$", r"$mass$", r"$age$", r"$teff$", r"$logg$", r"$lum$", r"$rho$"],
+                           #quantiles=[0.16, 0.5, 0.84],
+                           #show_titles=True, title_kwargs={"fontsize": 4})
+
+    figure = corner.corner(samples1, labels=[r"$feh$", r"$mass$", r"$age$"],
+                            quantiles=[0.16, 0.5, 0.84],
+                            show_titles=True, title_kwargs={"fontsize": 4})
+    pyplot.show()
+    figure = corner.corner(samples2, labels=[r"$feh$", r"$teff$", r"$logg$", r"$lum$", r"$rho$"],
+                           quantiles=[0.16, 0.5, 0.84],
+                           show_titles=True, title_kwargs={"fontsize": 4})
+    pyplot.show()
+    return
+
+
+
+
+
+
 
 def main(config):
     """Avoid polluting the global namespace."""
@@ -244,9 +312,7 @@ def main(config):
 
     FeHConditionalLikelihoodBase.set_interpolator(interpolator)
 
-#    test_marginalized_pdfs(config, interpolator)
     serialize_poet_likelihood(config, interpolator)
-    #test_marginalized_pdfs(config, interpolator)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
