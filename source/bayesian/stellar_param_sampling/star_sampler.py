@@ -844,6 +844,7 @@ class StarSampler:
                     return False
                 pickled_value = pickled_cfg_dict[key]
                 if isinstance(pickled_value, (rv_continuous, rv_frozen)):
+                    print('**********', pickled_value, input_cfg_dict)
                     if (
                             pickled_value.kwds != input_cfg_dict[key].kwds
                             or

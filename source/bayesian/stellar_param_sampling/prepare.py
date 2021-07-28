@@ -9,6 +9,8 @@ from configargparse import ArgumentParser, DefaultsFormatter
 import numpy
 from numpy.random import rand
 import logging
+
+from split_normal_distribution import split_normal
 from stellar_evolution.manager import StellarEvolutionManager
 from stellar_evolution.change_variables import QuantityEvaluator
 from random import random
@@ -83,11 +85,9 @@ def parse_configuration():
     )
 
 
-
     add_star_sampler_config_args(parser)
 
-    print('parser args ',parser.parse_args())
-    #parser.parse_args().feh = '-1.014 +- 0.01'
+
 
 
     return parser.parse_args()
@@ -202,7 +202,6 @@ def test_marginalized_pdfs(config, interpolator):
                        star_sampler,
                        interpolator,
                        marginalized_distribution)
-
 def serialize_poet_likelihood(config, interpolator):
     """Create and pickle a sampler for POET based likelihood."""
 
@@ -222,11 +221,10 @@ def serialize_poet_likelihood(config, interpolator):
         atol=config.time_ode_atol,
         max_step=config.time_ode_max_step
     )
-
     star_sampler = StarSampler(likelihood, config)
 
     marginalized_plots(config, star_sampler, interpolator, fast=True)
-    _corner_plot_of_mass_feh_age(number_of_samples=10000, star_sampler=star_sampler, interpolator=interpolator, config=config)
+    _corner_plot_of_mass_feh_age(number_of_samples=1000, star_sampler=star_sampler, interpolator=interpolator, config=config)
 
 def _corner_plot_of_mass_feh_age(number_of_samples,
                                  star_sampler,
@@ -304,15 +302,13 @@ def main(config):
         'default'
     )
 
-    print('interpolator ', interpolator)
-
-
     matplotlib.rcParams['figure.dpi'] = config.debug_plot_dpi
     matplotlib.rcParams['figure.autolayout'] = True
 
     FeHConditionalLikelihoodBase.set_interpolator(interpolator)
 
     serialize_poet_likelihood(config, interpolator)
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)

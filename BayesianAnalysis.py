@@ -31,9 +31,6 @@ if not sys.warnoptions:
                             "integers on this platform for lossless storage\.$",
                             SAWarning, r'^sqlalchemy\.sql\.type_api$')
 
-    #warnings.filterwarnings('ignore', r".*support Decimal objects natively", SAWarning, r'^sqlalchemy\.sql\.sqltypes$')
-
-    #warnings.simplefilter("error")
 
 sys.path.append('/home/mmmahmud/poet/PythonPackage')
 sys.path.append('../scripts')
@@ -51,7 +48,6 @@ def analysis_on_Nasa_exoplanet_data():
     serialized_dir = '/home/mmmahmud/poet/stellar_evolution_interpolators'
     manager = StellarEvolutionManager(serialized_dir)
     interpolator = manager.get_interpolator_by_name('default')
-    print('ddddd = ', interpolator)
     evolutionary_data = test_Nasa_Exoplanet_data(interpolator=(interpolator, interpolator))
     return evolutionary_data
 
@@ -123,18 +119,8 @@ def test_Nasa_Exoplanet_data(interpolator,
                     )
                 )
 
-
-
-
-
                 final_age = stellar_age[i]
                 print(repr(interpolator))
-
-
-
-
-
-
 
                 b = find_evolution(system=a,
                                    interpolator=interpolator,
@@ -676,6 +662,7 @@ class EnvelopeEccentricityDistribution:
             if eliminate:
                 data = do_eliminate()
 
+
             result = Structure()
             string_columns = ['pl_hostname',
                               'hostname',
@@ -732,7 +719,6 @@ class EnvelopeEccentricityDistribution:
                         column_values = [v.decode() for v in column_values]
                     else:
                         print('column_name: ' + repr(column_name))
-                        print('data [...]', data[:, column_index][1:])
                         column_values = [
                             numpy.nan if v == b'' else float(v)
                             for v in data[:, column_index][1:]
@@ -764,7 +750,7 @@ class EnvelopeEccentricityDistribution:
 
             return result
 
-        readPlanet = read_nasa_planets(self.path, eliminate=('SWEEPS-11', 'HD 41004 B', 'PSR J1719-1438', 'K2-22'), need_ages=False,)
+        readPlanet = read_nasa_planets(self.path, eliminate=('SWEEPS-11', 'HD 41004 B', 'PSR J1719-1438', 'K2-22', 'HATS-67 b'), need_ages=False,)
         ###########################################################################################
 
         #readPlanet = planetary_system_io.read_nasa_planets(self.path, eliminate=('SWEEPS-11','HD 41004 B','PSR J1719-1438','K2-22'), need_ages=False,)
@@ -814,6 +800,24 @@ class EnvelopeEccentricityDistribution:
         self.planet_mass_sin_i = readPlanet.pl_msinie # Earth mass
         self.planet_mass_sin_i_upper_uncertainty = readPlanet.pl_msinieerr1
         self.planet_mass_sin_i_lower_uncertainty = readPlanet.pl_msinieerr2
+        self.stellar_log_g = readPlanet.st_logg #log10(cm/s**2)
+        self.stellar_log_g_upper_uncertainty = readPlanet.st_loggerr1
+        self.stellar_log_g_lower_uncertainty = readPlanet.st_loggerr2
+        self.stellar_log_g_limit_flag = readPlanet.st_logglim
+        self.stellar_effective_temperature = readPlanet.st_teff #Kelvin
+        self.stellar_effective_temperature_upper_uncertainty = readPlanet.st_tefferr1
+        self.stellar_effective_temperature_lower_uncertainty = readPlanet.st_tefferr2
+        self.stellar_effective_temperature_limit_flag = readPlanet.st_tefflim
+        self.stellar_density = readPlanet.st_dens #gm/cm**3
+        self.stellar_density_upper_uncertainty = readPlanet.st_denserr1
+        self.stellar_density_lower_uncertainty = readPlanet.st_denserr2
+        self.stellar_density_limit_flag = readPlanet.st_denslim
+        self.stellar_luminosity = readPlanet.st_lum #log(solar)
+        self.stellar_luminosity_upper_uncertainty = readPlanet.st_lumerr1
+        self.stellar_luminosity_lower_uncertainty = readPlanet.st_lumerr2
+        self.stellar_luminosity_limit_flag = readPlanet.st_lumlim
+
+
 
         self.envelope_eccentricity_function = self.create_envelope_eccentricity_function(maximum_number_of_data_points,
                                                                                          threshold_value_of_envelope_eccentricity,
@@ -825,8 +829,10 @@ class EnvelopeEccentricityDistribution:
                                      threshold_value_of_envelope_eccentricity,
                                      largest_acceptable_value_of_envelope_eccentricity,
                                      constraints = constraints_for_eccentricity_envelope(),
-                                     x_attribute = 'log of semi major axis over planetary radius',
-                                     manual_envelope = True):
+                                     #x_attribute = 'log of semi major axis over planetary radius',
+                                     x_attribute='log of semi major axis over planetary radius',
+                                     manual_envelope = True,
+                                     eliminate = ('HATS-67 b', 'HATS-69 b', 'HATS-62 b')):
 
         def find_records_of_the_points_on_envelope(records_of_certain_attribute_and_eccentricity_now, attribute):
             records_of_the_points_on_envelope = []
@@ -877,7 +883,7 @@ class EnvelopeEccentricityDistribution:
             for i in range(0, len(self.orbital_period)):
                 if not (math.isnan(self.orbital_period[i])
                         or math.isnan(self.eccentricity_now[i])
-                ) and self.eccentricity_now_limit_flag[i] == 0:
+                ) and self.eccentricity_now_limit_flag[i] == 0 and not(self.planet_name[i] in eliminate):
                     if (constraints_for_eccentricity_envelope_are_satisfied(
                             secondary_radius=self.secondary_radius[i],
                             planet_mass_sin_i=self.planet_mass_sin_i[i],
@@ -909,7 +915,7 @@ class EnvelopeEccentricityDistribution:
                 if not (math.isnan(self.semi_major_axis[i])
                         or math.isnan(self.secondary_radius[i])
                         or math.isnan(self.eccentricity_now[i])
-                ) and self.eccentricity_now_limit_flag[i] != 1 and self.semi_major_axis_flag_limit[i] == 0:
+                ) and self.eccentricity_now_limit_flag[i] == 0 and self.semi_major_axis_flag_limit[i] == 0 and not(self.planet_name[i] in eliminate):
                     if (constraints_for_eccentricity_envelope_are_satisfied(
                             secondary_radius=self.secondary_radius[i],
                             planet_mass_sin_i=self.planet_mass_sin_i[i],
@@ -1030,9 +1036,9 @@ class EnvelopeEccentricityDistribution:
         # naming the y axis
         plt.ylabel('Present Eccentricity')
         # giving a title to my graph
-        #plt.title('Present Eccentricity vs', x_attribute)
-        # function to show the plot
-        #plt.plot(x_on_envelope, eccentricity_now_on_envelope)
+        string = 'Present Eccentricity vs. ' + x_attribute
+        plt.title(string)
+
         plt.show()
         return
 
@@ -1059,7 +1065,10 @@ class EnvelopeEccentricityDistribution:
                 or math.isnan(self.stellar_age_lower_uncertainty[i])
                 or math.isnan(self.eccentricity_now[i])
                 or math.isnan(self.eccentricity_now_lower_uncertainty[i])
-                or math.isnan(self.eccentricity_now_upper_uncertainty[i])):
+                or math.isnan(self.eccentricity_now_upper_uncertainty[i])
+                or math.isnan(self.semi_major_axis[i])
+                or math.isnan(self.semi_major_axis_lower_uncertainty[i])
+                or math.isnan(self.semi_major_axis_upper_uncertainty[i])):
             if (constraints_are_satisfied(orbital_period=self.orbital_period[i],
                                           primary_mass=self.primary_mass[i],
                                           secondary_mass=self.secondary_mass[i],
@@ -1075,7 +1084,8 @@ class EnvelopeEccentricityDistribution:
                          'obliquity': self.obliquity[i],
                          'stellar age': self.stellar_age[i],
                          'present eccentricity': self.eccentricity_now[i],
-                         'v sin i': self.vsini[i]}
+                         'v sin i': self.vsini[i],
+                         'semi major axis': self.semi_major_axis[i]}
                 standard_deviations = {'primary_mass_upper_uncertainty': self.primary_mass_upper_uncertainty[i],
                                        'primary_mass_lower_uncertainty': self.primary_mass_lower_uncertainty[i],
                                        'secondary_mass_upper_uncertainty': self.secondary_mass_upper_uncertainty[i],
@@ -1093,7 +1103,9 @@ class EnvelopeEccentricityDistribution:
                                        'eccentricity_now_upper_uncertainty': self.eccentricity_now_upper_uncertainty[i],
                                        'eccentricity_now_lower_uncertainty': self.eccentricity_now_lower_uncertainty[i],
                                        'vsini_upper_uncertainty': self.vsini_upper_uncertainty[i],
-                                       'vsini_lower_uncertainty': self.vsini_lower_uncertainty[i]}
+                                       'vsini_lower_uncertainty': self.vsini_lower_uncertainty[i],
+                                       'semi_major_axis_upper_uncertainty': self.semi_major_axis_upper_uncertainty[i],
+                                       'semi_major_axis_lower_uncertainty': self.semi_major_axis_lower_uncertainty[i]}
                 return means, standard_deviations, self.planet_name[i]
         return None, None, None
 
@@ -1111,13 +1123,35 @@ class EnvelopeEccentricityDistribution:
                 print('e_mean ', means['present eccentricity'])
                 print('e_now_upper_uncertainty ', standard_deviations['eccentricity_now_upper_uncertainty'])
                 print('e_now_lower_uncertainty ', standard_deviations['eccentricity_now_lower_uncertainty'])
-                print('log of orbital period = ', math.log(means['orbital period'], 10))
-                print('Envelope eccentricity for orbital period = ', means['orbital period'], ' is = ',
-                      self.envelope_eccentricity_function(means['orbital period']))
+                a_over_Rpl = means['semi major axis']/means['secondary radius']
+                print('log of semi major axis over secondary radius = ', math.log(a_over_Rpl, 10))
+                print('Envelope eccentricity for semi major axis over secondary radius = ', a_over_Rpl, ' is = ',
+                      self.envelope_eccentricity_function(a_over_Rpl))
                 index_of_binary_system_with_constrained_properties = index_of_binary_system_with_constrained_properties + [i]
         return index_of_binary_system_with_constrained_properties
 
-
+class Element:
+    def __init__(self, teff, feh, logg, lum, mean_density, debug_plot=[('interpolation_performance', 'interp_performance.pdf')]):
+        self.Teff=teff
+        self.age_cdf_interp_tolerance=0.0001
+        self.debug_plot=debug_plot
+        self.debug_plot_dpi=300
+        self.feh=feh
+        self.feh_max_cdf_step=0.1
+        self.feh_max_step=0.1
+        self.grid_refine_algorithm='worst'
+        self.logg=logg
+        self.lum=lum
+        self.mass_cdf_interp_tolerance=0.0001
+        self.mass_max_step=0.1
+        self.max_discarded_feh_probability=1e-08
+        self.mean_density=mean_density
+        self.num_parallel_processes=4
+        self.star_sampler_pickle_fname='star_sampler.pkl'
+        self.stellar_evolution_interpolator_dir='/home/mmmahmud/poet/stellar_evolution_interpolators'
+        self.time_ode_atol=1e-08
+        self.time_ode_max_step=0.1
+        self.time_ode_rtol=1e-06
 
 class SamplingPropertiesOfSystem:
     def __init__(self,
@@ -1127,10 +1161,11 @@ class SamplingPropertiesOfSystem:
                  serialized_directory='/home/mmmahmud/poet/stellar_evolution_interpolators',
                  envelope_eccentricity_function=None,
                  initial_eccentricity = 0.5,
-                 max_argument_of_phase_lag_function_for_planet=5,
-                 min_argument_of_phase_lag_function_for_planet=10,
-                 max_initial_stellar_spin=5,
-                 min_initial_stellar_spin=15,
+                 initial_stellar_spin = 5,
+                 max_argument_of_phase_lag_function_for_planet=10,
+                 min_argument_of_phase_lag_function_for_planet=5,
+                 max_initial_stellar_spin=15,
+                 min_initial_stellar_spin=5,
                  constraints = constraints(),
                  tidal_frequency_breaks_for_planet = np.array([2*math.pi/20]),
                  tidal_frequency_powers_for_planet = np.array([1.0, 0.0]),
@@ -1139,6 +1174,7 @@ class SamplingPropertiesOfSystem:
                  find_argument_of_phase_lag_function_for_planet_range_auto = False):
 
         self.initial_eccentricity = initial_eccentricity
+        self.initial_stellar_spin = initial_stellar_spin
         self.max_argument_of_phase_lag_function_for_planet = max_argument_of_phase_lag_function_for_planet
         self.min_argument_of_phase_lag_function_for_planet = min_argument_of_phase_lag_function_for_planet
         self.max_initial_stellar_spin = max_initial_stellar_spin
@@ -1180,7 +1216,7 @@ class SamplingPropertiesOfSystem:
 
             print('orbital period = ',  means['orbital period'])
 
-            self.e_env = self.envelope_eccentricity_function(x =self.means['orbital period'])
+            self.e_env = self.envelope_eccentricity_function(x =self.means['semi major axis']/self.means['secondary radius'])
             print(self.means['present eccentricity'],
                   self.standard_deviations['eccentricity_now_upper_uncertainty'],
                   self.standard_deviations['eccentricity_now_lower_uncertainty'],
@@ -1194,8 +1230,8 @@ class SamplingPropertiesOfSystem:
 
             if find_argument_of_phase_lag_function_for_planet_range_auto:
                 min_Qpl, max_Qpl = self.determine_a_suitable_range_of_argument_of_phase_lag_function_for_planet()
-                self.max_argument_of_phase_lag_function_for_planet = min_Qpl
-                self.min_argument_of_phase_lag_function_for_planet = max_Qpl
+                self.max_argument_of_phase_lag_function_for_planet = max_Qpl
+                self.min_argument_of_phase_lag_function_for_planet = min_Qpl
                 print('minimum Qpl = ', min_Qpl, ' maximum Qpl = ', max_Qpl)
 
     def pick_a_tuple_from_the_multi_variable_Gaussian_distribution(self, mean, standard_deviation):
@@ -1422,7 +1458,7 @@ class SamplingPropertiesOfSystem:
 
     def determine_a_suitable_range_of_argument_of_phase_lag_function_for_planet(self):
 
-        initial_stellar_spin = 10
+        initial_stellar_spin = self.initial_stellar_spin
         argument_of_phase_lag_function_for_planet = 5.0
 
         theta0 = [self.means['primary mass'],
