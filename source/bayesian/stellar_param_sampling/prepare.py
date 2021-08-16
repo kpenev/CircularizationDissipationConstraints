@@ -205,6 +205,7 @@ def test_marginalized_pdfs(config, interpolator):
 def serialize_poet_likelihood(config, interpolator):
     """Create and pickle a sampler for POET based likelihood."""
 
+
     constraints = dict()
     if config.logg is not None:
         constraints['logg'] = config.logg
@@ -222,6 +223,7 @@ def serialize_poet_likelihood(config, interpolator):
         max_step=config.time_ode_max_step
     )
     star_sampler = StarSampler(likelihood, config)
+
 
     marginalized_plots(config, star_sampler, interpolator, fast=True)
     _corner_plot_of_mass_feh_age(number_of_samples=1000, star_sampler=star_sampler, interpolator=interpolator, config=config)
@@ -286,11 +288,6 @@ def _corner_plot_of_mass_feh_age(number_of_samples,
     return
 
 
-
-
-
-
-
 def main(config):
     """Avoid polluting the global namespace."""
 
@@ -309,7 +306,51 @@ def main(config):
 
     serialize_poet_likelihood(config, interpolator)
 
+class Element:
+    def __init__(self, teff, feh, logg, mean_density, debug_plot):
+        self.Teff=teff
+        self.age_cdf_interp_tolerance=0.0001
+        self.debug_plot=debug_plot
+        self.debug_plot_dpi=300
+        self.feh=feh
+        self.feh_max_cdf_step=0.1
+        self.feh_max_step=0.1
+        self.grid_refine_algorithm='worst'
+        self.logg=logg
+        self.mass_cdf_interp_tolerance=0.0001
+        self.mass_max_step=0.1
+        self.max_discarded_feh_probability=1e-08
+        self.mean_density=mean_density
+        self.lum = None
+        self.num_parallel_processes=4
+        self.star_sampler_pickle_fname='star_sampler.pkl'
+        self.stellar_evolution_interpolator_dir='/home/mmmahmud/poet/stellar_evolution_interpolators'
+        self.time_ode_atol=1e-08
+        self.time_ode_max_step=0.1
+        self.time_ode_rtol=1e-06
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    main(parse_configuration())
+    debug_plot = [('interpolation_performance', 'interp_performance.pdf')]
+    teff = split_normal.freeze_error_bar(
+            mode=5700,
+            abs_plus_error=100,
+            abs_minus_error=100)
+    feh = split_normal.freeze_error_bar(
+            mode=0.09,
+            abs_plus_error=0.09,
+            abs_minus_error=0.09)
+    logg = split_normal.freeze_error_bar(
+            mode=4.5,
+            abs_plus_error=0.2,
+            abs_minus_error=0.2)
+    mean_density = split_normal.freeze_error_bar(
+            mode=0.88,
+            abs_plus_error=0.12,
+            abs_minus_error=0.12)
+    config = Element(teff, feh, logg, mean_density, debug_plot)
+
+    main(config)
+
+
+    #main(parse_configuration())
