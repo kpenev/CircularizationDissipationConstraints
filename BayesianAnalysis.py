@@ -1307,17 +1307,8 @@ class SamplingPropertiesOfSystem:
         )
         star_sampler = StarSampler(likelihood, config)
 
-        primary_mass_samples = numpy.array([])
-        stellar_age_samples = numpy.array([])
-
-        for i in range(0, number_of_samples):
-            unit_cube = numpy.array([random(), random(), random()])
-            _feh, _mass, _age = star_sampler.__call__(unit_cube)
-            primary_mass_samples = numpy.append(primary_mass_samples, numpy.array([_mass]))
-            stellar_age_samples = numpy.append(stellar_age_samples, numpy.array([_age]))
-
-        primary_mass = numpy.mean(primary_mass_samples)
-        stellar_age = numpy.mean(stellar_age_samples)
+        unit_cube = numpy.array([random(), random(), random()])
+        metallicity, primary_mass, stellar_age = star_sampler.__call__(unit_cube)
         primary_radius = (primary_mass*const.M_sun.value*1000/(4*math.pi/3*sample['stellar density']))**(1/3)/100/const.R_sun.value
         secondary_radius = (sample['ratio of planet to stellar radius']**0.5)*primary_radius*const.R_sun.value/const.R_earth.value
         parameters_for_evolution = {'primary mass': primary_mass,
@@ -1437,7 +1428,7 @@ class SamplingPropertiesOfSystem:
     def testing_log_prob(self):
 
         initial_stellar_spin = 10
-        argument_of_phase_lag_function_for_planet = 3.0
+        argument_of_phase_lag_function_for_planet = 5.0
 
         sample = [
             self.means['stellar metallicity'],
