@@ -26,24 +26,30 @@ class LogLikelihoodSB1(LogLikelihoodBase):
             )
         )
         if 'lgQ_break_period' in self.parameter_indices:
-            star_dissipation['tidal_frequency_breaks'] = numpy.array([
-                2.0 * numpy.pi
-                /
-                self.get_parameter_value(
-                    parameters,
-                    'lgQ_break_period'
-                ).to_value(units.day)
-            ])
+            break_frequency = (2.0 * numpy.pi
+                               /
+                               self.get_parameter_value(
+                                   parameters,
+                                   'lgQ_break_period'
+                               ).to_value(units.day))
             powerlaw = self.get_parameter_value(parameters, 'lgQ_powerlaw')
             if powerlaw > 0:
                 star_dissipation['tidal_frequency_powers'] = numpy.array([
                     powerlaw,
                     0.0
                 ])
+                star_dissipation['tidal_frequency_breaks'] = numpy.array([
+                    break_frequency
+                ])
             else:
                 star_dissipation['tidal_frequency_powers'] = numpy.array([
+                    1.0,
                     0.0,
                     powerlaw
+                ])
+                star_dissipation['tidal_frequency_breaks'] = numpy.array([
+                    2.0 * numpy.pi / 50.0,
+                    break_frequency
                 ])
         else:
             star_dissipation['tidal_frequency_breaks'] = None
