@@ -72,8 +72,7 @@ class Plot2DInterpolation(ABC):
                                         interpolated_values,
                                         x_grid,
                                         y_grid,
-                                        interp_data,
-                                        title):
+                                        interp_data):
         """Show plot of how the interpolation performs as grid is refined."""
 
         if 'interpolation_performance' not in self._debug_plots:
@@ -156,14 +155,24 @@ class Plot2DInterpolation(ABC):
             )
             self._handle_debug_plot(
                 title=(
-                    title
+                    self._plot_labels['function']
                     +
                     '_interp_vs_calc_'
                     +
+                    'v%s_%s=%g'
+                    %
                     (
-                        'vM_FeH=%g' % x_grid[max_discrepancy_ind[0]]
+                        (
+                            self._plot_labels['y'],
+                            self._plot_labels['x'],
+                            x_grid[max_discrepancy_ind[0]]
+                        )
                         if direction == 'y' else
-                        'vFeH_M=%g' % y_grid[max_discrepancy_ind[1]]
+                        (
+                            self._plot_labels['x'],
+                            self._plot_labels['y'],
+                            y_grid[max_discrepancy_ind[1]]
+                        )
                     )
                 )
             )
@@ -172,34 +181,34 @@ class Plot2DInterpolation(ABC):
             """Create multi-panel plot showing the current interpolation."""
 
             pyplot.subplot(221)
-            plot_feh = get_plot_grid(x_grid)
-            plot_masses = get_plot_grid(y_grid)
-            pyplot.pcolormesh(plot_masses,
-                              plot_feh,
+            plot_x = get_plot_grid(x_grid)
+            plot_y = get_plot_grid(y_grid)
+            pyplot.pcolormesh(plot_y,
+                              plot_x,
                               calculated_values,
                               edgecolors='none')
-            pyplot.xlabel(r'$M_\star$ [$M_\odot$]')
-            pyplot.ylabel('[Fe/H]')
+            pyplot.xlabel(self._plot_labels['y'])
+            pyplot.ylabel(self._plot_labels['x'])
             pyplot.title('Calculated')
             pyplot.colorbar()
 
             pyplot.subplot(222)
-            pyplot.pcolormesh(plot_masses,
-                              plot_feh,
+            pyplot.pcolormesh(plot_y,
+                              plot_x,
                               interpolated_values,
                               edgecolors='none')
-            pyplot.xlabel(r'$M_\star$ [$M_\odot$]')
-            pyplot.ylabel('[Fe/H]')
+            pyplot.xlabel(self._plot_labels['y'])
+            pyplot.ylabel(self._plot_labels['x'])
             pyplot.title('Interpolated')
             pyplot.colorbar()
 
             pyplot.subplot(223)
-            pyplot.pcolormesh(plot_masses,
-                              plot_feh,
+            pyplot.pcolormesh(plot_y,
+                              plot_x,
                               difference,
                               edgecolors='none')
-            pyplot.xlabel(r'$M_\star$ [$M_\odot$]')
-            pyplot.ylabel('[Fe/H]')
+            pyplot.xlabel(self._plot_labels['y'])
+            pyplot.ylabel(self._plot_labels['x'])
             pyplot.title('Calculated - Interpolated')
             pyplot.colorbar()
 
@@ -207,14 +216,14 @@ class Plot2DInterpolation(ABC):
             pyplot.plot(y_grid,
                         difference[max_discrepancy_ind[0], : ],
                         '.r')
-            pyplot.xlabel(r'$M_\star$ [$M_\odot$]')
+            pyplot.xlabel(self._plot_labels['y'])
             pyplot.ylabel('calc - interp')
 
             pyplot.twiny()
             pyplot.plot(x_grid,
                         difference[ :, max_discrepancy_ind[1]],
                         '.b')
-            pyplot.xlabel('[Fe/H]')
+            pyplot.xlabel(self._plot_labels['x'])
 
             pyplot.suptitle(title)
 
@@ -234,9 +243,28 @@ class Plot2DInterpolation(ABC):
         plot_interp_performance(difference, max_discrepancy_ind)
     #pylint: enable=too-many-statements
 
-    def __init__(self, debug_plots):
-        """Configure the plots to create."""
+    def __init__(self, debug_plots=None, plot_labels=None):
+        """
+        Configure the plots to create.
 
-        self._debug_plots = debug_plots
+        Args:
+            debug_plots(dict or None):    Each key enables another kind of plot
+                showing the progress of the tuning, with the corresponding value
+                specifying a `%(keyword)` substitution string that exands to the
+                filanema under which to save the plot. The substitution keywords
+                depend on the type of plot.
+
+            plot_labels(dict or None):    Labels for the various quantities that
+                appear on plots (e.g. `plot_labels['x']` specifies a name for
+                the x variable).
+
+
+        """
+
+        self._debug_plots = debug_plots or dict()
+        self._plot_labels = plot_labels or dict(
+            x='X',
+            y='Y'
+        )
         self._grid_refinement_iteration = None
 #pylint: enable=too-few-public-methods

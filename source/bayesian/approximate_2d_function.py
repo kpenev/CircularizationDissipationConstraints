@@ -1,6 +1,9 @@
 """Implement fast approximate evaluation of expensive 2D functions."""
 
 from collections import namedtuple
+import logging
+from itertools import count
+from multiprocessing import Pool
 
 from scipy.interpolate import RectBivariateSpline
 import numpy
@@ -19,6 +22,8 @@ ApproximationConfig = namedtuple(
 )
 
 
+#No reasonable way to simplify
+#pylint: disable=too-many-instance-attributes
 class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
     """
     Approximate but fast evalution of expensive 2D functions.
@@ -44,9 +49,8 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                 interpolation is to be defined.
 
             values(2-D array):     The known values of the function to
-                interpolate at each [Fe/H], mass combination from the above
-                grids. The first index should correspond to feh_grid and the
-                second to mass_grid.
+                interpolate at each x, y combination from the above grids. The
+                first index should correspond to x and the second to y.
 
             target_x(1-D array):    New x values where the interpolation is to
                 be evaluated.
@@ -103,17 +107,12 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
         return tuple(numpy.array([ind]) for ind in worst_index)
 
 
-    def _get_mismatch_indices(self, values, debug_title):
+    def _get_mismatch_indices(self):
         """
         Return indices where interpolating values fails on current grid.
 
         Args:
-            values(2-D array):    The values of the quantity being interpolated
-                at the current grid. The first index should iterate over x and
-                the second over y.
-
-           debug_title(str):    The title to use for the plot showing the
-                current interpolation performance.
+           None
 
         Returns:
             1-D int array:
@@ -130,11 +129,11 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                 if x_offset == y_offset == 0:
                     continue
 
-                calculated_values = values[x_offset : : 2, y_offset : : 2]
+                calculated_values = self._values[x_offset : : 2, y_offset : : 2]
                 interpolated_values = self._interpolate(
                     self._x_grid[ : : 2],
                     self._y_grid[ : : 2],
-                    values[ : : 2, : : 2],
+                    self._values[ : : 2, : : 2],
                     self._x_grid[x_offset : : 2],
                     self._y_grid[y_offset : : 2],
                 )
@@ -143,10 +142,7 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                     interpolated_values=interpolated_values,
                     x_grid=self._x_grid[x_offset : : 2],
                     y_grid=self._y_grid[y_offset : : 2],
-                    interp_data=values[ : : 2, : : 2],
-                    title=(debug_title
-                           +
-                           ' x_di=%d, y_di=%d' % (x_offset, y_offset))
+                    interp_data=self._values[ : : 2, : : 2]
                 )
 
                 new_mismatches = getattr(
@@ -177,6 +173,197 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
         return mismatches
 
 
+    def _get_grid_refinement(self):
+        """
+        Return new x and y values to add to grid to improve the interpolation.
+
+        Args:
+            None
+
+        Returns:
+            (1-D float array, 1-D int array):
+                Sorted extra x values to add to the grid near places where
+                the interpolation precision is insufficient and the number of
+                current x grid nodes smaller than the corresponding new
+                x value.
+
+            (1-D float array, 1-D int array):
+                Same as above but for the y grid.
+        """
+
+        def get_new_grid_points(mismatch_indices, current_grid):
+            """Return new values to add per the given mismatch indices."""
+
+            if mismatch_indices.size == 0:
+                return numpy.array([], dtype=float), numpy.array([], dtype=int)
+
+            below_indices = numpy.unique(
+                numpy.concatenate((
+                    (
+                        mismatch_indices
+                        if mismatch_indices[-1] < current_grid.size - 1 else
+                        mismatch_indices[:-1]
+                    ),
+                    (
+                        mismatch_indices
+                        if mismatch_indices[0] > 0 else
+                        mismatch_indices[1:]
+                    ) - 1
+                ))
+            )
+            return (
+                0.5 * (current_grid[below_indices]
+                       +
+                       current_grid[below_indices + 1]),
+                below_indices + 1
+            )
+
+        mismatch_indices = list(self._get_mismatch_indices())
+
+        self._logger.debug('Mismatch indices: %s', repr(mismatch_indices))
+
+        return [
+            get_new_grid_points(*args)
+            for args in zip(mismatch_indices, [self._x_grid, self._y_grid])
+        ]
+
+
+    def _calculate_function_values(self, x_grid, y_grid, workers):
+        """
+        Calculate function at the given grid points using parallel processing.
+
+        Args:
+            x_grid(1-D array):    The x values at which to evaluate the
+                function.
+
+            y_grid(1-D array):    The y values at which to evaluate the
+                function.
+
+        Returns:
+            [[OdeSolution, ...], ...]:
+                Unnormalized CDF(age | mass, [Fe/H]) at each mass [Fe/H]
+                combination. The first index is over [Fe/H] and the second is
+                over mass.
+        """
+
+        eval_y, eval_x = numpy.meshgrid(y_grid, x_grid)
+
+        result = numpy.array(
+            list(
+                workers.starmap(
+                    self.func,
+                    zip(eval_x.flatten(), eval_y.flatten())
+                )
+            )
+        ).reshape(x_grid.size, y_grid.size)
+
+        return result
+
+
+    def _tune_interpolation(self, workers):
+        """Find a grid dense enough to achive desired approximation."""
+
+        def insert_entries(current, new, num_before, destination):
+            """
+            Set destination to new entries inserted among current.
+
+            Args:
+                current:    The current array to add entries to. Not modified.
+
+                new:    The new entries to add.
+
+                num_before:    The number of current entries to precede each
+                    entry in new.
+
+                destination:    The array to fill. Sholud already be
+                    pre-allocated and is completely overwritten.
+
+            Returns:
+                None
+            """
+
+            current_start = 0
+            for new_index, (current_end, new_entry) in enumerate(zip(num_before,
+                                                                     new)):
+                destination[
+                    current_start + new_index
+                    :
+                    current_end + new_index
+                ] = current[current_start : current_end]
+
+                destination[current_end + new_index] = new_entry
+
+                current_start = current_end
+
+            destination[current_start + len(new) : ] = current[current_start : ]
+
+        def add_grid_points(grid, new_points, num_smaller):
+            """
+            Return new grid combining the current grid with new points.
+
+            Args:
+                grid:    The grid to add points to. Not modified.
+
+                new_points:    The new values to add to the grid.
+
+                num_smaller:    The number of current grid points smaller than
+                    each entry in new_points.
+
+            Returns:
+                1-D array:
+                    The new grid.
+            """
+
+            result = numpy.empty(shape=(grid.size + new_points.size),
+                                 dtype=grid.dtype)
+            insert_entries(grid, new_points, num_smaller, result)
+            return result
+
+        for self._grid_refinement_iteration in count():
+            grid_refinement = self._get_grid_refinement()
+
+            if grid_refinement[0][0].size == grid_refinement[1][0].size == 0:
+                return
+
+            new_grids= (
+                add_grid_points(args[0], *args[1])
+                for args in zip(
+                    (self._x_grid, self._y_grid), grid_refinement
+                )
+            )
+            for grid, label in zip(new_grids, 'xy'):
+                self._logger.debug('New %s grid: %s',
+                                   self._plot_labels[label],
+                                   repr(grid.T))
+
+            function_values_to_add = self._calculate_function_values(
+                self._x_grid,
+                grid_refinement[1][0],
+                workers
+            )
+            new_y_old_x_function_values = [[None] * new_grids[1].size
+                                           for x in self._x_grid]
+            for x_index in range(self._x_grid.size):
+                insert_entries(self._values[x_index],
+                               function_values_to_add[x_index],
+                               grid_refinement[1][1],
+                               new_y_old_x_function_values[x_index])
+
+            function_values_to_add = self._calculate_function_values(
+                grid_refinement[0][0],
+                new_grids[1],
+                workers
+            )
+            self._values = [[None] * new_grids[1].size
+                            for x in new_grids[0]]
+            insert_entries(new_y_old_x_function_values,
+                           function_values_to_add,
+                           grid_refinement[0][1],
+                           self._values)
+
+            self._x_grid, self._y_grid = new_grids
+
+
     def __init__(self,
                  func,
                  support,
@@ -186,6 +373,7 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                  num_parallel_processes=1,
                  grid_refine_algorithm='worst',
                  debug_plots=None,
+                 plot_labels=None,
                  **spline_options):
         """
         Setup an interpolation that approximates the given function.
@@ -194,9 +382,7 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
         if one with matching configuration is found, it is re-used.
 
         Args:
-            func(callable):    The function to approximate. Should be
-                vectorized, picklable, and provide equality comparison (for
-                checking if existing pickle matches).
+            func(callable):    The function to approximate.
 
             support(iterable):    Iterable containing 4 numbers: xmin, xmax,
                 ymin, ymax specifying the area over which the function must
@@ -218,11 +404,23 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                 launch when generating a new interpolation. Ignored if existing
                 interpolation is found.
 
-            debug_plots(dict or None):    Each key enables another kind of plot
-                showing the progress of the tuning, with the corresponding value
-                specifying a `%(keyword)` substitution string that exands to the
-                filanema under which to save the plot. The substitution keywords
-                depend on the type of plot.
+            grid_refine_algorithm(str):    The algorithm to use for selecting
+                which points to refine at each step. Currently supported
+                algorithms are:
+
+                `'all'`:
+                    Refine all grid cells where the discrepancy exceeds the
+                    tolerance.
+
+                `'worst'`:
+                    Only refine the grid cell where the worst discrepancy
+                    occurs.
+
+            debug_plots:    See same name argument to
+                `Plot2DInterpolation.__init__`.
+
+            plot_labels:    See same name argument to
+                `Plot2DInterpolation.__init__`.
 
             spline_options:    Any additional keyword arguments to pass to
                 `scipy.interpolate.RectBivariateSpline` (used to create the
@@ -233,6 +431,8 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                 The approximation of the function satisfying the given
                 configuration.
         """
+
+        self._logger = logging.getLogger(__name__)
 
         for order_opt in ['kx', 'ky']:
             if order_opt not in spline_options:
@@ -251,12 +451,19 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
         self._y_grid = numpy.linspace(support[2],
                                       support[3],
                                       min_grid_points[1])
-        self._values = func(*numpy.meshgrid(self._x_grid, self._y_grid)).T
 
+        Plot2DInterpolation.__init__(self, debug_plots, plot_labels)
 
         self._debug_plots = debug_plots or dict()
-        self._tune_interpolation(num_parallel_processes)
-        super().__init__(self._x_grid,
-                         self._y_grid,
-                         self._values,
-                         **self.configuration.spline_options)
+        with Pool(num_parallel_processes) as workers:
+            self._values = self._calculate_function_values(self._x_grid,
+                                                           self._y_grid,
+                                                           workers)
+            self._tune_interpolation(workers)
+
+        RectBivariateSpline.__init__(self,
+                                     self._x_grid,
+                                     self._y_grid,
+                                     self._values,
+                                     **self.configuration.spline_options)
+#pylint: enable=too-many-instance-attributes
