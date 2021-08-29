@@ -991,6 +991,10 @@ class SamplingPropertiesOfSystem:
                  initial_stellar_spin = 5,
                  max_argument_of_phase_lag_function_for_planet=10,
                  min_argument_of_phase_lag_function_for_planet=5,
+                 min_tidal_break_period = 0.5,
+                 max_tidal_break_period = 10,
+                 min_power_law_argument = -5,
+                 max_power_law_argument = 5,
                  max_initial_stellar_spin=15,
                  min_initial_stellar_spin=5,
                  constraints = constraints(),
@@ -1004,6 +1008,10 @@ class SamplingPropertiesOfSystem:
         self.initial_stellar_spin = initial_stellar_spin
         self.max_argument_of_phase_lag_function_for_planet = max_argument_of_phase_lag_function_for_planet
         self.min_argument_of_phase_lag_function_for_planet = min_argument_of_phase_lag_function_for_planet
+        self.max_tidal_break_period = max_tidal_break_period
+        self.min_tidal_break_period = min_tidal_break_period
+        self.max_power_law_argument = max_power_law_argument
+        self.min_power_law_argument = min_power_law_argument
         self.max_initial_stellar_spin = max_initial_stellar_spin
         self.min_initial_stellar_spin = min_initial_stellar_spin
         self.tidal_frequency_breaks_for_planet = tidal_frequency_breaks_for_planet
@@ -1159,7 +1167,9 @@ class SamplingPropertiesOfSystem:
             'ratio of planet to stellar radius': sample[4],
             'secondary mass': sample[5],
             'initial stellar spin': sample[6],
-            'argument of phase lag function for planet': sample[7]
+            'argument of phase lag function for planet': sample[7],
+            'tidal period break': sample[8],
+            'poower law argument': sample[9]
         }
 
         parameters_for_evolution = self.calculate_parameters_for_evolution(sample_dictionary)
@@ -1179,13 +1189,10 @@ class SamplingPropertiesOfSystem:
             return -math.inf
 
         primary_mass = parameters_for_evolution['primary mass']
-        #primary_mass = self.means['primary mass']
         secondary_mass = sample_dictionary['secondary mass']
         secondary_radius = parameters_for_evolution['secondary radius']
-        #secondary_radius = self.means['secondary radius']
         metallicity = sample_dictionary['stellar metallicity']
         stellar_age = parameters_for_evolution['stellar age']
-        #stellar_age = self.means['stellar age']
         initial_stellar_spin = sample_dictionary['initial stellar spin']
         argument_of_phase_lag_function_for_planet = sample_dictionary['argument of phase lag function for planet']
         orbital_period = self.means['orbital period']
@@ -1210,16 +1217,29 @@ class SamplingPropertiesOfSystem:
                                               obliquity=obliquity * u.deg,
                                               age=stellar_age * u.Gyr)
 
+        tidal_frequency_breaks_for_planet = np.array([2*math.pi/20, 2*math.pi/sample_dictionary['tidal period break']])
+        if sample_dictionary['poower law argument'] < 0:
+            tidal_frequency_powers_for_planet = np.array([1.0, 0.0, sample_dictionary['poower law argument']])
+            reference_argument_of_phase_lag_function_for_planet = sample_dictionary['argument of phase lag function for planet']
+        if sample_dictionary['power law argument'] > 0:
+            reference_argument_of_phase_lag_function_for_planet = sample_dictionary['argument of phase lag function for planet'] + sample_dictionary['poower law argument'] * (log10(20.0) - log10(sample_dictionary['tidal period break']))
+            tidal_frequency_powers_for_planet = np.array([1.0, sample_dictionary['poower law argument'], 0.0])
+        else:
+            reference_argument_of_phase_lag_function_for_planet = sample_dictionary['argument of phase lag function for planet']
+            tidal_frequency_powers_for_planet = np.array([1.0, 0.0])
+
         dissipation = dict(
             primary=None,
             secondary=dict(
-                tidal_frequency_breaks=self.tidal_frequency_breaks_for_planet,
+                tidal_frequency_breaks=tidal_frequency_breaks_for_planet,
+                #tidal_frequency_breaks=self.tidal_frequency_breaks_for_planet,
                 #tidal_frequency_breaks=None,
                 spin_frequency_breaks=self.spin_frequency_breaks_for_planet,
-                tidal_frequency_powers=self.tidal_frequency_powers_for_planet,
+                tidal_frequency_powers=tidal_frequency_powers_for_planet,
+                #tidal_frequency_powers=self.tidal_frequency_powers_for_planet,
                 #tidal_frequency_powers=np.array([0.0]),
                 spin_frequency_powers=self.spin_frequency_powers_for_planet,
-                reference_phase_lag=phase_lag(argument_of_phase_lag_function_for_planet)
+                reference_phase_lag=phase_lag(reference_argument_of_phase_lag_function_for_planet)
             )
         )
 
@@ -1307,9 +1327,13 @@ class SamplingPropertiesOfSystem:
         )
         star_sampler = StarSampler(likelihood, config)
 
+
         unit_cube = numpy.array([random(), random(), random()])
-        metallicity, primary_mass, stellar_age = star_sampler.__call__(unit_cube)
-        primary_radius = (primary_mass*const.M_sun.value*1000/(4*math.pi/3*sample['stellar density']))**(1/3)/100/const.R_sun.value
+        stellar_metallicity, primary_mass, stellar_age = star_sampler.__call__(unit_cube)
+
+        interpolator = self.interpolator
+        primary_rad = interpolator('RADIUS', primary_mass, stellar_metallicity)
+        primary_radius = primary_rad(stellar_age)
         secondary_radius = (sample['ratio of planet to stellar radius']**0.5)*primary_radius*const.R_sun.value/const.R_earth.value
         parameters_for_evolution = {'primary mass': primary_mass,
                                     'stellar age': stellar_age,
@@ -1335,8 +1359,12 @@ class SamplingPropertiesOfSystem:
                                 + self.max_initial_stellar_spin) / 2
         argument_of_phase_lag_function_for_planet = (self.min_argument_of_phase_lag_function_for_planet
                                                      + self.max_argument_of_phase_lag_function_for_planet) / 2
+        tidal_break_period = (self.min_tidal_break_period+self.max_tidal_break_period)/2
+        power_law_argument = (self.min_power_law_argument+self.max_power_law_argument)/2
         sample['initial stellar spin'] = initial_stellar_spin
         sample['argument of phase lag function for planet'] = argument_of_phase_lag_function_for_planet
+        sample['tidal break period'] = tidal_break_period
+        sample['power law argument'] = power_law_argument
 
         p0 = numpy.array([sample['stellar metallicity'],
                           sample['stellar density'],
@@ -1345,7 +1373,9 @@ class SamplingPropertiesOfSystem:
                           sample['ratio of planet to stellar radius'],
                           sample['secondary mass'],
                           sample['initial stellar spin'],
-                          sample['argument of phase lag function for planet']
+                          sample['argument of phase lag function for planet'],
+                          sample['tidal break period'],
+                          sample['power law argument']
                           ])
 
         smallest, largest = constraints()
@@ -1360,6 +1390,8 @@ class SamplingPropertiesOfSystem:
             new_walker['argument of phase lag function for planet'] = np.random.uniform(low=self.min_argument_of_phase_lag_function_for_planet,
                                     high=self.max_argument_of_phase_lag_function_for_planet,
                                     size=1)
+            new_walker['tidal break period'] = np.random.uniform(low=self.min_tidal_break_period, high=self.max_tidal_break_period, size=1)
+            new_walker['power law argument'] = np.random.uniform(low=self.min_power_law_argument, high=self.max_power_law_argument, size =1)
             p0 = numpy.append(p0, numpy.array([
                 new_walker['stellar metallicity'],
                 new_walker['stellar density'],
@@ -1368,7 +1400,9 @@ class SamplingPropertiesOfSystem:
                 new_walker['ratio of planet to stellar radius'],
                 new_walker['secondary mass'],
                 new_walker['initial stellar spin'],
-                new_walker['argument of phase lag function for planet']
+                new_walker['argument of phase lag function for planet'],
+                new_walker['tidal break period'],
+                new_walker['power law argument']
             ]))
 
         print('Full p0 = ', p0)
@@ -1392,6 +1426,8 @@ class SamplingPropertiesOfSystem:
 
         initial_stellar_spin = self.initial_stellar_spin
         argument_of_phase_lag_function_for_planet = 5.0
+        tidal_period_break = 7.5
+        power_law_argument = 2
 
         sample = [
             self.means['stellar metallicity'],
@@ -1401,7 +1437,9 @@ class SamplingPropertiesOfSystem:
             self.means['ratio of planet to stellar radius'],
             self.means['secondary mass'],
             initial_stellar_spin,
-            argument_of_phase_lag_function_for_planet
+            argument_of_phase_lag_function_for_planet,
+            tidal_period_break,
+            power_law_argument
         ]
 
         min_value_found = False
@@ -1429,6 +1467,8 @@ class SamplingPropertiesOfSystem:
 
         initial_stellar_spin = 10
         argument_of_phase_lag_function_for_planet = 5.0
+        tidal_period_break = 7.5
+        power_law_argument = 2
 
         sample = [
             self.means['stellar metallicity'],
@@ -1438,7 +1478,9 @@ class SamplingPropertiesOfSystem:
             self.means['ratio of planet to stellar radius'],
             self.means['secondary mass'],
             initial_stellar_spin,
-            argument_of_phase_lag_function_for_planet
+            argument_of_phase_lag_function_for_planet,
+            tidal_period_break,
+            power_law_argument
         ]
 
         prob = []
