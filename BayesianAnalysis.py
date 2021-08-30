@@ -1169,7 +1169,7 @@ class SamplingPropertiesOfSystem:
             'initial stellar spin': sample[6],
             'argument of phase lag function for planet': sample[7],
             'tidal period break': sample[8],
-            'poower law argument': sample[9]
+            'power law argument': sample[9]
         }
 
         parameters_for_evolution = self.calculate_parameters_for_evolution(sample_dictionary)
@@ -1218,12 +1218,12 @@ class SamplingPropertiesOfSystem:
                                               age=stellar_age * u.Gyr)
 
         tidal_frequency_breaks_for_planet = np.array([2*math.pi/20, 2*math.pi/sample_dictionary['tidal period break']])
-        if sample_dictionary['poower law argument'] < 0:
-            tidal_frequency_powers_for_planet = np.array([1.0, 0.0, sample_dictionary['poower law argument']])
+        if sample_dictionary['power law argument'] < 0:
+            tidal_frequency_powers_for_planet = np.array([1.0, 0.0, sample_dictionary['power law argument']])
             reference_argument_of_phase_lag_function_for_planet = sample_dictionary['argument of phase lag function for planet']
         if sample_dictionary['power law argument'] > 0:
-            reference_argument_of_phase_lag_function_for_planet = sample_dictionary['argument of phase lag function for planet'] + sample_dictionary['poower law argument'] * (log10(20.0) - log10(sample_dictionary['tidal period break']))
-            tidal_frequency_powers_for_planet = np.array([1.0, sample_dictionary['poower law argument'], 0.0])
+            reference_argument_of_phase_lag_function_for_planet = sample_dictionary['argument of phase lag function for planet'] + sample_dictionary['power law argument'] * (math.log(20.0,10) - math.log(sample_dictionary['tidal period break'], 10))
+            tidal_frequency_powers_for_planet = np.array([1.0, sample_dictionary['power law argument'], 0.0])
         else:
             reference_argument_of_phase_lag_function_for_planet = sample_dictionary['argument of phase lag function for planet']
             tidal_frequency_powers_for_planet = np.array([1.0, 0.0])
@@ -1242,6 +1242,8 @@ class SamplingPropertiesOfSystem:
                 reference_phase_lag=phase_lag(reference_argument_of_phase_lag_function_for_planet)
             )
         )
+
+        print('dissipation ', dissipation)
 
         print(dissipation)
         evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
@@ -1262,7 +1264,7 @@ class SamplingPropertiesOfSystem:
                                               solve=True,
                                               secondary_is_star=False)
 
-
+        print('evolutionary history. eccentricity ', evolutionary_history.eccentricity)
         calculated_eccentricity_now = evolutionary_history.eccentricity[- 1]
         self.calculated_eccentricity_now = calculated_eccentricity_now
         print('Calculated eccentricity due to tidal dissipation = ',
