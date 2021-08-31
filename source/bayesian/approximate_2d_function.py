@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Implement fast approximate evaluation of expensive 2D functions."""
 
 from collections import namedtuple
@@ -15,6 +16,7 @@ ApproximationConfig = namedtuple(
     [
         'support',
         'min_grid_points',
+        'min_grid_steps',
         'tolerance',
         'spline_options',
         'grid_refine_algorithm'
@@ -142,7 +144,9 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                     interpolated_values=interpolated_values,
                     x_grid=self._x_grid[x_offset : : 2],
                     y_grid=self._y_grid[y_offset : : 2],
-                    interp_data=self._values[ : : 2, : : 2]
+                    interp_data=self._values[ : : 2, : : 2],
+                    x_offset=x_offset,
+                    y_offset=y_offset
                 )
 
                 new_mismatches = getattr(
@@ -155,8 +159,14 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                 )(
                     calculated_values,
                     interpolated_values,
-                    self.configuration.tolerance
                 )
+                self._logger.debug(
+                    'Max absolute difference: %s',
+                    numpy.max(
+                        numpy.absolute(calculated_values - interpolated_values)
+                    )
+                )
+
 
                 mismatches = tuple(
                     numpy.unique(
@@ -191,7 +201,7 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                 Same as above but for the y grid.
         """
 
-        def get_new_grid_points(mismatch_indices, current_grid):
+        def get_new_grid_points(mismatch_indices, current_grid, min_grid_step):
             """Return new values to add per the given mismatch indices."""
 
             if mismatch_indices.size == 0:
@@ -211,6 +221,12 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                     ) - 1
                 ))
             )
+            valid = (
+                (current_grid[below_indices + 1] - current_grid[below_indices])
+                >
+                2.0 * min_grid_step
+            )
+            below_indices = below_indices[valid]
             return (
                 0.5 * (current_grid[below_indices]
                        +
@@ -221,10 +237,15 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
         mismatch_indices = list(self._get_mismatch_indices())
 
         self._logger.debug('Mismatch indices: %s', repr(mismatch_indices))
+        self._converged = (mismatch_indices[0].size == 0
+                           and
+                           mismatch_indices[1].size == 0)
 
         return [
             get_new_grid_points(*args)
-            for args in zip(mismatch_indices, [self._x_grid, self._y_grid])
+            for args in zip(mismatch_indices,
+                            [self._x_grid, self._y_grid],
+                            self.configuration.min_grid_steps)
         ]
 
 
@@ -325,16 +346,19 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
             if grid_refinement[0][0].size == grid_refinement[1][0].size == 0:
                 return
 
-            new_grids= (
+            new_grids = [
                 add_grid_points(args[0], *args[1])
                 for args in zip(
                     (self._x_grid, self._y_grid), grid_refinement
                 )
-            )
+            ]
             for grid, label in zip(new_grids, 'xy'):
-                self._logger.debug('New %s grid: %s',
+#                self._logger.debug('New %s grid: %s',
+#                                   self._plot_labels[label],
+#                                   repr(grid.T))
+                self._logger.debug('Min %s grid step: %s',
                                    self._plot_labels[label],
-                                   repr(grid.T))
+                                   repr((grid[1:] - grid[:-1]).min()))
 
             function_values_to_add = self._calculate_function_values(
                 self._x_grid,
@@ -354,8 +378,8 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                 new_grids[1],
                 workers
             )
-            self._values = [[None] * new_grids[1].size
-                            for x in new_grids[0]]
+            self._values = numpy.empty((new_grids[0].size, new_grids[1].size),
+                                       dtype=numpy.float64)
             insert_entries(new_y_old_x_function_values,
                            function_values_to_add,
                            grid_refinement[0][1],
@@ -370,6 +394,7 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                  *,
                  min_grid_points=(100, 100),
                  tolerance=1e-6,
+                 min_grid_steps=None,
                  num_parallel_processes=1,
                  grid_refine_algorithm='worst',
                  debug_plots=None,
@@ -438,11 +463,21 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
             if order_opt not in spline_options:
                 spline_options[order_opt] = 1
 
-        self.configuration = ApproximationConfig(support,
-                                                 min_grid_points,
-                                                 tolerance,
-                                                 spline_options,
-                                                 grid_refine_algorithm)
+        self.configuration = ApproximationConfig(
+            support,
+            min_grid_points,
+            (
+                min_grid_steps
+                or
+                (
+                    1e-12 * (support[1] - support[0]),
+                    1e-12 * (support[3] - support[2])
+                )
+            ),
+            tolerance,
+            spline_options,
+            grid_refine_algorithm
+        )
         self.func = func
         self.support = support
         self._x_grid = numpy.linspace(support[0],
@@ -455,11 +490,27 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
         Plot2DInterpolation.__init__(self, debug_plots, plot_labels)
 
         self._debug_plots = debug_plots or dict()
+        self._converged = False
         with Pool(num_parallel_processes) as workers:
             self._values = self._calculate_function_values(self._x_grid,
                                                            self._y_grid,
                                                            workers)
             self._tune_interpolation(workers)
+
+        assert self._converged
+
+        self._logger.info(
+            'Approximating %s over %s <= %s <= %s and %s <= %s <= %s converged'
+            ' using %d function evaluations.',
+            self._plot_labels['function'],
+            repr(support[0]),
+            self._plot_labels['x'],
+            repr(support[1]),
+            repr(support[2]),
+            self._plot_labels['y'],
+            repr(support[3]),
+            self._x_grid.size * self._y_grid.size
+        )
 
         RectBivariateSpline.__init__(self,
                                      self._x_grid,
@@ -467,3 +518,23 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                                      self._values,
                                      **self.configuration.spline_options)
 #pylint: enable=too-many-instance-attributes
+
+if __name__ == '__main__':
+
+    def fit_func(x, y):
+        """Example function to fit."""
+
+        result = numpy.sin(2.0 * x + 1.5) * numpy.cos(3.0 * y - 1.5)
+        return result
+
+    logging.basicConfig(level=logging.DEBUG)
+
+    approx = Approximate2DFunction(
+        fit_func,
+        (0.0, 1.0, 2.0, 3.0),
+#        debug_plots=dict(
+#            interpolation_performance='%(title)s.png'
+#        ),
+        min_grid_steps=(1e-6, 1e-6),
+        grid_refine_algorithm='all'
+    )

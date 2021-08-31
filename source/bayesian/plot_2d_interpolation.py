@@ -11,23 +11,9 @@ import numpy
 class Plot2DInterpolation(ABC):
     """Implement plotting of the progress of 2D interpolation tuning."""
 
-    @property
-    def _x_grid(self):
-        raise NotImplementedError
-
-
-    @property
-    def _y_grid(self):
-        raise NotImplementedError
-
-
-    #Intended to be overwritten by child classes
-    #pylint: disable=missing-function-docstring
-    @property
-    def configuration(self):
-        raise NotImplementedError
-    #pylint: enable=missing-function-docstring
-
+    _x_grid = None
+    _y_grid = None
+    configuration = None
 
     #This is sufficiently simple.
     #pylint: disable=too-many-arguments
@@ -72,7 +58,9 @@ class Plot2DInterpolation(ABC):
                                         interpolated_values,
                                         x_grid,
                                         y_grid,
-                                        interp_data):
+                                        interp_data,
+                                        x_offset,
+                                        y_offset):
         """Show plot of how the interpolation performs as grid is refined."""
 
         if 'interpolation_performance' not in self._debug_plots:
@@ -225,6 +213,17 @@ class Plot2DInterpolation(ABC):
                         '.b')
             pyplot.xlabel(self._plot_labels['x'])
 
+            title = (
+                '%s %s_di=%d, %s_di=%d'
+                %
+                (
+                    self._plot_labels['function'],
+                    self._plot_labels['x'],
+                    x_offset,
+                    self._plot_labels['y'],
+                    y_offset
+                )
+            )
             pyplot.suptitle(title)
 
             self._handle_debug_plot(title=title)
@@ -261,10 +260,15 @@ class Plot2DInterpolation(ABC):
 
         """
 
+        assert self._x_grid is not None
+        assert self._y_grid is not None
+        assert self.configuration is not None
+
         self._debug_plots = debug_plots or dict()
         self._plot_labels = plot_labels or dict(
             x='X',
-            y='Y'
+            y='Y',
+            function='F'
         )
         self._grid_refinement_iteration = None
 #pylint: enable=too-few-public-methods
