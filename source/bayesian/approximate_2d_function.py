@@ -5,7 +5,9 @@ from collections import namedtuple
 import logging
 from itertools import count
 from multiprocessing import Pool
+from functools import partial
 
+from matplotlib import pyplot
 from scipy.interpolate import RectBivariateSpline
 import numpy
 
@@ -261,10 +263,8 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                 function.
 
         Returns:
-            [[OdeSolution, ...], ...]:
-                Unnormalized CDF(age | mass, [Fe/H]) at each mass [Fe/H]
-                combination. The first index is over [Fe/H] and the second is
-                over mass.
+            numpy.array(shape=(x_grid.shape, y_grid.shape)):
+                The values of the function at the specified grid.
         """
 
         eval_y, eval_x = numpy.meshgrid(y_grid, x_grid)
@@ -413,10 +413,6 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                 ymin, ymax specifying the area over which the function must
                 be approximated.
 
-            pickle_fname(str):    The filename to check for previously stored
-                approximation and where to store a newly generated one if not
-                found.
-
             min_grid_points(int, int):    Iterable of 2 integers specifying the
                 minimun interpolation grid resolution along each argument of the
                 function being approximated.
@@ -424,6 +420,9 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
             tolerance(float):    The interpolation grid resolution is increased
                 until the inteprolaiton at mid points of grid cells and grid
                 walls is within `tolerance` of the calculated value.
+
+            min_grid_steps(float, float):    The smallest steps allowed each of
+                the grid directions.
 
             num_parallel_processes(int):    How many simultaneous processes to
                 launch when generating a new interpolation. Ignored if existing
@@ -538,3 +537,15 @@ if __name__ == '__main__':
         min_grid_steps=(1e-6, 1e-6),
         grid_refine_algorithm='all'
     )
+
+    pyplot.plot(numpy.arange(approx._x_grid.size - 1),
+                approx._x_grid[1:] - approx._x_grid[:-1],
+                'or',
+                label='x steps')
+    pyplot.twinx()
+    pyplot.plot(numpy.arange(approx._y_grid.size - 1),
+                approx._y_grid[1:] - approx._y_grid[:-1],
+                'og',
+                label='y steps')
+    pyplot.figlegend()
+    pyplot.show()
