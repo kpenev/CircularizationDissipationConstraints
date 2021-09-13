@@ -5,7 +5,8 @@ from collections import namedtuple
 import logging
 from itertools import count
 from multiprocessing import Pool
-from functools import partial
+import os.path
+from pickle import Pickler, Unpickler
 
 from matplotlib import pyplot
 from scipy.interpolate import RectBivariateSpline
@@ -21,7 +22,8 @@ ApproximationConfig = namedtuple(
         'min_grid_steps',
         'tolerance',
         'spline_options',
-        'grid_refine_algorithm'
+        'grid_refine_algorithm',
+        'refine_1d'
     ]
 )
 
@@ -38,6 +40,8 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
 
         func(callable):    The function being approximated.
     """
+
+    _logger = logging.getLogger(__name__)
 
     #This is sufficiently simple.
     #pylint: disable=too-many-arguments
@@ -207,7 +211,7 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
             """Return new values to add per the given mismatch indices."""
 
             if mismatch_indices.size == 0:
-                return numpy.array([], dtype=float), numpy.array([], dtype=int)
+                return None
 
             below_indices = numpy.unique(
                 numpy.concatenate((
@@ -243,12 +247,22 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                            and
                            mismatch_indices[1].size == 0)
 
-        return [
-            get_new_grid_points(*args)
+        no_refinement = numpy.array([], dtype=float), numpy.array([], dtype=int)
+
+        result = [
+            (get_new_grid_points(*args) or no_refinement)
             for args in zip(mismatch_indices,
                             [self._x_grid, self._y_grid],
                             self.configuration.min_grid_steps)
         ]
+
+
+        if self.configuration.refine_1d:
+            if result[0][0].size > result[1][0].size:
+                return [no_refinement, result[1]]
+            return [result[0], no_refinement]
+
+        return result
 
 
     def _calculate_function_values(self, x_grid, y_grid, workers):
@@ -360,33 +374,112 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                                    self._plot_labels[label],
                                    repr((grid[1:] - grid[:-1]).min()))
 
-            function_values_to_add = self._calculate_function_values(
-                self._x_grid,
-                grid_refinement[1][0],
-                workers
-            )
-            new_y_old_x_function_values = [[None] * new_grids[1].size
-                                           for x in self._x_grid]
-            for x_index in range(self._x_grid.size):
-                insert_entries(self._values[x_index],
-                               function_values_to_add[x_index],
-                               grid_refinement[1][1],
-                               new_y_old_x_function_values[x_index])
+            if grid_refinement[1][0].size == 0:
+                new_y_old_x_function_values = self._values
+            else:
+                function_values_to_add = self._calculate_function_values(
+                    self._x_grid,
+                    grid_refinement[1][0],
+                    workers
+                )
+                new_y_old_x_function_values = [[None] * new_grids[1].size
+                                               for x in self._x_grid]
+                for x_index in range(self._x_grid.size):
+                    insert_entries(self._values[x_index],
+                                   function_values_to_add[x_index],
+                                   grid_refinement[1][1],
+                                   new_y_old_x_function_values[x_index])
 
-            function_values_to_add = self._calculate_function_values(
-                grid_refinement[0][0],
-                new_grids[1],
-                workers
-            )
-            self._values = numpy.empty((new_grids[0].size, new_grids[1].size),
-                                       dtype=numpy.float64)
-            insert_entries(new_y_old_x_function_values,
-                           function_values_to_add,
-                           grid_refinement[0][1],
-                           self._values)
+            if grid_refinement[0][0].size == 0:
+                self._values = numpy.copy(new_y_old_x_function_values)
+            else:
+                function_values_to_add = self._calculate_function_values(
+                    grid_refinement[0][0],
+                    new_grids[1],
+                    workers
+
+                )
+                self._values = numpy.empty(
+                    (new_grids[0].size, new_grids[1].size),
+                    dtype=numpy.float64
+                )
+                insert_entries(new_y_old_x_function_values,
+                               function_values_to_add,
+                               grid_refinement[0][1],
+                               self._values)
 
             self._x_grid, self._y_grid = new_grids
 
+
+    def _check_for_pickled(self, pickle_fname):
+        """Check if given file contains a re-usable pickle of desired approx."""
+
+        if not os.path.exists(pickle_fname):
+            open(pickle_fname, 'wb').close()
+            return None, None, None
+        try:
+            with open(pickle_fname, 'rb') as pickle_file:
+                unpickler = Unpickler(pickle_file)
+                while True:
+                    section, nobjects = unpickler.load()
+                    assert isinstance(section, str)
+                    assert isinstance(nobjects, int)
+                    if section == 'Approximate2DFunction' and nobjects == 6:
+                        func = unpickler.load()
+                        support = unpickler.load()
+                        configuration = unpickler.load()
+                        nobjects -= 3
+                        if (
+                                self.func == func
+                                and
+                                self.support == support
+                                and
+                                self.configuration == configuration
+                        ):
+                            self._logger.debug(
+                                'Found matching 2D approximation pickle.'
+                            )
+                            return (
+                                unpickler.load(),
+                                unpickler.load(),
+                                unpickler.load()
+                            )
+
+                        self._logger.debug(
+                            'Pickled 2D approximation does not match!'
+                        )
+                    for _ in range(nobjects):
+                        unpickler.load()
+
+        except EOFError:
+            self._logger.info('None of the pickled 2D approximations matches!')
+            return None, None, None
+
+
+    def _add_to_pickle_file(self, pickle_fname):
+        """Append the currently set-up approximation to a pickle file."""
+
+        with open(pickle_fname, 'ab') as pickle_file:
+            pickler = Pickler(pickle_file)
+            pickler.dump(('Approximate2DFunction', 6))
+            pickler.dump(self.func)
+            pickler.dump(self.support)
+            pickler.dump(self.configuration)
+            pickler.dump(self._x_grid)
+            pickler.dump(self._y_grid)
+            pickler.dump(self._values)
+
+    def _get_initial_grid(self):
+        """Return an initial grid from which to start refining interpolation."""
+
+        return (
+            numpy.linspace(self.configuration.support[0],
+                           self.configuration.support[1],
+                           self.configuration.min_grid_points[0]),
+            numpy.linspace(self.configuration.support[2],
+                           self.configuration.support[3],
+                           self.configuration.min_grid_points[1])
+        )
 
     def __init__(self,
                  func,
@@ -397,6 +490,7 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                  min_grid_steps=None,
                  num_parallel_processes=1,
                  grid_refine_algorithm='worst',
+                 pickle_fname='approximate_2d.pkl',
                  debug_plots=None,
                  plot_labels=None,
                  **spline_options):
@@ -440,6 +534,10 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                     Only refine the grid cell where the worst discrepancy
                     occurs.
 
+            pickle_fname(str):    A filename which to check for pickle
+                approximations and store newly created one if none of those
+                stored in the file matches what is being constructed.
+
             debug_plots:    See same name argument to
                 `Plot2DInterpolation.__init__`.
 
@@ -455,8 +553,6 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                 The approximation of the function satisfying the given
                 configuration.
         """
-
-        self._logger = logging.getLogger(__name__)
 
         for order_opt in ['kx', 'ky']:
             if order_opt not in spline_options:
@@ -475,41 +571,65 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
             ),
             tolerance,
             spline_options,
-            grid_refine_algorithm
+            'all' if grid_refine_algorithm == '1d' else grid_refine_algorithm,
+            grid_refine_algorithm == '1d'
         )
         self.func = func
         self.support = support
-        self._x_grid = numpy.linspace(support[0],
-                                      support[1],
-                                      min_grid_points[0])
-        self._y_grid = numpy.linspace(support[2],
-                                      support[3],
-                                      min_grid_points[1])
-
-        Plot2DInterpolation.__init__(self, debug_plots, plot_labels)
-
-        self._debug_plots = debug_plots or dict()
-        self._converged = False
-        with Pool(num_parallel_processes) as workers:
-            self._values = self._calculate_function_values(self._x_grid,
-                                                           self._y_grid,
-                                                           workers)
-            self._tune_interpolation(workers)
-
-        assert self._converged
-
-        self._logger.info(
-            'Approximating %s over %s <= %s <= %s and %s <= %s <= %s converged'
-            ' using %d function evaluations.',
-            self._plot_labels['function'],
-            repr(support[0]),
-            self._plot_labels['x'],
-            repr(support[1]),
-            repr(support[2]),
-            self._plot_labels['y'],
-            repr(support[3]),
-            self._x_grid.size * self._y_grid.size
+        self._x_grid, self._y_grid, self._values = self._check_for_pickled(
+            pickle_fname
         )
+
+        if (
+            self._x_grid is None
+            or
+            self._y_grid is None
+            or
+            self._values is None
+        ):
+            self._x_grid, self._y_grid = self._get_initial_grid()
+            Plot2DInterpolation.__init__(self, debug_plots, plot_labels)
+
+            self._debug_plots = debug_plots or dict()
+            self._converged = False
+            with Pool(num_parallel_processes) as workers:
+                self._values = self._calculate_function_values(self._x_grid,
+                                                               self._y_grid,
+                                                               workers)
+                self._tune_interpolation(workers)
+
+            assert self._converged
+            self._logger.info(
+                'Approximating %s over %s <= %s <= %s and %s <= %s <= %s '
+                'converged using %dx%d grid.',
+                self._plot_labels['function'],
+                repr(support[0]),
+                self._plot_labels['x'],
+                repr(support[1]),
+                repr(support[2]),
+                self._plot_labels['y'],
+                repr(support[3]),
+                self._x_grid.size,
+                self._y_grid.size
+            )
+
+            self._add_to_pickle_file(pickle_fname)
+
+        else:
+            Plot2DInterpolation.__init__(self, debug_plots, plot_labels)
+            self._logger.info(
+                'Approximation of %s over %s <= %s <= %s and %s <= %s <= %s, '
+                'using %dx%d grid, found in pickle file.',
+                self._plot_labels['function'],
+                repr(support[0]),
+                self._plot_labels['x'],
+                repr(support[1]),
+                repr(support[2]),
+                self._plot_labels['y'],
+                repr(support[3]),
+                self._x_grid.size,
+                self._y_grid.size
+            )
 
         RectBivariateSpline.__init__(self,
                                      self._x_grid,
@@ -538,6 +658,8 @@ if __name__ == '__main__':
         grid_refine_algorithm='all'
     )
 
+    #Debugging purposes
+    #pylint: disable=protected-access
     pyplot.plot(numpy.arange(approx._x_grid.size - 1),
                 approx._x_grid[1:] - approx._x_grid[:-1],
                 'or',
@@ -547,5 +669,6 @@ if __name__ == '__main__':
                 approx._y_grid[1:] - approx._y_grid[:-1],
                 'og',
                 label='y steps')
+    #pylint: enable=protected-access
     pyplot.figlegend()
     pyplot.show()

@@ -24,7 +24,7 @@ from bayesian.photometric_constraint import\
     plot_m2_cdf
 from bayesian.cluster_util import\
     select_binary_data,\
-    plot_rvk_constraint,\
+    plot_rv_likelihood,\
     plot_eccentricity_vs_period,\
     plot_eccentricity_likelihood
 
@@ -277,16 +277,20 @@ def _test_photometric_constraint(binary_pkm_id):
     plot_m1_cdf(constraint)
     plot_m2_cdf(constraint)
 
-def _test_rvk_constraint(binary_pkm_id):
+def _test_rv_likelihood(binary_pkm_id):
     """Display plots showing the RV based constraint."""
 
     observed_orbit = get_observed_orbit(binary_pkm_id)
     photometric_constraint = get_photometric_constraint(binary_pkm_id)
-    plot_rvk_constraint(observed_orbit, photometric_constraint)
+    plot_rv_likelihood(observed_orbit,
+                       eccentricity_envelope,
+                       photometric_constraint)
 
 if __name__ == '__main__':
     set_start_method('forkserver')
     logging.basicConfig(level=logging.DEBUG)
+    _test_rv_likelihood(4965)
+    exit(0)
     plot_eccentricity_likelihood(get_observed_orbit(4965),
                                  eccentricity_envelope)
     rcParams['font.size'] = 18

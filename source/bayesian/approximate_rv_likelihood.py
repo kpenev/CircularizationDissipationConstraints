@@ -1,5 +1,7 @@
 """Allow approximating the RV likelihood (lambda in notes)."""
 
+from functools import partial
+
 import numpy
 from scipy import integrate
 from scipy.optimize import root_scalar
@@ -59,6 +61,17 @@ class ApproximateRVLikelihood(Approximate2DFunction):
         )
         return result[result < 1.0]
 
+    def _get_eccentricity_integration_breaks(self, cdf_step=0.01):
+        """Return array of points integration must hit for accuracy."""
+
+        result = self._observed_eccentricity.ppf(
+            numpy.arange(cdf_step, 1.0, cdf_step)
+        )
+        return result[
+            numpy.logical_and(result > 0, result < self._envelope_eccentricity)
+        ]
+
+
     def _marginalize_inclination(self,
                                  max_rv_semiamplitude,
                                  integrand=None,
@@ -106,6 +119,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
 
         return result
 
+
     def _get_eccentricity_integrand(self, eccentricity, _, rvk_scale):
         """
         Calculate the likelihood marginalized over inclination for given eccent.
@@ -132,6 +146,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
             )
         )
 
+
     def _get_eccentircity_integral(self, rvk_scale):
         """
         Return a function that evaluates to the integral of likelihood vs eccen.
@@ -147,18 +162,29 @@ class ApproximateRVLikelihood(Approximate2DFunction):
                 range 0 to the argument of the function.
         """
 
-        if rvk_scale not in self._eccentricity_integrals:
-            solution = integrate.solve_ivp(
-                fun=self._get_eccentricity_integrand,
-                t_span=(0, self._envelope_eccentricity),
-                args=(rvk_scale,),
-                dense_output=True,
-                **self._solve_ivp_options
-            )
-            assert solution.status == 0
-            self._eccentricity_integrals[rvk_scale] = solution.sol
+        assert rvk_scale not in self._eccentricity_integrals
 
-        return self._eccentricity_integrals[rvk_scale]
+        solution = integrate.solve_ivp(
+            fun=self._get_eccentricity_integrand,
+            t_span=(0, self._envelope_eccentricity),
+            y0=numpy.array([
+                self._marginalize_inclination(rvk_scale)
+                *
+                self._observed_eccentricity.cdf(0.0)
+            ]),
+            t_eval=self._get_eccentricity_integration_breaks(),
+            args=(rvk_scale,),
+            dense_output=True,
+            **self._solve_ivp_options
+        )
+        assert solution.status == 0
+        return solution.sol
+
+
+    def _evaluate_e_integral(self, e_grid, rvk_scale):
+        """Evaluate the integral for the given rvk_scale for x_grid."""
+
+        return self._eccentricity_integrals[rvk_scale](e_grid)
 
 
     def _calculate_function_values(self, x_grid, y_grid, workers):
@@ -178,14 +204,24 @@ class ApproximateRVLikelihood(Approximate2DFunction):
 
         assert x_grid.max() <= self._envelope_eccentricity
 
-        eccentricity_integrals = workers.map(self._get_eccentircity_integral,
-                                             y_grid)
-        result = numpy.empty((x_grid.size, y_grid.size),
-                             dtype=numpy.float64)
-        for i, e_int in enumerate(eccentricity_integrals):
-            result[i, :] = e_int(x_grid)
+        new_rvk_scales = [
+            rvk_scale for rvk_scale in y_grid
+            if rvk_scale not in self._eccentricity_integrals
+        ]
+        new_eccentricity_integrals = workers.map(
+            self._get_eccentircity_integral,
+            new_rvk_scales
+        )
+        for rvk_scale, eccentricity_integral in zip(new_rvk_scales,
+                                                    new_eccentricity_integrals):
+            self._eccentricity_integrals[rvk_scale] = eccentricity_integral
 
-        return result
+        return numpy.dstack(
+            workers.map(
+                partial(self._evaluate_e_integral, x_grid),
+                y_grid
+            )
+        )[0]
 
 
     def _get_integration_breaks(self, max_rv_semiamplitude, cdf_step=0.01):
@@ -235,6 +271,32 @@ class ApproximateRVLikelihood(Approximate2DFunction):
         assert rvk_upper_bound.converged
         return rvk_upper_bound.root
 
+    def _get_initial_grid(self):
+        """Return an initial grid from which to start refining interpolation."""
+
+        e_grid = self._observed_eccentricity.ppf(
+            numpy.linspace(0, 1.0, self.configuration.min_grid_points[0])
+        )
+        assert e_grid[0] <= 0
+        e_grid[0] = 0.0
+
+        rvk_grid = self._observed_rvk.ppf(
+            numpy.linspace(0, 1.0, self.configuration.min_grid_points[1])
+        )
+        assert rvk_grid[0] <= 0
+        rvk_grid[0] = self.configuration.support[2]
+        rvk_grid[-1] = self.configuration.support[3]
+
+        return (
+            e_grid[
+                numpy.logical_and(
+                    e_grid >= 0,
+                    e_grid <= self._envelope_eccentricity
+                )
+            ],
+            rvk_grid[rvk_grid >= 0]
+        )
+
     def __init__(self,
                  *,
                  observed_rvk,
@@ -243,12 +305,10 @@ class ApproximateRVLikelihood(Approximate2DFunction):
                  max_discarded_probabiity,
                  min_grid_points=(100, 100),
                  tolerance=1e-6,
-                 min_grid_steps=None,
-                 num_parallel_processes=1,
-                 grid_refine_algorithm='worst',
-                 debug_plots=None,
-                 integration_options,
-                 solve_ivp_options):
+                 pickle_fname='rv_likelihood.pkl',
+                 integration_options=None,
+                 solve_ivp_options=None,
+                 **approximation_options):
         """
         Configure the approximation.
 
@@ -260,27 +320,21 @@ class ApproximateRVLikelihood(Approximate2DFunction):
                 of the orbital eccentricity. Assumed independent of
                 `observed_rvk`.
 
+            envelope_eccentricity(float):    The eccentricity of the envelope at
+                evaluated for the current system.
+
             max_discarded_probabiity(float):    The tails of the RV
                 semi-amplitude distribution with weight less than this are
                 truncated to define the range for interpolation.
 
-            min_grid_points(int, int):    See same name argument to
+            min_grid_points:    See same name argument to
                 `approximate_2d_function.__init__()`
 
             tolerance(float):    The maximum absolute deviation between the
                 approximate value and directly numerically calculated one.
 
-            min_grid_steps(float, float):    See same name argument to
+            pickle_fname:    See same name argument to
                 `approximate_2d_function.__init__()`
-
-            num_parallel_processes(int):    See same name argument to
-                `approximate_2d_function.__init__()`
-
-            grid_refine_algorithm(str):    See same name argument to
-                `approximate_2d_function.__init__()`
-
-            debug_plots:    See same name argument to
-                `Plot2DInterpolation.__init__`.
 
             integration_options(dict):    Passed directly to
                 :func:`integrate.quad()` to control integration. Must not
@@ -290,22 +344,32 @@ class ApproximateRVLikelihood(Approximate2DFunction):
                 :func:`integrate.solve_ivp()`, used to calculate the
                 eccentricity dependence.
 
+            **approximation_options:    Any additional options to pass to
+                `approximate_2d_function.__init__()`
+
         Returns:
             None
         """
 
+        self._logger.info(
+            'Constructing RV likelihood for K = %s, e = %s, e_env = %s',
+            repr(observed_rvk),
+            repr(observed_eccentricity),
+            repr(envelope_eccentricity)
+        )
+
         self._observed_rvk = observed_rvk
         self._observed_eccentricity = observed_eccentricity
         self._envelope_eccentricity = envelope_eccentricity
-        self._integration_options = integration_options
-        self._solve_ivp_options = solve_ivp_options
+        self._integration_options = integration_options or dict()
+        self._solve_ivp_options = solve_ivp_options or dict()
 
         for opt_name, opt_value in [
-                ('rtol', 0.0),
-                ('atol', 0.01 * self.configuration.tolerance),
-                ('max_step', (self._envelope_eccentricity
+                ('rtol', 1.0e-5),
+                ('atol', 0.01 * tolerance),
+                ('max_step', (envelope_eccentricity
                               /
-                              self.configuration.min_grid_points[0]))
+                              min_grid_points[0]))
         ]:
             if opt_name not in self._solve_ivp_options:
                 self._solve_ivp_options[opt_name] = opt_value
@@ -315,7 +379,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
         max_discarded_probabiity /= 4.0
 
         super().__init__(
-            func=None,
+            func='rv_likelihood',
             support=(
                 0.0,
                 envelope_eccentricity,
@@ -324,11 +388,10 @@ class ApproximateRVLikelihood(Approximate2DFunction):
             ),
             min_grid_points=min_grid_points,
             tolerance=tolerance,
-            min_grid_steps=min_grid_steps,
-            num_parallel_processes=num_parallel_processes,
-            grid_refine_algorithm=grid_refine_algorithm,
-            debug_plots=debug_plots,
+            pickle_fname=pickle_fname,
             plot_labels=dict(function=r'$\lambda(e_{max}, K)$',
                              x=r'$e_{max}$',
-                             y='K')
+                             y='K'),
+            **approximation_options
         )
+        self._eccentricity_integrals = None

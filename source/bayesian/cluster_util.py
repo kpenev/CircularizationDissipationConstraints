@@ -6,21 +6,23 @@ from time import time
 from matplotlib import pyplot
 from scipy import stats
 import numpy
-from astropy import units
+from astropy import units, constants
 
 from bayesian.eccentricity_likelihood import EccentricityLikelihood
-from bayesian.rv_semiamplitude_constraint import RVSemiAmplitudeConstraint
+from bayesian.approximate_rv_likelihood import ApproximateRVLikelihood
 
 _logger = logging.getLogger(__name__)
 
-def get_rvk_constraint(observed_orbit,
-                       num_parallel_processes,
-                       interpolation_accuracy,
-                       show_mismatch_plot):
+def get_rv_likelihood(observed_orbit,
+                      eccentricity_envelope,
+                      num_parallel_processes,
+                      interpolation_accuracy,
+                      show_mismatch_plot):
     """Return fully set-up RV semi-amplitude constraint for an NGC188 binary."""
 
     signal_to_noise = float(observed_orbit['K']) / float(observed_orbit['e_K'])
-    return RVSemiAmplitudeConstraint(
+    #TODO: find better observed eccentricity distribution
+    return ApproximateRVLikelihood(
         observed_rvk=(
             stats.norm(
                 loc=numpy.sqrt(
@@ -36,15 +38,24 @@ def get_rvk_constraint(observed_orbit,
                 scale=float(observed_orbit['e_K']) * 1000.0
             )
         ),
+        observed_eccentricity=stats.norm(
+            loc=float(observed_orbit['e']),
+            scale=float(observed_orbit['e_e'])
+        ),
+        envelope_eccentricity=eccentricity_envelope(
+            float(observed_orbit['Per'])
+        ),
         max_discarded_probabiity=1e-6,
-        interpolation_accuracy=interpolation_accuracy,
+        tolerance=interpolation_accuracy,
         num_parallel_processes=num_parallel_processes,
-        pickle_fname='rvk_constraints.pkl',
-        epsabs=0,
-        epsrel=1e-8,
-        limit=200,
-        maxp1=200,
-        show_mismatch_plot=show_mismatch_plot
+        integration_options=dict(epsabs=0,
+                                 epsrel=1e-8,
+                                 limit=200,
+                                 maxp1=200),
+        min_grid_points=(100, 100),
+        grid_refine_algorithm='1d',
+        debug_plots=(dict(interpolation_performance='') if show_mismatch_plot
+                     else None)
     )
 
 def select_binary_data(single_lined_data, _, id_column, binary_id):
@@ -62,13 +73,16 @@ def select_binary_data(single_lined_data, _, id_column, binary_id):
     _logger.info('Selected binary data:\n%s', repr(selected.T))
     return selected
 
-def plot_rvk_constraint(observed_orbit, photometric_constraint):
+def plot_rv_likelihood(observed_orbit,
+                       eccentricity_envelope,
+                       photometric_constraint):
     """Display plots showing the RV based constraint."""
 
-    rvk_constraint = get_rvk_constraint(
+    rv_likelihood = get_rv_likelihood(
         observed_orbit=observed_orbit,
-        num_parallel_processes=4,
-        interpolation_accuracy=(1e-8, 1e-4),
+        eccentricity_envelope=eccentricity_envelope,
+        num_parallel_processes=24,
+        interpolation_accuracy=1e-8,
         show_mismatch_plot=False
     )
 
@@ -92,81 +106,90 @@ def plot_rvk_constraint(observed_orbit, photometric_constraint):
         )
     )
 
-    for eccentricity in numpy.linspace(0.5, 0, 6):
-
-        rvk_constraint.prepare_secondary_sampling(
-            primary_mass=primary_mass,
-            orbital_period=float(observed_orbit['Per']) * units.day,
-            eccentricity=eccentricity,
-            secondary_mass_prior=secondary_mass_photometric_prior
-        )
-
-        plot_m2 = numpy.linspace(
-            rvk_constraint.secondary_mass_ppf(1e-5).to_value(units.M_sun),
-            rvk_constraint.secondary_mass_ppf(1.0 - 1e-5).to_value(units.M_sun),
-            300
-        )
-
-        start_time = time()
-        plot_pdf = numpy.fromiter(
+    print('Plotting for M1 = ' + repr(primary_mass))
+    plot_m2 = numpy.linspace(
+        0.2,#secondary_mass_photometric_prior.ppf(1e-5),
+        1.0,#secondary_mass_photometric_prior.sf(1e-5),
+        30000
+    )
+    print('M2 = ' + repr(plot_m2))
+    plot_rvk_scale = (
+        plot_m2 * units.M_sun
+        *
+        (
+            2.0 * numpy.pi * constants.G
+            /
             (
-                rvk_constraint.secondary_mass_pdf(m2)
-                for m2 in  plot_m2 * units.M_sun
-            ),
-            dtype=float
-        )
-        _logger.debug('Calculating %d PDF values took %g minutes.',
-                      plot_pdf.size,
-                      (time() - start_time) / 60.0)
-        start_time = time()
-        plot_cdf = numpy.fromiter(
-            (
-                rvk_constraint.secondary_mass_cdf(m2)
-                for m2 in plot_m2 * units.M_sun
-            ),
-            dtype=float
-        )
-        _logger.debug('Calculating %d CDF values took %g minutes.',
-                      plot_cdf.size,
-                      (time() - start_time) / 60.0)
-        start_time = time()
-        plot_fk_ratio = numpy.fromiter(
-            (
-                rvk_constraint.rv_semi_amplitude_pdf(
-                    rvk_constraint.rv_semi_amplitude(
-                        primary_mass=primary_mass,
-                        secondary_mass=secondary_mass,
-                        eccentricity=eccentricity
-                    )
-                )
-                /
-                rvk_constraint.rv_semi_amplitude_pdf(
-                    rvk_constraint.rv_semi_amplitude(
-                        primary_mass=primary_mass,
-                        secondary_mass=secondary_mass,
-                        eccentricity=0.5
-                    )
-                )
-                for secondary_mass in plot_m2 * units.M_sun
-            ),
-            dtype=float
-        )
-        _logger.debug('Calculating %d f\'(K) ratios took %g minutes.',
-                      plot_fk_ratio.size,
-                      (time() - start_time) / 60.0)
+                float(observed_orbit['Per']) * units.day
+                *
+                (primary_mass + plot_m2 * units.M_sun)**2
+            )
+        )**(1.0/3.0)
+    ).to_value(units.m / units.s)
+
+    print('K0 = ' + repr(plot_rvk_scale))
+
+
+    plot_rv_likelihood_denom = rv_likelihood(
+        0.5,#eccentricity_envelope(float(observed_orbit['Per'])),
+        plot_rvk_scale
+    )[0]
+
+    for eccentricity in numpy.linspace(0.1, 0, 20):
+
+#        rvk_constraint.prepare_secondary_sampling(
+#            primary_mass=primary_mass,
+#            orbital_period=float(observed_orbit['Per']) * units.day,
+#            eccentricity=eccentricity,
+#            secondary_mass_prior=secondary_mass_photometric_prior
+#        )
+
+        plot_rv_likelihood_numer = rv_likelihood(eccentricity,
+                                                 plot_rvk_scale)[0]
+
+#        start_time = time()
+#        plot_pdf = numpy.fromiter(
+#            (
+#                rvk_constraint.secondary_mass_pdf(m2)
+#                for m2 in  plot_m2 * units.M_sun
+#            ),
+#            dtype=float
+#        )
+#        _logger.debug('Calculating %d PDF values took %g minutes.',
+#                      plot_pdf.size,
+#                      (time() - start_time) / 60.0)
+#        start_time = time()
+#        plot_cdf = numpy.fromiter(
+#            (
+#                rvk_constraint.secondary_mass_cdf(m2)
+#                for m2 in plot_m2 * units.M_sun
+#            ),
+#            dtype=float
+#        )
+#        _logger.debug('Calculating %d CDF values took %g minutes.',
+#                      plot_cdf.size,
+#                      (time() - start_time) / 60.0)
+#        start_time = time()
 
         _logger.info('Finished calculations for e = %s',
                      repr(eccentricity))
 
-        plots['left'].plot(plot_m2,
-                           plot_pdf,
-                           label='e = ' + str(eccentricity))
-        plots['middle'].semilogy(plot_m2,
-                                 plot_fk_ratio,
-                                 label='e = ' + str(eccentricity))
-        plots['right'].plot(plot_m2,
-                            plot_cdf)
-    plots['middle'].set_ylim((0.1, 10.0))
+        plots['left'].plot(
+            plot_m2,
+            plot_rv_likelihood_numer,
+            label='e = ' + str(eccentricity)
+        )
+        plots['middle'].semilogy(
+            plot_m2,
+            plot_rv_likelihood_numer / plot_rv_likelihood_denom,
+            label='e = ' + str(eccentricity)
+        )
+#        plots['right'].plot(plot_m2,
+#                            plot_cdf)
+#    plots['middle'].set_ylim((0.1, 10.0))
+    plots['left'].legend()
+    plots['middle'].legend()
+
     pyplot.show()
 
 #TODO: figure out a better distribution for eccentricity
