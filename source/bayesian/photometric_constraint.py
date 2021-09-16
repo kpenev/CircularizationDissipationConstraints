@@ -7,19 +7,18 @@ from functools import partial
 import logging
 
 from matplotlib import pyplot, cm
-from scipy import integrate, optimize
 from astropy import units, constants
 import numpy
 
 #False positive (fixed in __init__.py)
 #pylint: disable=import-error
-from photometric_secondary_constraint import PhotometricSecondaryConstraint
+from sample_binary_masses import SampleBinaryMasses
 #pylint: enable=import-error
 from mass_fitting import fit_binary_masses
 
 #Simplifying decreases readability
 #pylint: disable=too-many-instance-attributes
-class PhotometricConstraint:
+class PhotometricConstraint(SampleBinaryMasses):
     """Constraint on component masses from observed color & magnitude."""
 
     _logger = logging.getLogger(__name__)
@@ -27,11 +26,7 @@ class PhotometricConstraint:
     def _check_constraints(self, primary_mass, secondary_mass):
         """Return True iff the given masses are allowed."""
 
-        if (
-                min(primary_mass, secondary_mass) < self.mass_range[0]
-                or
-                max(primary_mass, secondary_mass) > self.mass_range[1]
-        ):
+        if not super()._check_constraints(primary_mass, secondary_mass):
             return False
 
         for (
@@ -92,19 +87,15 @@ class PhotometricConstraint:
                 result *= distribution.pdf(predicted_value)
         return result
 
-    def _prepare_constraint(self, min_magnitude_difference):
+
+    def _secondary_mass_quad_points(self, primary_mass):
+        """Points arg to quad required for reliable marginalization oven m2."""
+
+        return self._quad_points
+
+
+    def _get_max_likelihood(self, min_magnitude_difference):
         """Prepare the constraint for use with current configuration."""
-
-        def integrand(primary_mass, _):
-            """The derivative of cumulative m1 likelihood."""
-
-            return integrate.quad(self._joint_likelihood,
-                                  self.mass_range[0],
-                                  primary_mass,
-                                  args=(primary_mass,),
-                                  points=self._quad_points,
-                                  limit=200,
-                                  **self._integration_config)[0]
 
         likelihood_maximization = fit_binary_masses(
             photometry_interpolators=self._photometry_interpolators,
@@ -116,27 +107,18 @@ class PhotometricConstraint:
             likelihood_maximization.x[1] -= 1e-5
 
         assert likelihood_maximization.success
+
+        result = self._joint_likelihood(likelihood_maximization.x[1],
+                                        likelihood_maximization.x[0])
+
         self._logger.debug(
             'Maximum log-likelihood(m1=%s, m2=%s) = %s',
             repr(likelihood_maximization.x[0]),
             repr(likelihood_maximization.x[1]),
-            repr(self._joint_likelihood(likelihood_maximization.x[1],
-                                        likelihood_maximization.x[0]))
+            repr(result)
         )
+        return result
 
-        result = integrate.solve_ivp(
-            integrand,
-            self.mass_range,
-            numpy.array([0.0]),
-            dense_output=True,
-            max_step=1e-2,
-            rtol=1e-6,
-            atol=1e-9 * self._joint_likelihood(likelihood_maximization.x[1],
-                                               likelihood_maximization.x[0]),
-            method='LSODA'
-        )
-        assert result.success
-        return result.sol
 
     def _check_for_pickled(self, pickle_fname):
         """Check if given file contains a re-usable pickle for current setup."""
@@ -191,7 +173,11 @@ class PhotometricConstraint:
                                 and
                                 compare_measured_photometry(measured_photometry)
                                 and
-                                self._integration_config == integration_config
+                                (
+                                    self._m2_integration_config
+                                    ==
+                                    integration_config
+                                )
                         ):
                             self._logger.debug('Found matching pickle')
                             return unpickler.load()
@@ -225,7 +211,7 @@ class PhotometricConstraint:
 
             pickler.dump(self._min_magnitude_difference)
             pickler.dump(self._measured_photometry)
-            pickler.dump(self._integration_config)
+            pickler.dump(self._m2_integration_config)
             pickler.dump(self._cumulative_m1_likelihood)
 
     def _show_joint_likelihood_plot(self):
@@ -308,100 +294,28 @@ class PhotometricConstraint:
                             )
                         )
 
-        self.mass_range = (-float('inf'), float('inf'))
+        mass_range = (-float('inf'), float('inf'))
         for interpolator in photometry_interpolators:
-            self.mass_range = (
-                max(self.mass_range[0], interpolator.min_mass),
-                min(self.mass_range[1], interpolator.max_mass)
+            mass_range = (
+                max(mass_range[0], interpolator.min_mass),
+                min(mass_range[1], interpolator.max_mass)
             )
 
 
-        self._integration_config = integration_config
-        self._quad_points = numpy.linspace(*self.mass_range, 30)
+        self._quad_points = numpy.linspace(*mass_range, 30)
         self._measured_photometry = measured_photometry
 
 #        self._show_joint_likelihood_plot()
-
-        self._cumulative_m1_likelihood = self._check_for_pickled(pickle_fname)
-        if self._cumulative_m1_likelihood is None:
-            self._cumulative_m1_likelihood = self._prepare_constraint(
-                min_magnitude_difference
-            )
-            self._add_to_pickle_file(pickle_fname)
-
-        self._norm = self._cumulative_m1_likelihood(self.mass_range[1])[0]
-        self._secondary_norm = None
-
-    def pdf(self, primary_mass, secondary_mass):
-        """The joint PDF of component masses given observed colors and mags."""
-
-        primary_mass = float(primary_mass)
-        secondary_mass = float(secondary_mass)
-
-        if(
-                secondary_mass > primary_mass
-                or
-                secondary_mass < self.mass_range[0]
-                or
-                primary_mass > self.mass_range[1]
-        ):
-            return 0.0
-        return (
-            self._joint_likelihood(secondary_mass, primary_mass)
-            /
-            self._norm
+        super().__init__(
+            mass_range=mass_range,
+            m2_integration_config=integration_config,
+            m1_solve_ivp_config=dict(
+                rtol=1e-6,
+                atol=1e-9 * self._get_max_likelihood(min_magnitude_difference),
+            ),
+            pickle_fname=pickle_fname
         )
 
-    def logpdf(self, primary_mass, secondary_mass):
-        """Natural log of the joint PDF."""
-
-        if(
-                secondary_mass > primary_mass
-                or
-                secondary_mass < self.mass_range[0]
-                or
-                primary_mass > self.mass_range[1]
-        ):
-            return -numpy.inf
-        result = (
-            self._joint_likelihood(secondary_mass, primary_mass, True)
-            -
-            numpy.log(self._norm)
-        )
-        return result
-
-
-    def primary_mass_pdf(self, primary_mass):
-        """The PDF(m1) marginalized over m2."""
-
-        return (
-            integrate.quad(self._joint_likelihood,
-                           self.mass_range[0],
-                           primary_mass,
-                           args=(primary_mass,),
-                           points=self._quad_points,
-                           **self._integration_config)[0]
-            /
-            self._norm
-        )
-
-    def primary_mass_cdf(self, primary_mass):
-        """The CDF(m1) marginalized over m2."""
-
-        return self._cumulative_m1_likelihood(primary_mass)[0] / self._norm
-
-    def primary_mass_ppf(self, quantile):
-        """Find the primary mass for which the CDF matches given quantile."""
-
-        def equation(primary_mass):
-            return self.primary_mass_cdf(primary_mass) - quantile
-
-        return optimize.root_scalar(equation, bracket=self.mass_range).root
-
-    def get_conditional_secondary_mass_distribution(self, primary_mass):
-        """Return scipy style RV for the secondary mass given primary mass."""
-
-        return PhotometricSecondaryConstraint(self, primary_mass)
 
     def get_component_radius(self, mass):
         """

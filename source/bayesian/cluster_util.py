@@ -73,6 +73,40 @@ def select_binary_data(single_lined_data, _, id_column, binary_id):
     _logger.info('Selected binary data:\n%s', repr(selected.T))
     return selected
 
+def rv_semi_amplitude_scale(primary_mass,
+                            secondary_mass,
+                            orbital_period):
+    """
+    Calculate the radial velocity semi-amplitude of a circular edge-on orbit.
+
+    Args:
+        primary_mass:    The mass of the primary star in the binary. Must
+            include units.
+
+        secondary_mass:    The mass of the secondary star in the binary. Must
+            include units.
+
+        orbital_period:    The orbital period of the binary. Must include units.
+
+    Returns:
+        The radial velocity semi-amplitude of a circular edge-on orbit with the
+        given parameters.
+    """
+
+    return (
+        secondary_mass
+        *
+        (
+            2.0 * numpy.pi * constants.G
+            /
+            (
+                orbital_period
+                *
+                (primary_mass + secondary_mass)**2
+            )
+        )**(1.0/3.0)
+    )
+
 def plot_rv_likelihood(observed_orbit,
                        eccentricity_envelope,
                        photometric_constraint):
@@ -113,18 +147,10 @@ def plot_rv_likelihood(observed_orbit,
         30000
     )
     print('M2 = ' + repr(plot_m2))
-    plot_rvk_scale = (
-        plot_m2 * units.M_sun
-        *
-        (
-            2.0 * numpy.pi * constants.G
-            /
-            (
-                float(observed_orbit['Per']) * units.day
-                *
-                (primary_mass + plot_m2 * units.M_sun)**2
-            )
-        )**(1.0/3.0)
+    plot_rvk_scale = rv_semi_amplitude_scale(
+        primary_mass,
+        plot_m2 * units.M_sun,
+        float(observed_orbit['Per']) * units.day
     ).to_value(units.m / units.s)
 
     print('K0 = ' + repr(plot_rvk_scale))

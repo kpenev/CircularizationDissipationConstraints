@@ -4,9 +4,9 @@ from scipy import integrate, optimize
 from scipy.stats import rv_continuous
 import numpy
 
-class PhotometricSecondaryConstraint(rv_continuous):
+class ConditionalSecondaryMassDistribution(rv_continuous):
     """
-    Distribution of M2 given M1 from photometric measuremnents.
+    Distribution of M2 given M1 given a joint constraint.
 
     Partially implements the interface of `scipy.stats.rv_frozen`.
 
