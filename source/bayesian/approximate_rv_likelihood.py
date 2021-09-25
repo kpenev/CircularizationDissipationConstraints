@@ -8,6 +8,8 @@ from scipy.optimize import root_scalar
 
 from approximate_2d_function import Approximate2DFunction
 
+#Most ancestors are from scipy
+#pylint: disable=too-many-ancestors
 class ApproximateRVLikelihood(Approximate2DFunction):
     """Specialize 2D approximation to RV likelihood."""
 
@@ -29,7 +31,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
                 PDF of observing RV given the specified orbit.
         """
 
-        return self._observed_rvk.pdf(
+        return self.observed_rvk.pdf(
             max_rv_semiamplitude
             *
             numpy.sqrt(1.0 - numpy.square(cos_inclination))
@@ -38,14 +40,14 @@ class ApproximateRVLikelihood(Approximate2DFunction):
     def _cdf_inclination_integrand(self, sin_inclination, max_rv_semiamplitude):
         """The integrand for marginalizing the CDF over inclination."""
 
-        return (self._observed_rvk.cdf(max_rv_semiamplitude * sin_inclination)
+        return (self.observed_rvk.cdf(max_rv_semiamplitude * sin_inclination)
                 /
                 numpy.sqrt(1.0 - numpy.square(sin_inclination)))
 
     def _sf_inclination_integrand(self, sin_inclination, max_rv_semiamplitude):
         """The integrand for marginalizing survival functn over inclination."""
 
-        return (self._observed_rvk.sf(max_rv_semiamplitude * sin_inclination)
+        return (self.observed_rvk.sf(max_rv_semiamplitude * sin_inclination)
                 /
                 numpy.sqrt(1.0 - numpy.square(sin_inclination)))
 
@@ -55,7 +57,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
         """Return array of points integration must hit for accuracy."""
 
         result = (
-            self._observed_rvk.ppf(numpy.arange(cdf_step, 1.0, cdf_step))
+            self.observed_rvk.ppf(numpy.arange(cdf_step, 1.0, cdf_step))
             /
             max_rv_semiamplitude
         )
@@ -64,11 +66,11 @@ class ApproximateRVLikelihood(Approximate2DFunction):
     def _get_eccentricity_integration_breaks(self, cdf_step=0.01):
         """Return array of points integration must hit for accuracy."""
 
-        result = self._observed_eccentricity.ppf(
+        result = self.observed_eccentricity.ppf(
             numpy.arange(cdf_step, 1.0, cdf_step)
         )
         return result[
-            numpy.logical_and(result > 0, result < self._envelope_eccentricity)
+            numpy.logical_and(result > 0, result < self.envelope_eccentricity)
         ]
 
 
@@ -82,7 +84,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
             return 0.0
 
         points = self._get_inclination_integration_breaks(max_rv_semiamplitude)
-        split = min(self._observed_rvk.isf(1e-6) / max_rv_semiamplitude, 1.0)
+        split = min(self.observed_rvk.isf(1e-6) / max_rv_semiamplitude, 1.0)
         if integrand is None:
             integrand = self._pdf_inclination_integrand
 
@@ -139,7 +141,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
         """
 
         return (
-            self._observed_eccentricity.pdf(eccentricity)
+            self.observed_eccentricity.pdf(eccentricity)
             *
             self._marginalize_inclination(
                 rvk_scale / numpy.sqrt(1.0 - numpy.square(eccentricity))
@@ -166,11 +168,11 @@ class ApproximateRVLikelihood(Approximate2DFunction):
 
         solution = integrate.solve_ivp(
             fun=self._get_eccentricity_integrand,
-            t_span=(0, self._envelope_eccentricity),
+            t_span=(0, self.envelope_eccentricity),
             y0=numpy.array([
                 self._marginalize_inclination(rvk_scale)
                 *
-                self._observed_eccentricity.cdf(0.0)
+                self.observed_eccentricity.cdf(0.0)
             ]),
             t_eval=self._get_eccentricity_integration_breaks(),
             args=(rvk_scale,),
@@ -202,7 +204,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
             See `Approximate2DFunction._calculate_function_values()`.
         """
 
-        assert x_grid.max() <= self._envelope_eccentricity
+        assert x_grid.max() <= self.envelope_eccentricity
 
         new_rvk_scales = [
             rvk_scale for rvk_scale in y_grid
@@ -228,7 +230,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
         """Return array of points integration must hit for accuracy."""
 
         result = (
-            self._observed_rvk.ppf(numpy.arange(cdf_step, 1.0, cdf_step))
+            self.observed_rvk.ppf(numpy.arange(cdf_step, 1.0, cdf_step))
             /
             max_rv_semiamplitude
         )
@@ -239,7 +241,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
         """The equation to solve in order to find max RV semi-amplitude."""
 
         integral = integrate.quad(
-            lambda s: (self._observed_rvk.sf(s * upper_bound)
+            lambda s: (self.observed_rvk.sf(s * upper_bound)
                        /
                        numpy.sqrt(1.0 - numpy.square(s))),
             0,
@@ -262,7 +264,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
             bracket=(
                 0,
                 (
-                    self._observed_rvk.isf(target_prob / numpy.pi)
+                    self.observed_rvk.isf(target_prob / numpy.pi)
                     /
                     numpy.sin(target_prob / 2.0)
                 )
@@ -274,13 +276,13 @@ class ApproximateRVLikelihood(Approximate2DFunction):
     def _get_initial_grid(self):
         """Return an initial grid from which to start refining interpolation."""
 
-        e_grid = self._observed_eccentricity.ppf(
+        e_grid = self.observed_eccentricity.ppf(
             numpy.linspace(0, 1.0, self.configuration.min_grid_points[0])
         )
         assert e_grid[0] <= 0
         e_grid[0] = 0.0
 
-        rvk_grid = self._observed_rvk.ppf(
+        rvk_grid = self.observed_rvk.ppf(
             numpy.linspace(0, 1.0, self.configuration.min_grid_points[1])
         )
         assert rvk_grid[0] <= 0
@@ -291,7 +293,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
             e_grid[
                 numpy.logical_and(
                     e_grid >= 0,
-                    e_grid <= self._envelope_eccentricity
+                    e_grid <= self.envelope_eccentricity
                 )
             ],
             rvk_grid[rvk_grid >= 0]
@@ -358,9 +360,9 @@ class ApproximateRVLikelihood(Approximate2DFunction):
             repr(envelope_eccentricity)
         )
 
-        self._observed_rvk = observed_rvk
-        self._observed_eccentricity = observed_eccentricity
-        self._envelope_eccentricity = envelope_eccentricity
+        self.observed_rvk = observed_rvk
+        self.observed_eccentricity = observed_eccentricity
+        self.envelope_eccentricity = envelope_eccentricity
         self._integration_options = integration_options or dict()
         self._solve_ivp_options = solve_ivp_options or dict()
 
@@ -395,3 +397,4 @@ class ApproximateRVLikelihood(Approximate2DFunction):
             **approximation_options
         )
         self._eccentricity_integrals = None
+#pylint: enable=too-many-ancestors

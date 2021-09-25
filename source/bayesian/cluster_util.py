@@ -1,15 +1,16 @@
 """Functions working with cluster data required for the circ. analysis."""
 
 import logging
-from time import time
 
 from matplotlib import pyplot
 from scipy import stats
 import numpy
-from astropy import units, constants
+from astropy import units
 
 from bayesian.eccentricity_likelihood import EccentricityLikelihood
 from bayesian.approximate_rv_likelihood import ApproximateRVLikelihood
+from binary_utils import rv_semi_amplitude_scale
+from sample_sb1_masses import SampleSB1Masses
 
 _logger = logging.getLogger(__name__)
 
@@ -73,39 +74,63 @@ def select_binary_data(single_lined_data, _, id_column, binary_id):
     _logger.info('Selected binary data:\n%s', repr(selected.T))
     return selected
 
-def rv_semi_amplitude_scale(primary_mass,
-                            secondary_mass,
-                            orbital_period):
-    """
-    Calculate the radial velocity semi-amplitude of a circular edge-on orbit.
+def plot_mass_pdfs(sample_stellar_masses,
+                   m1_pdf_axis,
+                   m2_pdf_axis,
+                   linestyle='-'):
+    """Plot PDF(M1) marginalized over M2 and PDF(M2|M1) on given axis."""
 
-    Args:
-        primary_mass:    The mass of the primary star in the binary. Must
-            include units.
+    m1_pdf_axis.set_title('$PDF(M_1 | e_{env}, P_{orb})$')
+    m2_pdf_axis.set_title('$PDF(M_2 | M_1, e_{env}, P_{orb})$')
 
-        secondary_mass:    The mass of the secondary star in the binary. Must
-            include units.
+    m1_pdf_axis.set_xlabel(r'$M_1\ [M_\odot]$')
+    m2_pdf_axis.set_xlabel(r'$M_2\ [M_\odot]$')
 
-        orbital_period:    The orbital period of the binary. Must include units.
-
-    Returns:
-        The radial velocity semi-amplitude of a circular edge-on orbit with the
-        given parameters.
-    """
-
-    return (
-        secondary_mass
-        *
-        (
-            2.0 * numpy.pi * constants.G
-            /
-            (
-                orbital_period
-                *
-                (primary_mass + secondary_mass)**2
-            )
-        )**(1.0/3.0)
+    med_primary_mass = sample_stellar_masses.primary_mass_ppf(0.5) * units.M_sun
+    secondary_mass_distro = (
+        sample_stellar_masses.get_conditional_secondary_mass_distribution(
+            med_primary_mass.to_value(units.M_sun)
+        )
     )
+
+    print('Plotting for M1 = ' + repr(med_primary_mass))
+    plot_data = dict(
+        m1=numpy.linspace(
+            sample_stellar_masses.primary_mass_ppf(1e-5),
+            sample_stellar_masses.primary_mass_ppf(1.0-1e-5),
+            30
+        ),
+        m2=numpy.linspace(
+            secondary_mass_distro.ppf(1e-5),
+            secondary_mass_distro.sf(1e-5),
+            30
+        )
+    )
+    plot_data['m1_pdf'] = numpy.vectorize(
+        sample_stellar_masses.primary_mass_pdf
+    )(
+        plot_data['m1']
+    )
+    print('Calculated M1 PDF values')
+    plot_data['m2_pdf'] = numpy.vectorize(
+        secondary_mass_distro.pdf
+    )(
+        plot_data['m2']
+    )
+    print('Calculated M2 PDF values')
+    m1_pdf_axis.semilogy(plot_data['m1'],
+                         plot_data['m1_pdf'],
+                         linestyle=linestyle,
+                         color='b',
+                         label='PDF(M1)')
+    m2_pdf_axis.semilogy(plot_data['m2'],
+                         plot_data['m2_pdf'],
+                         linestyle=linestyle,
+                         color='r',
+                         label='PDF(M2|M1)')
+    m1_pdf_axis.legend()
+    m2_pdf_axis.legend()
+
 
 def plot_rv_likelihood(observed_orbit,
                        eccentricity_envelope,
@@ -121,26 +146,43 @@ def plot_rv_likelihood(observed_orbit,
     )
 
     plots = dict(
-        left=pyplot.subplot(131),
-        middle=pyplot.subplot(132),
-        right=pyplot.subplot(133)
+        rv_likelihood=pyplot.subplot(131),
+        rv_likelihood_ratio=pyplot.subplot(132),
+        m2_pdf=pyplot.subplot(133)
     )
+    plots['m1_pdf'] = pyplot.twiny(plots['m2_pdf'])
+
     for sub_plot in plots.values():
         sub_plot.set_xlabel(r'$M_2\ [M_\odot]$')
-    plots['left'].set_title('$PDF(M_2 | M_1, e, P_{orb})$')
-    plots['middle'].set_title(
-        "$f'[K(M_1, M_2, P_{orb}, e)] / f'[K(M_1, M_2, P_{orb}, e=0.5)]$"
+    plots['rv_likelihood'].set_title(
+        r'$\lambda\left[e, K(M_1, M_2, P_{orb})\right]$'
     )
-    plots['right'].set_title('$CDF(M_2 | M_1, e, P_{orb})$')
+    plots['rv_likelihood_ratio'].set_title(
+        r'$\frac{\lambda\left[e, K(M_1, M_2, P_{orb})\right]}'
+        r'{\lambda\left[e_{env}, K(M_1, M_2, P_{orb})\right]}$'
+    )
 
-    primary_mass = photometric_constraint.primary_mass_ppf(0.5) * units.M_sun
-    secondary_mass_photometric_prior = (
-        photometric_constraint.get_conditional_secondary_mass_distribution(
-            primary_mass.to_value(units.M_sun)
+    sample_stellar_masses = SampleSB1Masses(
+        rv_likelihood=rv_likelihood,
+        photometric_constraint=photometric_constraint,
+        orbital_period=float(observed_orbit['Per']),
+        envelope_eccentricity=eccentricity_envelope(
+            float(observed_orbit['Per'])
         )
     )
 
-    print('Plotting for M1 = ' + repr(primary_mass))
+    plot_mass_pdfs(sample_stellar_masses,
+                   plots['m1_pdf'],
+                   plots['m2_pdf'],
+                   '-')
+    plot_mass_pdfs(photometric_constraint,
+                   plots['m1_pdf'],
+                   plots['m2_pdf'],
+                   '--')
+
+    med_primary_mass = sample_stellar_masses.primary_mass_ppf(0.5) * units.M_sun
+
+    print('Plotting for M1 = ' + repr(med_primary_mass))
     plot_m2 = numpy.linspace(
         0.2,#secondary_mass_photometric_prior.ppf(1e-5),
         1.0,#secondary_mass_photometric_prior.sf(1e-5),
@@ -148,7 +190,7 @@ def plot_rv_likelihood(observed_orbit,
     )
     print('M2 = ' + repr(plot_m2))
     plot_rvk_scale = rv_semi_amplitude_scale(
-        primary_mass,
+        med_primary_mass,
         plot_m2 * units.M_sun,
         float(observed_orbit['Per']) * units.day
     ).to_value(units.m / units.s)
@@ -163,49 +205,18 @@ def plot_rv_likelihood(observed_orbit,
 
     for eccentricity in numpy.linspace(0.1, 0, 20):
 
-#        rvk_constraint.prepare_secondary_sampling(
-#            primary_mass=primary_mass,
-#            orbital_period=float(observed_orbit['Per']) * units.day,
-#            eccentricity=eccentricity,
-#            secondary_mass_prior=secondary_mass_photometric_prior
-#        )
-
         plot_rv_likelihood_numer = rv_likelihood(eccentricity,
                                                  plot_rvk_scale)[0]
-
-#        start_time = time()
-#        plot_pdf = numpy.fromiter(
-#            (
-#                rvk_constraint.secondary_mass_pdf(m2)
-#                for m2 in  plot_m2 * units.M_sun
-#            ),
-#            dtype=float
-#        )
-#        _logger.debug('Calculating %d PDF values took %g minutes.',
-#                      plot_pdf.size,
-#                      (time() - start_time) / 60.0)
-#        start_time = time()
-#        plot_cdf = numpy.fromiter(
-#            (
-#                rvk_constraint.secondary_mass_cdf(m2)
-#                for m2 in plot_m2 * units.M_sun
-#            ),
-#            dtype=float
-#        )
-#        _logger.debug('Calculating %d CDF values took %g minutes.',
-#                      plot_cdf.size,
-#                      (time() - start_time) / 60.0)
-#        start_time = time()
 
         _logger.info('Finished calculations for e = %s',
                      repr(eccentricity))
 
-        plots['left'].plot(
+        plots['rv_likelihood'].semilogy(
             plot_m2,
             plot_rv_likelihood_numer,
             label='e = ' + str(eccentricity)
         )
-        plots['middle'].semilogy(
+        plots['rv_likelihood_ratio'].semilogy(
             plot_m2,
             plot_rv_likelihood_numer / plot_rv_likelihood_denom,
             label='e = ' + str(eccentricity)
@@ -213,8 +224,8 @@ def plot_rv_likelihood(observed_orbit,
 #        plots['right'].plot(plot_m2,
 #                            plot_cdf)
 #    plots['middle'].set_ylim((0.1, 10.0))
-    plots['left'].legend()
-    plots['middle'].legend()
+    plots['rv_likelihood'].legend()
+    plots['rv_likelihood_ratio'].legend()
 
     pyplot.show()
 

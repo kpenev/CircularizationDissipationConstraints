@@ -5,14 +5,13 @@ from collections import namedtuple
 import logging
 from itertools import count
 from multiprocessing import Pool
-import os.path
-from pickle import Pickler, Unpickler
 
 from matplotlib import pyplot
 from scipy.interpolate import RectBivariateSpline
 import numpy
 
 from plot_2d_interpolation import Plot2DInterpolation
+from picklable import Picklable
 
 ApproximationConfig = namedtuple(
     'ApproximationConfig',
@@ -30,7 +29,9 @@ ApproximationConfig = namedtuple(
 
 #No reasonable way to simplify
 #pylint: disable=too-many-instance-attributes
-class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
+class Approximate2DFunction(RectBivariateSpline,
+                            Plot2DInterpolation,
+                            Picklable):
     """
     Approximate but fast evalution of expensive 2D functions.
 
@@ -411,63 +412,41 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
             self._x_grid, self._y_grid = new_grids
 
 
-    def _check_for_pickled(self, pickle_fname):
+    def __eq__(self, other):
+        """Return True iff self and other are identical approximations."""
+
+        return (
+            self.func == other.func
+            and
+            self.support == other.support
+            and
+            self.configuration == other.configuration
+            and
+            (self._x_grid == other._x_grid).all()
+            and
+            (self._y_grid == other._y_grid).all()
+            and
+            (self._values == other._values).all()
+        )
+
+
+    def _check_pickle(self):
         """Check if given file contains a re-usable pickle of desired approx."""
 
-        if not os.path.exists(pickle_fname):
-            open(pickle_fname, 'wb').close()
-            return None, None, None
-        try:
-            with open(pickle_fname, 'rb') as pickle_file:
-                unpickler = Unpickler(pickle_file)
-                while True:
-                    section, nobjects = unpickler.load()
-                    assert isinstance(section, str)
-                    assert isinstance(nobjects, int)
-                    if section == 'Approximate2DFunction' and nobjects == 6:
-                        func = unpickler.load()
-                        support = unpickler.load()
-                        configuration = unpickler.load()
-                        nobjects -= 3
-                        if (
-                                self.func == func
-                                and
-                                self.support == support
-                                and
-                                self.configuration == configuration
-                        ):
-                            self._logger.debug(
-                                'Found matching 2D approximation pickle.'
-                            )
-                            return (
-                                unpickler.load(),
-                                unpickler.load(),
-                                unpickler.load()
-                            )
+        if (
+                self.func == self._load_pickle_object()
+                and
+                self.support == self._load_pickle_object()
+                and
+                self.configuration == self._load_pickle_object()
+        ):
+            return (
+                self._load_pickle_object(),
+                self._load_pickle_object(),
+                self._load_pickle_object(),
+            )
 
-                        self._logger.debug(
-                            'Pickled 2D approximation does not match!'
-                        )
-                    for _ in range(nobjects):
-                        unpickler.load()
-
-        except EOFError:
-            self._logger.info('None of the pickled 2D approximations matches!')
-            return None, None, None
-
-
-    def _add_to_pickle_file(self, pickle_fname):
-        """Append the currently set-up approximation to a pickle file."""
-
-        with open(pickle_fname, 'ab') as pickle_file:
-            pickler = Pickler(pickle_file)
-            pickler.dump(('Approximate2DFunction', 6))
-            pickler.dump(self.func)
-            pickler.dump(self.support)
-            pickler.dump(self.configuration)
-            pickler.dump(self._x_grid)
-            pickler.dump(self._y_grid)
-            pickler.dump(self._values)
+        return None
 
     def _get_initial_grid(self):
         """Return an initial grid from which to start refining interpolation."""
@@ -554,6 +533,8 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                 configuration.
         """
 
+        Picklable.__init__(self, 6)
+
         for order_opt in ['kx', 'ky']:
             if order_opt not in spline_options:
                 spline_options[order_opt] = 1
@@ -576,8 +557,10 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
         )
         self.func = func
         self.support = support
-        self._x_grid, self._y_grid, self._values = self._check_for_pickled(
-            pickle_fname
+        self._x_grid, self._y_grid, self._values = (
+            self.check_for_pickled(pickle_fname)
+            or
+            (None, None, None)
         )
 
         if (
@@ -613,7 +596,13 @@ class Approximate2DFunction(RectBivariateSpline, Plot2DInterpolation):
                 self._y_grid.size
             )
 
-            self._add_to_pickle_file(pickle_fname)
+            self.add_to_pickle_file(pickle_fname,
+                                    self.func,
+                                    self.support,
+                                    self.configuration,
+                                    self._x_grid,
+                                    self._y_grid,
+                                    self._values)
 
         else:
             Plot2DInterpolation.__init__(self, debug_plots, plot_labels)

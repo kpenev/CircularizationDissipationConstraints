@@ -1,57 +1,49 @@
 """Implement sampling of binary star masses."""
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
+import logging
 
 import numpy
-from scipy import integrate, optimize
+from scipy import integrate, optimize, stats
 
 from conditional_secondary_mass_distribution import\
     ConditionalSecondaryMassDistribution
+from picklable import Picklable
+from basic_util import compare_frozen_distributions
 
-class SampleBinaryMasses(ABC):
+class SampleBinaryMasses(Picklable):
     """Allow sampling from joint distribution of the two masses in a binary."""
 
-    def _check_constraints(self, primary_mass, secondary_mass):
-        """Return True iff the given masses are allowed."""
-
-        if (
-                min(primary_mass, secondary_mass) < self.mass_range[0]
-                or
-                max(primary_mass, secondary_mass) > self.mass_range[1]
-        ):
-            return False
-
-        return True
-
+    _logger = logging.getLogger(__name__)
 
     @abstractmethod
-    def _joint_likelihood(self, secondary_mass, primary_mass, return_log=False):
+    def joint_likelihood(self, secondary_mass, primary_mass, return_log=False):
         """The likelihood to sample from (proportional to joint PDF)."""
 
 
     @abstractmethod
-    def _secondary_mass_quad_points(self, primary_mass):
+    def secondary_mass_quad_points(self, primary_mass):
         """Points arg to quad required for reliable marginalization oven m2."""
 
 
-    def _primary_mass_likelihood(self, primary_mass, *_):
+    def primary_mass_likelihood(self, primary_mass, *_):
         """The derivative of cumulative m1 likelihood."""
 
         return integrate.quad(
-            self._joint_likelihood,
+            self.joint_likelihood,
             self.mass_range[0],
             primary_mass,
             args=(primary_mass,),
-            points=self._secondary_mass_quad_points(primary_mass),
+            points=self.secondary_mass_quad_points(primary_mass),
             **self._m2_integration_config
         )[0]
 
 
-    def _get_cumulative_m1_likelihood(self):
+    def get_cumulative_m1_likelihood(self):
         """Return scaled version of CDF(m1) marginalized over m2."""
 
         result = integrate.solve_ivp(
-            self._primary_mass_likelihood,
+            self.primary_mass_likelihood,
             self.mass_range,
             numpy.array([0.0]),
             dense_output=True,
@@ -61,24 +53,54 @@ class SampleBinaryMasses(ABC):
         return result.sol
 
 
-    @abstractmethod
-    def _check_for_pickled(self, pickle_fname):
-        """Check if given file contains a re-usable pickle for current setup."""
+    def _check_pickle(self):
+        """Return None if given pickle does not match otherwise unpickle."""
+
+        for entry in self._likelihood_pickle_entires:
+            self._logger.debug('Comparing %s to pickled', repr(entry))
+            if isinstance(entry, type(stats.uniform())):
+                if not compare_frozen_distributions(entry,
+                                                    self._load_pickle_object()):
+                    self._logger.debug('Distribution mismatch')
+                    return None
+                self._logger.debug('Distribution match')
+            elif entry != self._load_pickle_object():
+                self._logger.debug('Simple mismatch')
+                return None
+            else:
+                self._logger.debug('Simple match')
+
+        for attr_name in ['mass_range',
+                          '_m1_solve_ivp_config',
+                          '_m2_integration_config']:
+            if getattr(self, attr_name) != self._load_pickle_object():
+                return None
+
+        return self._load_pickle_object()
 
 
-    @abstractmethod
-    def _add_to_pickle_file(self, pickle_fname):
-        """Pickle a fully set-up constaint to the given file for fast re-use."""
+    def __eq__(self, other):
+        """Return True iff self and other would sample fro identical distros."""
+
+        for attr_name in ['_m1_solve_ivp_config',
+                          '_m2_integration_config',
+                          '_likelihood_pickle_entires']:
+            if getattr(self, attr_name) != getattr(other, attr_name):
+                return False
+        return True
 
 
     def __init__(self,
+                 *,
                  mass_range,
                  m2_integration_config,
                  m1_solve_ivp_config,
+                 likelihood_pickle_entries,
                  pickle_fname):
         """Set-up the constraint."""
 
-        self._m1_solve_ivp_config = dict(m1_solve_ivp_config)
+
+        self._m1_solve_ivp_config = dict(m1_solve_ivp_config or dict())
         self._m2_integration_config = m2_integration_config
         self.mass_range = mass_range
 
@@ -92,12 +114,20 @@ class SampleBinaryMasses(ABC):
             if kwarg not in self._m2_integration_config:
                 self._m2_integration_config[kwarg] = default
 
-        self._cumulative_m1_likelihood = self._check_for_pickled(pickle_fname)
+        self._likelihood_pickle_entires = likelihood_pickle_entries
+        super().__init__(len(likelihood_pickle_entries) + 4)
+
+        self._cumulative_m1_likelihood = self.check_for_pickled(pickle_fname)
         if self._cumulative_m1_likelihood is None:
             self._cumulative_m1_likelihood = (
-                self._get_cumulative_m1_likelihood()
+                self.get_cumulative_m1_likelihood()
             )
-            self._add_to_pickle_file(pickle_fname)
+            self.add_to_pickle_file(pickle_fname,
+                                    *likelihood_pickle_entries,
+                                    self.mass_range,
+                                    self._m1_solve_ivp_config,
+                                    self._m2_integration_config,
+                                    self._cumulative_m1_likelihood)
 
         self._norm = self._cumulative_m1_likelihood(self.mass_range[1])[0]
         self._secondary_norm = None
@@ -118,7 +148,7 @@ class SampleBinaryMasses(ABC):
         ):
             return 0.0
         return (
-            self._joint_likelihood(secondary_mass, primary_mass)
+            self.joint_likelihood(secondary_mass, primary_mass)
             /
             self._norm
         )
@@ -136,7 +166,7 @@ class SampleBinaryMasses(ABC):
         ):
             return -numpy.inf
         result = (
-            self._joint_likelihood(secondary_mass, primary_mass, True)
+            self.joint_likelihood(secondary_mass, primary_mass, True)
             -
             numpy.log(self._norm)
         )
@@ -146,7 +176,7 @@ class SampleBinaryMasses(ABC):
     def primary_mass_pdf(self, primary_mass):
         """The PDF(m1) marginalized over m2."""
 
-        return self._primary_mass_likelihood(primary_mass) / self._norm
+        return self.primary_mass_likelihood(primary_mass) / self._norm
 
 
     def primary_mass_cdf(self, primary_mass):
@@ -169,3 +199,30 @@ class SampleBinaryMasses(ABC):
 
         return ConditionalSecondaryMassDistribution(self, primary_mass)
 
+    def __call__(self, m1_cdf_value, m2_cdf_value):
+        """
+        Transform 2 U(0, 1) idrv to primray & secondary mass per constraints.
+
+        Args:
+            m1_cdf_value(float):    The primary mass return is such that the CDF
+                of the CDF of the primary mass, marginalized over the secondary
+                mass, has this value.
+
+            m2_cdf_value (float):    The secondary mass returned is such that
+                the conditional CDF of the secondary mass given the chosen value
+                of the primary mass above has this value.
+
+        Returns:
+            float, float:
+                The two masses that correspond to the given U(0, 1) random
+                variates given.
+        """
+
+        primary_mass = self.primary_mass_ppf(m1_cdf_value)
+        secondary_mass = self.get_conditional_secondary_mass_distribution(
+            primary_mass
+        ).ppf(
+            m2_cdf_value
+        )
+
+        return primary_mass, secondary_mass

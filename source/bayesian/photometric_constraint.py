@@ -1,8 +1,6 @@
 """Interface for working with mass constraints from color-mag measurements."""
 
 from multiprocessing import Pool
-import os.path
-from pickle import Pickler, Unpickler
 from functools import partial
 import logging
 
@@ -23,10 +21,14 @@ class PhotometricConstraint(SampleBinaryMasses):
 
     _logger = logging.getLogger(__name__)
 
-    def _check_constraints(self, primary_mass, secondary_mass):
+    def check_constraints(self, primary_mass, secondary_mass):
         """Return True iff the given masses are allowed."""
 
-        if not super()._check_constraints(primary_mass, secondary_mass):
+        if (
+                min(primary_mass, secondary_mass) < self.mass_range[0]
+                or
+                max(primary_mass, secondary_mass) > self.mass_range[1]
+        ):
             return False
 
         for (
@@ -55,10 +57,10 @@ class PhotometricConstraint(SampleBinaryMasses):
         return True
 
 
-    def _joint_likelihood(self, secondary_mass, primary_mass, return_log=False):
+    def joint_likelihood(self, secondary_mass, primary_mass, return_log=False):
         """The likelihood of the observed colors and magnitudes given masses."""
 
-        if not self._check_constraints(primary_mass, secondary_mass):
+        if not self.check_constraints(primary_mass, secondary_mass):
             return -numpy.inf if return_log else 0
 
         predicted_photometry = dict()
@@ -88,13 +90,13 @@ class PhotometricConstraint(SampleBinaryMasses):
         return result
 
 
-    def _secondary_mass_quad_points(self, primary_mass):
+    def secondary_mass_quad_points(self, primary_mass):
         """Points arg to quad required for reliable marginalization oven m2."""
 
         return self._quad_points
 
 
-    def _get_max_likelihood(self, min_magnitude_difference):
+    def _init_max_likelihood(self, min_magnitude_difference):
         """Prepare the constraint for use with current configuration."""
 
         likelihood_maximization = fit_binary_masses(
@@ -103,116 +105,72 @@ class PhotometricConstraint(SampleBinaryMasses):
             min_mag_difference=min_magnitude_difference
         )
 
-        while not self._check_constraints(*likelihood_maximization.x):
+        while not self.check_constraints(*likelihood_maximization.x):
             likelihood_maximization.x[1] -= 1e-5
 
         assert likelihood_maximization.success
 
-        result = self._joint_likelihood(likelihood_maximization.x[1],
-                                        likelihood_maximization.x[0])
+        result = self.joint_likelihood(likelihood_maximization.x[1],
+                                       likelihood_maximization.x[0])
 
         self._logger.debug(
-            'Maximum log-likelihood(m1=%s, m2=%s) = %s',
+            'Maximum likelihood(m1=%s, m2=%s) = %s',
             repr(likelihood_maximization.x[0]),
             repr(likelihood_maximization.x[1]),
             repr(result)
         )
-        return result
+        self.max_likelihood = dict(m1=likelihood_maximization.x[0],
+                                   m2=likelihood_maximization.x[1],
+                                   likelihood=result)
 
 
-    def _check_for_pickled(self, pickle_fname):
-        """Check if given file contains a re-usable pickle for current setup."""
+    def _get_interp_tuple(self, attr_name):
+        """Return tuple of the values of an attribute for all interpolators."""
 
-        def compare_measured_photometry(pickled_photometry):
-            """Check if the pickled photometry measurements match config."""
+        return tuple(
+            getattr(interp, attr_name)
+            for interp in self._photometry_interpolators
+        )
 
-            if self._measured_photometry.keys() != pickled_photometry.keys():
+
+    def _compare_measured_photometry(self, photometry):
+        """Check if the given photometry measurements match config."""
+
+        if self._measured_photometry.keys() != photometry.keys():
+            return False
+        for quantity, distribution in self._measured_photometry.items():
+            if distribution.args != photometry[quantity].args:
                 return False
-            for quantity, distribution in self._measured_photometry.items():
-                if distribution.args != pickled_photometry[quantity].args:
-                    return False
-                if distribution.kwds != pickled_photometry[quantity].kwds:
-                    return False
-            return True
+            if distribution.kwds != photometry[quantity].kwds:
+                return False
+        return True
 
 
-        if not os.path.exists(pickle_fname):
-            open(pickle_fname, 'wb').close()
-            return None
-        try:
-            with open(pickle_fname, 'rb') as pickle_file:
-                unpickler = Unpickler(pickle_file)
-                while True:
-                    section, nobjects = unpickler.load()
-                    assert isinstance(section, str)
-                    assert isinstance(nobjects, int)
-                    if section == 'PhotometricConstraint' and nobjects == 6:
-                        isochrone_fnames = unpickler.load()
-                        distance_moduli = unpickler.load()
-                        min_magnitude_difference = unpickler.load()
-                        measured_photometry = unpickler.load()
-                        integration_config = unpickler.load()
-                        nobjects -= 5
+    def __eq__(self, other):
+        """Return True iff self and other are identical."""
 
-                        if(
-                                tuple(
-                                    interp.isochrone_fname
-                                    for interp in self._photometry_interpolators
-                                ) == isochrone_fnames
-                                and
-                                tuple(
-                                    interp.distance_modulus
-                                    for interp in self._photometry_interpolators
-                                ) == distance_moduli
-                                and
-                                (
-                                    self._min_magnitude_difference
-                                    ==
-                                    min_magnitude_difference
-                                )
-                                and
-                                compare_measured_photometry(measured_photometry)
-                                and
-                                (
-                                    self._m2_integration_config
-                                    ==
-                                    integration_config
-                                )
-                        ):
-                            self._logger.debug('Found matching pickle')
-                            return unpickler.load()
+        for attr_name in ['_m1_solve_ivp_config',
+                          '_m2_integration_config',
+                          '_min_magnitude_difference']:
+            if getattr(self, attr_name) != getattr(other, attr_name):
+                return False
 
-                        self._logger.debug('Pickled constraint does not '
-                                           'match!')
-
-                    for _ in range(nobjects):
-                        unpickler.load()
-
-        except EOFError:
-            self._logger.info(
-                'None of the pickled color magnitude constraints matches.'
+        return (
+            (
+                self._get_interp_tuple('isochrone_fname')
+                ==
+                other._get_interp_tuple('isochrone_fname')
             )
-            return None
-
-    def _add_to_pickle_file(self, pickle_fname):
-        """Pickle a fully set-up constaint to the given file for fast re-use."""
-
-        with open(pickle_fname, 'ab') as pickle_file:
-            pickler = Pickler(pickle_file)
-            pickler.dump(('PhotometricConstraint', 6))
-            pickler.dump(
-                tuple(interp.isochrone_fname
-                      for interp in self._photometry_interpolators)
+            and
+            (
+                self._get_interp_tuple('distance_modulus')
+                ==
+                other._get_interp_tuple('distance_modulus')
             )
-            pickler.dump(
-                tuple(interp.distance_modulus
-                      for interp in self._photometry_interpolators)
-            )
+            and
+            self._compare_measured_photometry(other._measured_photometry)
+        )
 
-            pickler.dump(self._min_magnitude_difference)
-            pickler.dump(self._measured_photometry)
-            pickler.dump(self._m2_integration_config)
-            pickler.dump(self._cumulative_m1_likelihood)
 
     def _show_joint_likelihood_plot(self):
         """Display a plot of the joint likelihood."""
@@ -227,7 +185,7 @@ class PhotometricConstraint(SampleBinaryMasses):
         )
         with Pool(4) as workers:
             plot_z = numpy.array(
-                workers.starmap(self._joint_likelihood,
+                workers.starmap(self.joint_likelihood,
                                 zip(plot_x.flatten(), plot_y.flatten()))
             ).reshape(plot_x.shape)
 
@@ -294,24 +252,37 @@ class PhotometricConstraint(SampleBinaryMasses):
                             )
                         )
 
-        mass_range = (-float('inf'), float('inf'))
+        self.mass_range = (-float('inf'), float('inf'))
         for interpolator in photometry_interpolators:
-            mass_range = (
-                max(mass_range[0], interpolator.min_mass),
-                min(mass_range[1], interpolator.max_mass)
+            self.mass_range = (
+                max(self.mass_range[0], interpolator.min_mass),
+                min(self.mass_range[1], interpolator.max_mass)
             )
 
 
-        self._quad_points = numpy.linspace(*mass_range, 30)
+        self._quad_points = numpy.linspace(*self.mass_range, 100)
         self._measured_photometry = measured_photometry
 
 #        self._show_joint_likelihood_plot()
+        self._init_max_likelihood(min_magnitude_difference)
         super().__init__(
-            mass_range=mass_range,
+            mass_range=self.mass_range,
             m2_integration_config=integration_config,
             m1_solve_ivp_config=dict(
                 rtol=1e-6,
-                atol=1e-9 * self._get_max_likelihood(min_magnitude_difference),
+                atol=1e-9 * self.max_likelihood['likelihood'],
+            ),
+            likelihood_pickle_entries=(
+                (
+                    self._get_interp_tuple('isochrone_fname'),
+                    self._get_interp_tuple('distance_modulus'),
+                    self._min_magnitude_difference
+                )
+                +
+                tuple(
+                    self._measured_photometry[band]
+                    for band in sorted(self._measured_photometry.keys())
+                )
             ),
             pickle_fname=pickle_fname
         )

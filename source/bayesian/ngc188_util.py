@@ -3,6 +3,7 @@
 """NGC188 specific functions required for circularization bayesian analysis."""
 
 import os.path
+import sys
 import logging
 from multiprocessing import set_start_method
 
@@ -290,7 +291,7 @@ if __name__ == '__main__':
     set_start_method('forkserver')
     logging.basicConfig(level=logging.DEBUG)
     _test_rv_likelihood(4965)
-    exit(0)
+    sys.exit()
     plot_eccentricity_likelihood(get_observed_orbit(4965),
                                  eccentricity_envelope)
     rcParams['font.size'] = 18
