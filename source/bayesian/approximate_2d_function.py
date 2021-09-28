@@ -124,15 +124,17 @@ class Approximate2DFunction(RectBivariateSpline,
            None
 
         Returns:
-            1-D int array:
-                Indices within `x_grid` where interpolation using 1/4 of the
-                grid is discrepant with the other 3/4 of the values.
+            (1-D int array, 1-D int array):
+                Indices within `x_grid`/`y_grid` where interpolation using 1/4
+                of the grid is discrepant with the other 3/4 of the values.
 
-            1-D int array:
-                Indices within `y_grid` where interpolation fails.
+            int:
+                The direction (0 for x, 1 for y) along which the interpolation
+                is worse.
         """
 
         mismatches = (numpy.array([], dtype=int), numpy.array([], dtype=int))
+        max_1d_error = numpy.empty((2, 2), dtype=numpy.float64)
         for x_offset in [0, 1]:
             for y_offset in [0, 1]:
                 if x_offset == y_offset == 0:
@@ -167,13 +169,13 @@ class Approximate2DFunction(RectBivariateSpline,
                     calculated_values,
                     interpolated_values,
                 )
-                self._logger.debug(
-                    'Max absolute difference: %s',
-                    numpy.max(
-                        numpy.absolute(calculated_values - interpolated_values)
-                    )
+
+                max_1d_error[x_offset, y_offset] = numpy.max(
+                    numpy.absolute(calculated_values - interpolated_values)
                 )
 
+                self._logger.debug('Max absolute difference: %s',
+                                   max_1d_error[x_offset, y_offset])
 
                 mismatches = tuple(
                     numpy.unique(
@@ -187,7 +189,7 @@ class Approximate2DFunction(RectBivariateSpline,
                                                 [x_offset, y_offset])
                 )
 
-        return mismatches
+        return mismatches, (1 if max_1d_error[0, 1] > max_1d_error[1, 0] else 0)
 
 
     def _get_grid_refinement(self):
@@ -241,7 +243,7 @@ class Approximate2DFunction(RectBivariateSpline,
                 below_indices + 1
             )
 
-        mismatch_indices = list(self._get_mismatch_indices())
+        mismatch_indices, worse_direction = list(self._get_mismatch_indices())
 
         self._logger.debug('Mismatch indices: %s', repr(mismatch_indices))
         self._converged = (mismatch_indices[0].size == 0
@@ -258,10 +260,16 @@ class Approximate2DFunction(RectBivariateSpline,
         ]
 
 
-        if self.configuration.refine_1d:
+        if self.configuration.refine_1d == 'fewer_ind':
             if result[0][0].size > result[1][0].size:
                 return [no_refinement, result[1]]
             return [result[0], no_refinement]
+
+        if self.configuration.refine_1d == 'worse_direction':
+            if worse_direction == 0:
+                return [result[0], no_refinement]
+            assert worse_direction == 1
+            return [no_refinement, result[1]]
 
         return result
 
@@ -552,8 +560,15 @@ class Approximate2DFunction(RectBivariateSpline,
             ),
             tolerance,
             spline_options,
-            'all' if grid_refine_algorithm == '1d' else grid_refine_algorithm,
-            grid_refine_algorithm == '1d'
+            (
+                'all'
+                if grid_refine_algorithm[:3] == '1d_' else
+                grid_refine_algorithm
+            ),
+            (
+                grid_refine_algorithm[3:] if grid_refine_algorithm[:3] == '1d_'
+                else False
+            )
         )
         self.func = func
         self.support = support

@@ -149,7 +149,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
         )
 
 
-    def _get_eccentircity_integral(self, rvk_scale):
+    def _get_eccentricity_integral(self, rvk_scale):
         """
         Return a function that evaluates to the integral of likelihood vs eccen.
 
@@ -211,7 +211,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
             if rvk_scale not in self._eccentricity_integrals
         ]
         new_eccentricity_integrals = workers.map(
-            self._get_eccentircity_integral,
+            self._get_eccentricity_integral,
             new_rvk_scales
         )
         for rvk_scale, eccentricity_integral in zip(new_rvk_scales,

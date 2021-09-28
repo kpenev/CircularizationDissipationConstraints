@@ -28,12 +28,11 @@ import ngc188_util
 import ngc6819_util
 import m35_util
 #pylint: enable=unused-import
-from cluster_util import\
-    get_final_eccentricity_likelihood,\
-    get_rvk_constraint
+from cluster_util import get_rv_likelihood
 #pylint: enable=import-error
 from bayesian.sampling import setup_process
-from bayesian.prior_transform_cluster_sb1 import PriorTransformClusterSB1
+from bayesian.prior_transform_binary_stars import PriorTransformBinaryStars
+from bayesian.sample_sb1_masses import SampleSB1Masses
 from bayesian.log_likelihood_sb1 import LogLikelihoodSB1
 from bayesian.parse_command_line import parse_command_line
 from bayesian import mcmc_sampling
@@ -179,32 +178,31 @@ def prepare_sampling(config):
             photometric_constraint = custom_util.get_photometric_constraint(
                 binary_id
             )
-            rvk_constraint = get_rvk_constraint(
+            rv_likelihood = get_rv_likelihood(
                 observed_orbit=binary_orbit,
+                eccentricity_envelope=custom_util.eccentricity_envelope,
                 num_parallel_processes=config.num_parallel_processes,
                 interpolation_accuracy=config.rvk_interpolation_accuracy,
                 show_mismatch_plot=config.rvk_show_interpolation
             )
             log_likelihood = LogLikelihoodSB1(
+                interpolator=interpolator,
+                rv_likelihood=rv_likelihood,
                 powerlaw_dissipation=(
                     config.lgQ_break_period is not None
                     and
                     config.lgQ_powerlaw is not None
                 ),
-                rv_semiamplitude_constraint=rvk_constraint,
-                interpolator=interpolator,
-                eccentricity_likelihood=get_final_eccentricity_likelihood(
-                    binary_orbit,
-                    custom_util.eccentricity_envelope
-                ),
                 evolution_timeout=config.evolution_timeout,
                 period_search_factor=config.initial_period_search_factor,
                 scaled_period_guess=config.initial_period_scaled_guess
             )
-
-            prior_transform = PriorTransformClusterSB1(
-                photometric_mass_constraint=photometric_constraint,
-                rv_semi_amplitude_constraint=rvk_constraint,
+            prior_transform = PriorTransformBinaryStars(
+                sample_binary_masses=SampleSB1Masses(
+                    rv_likelihood=rv_likelihood,
+                    photometric_constraint=photometric_constraint,
+                    orbital_period=float(binary_orbit['Per']),
+                ),
                 independent_parameter_distributions=get_independent_priors(
                     config,
                     binary_orbit,

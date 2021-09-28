@@ -31,8 +31,8 @@ class SampleSB1Masses(SampleBinaryMasses):
             return -numpy.inf if return_log else 0.0
 
         rv_likelihood = float(
-            self._rv_likelihood(
-                self._envelope_eccentricity,
+            self.rv_likelihood(
+                self.rv_likelihood.envelope_eccentricity,
                 rv_semi_amplitude_scale(primary_mass,
                                         secondary_mass,
                                         self._orbital_period)
@@ -41,14 +41,14 @@ class SampleSB1Masses(SampleBinaryMasses):
 
         if return_log:
             return (
-                self._photometric_constraint.logpdf(primary_mass,
-                                                    secondary_mass)
+                self.photometric_constraint.logpdf(primary_mass,
+                                                   secondary_mass)
                 +
                 numpy.log(rv_likelihood)
             )
 
         return (
-            self._photometric_constraint.pdf(primary_mass, secondary_mass)
+            self.photometric_constraint.pdf(primary_mass, secondary_mass)
             *
             rv_likelihood
         )
@@ -64,7 +64,7 @@ class SampleSB1Masses(SampleBinaryMasses):
 
         return numpy.concatenate(
             (
-                self._photometric_constraint.secondary_mass_quad_points(
+                self.photometric_constraint.secondary_mass_quad_points(
                     primary_mass
                 ),
                 [
@@ -73,7 +73,7 @@ class SampleSB1Masses(SampleBinaryMasses):
                         self._orbital_period * units.day,
                         rvk * units.m / units.s
                     ).to_value(units.M_sun)
-                    for rvk in self._rv_likelihood.observed_rvk.ppf(
+                    for rvk in self.rv_likelihood.observed_rvk.ppf(
                         numpy.linspace(0.01, 0.99, 99)
                     )
                 ]
@@ -86,7 +86,7 @@ class SampleSB1Masses(SampleBinaryMasses):
 
         guess_likelihood = -numpy.inf
         for primary_mass in numpy.linspace(
-                *self._photometric_constraint.mass_range,
+                *self.photometric_constraint.mass_range,
                 100
         ):
             secondary_masses = self.secondary_mass_quad_points(primary_mass)
@@ -105,7 +105,7 @@ class SampleSB1Masses(SampleBinaryMasses):
         min_result = optimize.minimize(
             fun=lambda x: -self.joint_likelihood(*x),
             x0=[m2_guess, m1_guess],
-            bounds=optimize.Bounds(*self._photometric_constraint.mass_range,
+            bounds=optimize.Bounds(*self.photometric_constraint.mass_range,
                                    keep_feasible=True),
             options=dict(maxiter=1e6, disp=False)
         )
@@ -122,15 +122,13 @@ class SampleSB1Masses(SampleBinaryMasses):
                  rv_likelihood,
                  photometric_constraint,
                  orbital_period,
-                 envelope_eccentricity,
                  pickle_fname='sample_sb1_masses.pkl',
                  quad_precision=None):
         """Set up sampling given RV and photometric likelihoods."""
 
-        self._rv_likelihood = rv_likelihood
-        self._photometric_constraint = photometric_constraint
+        self.rv_likelihood = rv_likelihood
+        self.photometric_constraint = photometric_constraint
         self._orbital_period = orbital_period
-        self._envelope_eccentricity = envelope_eccentricity
         if quad_precision is None:
             self._quad_precision = dict()
         else:
@@ -151,7 +149,6 @@ class SampleSB1Masses(SampleBinaryMasses):
                 rv_likelihood,
                 photometric_constraint,
                 orbital_period,
-                envelope_eccentricity,
                 quad_precision
             )
         )

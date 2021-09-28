@@ -7,7 +7,6 @@ from scipy import stats
 import numpy
 from astropy import units
 
-from bayesian.eccentricity_likelihood import EccentricityLikelihood
 from bayesian.approximate_rv_likelihood import ApproximateRVLikelihood
 from binary_utils import rv_semi_amplitude_scale
 from sample_sb1_masses import SampleSB1Masses
@@ -54,7 +53,7 @@ def get_rv_likelihood(observed_orbit,
                                  limit=200,
                                  maxp1=200),
         min_grid_points=(100, 100),
-        grid_refine_algorithm='1d',
+        grid_refine_algorithm='1d_worse_direction',
         debug_plots=(dict(interpolation_performance='') if show_mismatch_plot
                      else None)
     )
@@ -77,8 +76,24 @@ def select_binary_data(single_lined_data, _, id_column, binary_id):
 def plot_mass_pdfs(sample_stellar_masses,
                    m1_pdf_axis,
                    m2_pdf_axis,
-                   linestyle='-'):
-    """Plot PDF(M1) marginalized over M2 and PDF(M2|M1) on given axis."""
+                   **plot_config):
+    """
+    Plot PDF(M1) marginalized over M2 and PDF(M2|M1) on given axis.
+
+    Args:
+        sample_stellar_masses(SampleBinaryMasses):    The joint distribution of
+            the two masses to plot.
+
+        m1_pdf_axis:    A pyplot axis to use for plotting the primary mass
+            distribution.
+
+        m2_pdf_axis:    A pyplot axis to use for plotting the secondary mass
+            distribution.
+
+        plot_config:    The configuration to use for plotting the distributions.
+            If it does not include `color`, that is used to dsitinguish betwen
+            the primary and secondary masses.
+    """
 
     m1_pdf_axis.set_title('$PDF(M_1 | e_{env}, P_{orb})$')
     m2_pdf_axis.set_title('$PDF(M_2 | M_1, e_{env}, P_{orb})$')
@@ -118,18 +133,52 @@ def plot_mass_pdfs(sample_stellar_masses,
         plot_data['m2']
     )
     print('Calculated M2 PDF values')
+    add_color = ('color' not in plot_config)
+    if add_color:
+        plot_config['color'] = 'b'
     m1_pdf_axis.semilogy(plot_data['m1'],
                          plot_data['m1_pdf'],
-                         linestyle=linestyle,
-                         color='b',
-                         label='PDF(M1)')
+                         label='PDF(M1)',
+                         **plot_config)
+    if add_color:
+        plot_config['color'] = 'r'
     m2_pdf_axis.semilogy(plot_data['m2'],
                          plot_data['m2_pdf'],
-                         linestyle=linestyle,
-                         color='r',
-                         label='PDF(M2|M1)')
+                         label='PDF(M2|M1)',
+                         **plot_config)
     m1_pdf_axis.legend()
     m2_pdf_axis.legend()
+
+
+def plot_rv_likelihood_ratio_vs_e(rv_likelihood,
+                                  primary_mass,
+                                  orbital_period,
+                                  plot_axis):
+    """Create a plot of the final MCMC likelihood function vs final ecc."""
+
+    plot_e = numpy.linspace(0, rv_likelihood.envelope_eccentricity, 100)
+    plot_m2 = numpy.linspace(0.2, primary_mass, 10)
+    plot_rvk_scale = rv_semi_amplitude_scale(
+        primary_mass,
+        numpy.linspace(0.2, primary_mass, 10),
+        orbital_period
+    )
+
+    for secondary_mass, rvk_scale in zip(plot_m2, plot_rvk_scale):
+        plot_likelihood = [
+            (
+                rv_likelihood(ecc, rvk_scale)
+                /
+                rv_likelihood(rv_likelihood.envelope_eccentricity, rvk_scale)
+            )
+            for ecc in plot_e
+        ]
+        plot_axis.semilogy(
+            plot_e,
+            plot_likelihood,
+            label='M2 = ' + repr(secondary_mass.to_value(units.M_sun))
+        )
+    plot_axis.legend()
 
 
 def plot_rv_likelihood(observed_orbit,
@@ -147,10 +196,13 @@ def plot_rv_likelihood(observed_orbit,
 
     plots = dict(
         rv_likelihood=pyplot.subplot(131),
-        rv_likelihood_ratio=pyplot.subplot(132),
+        rv_likelihood_ratio_vs_M2=pyplot.subplot(132),
         m2_pdf=pyplot.subplot(133)
     )
     plots['m1_pdf'] = pyplot.twiny(plots['m2_pdf'])
+    plots['rv_likelihood_ratio_vs_e'] = pyplot.twiny(
+        plots['rv_likelihood_ratio_vs_m2']
+    )
 
     for sub_plot in plots.values():
         sub_plot.set_xlabel(r'$M_2\ [M_\odot]$')
@@ -166,19 +218,18 @@ def plot_rv_likelihood(observed_orbit,
         rv_likelihood=rv_likelihood,
         photometric_constraint=photometric_constraint,
         orbital_period=float(observed_orbit['Per']),
-        envelope_eccentricity=eccentricity_envelope(
-            float(observed_orbit['Per'])
-        )
     )
 
     plot_mass_pdfs(sample_stellar_masses,
                    plots['m1_pdf'],
                    plots['m2_pdf'],
-                   '-')
+                   linestyle='-',
+                   marker='None')
     plot_mass_pdfs(photometric_constraint,
                    plots['m1_pdf'],
                    plots['m2_pdf'],
-                   '--')
+                   marker='o',
+                   linestyle='None')
 
     med_primary_mass = sample_stellar_masses.primary_mass_ppf(0.5) * units.M_sun
 
@@ -199,11 +250,11 @@ def plot_rv_likelihood(observed_orbit,
 
 
     plot_rv_likelihood_denom = rv_likelihood(
-        0.5,#eccentricity_envelope(float(observed_orbit['Per'])),
+        rv_likelihood.envelope_eccentricity,
         plot_rvk_scale
     )[0]
 
-    for eccentricity in numpy.linspace(0.1, 0, 20):
+    for eccentricity in numpy.linspace(0.1, 0, 10):
 
         plot_rv_likelihood_numer = rv_likelihood(eccentricity,
                                                  plot_rvk_scale)[0]
@@ -216,32 +267,21 @@ def plot_rv_likelihood(observed_orbit,
             plot_rv_likelihood_numer,
             label='e = ' + str(eccentricity)
         )
-        plots['rv_likelihood_ratio'].semilogy(
+        plots['rv_likelihood_ratio_vs_m2'].semilogy(
             plot_m2,
             plot_rv_likelihood_numer / plot_rv_likelihood_denom,
             label='e = ' + str(eccentricity)
         )
-#        plots['right'].plot(plot_m2,
-#                            plot_cdf)
-#    plots['middle'].set_ylim((0.1, 10.0))
+
+    plot_rv_likelihood_ratio_vs_e(rv_likelihood,
+                                  med_primary_mass,
+                                  float(observed_orbit['Per']) * units.day,
+                                  plots['rv_likelihood_ratio_vs_e'])
+
     plots['rv_likelihood'].legend()
-    plots['rv_likelihood_ratio'].legend()
+    plots['rv_likelihood_ratio_vs_m2'].legend()
 
     pyplot.show()
-
-#TODO: figure out a better distribution for eccentricity
-def get_final_eccentricity_likelihood(observed_orbit, eccentricity_envelope):
-    """Return :class:`EccentricityLikelihood` instance per the given orbit."""
-
-    return EccentricityLikelihood(
-        observed_eccentricity=stats.norm(
-            loc=float(observed_orbit['e']),
-            scale=float(observed_orbit['e_e'])
-        ),
-        envelope_eccentricity=eccentricity_envelope(
-            float(observed_orbit['Per'])
-        )
-    )
 
 def plot_eccentricity_vs_period(binaries, eccentricity_envelope):
     """
@@ -252,25 +292,25 @@ def plot_eccentricity_vs_period(binaries, eccentricity_envelope):
             binaries respectively.
     """
 
-    def add_shifted_periods(binary_class):
-        """Calculate the shifted orbital period for determining envelope."""
-
-        m1_mult = 3.97405
-        m2_mult = 2.5685
-        m1_pwrlaw = 1.72462
-        m2_pwrlaw = 1.55429
-
-        binary_class.insert(
-            len(binary_class.columns),
-            'ShiftedPer',
-            (
-                binary_class['Per']
-                +
-                m1_mult * (1.0 - binary_class['M1']**m1_pwrlaw)
-                +
-                m2_mult * (1.0 - binary_class['M2']**m2_pwrlaw)
-            )
-        )
+#    def add_shifted_periods(binary_class):
+#        """Calculate the shifted orbital period for determining envelope."""
+#
+#        m1_mult = 3.97405
+#        m2_mult = 2.5685
+#        m1_pwrlaw = 1.72462
+#        m2_pwrlaw = 1.55429
+#
+#        binary_class.insert(
+#            len(binary_class.columns),
+#            'ShiftedPer',
+#            (
+#                binary_class['Per']
+#                +
+#                m1_mult * (1.0 - binary_class['M1']**m1_pwrlaw)
+#                +
+#                m2_mult * (1.0 - binary_class['M2']**m2_pwrlaw)
+#            )
+#        )
 
     binaries = [
         binary_class[
@@ -302,7 +342,8 @@ def plot_eccentricity_vs_period(binaries, eccentricity_envelope):
     pyplot.gca().set_xscale('log')
 
     for label, binary_class in zip(['SB1', 'SB2'], binaries):
-        color = pyplot.errorbar(binary_class['Per'],
+        #color = \
+        pyplot.errorbar(binary_class['Per'],
                                 binary_class['e'],
                                 binary_class['e_e'],
                                 fmt='ok',
@@ -328,12 +369,3 @@ def plot_eccentricity_vs_period(binaries, eccentricity_envelope):
     pyplot.ylabel('Eccentricity')
 #    pyplot.legend()
 #    pyplot.show()
-
-def plot_eccentricity_likelihood(observed_orbit, eccentricity_envelope):
-    """Plot the likelihood of the final ecc. for a given system."""
-
-    likelihood = get_final_eccentricity_likelihood(observed_orbit,
-                                                   eccentricity_envelope)
-    plot_e = numpy.linspace(0, 0.5, 1000)
-    pyplot.plot(plot_e, numpy.vectorize(likelihood)(plot_e))
-    pyplot.show()

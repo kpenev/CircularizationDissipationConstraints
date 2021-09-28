@@ -24,8 +24,9 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         interpolator:    Stellar evolution interpolator to use in orbital
             evolution calculations.
 
-        eccentricity_likelihood(callable):    The likelihood functionof the
-            final eccentricity.
+        envelope_eccentricity(float):    The maximum eccentricity systems with
+            the given period are allowed to have no matter their starting
+            eccentricity.
 
     """
 
@@ -106,7 +107,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
 
     def __init__(self,
                  interpolator,
-                 eccentricity_likelihood,
+                 envelope_eccentricity,
                  secondary_is_star,
                  *,
                  evolution_timeout,
@@ -120,7 +121,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             interpolator:    A POET stelar evolution interpolator to use for
                 calculating the orbital evolution.
 
-            eccentricity_likelihood:    See :attr:`eccentricity_likelihood`.
+            envelope_eccentricity:    See :attr:`envelope_eccentricity`.
 
             secondary_is_star(bool):    True iff the secondary in the system is
                 an evolving star.
@@ -141,7 +142,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             None
         """
 
-        self.eccentricity_likelihood = eccentricity_likelihood
+        self.envelope_eccentricity = envelope_eccentricity
         self._evolution_timeout = evolution_timeout
         self.final_eccentricity = None
 
@@ -158,7 +159,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
 
     def calculate_log_likelihood(self, parameters):
         """
-        Calculate the log-likelihood for the given model parameters
+        Return -inf if systems lantds above P-e envelope 0 otherwise.
 
         Args:
             parameters:    The parameters to evaluate the log-likelihood at. The
@@ -166,11 +167,10 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 :attr:`parameter_order`.
 
         Returns:
-            float:
-                Uknown constant times the log-PDF of the observational data for
-                the system assuming the given model parameters have exactly the
-                specified value. This includes the circularization envelope.
+            float
         """
+
+        #TODO: fix when high-e evoluition is possible
 
         logger = logging.getLogger(__name__)
 
@@ -223,8 +223,10 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 self.final_eccentricity
             )
 
-            return numpy.log(
-                self.eccentricity_likelihood(self.final_eccentricity)
+            return (
+                -numpy.inf
+                if self.final_eccentricity > self.envelope_eccentricity else
+                0
             )
 
         logger.error(

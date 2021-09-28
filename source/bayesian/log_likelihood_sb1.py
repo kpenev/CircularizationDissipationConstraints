@@ -6,6 +6,7 @@ import numpy
 from astropy import units
 
 from orbital_evolution.transformations import phase_lag
+from binary_utils import rv_semi_amplitude_scale
 
 from bayesian.log_likelihood_base import LogLikelihoodBase
 
@@ -75,13 +76,13 @@ class LogLikelihoodSB1(LogLikelihoodBase):
 
     def __init__(self,
                  *parent_args,
-                 rv_semiamplitude_constraint,
+                 rv_likelihood,
                  powerlaw_dissipation,
                  max_dissipative_mstar=1.2 * units.M_sun,
                  **parent_kwargs):
 
         self.max_dissipative_mstar = max_dissipative_mstar
-        self._rv_semiamplitude_constraint = rv_semiamplitude_constraint
+        self._rv_likelihood = rv_likelihood
 
         dissipation_parameters = [
             ('lgQ_min', units.dimensionless_unscaled),
@@ -92,10 +93,13 @@ class LogLikelihoodSB1(LogLikelihoodBase):
                 ('lgQ_break_period', units.day),
                 ('lgQ_powerlaw', units.dimensionless_unscaled)
             ])
-        super().__init__(*parent_args,
-                         dissipation_parameters=dissipation_parameters,
-                         secondary_is_star=True,
-                         **parent_kwargs)
+        super().__init__(
+            *parent_args,
+            envelope_eccentricity=rv_likelihood.envelope_eccentricity,
+            secondary_is_star=True,
+            dissipation_parameters=dissipation_parameters,
+            **parent_kwargs
+        )
 
     def calculate_log_likelihood(self, parameters):
         """Evaluate the log-likelihood at the given model parameters."""
@@ -103,34 +107,22 @@ class LogLikelihoodSB1(LogLikelihoodBase):
         circularization_log_likelihood = super().calculate_log_likelihood(
             parameters
         )
-        mass_kwargs = dict(
-            primary_mass=self.get_parameter_value(parameters,
-                                                  'primary_mass'),
-            secondary_mass=self.get_parameter_value(parameters,
-                                                    'secondary_mass'),
-        )
+
+        rvk_scale = rv_semi_amplitude_scale(
+            self.get_parameter_value(parameters, 'primary_mass'),
+            self.get_parameter_value(parameters, 'secondary_mass'),
+            self.get_parameter_value(parameters, 'orbital_period'),
+        ).to_value(units.m / units.s)
+
         return (
             circularization_log_likelihood
             +
             numpy.log(
-                self._rv_semiamplitude_constraint.rv_semi_amplitude_pdf(
-                    self._rv_semiamplitude_constraint.rv_semi_amplitude(
-                        eccentricity=self.final_eccentricity,
-                        **mass_kwargs
-                    )
-                )
+                self._rv_likelihood(self.final_eccentricity, rvk_scale)
             )
             -
             numpy.log(
-                self._rv_semiamplitude_constraint.rv_semi_amplitude_pdf(
-                    self._rv_semiamplitude_constraint.rv_semi_amplitude(
-                        eccentricity=self.get_parameter_value(
-                            parameters,
-                            'initial_eccentricity'
-                        ),
-                        **mass_kwargs
-                    )
-                )
+                self._rv_likelihood(self.envelope_eccentricity, rvk_scale)
             )
         )
 

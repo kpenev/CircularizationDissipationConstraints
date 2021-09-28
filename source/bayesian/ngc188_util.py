@@ -290,7 +290,7 @@ def _test_rv_likelihood(binary_pkm_id):
 if __name__ == '__main__':
     set_start_method('forkserver')
     logging.basicConfig(level=logging.DEBUG)
-    _test_rv_likelihood(4965)
+    _test_rv_likelihood(3871)
     sys.exit()
     plot_eccentricity_likelihood(get_observed_orbit(4965),
                                  eccentricity_envelope)
