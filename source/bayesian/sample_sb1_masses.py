@@ -33,9 +33,13 @@ class SampleSB1Masses(SampleBinaryMasses):
         rv_likelihood = float(
             self.rv_likelihood(
                 self.rv_likelihood.envelope_eccentricity,
-                rv_semi_amplitude_scale(primary_mass,
-                                        secondary_mass,
-                                        self._orbital_period)
+                rv_semi_amplitude_scale(
+                    primary_mass * units.M_sun,
+                    secondary_mass * units.M_sun,
+                    self._orbital_period * units.day
+                ).to_value(
+                    units.m / units.s
+                )
             )
         )
 
