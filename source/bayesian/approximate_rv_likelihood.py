@@ -164,7 +164,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
                 range 0 to the argument of the function.
         """
 
-        assert rvk_scale not in self._eccentricity_integrals
+        assert not self._eccentricity_integrals
 
         solution = integrate.solve_ivp(
             fun=self._get_eccentricity_integrand,
@@ -210,20 +210,27 @@ class ApproximateRVLikelihood(Approximate2DFunction):
             rvk_scale for rvk_scale in y_grid
             if rvk_scale not in self._eccentricity_integrals
         ]
+
+        temp_eccentricity_integrals = self._eccentricity_integrals
+        self._eccentricity_integrals = dict()
         new_eccentricity_integrals = workers.map(
             self._get_eccentricity_integral,
             new_rvk_scales
         )
+        self._eccentricity_integrals = temp_eccentricity_integrals
+
         for rvk_scale, eccentricity_integral in zip(new_rvk_scales,
                                                     new_eccentricity_integrals):
             self._eccentricity_integrals[rvk_scale] = eccentricity_integral
 
-        return numpy.dstack(
-            workers.map(
-                partial(self._evaluate_e_integral, x_grid),
-                y_grid
+        parallel = [
+            workers.apply_async(
+                self._eccentricity_integrals[rvk_scale],
+                (x_grid,)
             )
-        )[0]
+            for rvk_scale in y_grid
+        ]
+        return numpy.dstack([result.get() for result in parallel])[0]
 
 
     def _get_integration_breaks(self, max_rv_semiamplitude, cdf_step=0.01):
