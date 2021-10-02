@@ -17,7 +17,7 @@ def get_rv_likelihood(observed_orbit,
                       eccentricity_envelope,
                       num_parallel_processes,
                       interpolation_accuracy,
-                      show_mismatch_plot):
+                      mismatch_plot=None):
     """Return fully set-up RV semi-amplitude constraint for an NGC188 binary."""
 
     signal_to_noise = float(observed_orbit['K']) / float(observed_orbit['e_K'])
@@ -54,8 +54,8 @@ def get_rv_likelihood(observed_orbit,
                                  maxp1=200),
         min_grid_points=(100, 100),
         grid_refine_algorithm='1d_worse_direction',
-        debug_plots=(dict(interpolation_performance='') if show_mismatch_plot
-                     else None)
+        debug_plots=(None if mismatch_plot is None
+                     else dict(interpolation_performance=mismatch_plot))
     )
 
 def select_binary_data(single_lined_data, _, id_column, binary_id):
@@ -133,6 +133,7 @@ def plot_mass_pdfs(sample_stellar_masses,
         plot_data['m2']
     )
     print('Calculated M2 PDF values')
+    print('Plot data: ' + repr(plot_data))
     add_color = ('color' not in plot_config)
     if add_color:
         plot_config['color'] = 'b'
@@ -157,19 +158,21 @@ def plot_rv_likelihood_ratio_vs_e(rv_likelihood,
     """Create a plot of the final MCMC likelihood function vs final ecc."""
 
     plot_e = numpy.linspace(0, rv_likelihood.envelope_eccentricity, 100)
-    plot_m2 = numpy.linspace(0.2, primary_mass, 10)
+    min_m2 = 0.2 * units.M_sun
+    plot_m2 = numpy.linspace(min_m2, primary_mass, 10)
     plot_rvk_scale = rv_semi_amplitude_scale(
         primary_mass,
-        numpy.linspace(0.2, primary_mass, 10),
+        numpy.linspace(min_m2, primary_mass, 10),
         orbital_period
     )
 
     for secondary_mass, rvk_scale in zip(plot_m2, plot_rvk_scale):
         plot_likelihood = [
             (
-                rv_likelihood(ecc, rvk_scale)
+                float(rv_likelihood(ecc, rvk_scale))
                 /
-                rv_likelihood(rv_likelihood.envelope_eccentricity, rvk_scale)
+                float(rv_likelihood(rv_likelihood.envelope_eccentricity,
+                                    rvk_scale))
             )
             for ecc in plot_e
         ]
@@ -190,13 +193,15 @@ def plot_rv_likelihood(observed_orbit,
         observed_orbit=observed_orbit,
         eccentricity_envelope=eccentricity_envelope,
         num_parallel_processes=24,
-        interpolation_accuracy=1e-8,
-        show_mismatch_plot=False
+        interpolation_accuracy=1e-7,
+        mismatch_plot=(
+            'RV_likelihood_refinement_%(title)s_%(grid_refinement_i)d.png'
+        )
     )
 
     plots = dict(
         rv_likelihood=pyplot.subplot(131),
-        rv_likelihood_ratio_vs_M2=pyplot.subplot(132),
+        rv_likelihood_ratio_vs_m2=pyplot.subplot(132),
         m2_pdf=pyplot.subplot(133)
     )
     plots['m1_pdf'] = pyplot.twiny(plots['m2_pdf'])
@@ -209,7 +214,7 @@ def plot_rv_likelihood(observed_orbit,
     plots['rv_likelihood'].set_title(
         r'$\lambda\left[e, K(M_1, M_2, P_{orb})\right]$'
     )
-    plots['rv_likelihood_ratio'].set_title(
+    plots['rv_likelihood_ratio_vs_m2'].set_title(
         r'$\frac{\lambda\left[e, K(M_1, M_2, P_{orb})\right]}'
         r'{\lambda\left[e_{env}, K(M_1, M_2, P_{orb})\right]}$'
     )
@@ -234,9 +239,16 @@ def plot_rv_likelihood(observed_orbit,
     med_primary_mass = sample_stellar_masses.primary_mass_ppf(0.5) * units.M_sun
 
     print('Plotting for M1 = ' + repr(med_primary_mass))
+
+    secondary_mass_distro = (
+        photometric_constraint.get_conditional_secondary_mass_distribution(
+            med_primary_mass.to_value(units.M_sun)
+        )
+    )
+
     plot_m2 = numpy.linspace(
-        0.2,#secondary_mass_photometric_prior.ppf(1e-5),
-        1.0,#secondary_mass_photometric_prior.sf(1e-5),
+        secondary_mass_distro.ppf(1e-6),
+        secondary_mass_distro.sf(1e-5),
         30000
     )
     print('M2 = ' + repr(plot_m2))
@@ -254,7 +266,9 @@ def plot_rv_likelihood(observed_orbit,
         plot_rvk_scale
     )[0]
 
-    for eccentricity in numpy.linspace(0.1, 0, 10):
+    for eccentricity in numpy.linspace(rv_likelihood.envelope_eccentricity,
+                                       0,
+                                       10):
 
         plot_rv_likelihood_numer = rv_likelihood(eccentricity,
                                                  plot_rvk_scale)[0]
