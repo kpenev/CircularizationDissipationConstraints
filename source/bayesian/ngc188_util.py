@@ -26,8 +26,7 @@ from bayesian.photometric_constraint import\
 from bayesian.cluster_util import\
     select_binary_data,\
     plot_rv_likelihood,\
-    plot_eccentricity_vs_period,\
-    plot_eccentricity_likelihood
+    plot_eccentricity_vs_period
 
 _logger = logging.getLogger(__name__)
 
@@ -295,7 +294,7 @@ if __name__ == '__main__':
     plot_eccentricity_likelihood(get_observed_orbit(4965),
                                  eccentricity_envelope)
     rcParams['font.size'] = 18
-    rcParams['figure.figsize'] = [6.5, 4.8]
+    rcParams['figure.figsize'] = [26.0, 4.8 * 4]
     rcParams['figure.subplot.bottom'] = 0.15
     rcParams['figure.subplot.top'] = 0.98
     rcParams['figure.subplot.left'] = 0.13

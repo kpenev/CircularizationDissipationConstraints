@@ -175,6 +175,8 @@ class Plot2DInterpolation(ABC):
                               plot_x,
                               calculated_values,
                               edgecolors='none')
+            pyplot.xlim(y_grid[0], y_grid[-1])
+            pyplot.ylim(x_grid[0], x_grid[-1])
             pyplot.xlabel(self._plot_labels['y'])
             pyplot.ylabel(self._plot_labels['x'])
             pyplot.title('Calculated')
@@ -185,6 +187,8 @@ class Plot2DInterpolation(ABC):
                               plot_x,
                               interpolated_values,
                               edgecolors='none')
+            pyplot.xlim(y_grid[0], y_grid[-1])
+            pyplot.ylim(x_grid[0], x_grid[-1])
             pyplot.xlabel(self._plot_labels['y'])
             pyplot.ylabel(self._plot_labels['x'])
             pyplot.title('Interpolated')
@@ -195,6 +199,8 @@ class Plot2DInterpolation(ABC):
                               plot_x,
                               difference,
                               edgecolors='none')
+            pyplot.xlim(y_grid[0], y_grid[-1])
+            pyplot.ylim(x_grid[0], x_grid[-1])
             pyplot.xlabel(self._plot_labels['y'])
             pyplot.ylabel(self._plot_labels['x'])
             pyplot.title('Calculated - Interpolated')
@@ -204,6 +210,7 @@ class Plot2DInterpolation(ABC):
             pyplot.plot(y_grid,
                         difference[max_discrepancy_ind[0], : ],
                         '.r')
+            pyplot.xlim(y_grid[0], y_grid[-1])
             pyplot.xlabel(self._plot_labels['y'])
             pyplot.ylabel('calc - interp')
 
@@ -211,6 +218,7 @@ class Plot2DInterpolation(ABC):
             pyplot.plot(x_grid,
                         difference[ :, max_discrepancy_ind[1]],
                         '.b')
+            pyplot.xlim(x_grid[0], x_grid[-1])
             pyplot.xlabel(self._plot_labels['x'])
 
             title = (
