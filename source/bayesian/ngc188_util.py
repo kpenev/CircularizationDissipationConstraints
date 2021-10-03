@@ -27,6 +27,7 @@ from bayesian.cluster_util import\
     select_binary_data,\
     plot_rv_likelihood,\
     plot_eccentricity_vs_period
+from bayesian.basic_util import default_logging_format
 
 _logger = logging.getLogger(__name__)
 
@@ -288,7 +289,8 @@ def _test_rv_likelihood(binary_pkm_id):
 
 if __name__ == '__main__':
     set_start_method('forkserver')
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG,
+                        format=default_logging_format)
     _test_rv_likelihood(3871)
     sys.exit()
     plot_eccentricity_likelihood(get_observed_orbit(4965),

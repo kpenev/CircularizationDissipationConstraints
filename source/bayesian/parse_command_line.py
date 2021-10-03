@@ -15,8 +15,8 @@ import praesepe_binaries
 import hyades_binaries
 from command_line_utilities import data_dir
 from bayesian import m35_util
+from bayesian.basic_util import default_logging_format
 #pylint: enable=import-error
-
 
 RandomQuantity = namedtuple('RandomQuantity', ['distribution', 'units'])
 
@@ -438,8 +438,7 @@ def add_output_parameters(parser):
 
     output.add_argument(
         '--logging-message-format', '--logging-format', '--log-fmt',
-        default=('%(levelname)s %(asctime)s %(name)s: %(message)s | '
-                 '%(pathname)s.%(funcName)s:%(lineno)d'),
+        default=default_logging_format,
         help='How to format logging messages. See python logging module '
         'documentation for details.'
     )

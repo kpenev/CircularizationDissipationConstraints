@@ -4,6 +4,9 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
+default_logging_format = ('%(levelname)s %(asctime)s %(name)s: %(message)s | '
+                          '%(pathname)s.%(funcName)s:%(lineno)d')
+
 def compare_frozen_distributions(distro1, distro2):
     """Check if the given frozen stipy.stats are identical."""
 
