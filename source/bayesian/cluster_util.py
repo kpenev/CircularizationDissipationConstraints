@@ -158,12 +158,15 @@ def plot_rv_likelihood_ratio_vs_e(rv_likelihood,
     """Create a plot of the final MCMC likelihood function vs final ecc."""
 
     plot_e = numpy.linspace(0, rv_likelihood.envelope_eccentricity, 100)
-    min_m2 = 0.2 * units.M_sun
+    min_m2 = 0.1 * units.M_sun
+    max_m2 = 0.3 * units.M_sun #primary_mass
     plot_m2 = numpy.linspace(min_m2, primary_mass, 10)
     plot_rvk_scale = rv_semi_amplitude_scale(
         primary_mass,
         numpy.linspace(min_m2, primary_mass, 10),
         orbital_period
+    ).to_value(
+        units.m / units.s
     )
 
     for secondary_mass, rvk_scale in zip(plot_m2, plot_rvk_scale):
@@ -266,9 +269,10 @@ def plot_rv_likelihood(observed_orbit,
         plot_rvk_scale
     )[0]
 
-    for eccentricity in numpy.linspace(rv_likelihood.envelope_eccentricity,
-                                       0,
-                                       10):
+    for eccentricity in numpy.concatenate((
+        numpy.arange(0.0, rv_likelihood.envelope_eccentricity, 0.1),
+        [rv_likelihood.envelope_eccentricity]
+    )):
 
         plot_rv_likelihood_numer = rv_likelihood(eccentricity,
                                                  plot_rvk_scale)[0]
