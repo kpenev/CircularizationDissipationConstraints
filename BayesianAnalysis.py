@@ -1,6 +1,7 @@
 import logging
 import math
 import sys
+import corner
 
 import matplotlib
 from bayesian.stellar_param_sampling.prepare import serialize_poet_likelihood
@@ -1086,6 +1087,7 @@ class LogLikelihood:
                  orbital_period,
                  obliquity,
                  probability_density_of_eccentricity,
+                 e_env,
                  initial_eccentricity=0.5,
                  constraints = constraints(),
                  spin_frequency_breaks_for_planet=None,
@@ -1100,6 +1102,8 @@ class LogLikelihood:
         self.spin_frequency_breaks_for_planet = spin_frequency_breaks_for_planet
         self.spin_frequency_powers_for_planet = spin_frequency_powers_for_planet
 
+        self.e_env = e_env
+
     def priors(self,
                parameters_for_evolution):
         smallest = self.constraints[0]
@@ -1109,8 +1113,8 @@ class LogLikelihood:
                 return 1
             return 0
         priors = 1
-        for parameter in ['primary mass', 'secondary mass', 'stellar metallicity', 'stellar age']:
-            priors = priors * prior_parameter(parameters_for_evolution[parameter], parameter)
+        for parameter_name in ['primary mass', 'secondary mass', 'stellar metallicity', 'stellar age']:
+            priors = priors * prior_parameter(parameters_for_evolution[parameter_name], parameter_name)
         return priors
 
     def log_prob(self, parameters_for_evolution):
@@ -1146,7 +1150,7 @@ class LogLikelihood:
             tidal_frequency_powers_for_planet = np.array([1.0, 0.0, power_law_argument])
             reference_argument_of_phase_lag_function_for_planet = argument_of_phase_lag_function_for_planet
         if power_law_argument > 0:
-            reference_argument_of_phase_lag_function_for_planet = argument_of_phase_lag_function_for_planet + power_law_argument * (math.log(20.0,10) - math.log(tidal_period_break, 10))
+            reference_argument_of_phase_lag_function_for_planet = argument_of_phase_lag_function_for_planet + power_law_argument * (math.log(20.0,10) - math.log(tidal_break_period, 10))
             tidal_frequency_powers_for_planet = np.array([1.0, power_law_argument, 0.0])
         if power_law_argument == 0:
             reference_argument_of_phase_lag_function_for_planet = argument_of_phase_lag_function_for_planet
@@ -1162,26 +1166,33 @@ class LogLikelihood:
                 reference_phase_lag=phase_lag(reference_argument_of_phase_lag_function_for_planet)
             )
         )
+        yes = False
+        if yes:
+            evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
+                                                  interpolator=self.prior_transform_instance.interpolator,
+                                                  dissipation=dissipation,
+                                                  max_age=stellar_age * u.Gyr,
+                                                  initial_eccentricity=self.initial_eccentricity * u.dimensionless_unscaled,
+                                                  initial_obliquity=0.0,
+                                                  disk_period=initial_stellar_spin * u.d,
+                                                  disk_dissipation_age=2e-2 * u.Gyr,
+                                                  primary_wind_strength=0.17,
+                                                  primary_wind_saturation=2.78,
+                                                  primary_core_envelope_coupling_timescale=0.05 * u.Gyr,
+                                                  secondary_wind_strength=0.0,
+                                                  secondary_wind_saturation=100.0,
+                                                  secondary_core_envelope_coupling_timescale=0.05 * u.Gyr,
+                                                  orbital_period_tolerance=1e-6,
+                                                  solve=True,
+                                                  secondary_is_star=False)
 
-        evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
-                                              interpolator=self.prior_transform_instance.interpolator,
-                                              dissipation=dissipation,
-                                              max_age=stellar_age * u.Gyr,
-                                              initial_eccentricity=self.initial_eccentricity * u.dimensionless_unscaled,
-                                              initial_obliquity=0.0,
-                                              disk_period=initial_stellar_spin * u.d,
-                                              disk_dissipation_age=2e-2 * u.Gyr,
-                                              primary_wind_strength=0.17,
-                                              primary_wind_saturation=2.78,
-                                              primary_core_envelope_coupling_timescale=0.05 * u.Gyr,
-                                              secondary_wind_strength=0.0,
-                                              secondary_wind_saturation=100.0,
-                                              secondary_core_envelope_coupling_timescale=0.05 * u.Gyr,
-                                              orbital_period_tolerance=1e-6,
-                                              solve=True,
-                                              secondary_is_star=False)
+            calculated_eccentricity_now = evolutionary_history.eccentricity[- 1]
 
-        calculated_eccentricity_now = evolutionary_history.eccentricity[- 1]
+        if not yes:
+            calculated_eccentricity_now = self.prior_transform_instance.means[
+                                              'present eccentricity'] + 0.5 * (
+                                                      self.e_env - self.prior_transform_instance.means[
+                                                  'present eccentricity'])
         self.calculated_eccentricity_now = calculated_eccentricity_now
 
         if calculated_eccentricity_now >= 0 and calculated_eccentricity_now <= 1:
@@ -1197,40 +1208,64 @@ class LogLikelihood:
         print('Calculated present eccentricity can neither be less than zero nor greater than one')
         return None
 
-    def draw_successful_walkers(self, nwalkers=1, ndim = 9):
+
+
+
+    def draw_successful_walkers(self, nwalkers=32, ndim = 9):
         i = 0
-        p0 = numpy.array([])
+        p0 = []
         while i<nwalkers:
             u = numpy.random.rand(ndim)
-            log_likelihood = self.__call__(u)
+            log_likelihood, parameters_for_evolution = self.__call__(u) #, parameters_for_evolution
             if log_likelihood != -math.inf:
                 i = i+1
-                p0 = numpy.append(p0, u)
+                p0 = p0 + [u]
         return p0
 
     def MCMC(self,
-             nwalkers=32,
+             nwalkers=18,
              ndim=9):
 
         p0 = self.draw_successful_walkers(nwalkers, ndim)
 
-        sampler = emcee.EnsembleSampler(nwalker, ndim, self.__call__)
+        sampler = emcee.EnsembleSampler(nwalkers,
+                                        ndim,
+                                        self.__call__)
 
-        state = sampler.run_mcmc(p0, 100)
-        sampler.reset()
-        sampler.run_mcmc(state, 100)
-
-        samples = sampler.get_chain(flat=True)
-        plt.hist(samples[:, 0], 100, color="k", histtype="step")
-        plt.xlabel(r"$\theta_1$")
-        plt.ylabel(r"$p(\theta_1)$")
-        plt.gca().set_yticks([])
+        sampler.run_mcmc(p0, 5)
+        blobs = sampler.get_blobs(flat=True)
+        figure = corner.corner(blobs, labels=['primary mass',
+                                              'stellar age',
+                                              'secondary radius',
+                                              'stellar metallicity',
+                                              'secondary mass',
+                                              'initial stellar spin',
+                                              'argument of phase lag function for planet',
+                                              'tidal break point',
+                                              'power law argument'],
+                               quantiles=[0.16, 0.5, 0.84],
+                               show_titles=True, title_kwargs={"fontsize": 12})
         plt.show()
 
+
         return
+
     def __call__(self,u):
+        for i in range(0, 9):
+            if u[i]>1 or u[i]<0:
+                return -numpy.inf, numpy.array([0,0,0,0,0,0,0,0,0])
         parameters_for_evolution = self.prior_transform_instance(u)
-        return self.log_prob(parameters_for_evolution)
+
+        params =numpy.array([parameters_for_evolution['primary mass'],
+                  parameters_for_evolution['stellar age'],
+                  parameters_for_evolution['secondary radius'],
+                  parameters_for_evolution['stellar metallicity'],
+                  parameters_for_evolution['secondary mass'],
+                  parameters_for_evolution['initial stellar spin'],
+                  parameters_for_evolution['argument of phase lag function for planet'],
+                  parameters_for_evolution['tidal break period'],
+                  parameters_for_evolution['power law argument']])
+        return self.log_prob(parameters_for_evolution), params
 
 class SamplingPropertiesOfSystem:
     def __init__(self,
@@ -1306,8 +1341,9 @@ class SamplingPropertiesOfSystem:
 
             self.log_likelihood_instance = LogLikelihood(self.prior_transform_instance,
                                                     self.means['orbital period'],
-                                                    0,
+                                                    0, #obliquity
                                                     self.probability_density_of_eccentricity,
+                                                    self.e_env,
                                                     initial_eccentricity,
                                                     constraints,
                                                     spin_frequency_powers_for_planet,
@@ -1315,6 +1351,7 @@ class SamplingPropertiesOfSystem:
                                                     )
 
             #self.testing_log_prob(9)
+
             self.log_likelihood_instance.MCMC()
 
             if find_argument_of_phase_lag_function_for_planet_range_auto:
@@ -1403,6 +1440,7 @@ class SamplingPropertiesOfSystem:
 
 
 if __name__ == '__main__':
+
     #analysis_on_Nasa_exoplanet_data()
     print('**********************************************************')
     test1 = EccentricityDistribution(mean_e_now=0.39,
