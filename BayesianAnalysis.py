@@ -2,6 +2,7 @@ import logging
 import math
 import sys
 import corner
+import time
 
 import matplotlib
 from bayesian.stellar_param_sampling.prepare import serialize_poet_likelihood
@@ -27,6 +28,7 @@ from bayesian.stellar_param_sampling.poet_interp_likelihood import POETInterpLik
 from bayesian.stellar_param_sampling.star_sampler import StarSampler
 from random import random
 import multiprocessing as mp
+from multiprocessing import Pool
 
 from bayesian.stellar_param_sampling.feh_conditional_likelihood_base import\
     FeHConditionalLikelihoodBase
@@ -135,17 +137,18 @@ def constraints_for_eccentricity_envelope_are_satisfied(secondary_radius,
 
     return False
 
-class SuperEccentricityDistribution(metaclass=ABCMeta):
+#class SuperEccentricityDistribution(metaclass=ABCMeta):
 
-    @abstractmethod
-    def create_cumulative_density_function_of_present_eccentricity(self):
-        pass
+    #@abstractmethod
+    #def create_cumulative_density_function_of_present_eccentricity(self):
+        #pass
 
-    @abstractmethod
-    def probability_density_of_eccentricity(self, e):
-        pass
+    #@abstractmethod
+    #def probability_density_of_eccentricity(self, e):
+        #pass
 
-class EccentricityDistribution(SuperEccentricityDistribution):
+#class EccentricityDistribution(SuperEccentricityDistribution):
+class EccentricityDistribution:
 
     def __init__(self,
                  mean_e_now,
@@ -1110,11 +1113,15 @@ class LogLikelihood:
         largest = self.constraints[1]
         def prior_parameter(parameter, parameter_name):
             if (parameter > smallest[parameter_name] and parameter < largest[parameter_name]):
-                return 1
-            return 0
-        priors = 1
+                return True
+            return False
+        priors = True
         for parameter_name in ['primary mass', 'secondary mass', 'stellar metallicity', 'stellar age']:
-            priors = priors * prior_parameter(parameters_for_evolution[parameter_name], parameter_name)
+            priors = priors and prior_parameter(parameters_for_evolution[parameter_name], parameter_name)
+            print('smallest ',parameter_name, smallest[parameter_name])
+            print('largest ', parameter_name, largest[parameter_name])
+            print('value ', parameters_for_evolution[parameter_name])
+            print('priors ', priors)
         return priors
 
     def log_prob(self, parameters_for_evolution):
@@ -1132,8 +1139,9 @@ class LogLikelihood:
                               'secondary mass': secondary_mass,
                               'stellar metallicity': stellar_metallicity,
                               'stellar age': stellar_age})
-        if priors == 0:
-            return -math.inf
+
+        if not priors:
+            return -np.inf
 
         star_exoplanet_binary_system = System(primary_mass=primary_mass * u.solMass,
                                               secondary_mass=secondary_mass * u.earthMass,
@@ -1200,7 +1208,7 @@ class LogLikelihood:
                 calculated_eccentricity_now)
             probability_density = probability_density_of_the_calculated_eccentricity * priors
             if probability_density == 0:
-                return -math.inf
+                return -np.inf
             if probability_density < 0:
                 print('Probability density cannot be less than zero.')
                 return None
@@ -1223,17 +1231,27 @@ class LogLikelihood:
         return p0
 
     def MCMC(self,
-             nwalkers=18,
+             nwalkers=19,
              ndim=9):
 
         p0 = self.draw_successful_walkers(nwalkers, ndim)
 
+
         sampler = emcee.EnsembleSampler(nwalkers,
                                         ndim,
                                         self.__call__)
+        start1 = time.time()
+        #sampler.run_mcmc(p0, 50)
+        end1 = time.time()
+        with Pool() as pool:
+            sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool = pool)
+            start = time.time()
+            sampler.run_mcmc(p0, 50)
+            end = time.time()
 
-        sampler.run_mcmc(p0, 5)
-        blobs = sampler.get_blobs(flat=True)
+        print('Serial processing time for running MCMC is ', (end1-start1))
+        print('Parallel processing time for running MCMC is ', (end-start))
+        blobs = sampler.get_blobs(flat = True)
         figure = corner.corner(blobs, labels=['primary mass',
                                               'stellar age',
                                               'secondary radius',
@@ -1248,15 +1266,16 @@ class LogLikelihood:
         plt.show()
 
 
+
         return
 
     def __call__(self,u):
         for i in range(0, 9):
             if u[i]>1 or u[i]<0:
-                return -numpy.inf, numpy.array([0,0,0,0,0,0,0,0,0])
+                return -np.inf, np.array([None, None, None, None, None, None, None, None,  None])
         parameters_for_evolution = self.prior_transform_instance(u)
 
-        params =numpy.array([parameters_for_evolution['primary mass'],
+        params =np.array([parameters_for_evolution['primary mass'],
                   parameters_for_evolution['stellar age'],
                   parameters_for_evolution['secondary radius'],
                   parameters_for_evolution['stellar metallicity'],
@@ -1265,7 +1284,10 @@ class LogLikelihood:
                   parameters_for_evolution['argument of phase lag function for planet'],
                   parameters_for_evolution['tidal break period'],
                   parameters_for_evolution['power law argument']])
-        return self.log_prob(parameters_for_evolution), params
+        log_prob_parameters_for_evolution = self.log_prob(parameters_for_evolution)
+        if np.isinf(-log_prob_parameters_for_evolution):
+            return -np.inf, np.array([None, None, None, None, None, None, None, None,  None])
+        return log_prob_parameters_for_evolution, params
 
 class SamplingPropertiesOfSystem:
     def __init__(self,
