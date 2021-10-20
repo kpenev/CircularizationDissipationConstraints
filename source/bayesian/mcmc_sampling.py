@@ -449,9 +449,9 @@ def recover_initial_positions(config, num_params):
     looking_for = 'unit_cube_start'
     total_num_found = 0
     for log_fname in glob(
-        config.logging_fname.replace('%(pid)d', '*')
-        %
-        dict(system=config.system, now='*')
+            config.logging_fname.replace('%(pid)d', '*')
+            %
+            dict(system=config.system, now='*')
     ):
         num_found = 0
         with open(log_fname) as logf:

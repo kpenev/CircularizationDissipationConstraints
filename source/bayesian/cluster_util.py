@@ -16,7 +16,7 @@ _logger = logging.getLogger(__name__)
 def get_rv_likelihood(observed_orbit,
                       eccentricity_envelope,
                       num_parallel_processes,
-                      interpolation_accuracy=None,
+                      interpolation_accuracy=1e-4,
                       mismatch_plot=None):
     """Return fully set-up RV semi-amplitude constraint for an NGC188 binary."""
 
@@ -28,7 +28,7 @@ def get_rv_likelihood(observed_orbit,
         float(observed_orbit['Per'])
     )
     signal_to_noise = float(observed_orbit['K']) / float(observed_orbit['e_K'])
-    observed_rvk=(
+    observed_rvk = (
         stats.norm(
             loc=numpy.sqrt(
                 float(observed_orbit['K'])**2
@@ -44,14 +44,11 @@ def get_rv_likelihood(observed_orbit,
         )
     )
 
-    if interpolation_accuracy is None:
-        interpolation_accuracy = (
-            1e-4
-            *
-            observed_rvk.pdf(observed_rvk.mean())
-            *
-            (envelope_eccentricity - float(observed_orbit['e']))
-        )
+    interpolation_accuracy *= (
+        observed_rvk.pdf(observed_rvk.mean())
+        *
+        (envelope_eccentricity - float(observed_orbit['e']))
+    )
 
     #TODO: find better observed eccentricity distribution
     return ApproximateRVLikelihood(
@@ -282,8 +279,8 @@ def plot_rv_likelihood(observed_orbit,
     )[0]
 
     for eccentricity in numpy.concatenate((
-        numpy.arange(0.0, rv_likelihood.envelope_eccentricity, 0.1),
-        [rv_likelihood.envelope_eccentricity]
+            numpy.arange(0.0, rv_likelihood.envelope_eccentricity, 0.1),
+            [rv_likelihood.envelope_eccentricity]
     )):
 
         plot_rv_likelihood_numer = rv_likelihood(eccentricity,
@@ -374,10 +371,10 @@ def plot_eccentricity_vs_period(binaries, eccentricity_envelope):
     for label, binary_class in zip(['SB1', 'SB2'], binaries):
         #color = \
         pyplot.errorbar(binary_class['Per'],
-                                binary_class['e'],
-                                binary_class['e_e'],
-                                fmt='ok',
-                                label=label)[0].get_color()
+                        binary_class['e'],
+                        binary_class['e_e'],
+                        fmt='ok',
+                        label=label)[0].get_color()
 
 #        if 'M1' in binary_class:
 #            add_shifted_periods(binary_class)

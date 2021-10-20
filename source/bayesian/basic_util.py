@@ -17,9 +17,9 @@ def compare_frozen_distributions(distro1, distro2):
         return False
     for attr_name in ['args', 'kwds']:
         if(
-            getattr(distro1, attr_name)
-            !=
-            getattr(distro2, attr_name)
+                getattr(distro1, attr_name)
+                !=
+                getattr(distro2, attr_name)
         ):
             _logger.debug('%s mismatch: %s vs %s',
                           attr_name,

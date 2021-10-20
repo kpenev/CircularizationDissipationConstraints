@@ -147,7 +147,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         self.final_eccentricity = None
 
         self._find_evolution_kwargs = dict(
-            interpolator = interpolator,
+            interpolator=interpolator,
             secondary_is_star=secondary_is_star,
             period_search_factor=period_search_factor,
             scaled_period_guess=scaled_period_guess
@@ -157,13 +157,13 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         self._stashed_results = dict()
         self._stash = False
 
-    def calculate_log_likelihood(self, parameters):
+    def calculate_final_eccentricity(self, parameters):
         """
-        Return -inf if systems lantds above P-e envelope 0 otherwise.
+        Return the final eccentricity of the system with the given parameters.
 
         Args:
-            parameters:    The parameters to evaluate the log-likelihood at. The
-                order of the model parameters is specified by
+            parameters:    The parameters to evaluate the final eccentricity
+                for. The order of the model parameters is specified by
                 :attr:`parameter_order`.
 
         Returns:
@@ -195,13 +195,13 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             except ValueError as error:
                 logger.error('Invalid parameter values encountered: %s',
                              str(error))
-                return -numpy.inf
+                return None
             else:
                 failed = False
 
         if failed:
             logger.error('Calculating evolution failed!')
-            return -numpy.inf
+            return None
 
         expected_final_age = self.get_parameter_value(
             parameters,
@@ -220,14 +220,10 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
 
             logger.info(
                 'Successful evolution found: ef = %g',
-                self.final_eccentricity
+                evolution.eccentricity[-1]
             )
 
-            return (
-                -numpy.inf
-                if self.final_eccentricity > self.envelope_eccentricity else
-                0
-            )
+            return evolution.eccentricity[-1]
 
         logger.error(
             'Evolution terminated prematurely at t=%g (< %g) with ef = %g',
@@ -239,7 +235,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             )
         )
 
-        return -numpy.inf
+        return None
 
     def start_stashing(self):
         """
@@ -256,6 +252,10 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         """Stop stashing future :meth:`__call__`s but keep current stash."""
 
         self._stash = False
+
+    @abstractmethod
+    def calculate_log_likelihood(self, parameters):
+        """Evaluate the log-likelihood at the given model parameters."""
 
     def __call__(self, parameters):
         """Same as :meth:`calculate_log_likelihood` but handles stashing."""
@@ -279,5 +279,4 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             self._stashed_results[param_hash] = result
 
         return result
-
 #pylint: enable=too-few-public-methods

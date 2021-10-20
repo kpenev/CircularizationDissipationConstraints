@@ -183,7 +183,14 @@ def prepare_sampling(config):
                 eccentricity_envelope=custom_util.eccentricity_envelope,
                 num_parallel_processes=config.num_parallel_processes,
                 interpolation_accuracy=config.rvk_interpolation_accuracy,
-                show_mismatch_plot=config.rvk_show_interpolation
+                mismatch_plot=(
+                    (
+                        'RV_likelihood_refinement_'
+                        '%(title)s_%(grid_refinement_i)d.png'
+                    )
+                    if config.rvk_show_interpolation else
+                    None
+                )
             )
             log_likelihood = LogLikelihoodSB1(
                 interpolator=interpolator,

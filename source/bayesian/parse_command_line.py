@@ -346,12 +346,10 @@ def add_sampling_parameters(parser):
     sampling.add_argument(
         '--rvk-interpolation-accuracy',
         type=float,
-        nargs=2,
-        default=(1e-8, 1e-4),
+        default=1e-4,
         help='The maximum error allowed in the interpolation of the radial '
-        'velocity PDF as a fraction of the largest PDF value, and as the PDF '
-        'at the inteprolated position. Comparison is to direct numerical '
-        'integration.'
+        'velocity likelihood (lambda in notes) as a fraction of approximately '
+        'the largest value. Comparison is to direct numerical integration.'
     )
     sampling.add_argument(
         '--rvk-show-interpolation',

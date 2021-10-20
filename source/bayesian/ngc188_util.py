@@ -3,7 +3,6 @@
 """NGC188 specific functions required for circularization bayesian analysis."""
 
 import os.path
-import sys
 import logging
 from multiprocessing import set_start_method
 
@@ -292,9 +291,8 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG,
                         format=default_logging_format)
     _test_rv_likelihood(3871)
-    sys.exit()
-    plot_eccentricity_likelihood(get_observed_orbit(4965),
-                                 eccentricity_envelope)
+#    plot_eccentricity_likelihood(get_observed_orbit(4965),
+#                                 eccentricity_envelope)
     rcParams['font.size'] = 18
     rcParams['figure.figsize'] = [26.0, 4.8 * 4]
     rcParams['figure.subplot.bottom'] = 0.15
@@ -307,7 +305,7 @@ if __name__ == '__main__':
         LinearEccentricityEnvelope(min_period=7.0,
                                    max_period=45.0,
                                    max_eccentricity=0.71)
-#        eccentricity_envelope
+        #eccentricity_envelope
     )
     pyplot.text(s='NGC 188',
                 x=2.2, y=0.68,

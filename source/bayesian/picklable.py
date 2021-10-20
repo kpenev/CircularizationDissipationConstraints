@@ -41,9 +41,9 @@ class Picklable(ABC):
                     section, self._skip_nobjects = self._unpickler.load()
                     assert isinstance(section, str)
                     if (
-                        section == self.__class__.__name__
-                        and
-                        self._skip_nobjects == self._expect_nobjects
+                            section == self.__class__.__name__
+                            and
+                            self._skip_nobjects == self._expect_nobjects
                     ):
                         result = self._check_pickle()
                         if result is None:

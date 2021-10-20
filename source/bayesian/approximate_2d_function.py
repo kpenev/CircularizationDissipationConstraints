@@ -579,11 +579,11 @@ class Approximate2DFunction(RectBivariateSpline,
         )
 
         if (
-            self._x_grid is None
-            or
-            self._y_grid is None
-            or
-            self._values is None
+                self._x_grid is None
+                or
+                self._y_grid is None
+                or
+                self._values is None
         ):
             self._x_grid, self._y_grid = self._get_initial_grid()
             Plot2DInterpolation.__init__(self, debug_plots, plot_labels)
@@ -655,9 +655,9 @@ if __name__ == '__main__':
     approx = Approximate2DFunction(
         fit_func,
         (0.0, 1.0, 2.0, 3.0),
-#        debug_plots=dict(
-#            interpolation_performance='%(title)s.png'
-#        ),
+        #debug_plots=dict(
+        #    interpolation_performance='%(title)s.png'
+        #),
         min_grid_steps=(1e-6, 1e-6),
         grid_refine_algorithm='all'
     )

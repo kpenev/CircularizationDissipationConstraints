@@ -104,9 +104,14 @@ class LogLikelihoodSB1(LogLikelihoodBase):
     def calculate_log_likelihood(self, parameters):
         """Evaluate the log-likelihood at the given model parameters."""
 
-        circularization_log_likelihood = super().calculate_log_likelihood(
-            parameters
-        )
+        final_eccentricity = super().calculate_final_eccentricity(parameters)
+
+        if (
+                final_eccentricity is None
+                or
+                final_eccentricity > self.envelope_eccentricity
+        ):
+            return -numpy.inf
 
         rvk_scale = rv_semi_amplitude_scale(
             self.get_parameter_value(parameters, 'primary_mass'),
@@ -114,11 +119,10 @@ class LogLikelihoodSB1(LogLikelihoodBase):
             self.get_parameter_value(parameters, 'orbital_period'),
         ).to_value(units.m / units.s)
 
+
         return (
-            circularization_log_likelihood
-            +
             numpy.log(
-                self._rv_likelihood(self.final_eccentricity, rvk_scale)
+                self._rv_likelihood(final_eccentricity, rvk_scale)
             )
             -
             numpy.log(
