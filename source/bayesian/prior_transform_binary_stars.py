@@ -35,7 +35,7 @@ class PriorTransformBinaryStars(PriorTransformBase):
                 .
                 _sample_binary_masses
                 .
-                photometric_mass_constraint
+                photometric_constraint
                 .
                 get_component_radius
             )(

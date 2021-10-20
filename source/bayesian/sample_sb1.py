@@ -4,6 +4,7 @@
 
 import logging
 import traceback
+from multiprocessing import Pool
 #from multiprocessing import set_start_method
 
 import numpy
@@ -246,23 +247,27 @@ def main(config):
     )
 
     if config.sampling.lower() == 'prior':
-        result = numpy.empty(
-            (config.mcmc_nsteps, len(log_likelihood.parameter_order)),
-            dtype=float
-        )
-        for step in range(config.mcmc_nsteps):
-            result[step] = prior_transform(numpy.random.rand(num_params))
-            if step % 10 == 0:
-                logging.debug('Prior transform sampling progress %d/%d',
-                              step,
-                              config.mcmc_nsteps)
+        inputs = numpy.random.rand(num_params * config.mcmc_nsteps).reshape((
+            config.mcmc_nsteps,
+            num_params
+        ))
+
+        with Pool(config.num_parallel_processes,
+                  initializer=setup_process,
+                  initargs=[config],
+                  maxtasksperchild=1) as workers:
+            result = pandas.DataFrame(
+                workers.map(prior_transform, inputs),
+                columns=[p[0] for p in log_likelihood.parameter_order]
+            )
+
         make_corner_plot(
             pandas.DataFrame(
                 result,
                 columns=[p[0] for p in log_likelihood.parameter_order]
             )
         )
-    if config.sampling.lower() == 'nested':
+    elif config.sampling.lower() == 'nested':
         sampler = dynesty.NestedSampler(
             log_likelihood,
             prior_transform,
