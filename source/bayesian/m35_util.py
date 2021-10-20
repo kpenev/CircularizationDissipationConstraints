@@ -16,13 +16,10 @@ from cmd_utils import CMDPhotometryInterpolator
 from process_e_Q_grid import LinearEccentricityEnvelope
 from bayesian.cluster_util import\
     select_binary_data,\
-    plot_eccentricity_vs_period,\
-    plot_rvk_constraint
+    plot_rv_likelihood
 from bayesian.photometric_constraint import\
     PhotometricConstraint,\
-    plot_joint_pdf,\
-    plot_m1_cdf,\
-    plot_m2_cdf
+    plot_joint_pdf
 
 cluster_age_distribution = stats.norm(0.15, 0.03)
 cluster_feh_distribution = stats.norm(-0.18, 0.03)
@@ -168,22 +165,24 @@ def _test_photometric_constraint(binary_wocs_id):
 
     plot_joint_pdf(constraint, (1.04939401, 0.577582))
 
-def _test_rvk_constraint(binary_wocs_id):
+def _test_rv_likelihood(binary_wocs_id):
     """Display plots showing the RV based constraint."""
 
     observed_orbit = get_observed_orbit(binary_wocs_id)
 
     photometric_constraint = get_photometric_constraint(binary_wocs_id)
-    plot_rvk_constraint(observed_orbit, photometric_constraint)
+    plot_rv_likelihood(observed_orbit,
+                       eccentricity_envelope,
+                       photometric_constraint)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     pandas.set_option('display.max_rows', None)
 #    plot_color_magnitude_diagram()
 #    pyplot.show()
-    plot_eccentricity_vs_period(get_binary_data(), eccentricity_envelope)
+#    plot_eccentricity_vs_period(get_binary_data(), eccentricity_envelope)
     pyplot.show()
 #    _test_photometric_constraint(23043)
 #    pyplot.show()
-#    _test_rvk_constraint(23043)
+    _test_rv_likelihood(23043)
 #    pyplot.show()

@@ -291,7 +291,7 @@ def add_sampling_parameters(parser):
     )
     parser.add_argument(
         '--sampling',
-        choices=['mcmc', 'nested'],
+        choices=['mcmc', 'nested', 'prior'],
         default='mcmc',
         help='Which sampling method to use. MCMC sampling useng the `emcee` '
         'package and nested sampling used `dynesty`.'

@@ -6,13 +6,16 @@ import logging
 import traceback
 #from multiprocessing import set_start_method
 
+import numpy
 from astropy import units
 from scipy import stats
+import pandas
 import dynesty
 
 from stellar_evolution.manager import StellarEvolutionManager
 from orbital_evolution.evolve_interface import library as\
     orbital_evolution_library
+from visuals import make_corner_plot
 
 #Fixed module search paths, not intended to provide anything.
 #pylint: disable=unused-import
@@ -242,6 +245,23 @@ def main(config):
         num_params
     )
 
+    if config.sampling.lower() == 'prior':
+        result = numpy.empty(
+            (config.mcmc_nsteps, len(log_likelihood.parameter_order)),
+            dtype=float
+        )
+        for step in range(config.mcmc_nsteps):
+            result[step] = prior_transform(numpy.random.rand(num_params))
+            if step % 10 == 0:
+                logging.debug('Prior transform sampling progress %d/%d',
+                              step,
+                              config.mcmc_nsteps)
+        make_corner_plot(
+            pandas.DataFrame(
+                result,
+                columns=[p[0] for p in log_likelihood.parameter_order]
+            )
+        )
     if config.sampling.lower() == 'nested':
         sampler = dynesty.NestedSampler(
             log_likelihood,
