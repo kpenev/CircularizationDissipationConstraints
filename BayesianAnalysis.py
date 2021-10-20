@@ -137,18 +137,12 @@ def constraints_for_eccentricity_envelope_are_satisfied(secondary_radius,
 
     return False
 
-#class SuperEccentricityDistribution(metaclass=ABCMeta):
+class SuperEccentricityDistribution(metaclass=ABCMeta):
+    @abstractmethod
+    def probability_density_of_eccentricity(self, e):
+        pass
 
-    #@abstractmethod
-    #def create_cumulative_density_function_of_present_eccentricity(self):
-        #pass
-
-    #@abstractmethod
-    #def probability_density_of_eccentricity(self, e):
-        #pass
-
-#class EccentricityDistribution(SuperEccentricityDistribution):
-class EccentricityDistribution:
+class EccentricityDistribution(SuperEccentricityDistribution):
 
     def __init__(self,
                  mean_e_now,
@@ -164,9 +158,11 @@ class EccentricityDistribution:
         self.e_now_lower_uncertainty = e_now_lower_uncertainty
         self.percentile_for_e_now_upper_uncertainty = percentile_for_e_now_upper_uncertainty
         self.percentile_for_e_now_lower_uncertainty = percentile_for_e_now_lower_uncertainty
-        self.cumulative_density_function_of_present_eccentricity = self.create_cumulative_density_function_of_present_eccentricity()
+
         self.rice_parameters_are_found = True
         self.e_env = e_env
+        self.b, self.s = self.roots_for_Rice_parameters()
+        self.inv_norm = self.cdf(1.0)
 
     def equations_to_be_solved_for_Rice_distribution_parameters(self, x):
         b = x[0]
@@ -211,80 +207,79 @@ class EccentricityDistribution:
             self.rice_parameters_are_found = True
         return roots
 
-    def create_cumulative_density_function_of_present_eccentricity(self):
-        roots = self.roots_for_Rice_parameters()
-        if not(math.isnan(roots[0]) or math.isnan(roots[1])):
-            s = roots[1]
-            b = roots[0]
-            def pdf(e):
-                val = i0((e / s) * b)
-                if val == math.inf:
-                    return 0  # Then math.exp(-((e/s)**2+b**2)/2) = 0
-                return math.exp(-((e / s) ** 2 + b ** 2) / 2) * val
-            self.M = pdf
-            def cdf(e_now):
-                value = nquad(pdf, [[0, e_now]])
-                return value[0]
-            inv_norm = cdf(1.0)
-            def cumulative_density_function_of_present_eccentricity(e_now):
-                if inv_norm == 0:
-                    return math.inf
-                value = cdf(e_now)/inv_norm
-                return value
-            return cumulative_density_function_of_present_eccentricity
-        return None
+    def pdf(self, e):
+        val = i0((e / self.s) * self.b)
+        if val == math.inf:
+            return 0  # Then math.exp(-((e/s)**2+b**2)/2) = 0
+        return math.exp(-((e / self.s) ** 2 + self.b ** 2) / 2) * val
+
+    def cdf(self, e_now):
+        value = nquad(self.pdf, [[0, e_now]])
+        return value[0]
+
+    def cumulative_density_function_of_present_eccentricity(self, e_now):
+        if not(math.isnan(self.s) or math.isnan(self.b)):
+            if self.inv_norm == 0:
+                return math.inf
+            value = self.cdf(e_now) / self.inv_norm
+            return value
+        print('Cumulative density function of present eccentricity does not exist for the given e_now and its uncertainties')
+        return math.nan
+
 
     def probability_density_of_eccentricity(self, e):
         if e > 1 or e < 0:
             return 0
-        if e <= self.e_env and not(self.cumulative_density_function_of_present_eccentricity == None):
-            return self.cumulative_density_function_of_present_eccentricity(e)
+        if e <= self.e_env:
+            value = self.cumulative_density_function_of_present_eccentricity(e)
+            if not math.isnan(value):
+                return value
+            else:
+                return math.nan
         return 0
 
     def plot_probability_density_of_eccentricity_vs_eccentricity_graph(self):
-        if not(self.cumulative_density_function_of_present_eccentricity == None):
-            eccentricity = np.linspace(0, 1, 100)
-            probability_density_of_eccentricity = []
-            for i in range(0, len(eccentricity)):
-                probability_density_of_eccentricity = probability_density_of_eccentricity + [
-                    self.probability_density_of_eccentricity(eccentricity[i])]
-            M_cdf = []
-            for i in range(0, len(eccentricity)):
-                M_cdf = M_cdf + [self.cumulative_density_function_of_present_eccentricity(eccentricity[i])]
-            M_pdf = []
-            for i in range(0, len(eccentricity)):
-                M_pdf = M_pdf + [self.M(eccentricity[i])]
-            plt.plot(eccentricity, probability_density_of_eccentricity,
-                     label="Probality density of eccentricity (f(e)) vs. eccentricity (e)")
-            # naming the x axis
-            plt.xlabel('Eccentricity (e)')
-            # naming the y axis
-            plt.ylabel('probability density of eccentricity (f(e))')
-            # giving a title to my graph
-            plt.title('Probability density of eccentricity vs eccentricity')
-            # function to show the plot
-            plt.show()
-            plt.plot(eccentricity, M_cdf, label="cdf of M(e) vs. eccentricity (e)")
-            # naming the x axis
-            plt.xlabel('Eccentricity (e)')
-            # naming the y axis
-            plt.ylabel('M_cdf ')
-            # giving a title to my graph
-            plt.title('cdf of M(e) vs eccentricity')
-            # function to show the plot
-            plt.show()
-            plt.plot(eccentricity, M_pdf, label="pdf of M(e) vs. eccentricity (e)")
-            # naming the x axis
-            plt.xlabel('Eccentricity (e)')
-            # naming the y axis
-            plt.ylabel('M_pdf ')
-            # giving a title to my graph
-            plt.title('M_pdf of eccentricity vs eccentricity')
-            # function to show the plot
-            plt.show()
-            return
-        print('Probability density distributions of eccentricity according to given mean_e_now and its uncertainties do not exist')
+        eccentricity = np.linspace(0, 1, 100)
+        probability_density_of_eccentricity = []
+        for i in range(0, len(eccentricity)):
+            probability_density_of_eccentricity = probability_density_of_eccentricity + [
+                self.probability_density_of_eccentricity(eccentricity[i])]
+        M_cdf = []
+        for i in range(0, len(eccentricity)):
+            M_cdf = M_cdf + [self.cumulative_density_function_of_present_eccentricity(eccentricity[i])]
+        M_pdf = []
+        for i in range(0, len(eccentricity)):
+            M_pdf = M_pdf + [self.pdf(eccentricity[i])]
+        plt.plot(eccentricity, probability_density_of_eccentricity,
+                 label="Probality density of eccentricity (f(e)) vs. eccentricity (e)")
+        # naming the x axis
+        plt.xlabel('Eccentricity (e)')
+        # naming the y axis
+        plt.ylabel('probability density of eccentricity (f(e))')
+        # giving a title to my graph
+        plt.title('Probability density of eccentricity vs eccentricity')
+        # function to show the plot
+        plt.show()
+        plt.plot(eccentricity, M_cdf, label="cdf of M(e) vs. eccentricity (e)")
+        # naming the x axis
+        plt.xlabel('Eccentricity (e)')
+        # naming the y axis
+        plt.ylabel('M_cdf ')
+        # giving a title to my graph
+        plt.title('cdf of M(e) vs eccentricity')
+        # function to show the plot
+        plt.show()
+        plt.plot(eccentricity, M_pdf, label="pdf of M(e) vs. eccentricity (e)")
+        # naming the x axis
+        plt.xlabel('Eccentricity (e)')
+        # naming the y axis
+        plt.ylabel('M_pdf ')
+        # giving a title to my graph
+        plt.title('M_pdf of eccentricity vs eccentricity')
+        # function to show the plot
+        plt.show()
         return
+
 
 class System:
     def __init__(self,
@@ -1231,25 +1226,29 @@ class LogLikelihood:
         return p0
 
     def MCMC(self,
-             nwalkers=19,
+             nwalkers=18,
              ndim=9):
 
         p0 = self.draw_successful_walkers(nwalkers, ndim)
 
+        print('HHHHHHHHHHHHHHH***********')
 
-        sampler = emcee.EnsembleSampler(nwalkers,
-                                        ndim,
-                                        self.__call__)
-        start1 = time.time()
-        #sampler.run_mcmc(p0, 50)
-        end1 = time.time()
+
+        #sampler = emcee.EnsembleSampler(nwalkers,
+                                        #ndim,
+                                        #self.__call__)
+        #start1 = time.time()
+        #sampler.run_mcmc(p0, 10)
+        #end1 = time.time()
         with Pool() as pool:
             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool = pool)
             start = time.time()
-            sampler.run_mcmc(p0, 50)
+            sampler.run_mcmc(p0, 10
+                             #, progress = True
+                             )
             end = time.time()
 
-        print('Serial processing time for running MCMC is ', (end1-start1))
+        #print('Serial processing time for running MCMC is ', (end1-start1))
         print('Parallel processing time for running MCMC is ', (end-start))
         blobs = sampler.get_blobs(flat = True)
         figure = corner.corner(blobs, labels=['primary mass',
