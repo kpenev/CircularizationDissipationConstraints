@@ -1,12 +1,10 @@
 """Allow approximating the RV likelihood (lambda in notes)."""
 
-from functools import partial
-
 import numpy
 from scipy import integrate
 from scipy.optimize import root_scalar
 
-from approximate_2d_function import Approximate2DFunction
+from bayesian.approximate_2d_function import Approximate2DFunction
 
 #Most ancestors are from scipy
 #pylint: disable=too-many-ancestors
@@ -233,17 +231,6 @@ class ApproximateRVLikelihood(Approximate2DFunction):
         return numpy.dstack([result.get() for result in parallel])[0]
 
 
-    def _get_integration_breaks(self, max_rv_semiamplitude, cdf_step=0.01):
-        """Return array of points integration must hit for accuracy."""
-
-        result = (
-            self.observed_rvk.ppf(numpy.arange(cdf_step, 1.0, cdf_step))
-            /
-            max_rv_semiamplitude
-        )
-        return result[result < 1.0]
-
-
     def _upper_bound_equation(self, upper_bound, target_prob):
         """The equation to solve in order to find max RV semi-amplitude."""
 
@@ -253,7 +240,7 @@ class ApproximateRVLikelihood(Approximate2DFunction):
                        numpy.sqrt(1.0 - numpy.square(s))),
             0,
             1,
-            points=self._get_integration_breaks(upper_bound),
+            points=self._get_inclination_integration_breaks(upper_bound),
             **self._integration_options
         )
         self._logger.debug('Upper bound equation integral at %s: %s',

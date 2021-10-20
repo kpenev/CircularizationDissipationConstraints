@@ -16,36 +16,49 @@ _logger = logging.getLogger(__name__)
 def get_rv_likelihood(observed_orbit,
                       eccentricity_envelope,
                       num_parallel_processes,
-                      interpolation_accuracy,
+                      interpolation_accuracy=None,
                       mismatch_plot=None):
     """Return fully set-up RV semi-amplitude constraint for an NGC188 binary."""
 
+    observed_eccentricity_distro = stats.norm(
+        loc=float(observed_orbit['e']),
+        scale=float(observed_orbit['e_e'])
+    )
+    envelope_eccentricity = eccentricity_envelope(
+        float(observed_orbit['Per'])
+    )
     signal_to_noise = float(observed_orbit['K']) / float(observed_orbit['e_K'])
+    observed_rvk=(
+        stats.norm(
+            loc=numpy.sqrt(
+                float(observed_orbit['K'])**2
+                +
+                float(observed_orbit['e_K'])**2
+            ) * 1000.0,
+            scale=float(observed_orbit['e_K']) * 1000.0
+        )
+        if signal_to_noise > 50 else
+        stats.rice(
+            b=signal_to_noise,
+            scale=float(observed_orbit['e_K']) * 1000.0
+        )
+    )
+
+    if interpolation_accuracy is None:
+        interpolation_accuracy = (
+            1e-4
+            *
+            observed_rvk.pdf(observed_rvk.mean())
+            *
+            (envelope_eccentricity - float(observed_orbit['e']))
+        )
+
     #TODO: find better observed eccentricity distribution
     return ApproximateRVLikelihood(
-        observed_rvk=(
-            stats.norm(
-                loc=numpy.sqrt(
-                    float(observed_orbit['K'])**2
-                    +
-                    float(observed_orbit['e_K'])**2
-                ) * 1000.0,
-                scale=float(observed_orbit['e_K']) * 1000.0
-            )
-            if signal_to_noise > 50 else
-            stats.rice(
-                b=signal_to_noise,
-                scale=float(observed_orbit['e_K']) * 1000.0
-            )
-        ),
-        observed_eccentricity=stats.norm(
-            loc=float(observed_orbit['e']),
-            scale=float(observed_orbit['e_e'])
-        ),
-        envelope_eccentricity=eccentricity_envelope(
-            float(observed_orbit['Per'])
-        ),
-        max_discarded_probabiity=1e-6,
+        observed_rvk=observed_rvk,
+        observed_eccentricity=observed_eccentricity_distro,
+        envelope_eccentricity=envelope_eccentricity,
+        max_discarded_probabiity=1e-5,
         tolerance=interpolation_accuracy,
         num_parallel_processes=num_parallel_processes,
         integration_options=dict(epsabs=0,
@@ -53,7 +66,8 @@ def get_rv_likelihood(observed_orbit,
                                  limit=200,
                                  maxp1=200),
         min_grid_points=(100, 100),
-        grid_refine_algorithm='1d_worse_direction',
+        grid_refine_limit=16,
+        grid_refine_1d='worse_direction',
         debug_plots=(None if mismatch_plot is None
                      else dict(interpolation_performance=mismatch_plot))
     )
@@ -159,11 +173,11 @@ def plot_rv_likelihood_ratio_vs_e(rv_likelihood,
 
     plot_e = numpy.linspace(0, rv_likelihood.envelope_eccentricity, 100)
     min_m2 = 0.1 * units.M_sun
-    max_m2 = 0.3 * units.M_sun #primary_mass
-    plot_m2 = numpy.linspace(min_m2, primary_mass, 10)
+    max_m2 = primary_mass
+    plot_m2 = numpy.linspace(min_m2, max_m2, 10)
     plot_rvk_scale = rv_semi_amplitude_scale(
         primary_mass,
-        numpy.linspace(min_m2, primary_mass, 10),
+        numpy.linspace(min_m2, max_m2, 10),
         orbital_period
     ).to_value(
         units.m / units.s
@@ -196,11 +210,19 @@ def plot_rv_likelihood(observed_orbit,
         observed_orbit=observed_orbit,
         eccentricity_envelope=eccentricity_envelope,
         num_parallel_processes=24,
-        interpolation_accuracy=1e-7,
         mismatch_plot=(
             'RV_likelihood_refinement_%(title)s_%(grid_refinement_i)d.png'
         )
     )
+
+    sample_stellar_masses = SampleSB1Masses(
+        rv_likelihood=rv_likelihood,
+        photometric_constraint=photometric_constraint,
+        orbital_period=float(observed_orbit['Per']),
+    )
+
+    med_primary_mass = sample_stellar_masses.primary_mass_ppf(0.5) * units.M_sun
+    print('Plotting for M1 = ' + repr(med_primary_mass))
 
     plots = dict(
         rv_likelihood=pyplot.subplot(131),
@@ -222,12 +244,6 @@ def plot_rv_likelihood(observed_orbit,
         r'{\lambda\left[e_{env}, K(M_1, M_2, P_{orb})\right]}$'
     )
 
-    sample_stellar_masses = SampleSB1Masses(
-        rv_likelihood=rv_likelihood,
-        photometric_constraint=photometric_constraint,
-        orbital_period=float(observed_orbit['Per']),
-    )
-
     plot_mass_pdfs(sample_stellar_masses,
                    plots['m1_pdf'],
                    plots['m2_pdf'],
@@ -238,10 +254,6 @@ def plot_rv_likelihood(observed_orbit,
                    plots['m2_pdf'],
                    marker='o',
                    linestyle='None')
-
-    med_primary_mass = sample_stellar_masses.primary_mass_ppf(0.5) * units.M_sun
-
-    print('Plotting for M1 = ' + repr(med_primary_mass))
 
     secondary_mass_distro = (
         photometric_constraint.get_conditional_secondary_mass_distribution(

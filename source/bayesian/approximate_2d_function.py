@@ -10,8 +10,8 @@ from matplotlib import pyplot
 from scipy.interpolate import RectBivariateSpline
 import numpy
 
-from plot_2d_interpolation import Plot2DInterpolation
-from picklable import Picklable
+from bayesian.plot_2d_interpolation import Plot2DInterpolation
+from bayesian.picklable import Picklable
 
 ApproximationConfig = namedtuple(
     'ApproximationConfig',
@@ -21,7 +21,7 @@ ApproximationConfig = namedtuple(
         'min_grid_steps',
         'tolerance',
         'spline_options',
-        'grid_refine_algorithm',
+        'refine_limit',
         'refine_1d'
     ]
 )
@@ -88,32 +88,38 @@ class Approximate2DFunction(RectBivariateSpline,
     #pylint: enable=too-many-arguments
 
 
-    def _select_mismatches_all(self, calculated_values, interpolated_values):
+    def _select_mismatches(self, calculated_values, interpolated_values):
         """Return x and y grid indices to refine."""
 
-        return numpy.nonzero(
-            numpy.absolute(calculated_values - interpolated_values)
-            >
-            self.configuration.tolerance
-        )
+        residuals = numpy.absolute(calculated_values - interpolated_values)
+        if self.configuration.refine_limit:
+            mean_end = -self.configuration.refine_limit + 1
+            if mean_end == 0:
+                mean_end = residuals.size
+            tolerance = max(
+                self.configuration.tolerance,
+                numpy.mean(
+                    numpy.partition(
+                        residuals.flatten(),
+                        (
+                            -self.configuration.refine_limit - 1,
+                            -self.configuration.refine_limit
+                        )
+                    )[
+                        -self.configuration.refine_limit - 1
+                        :
+                        (-self.configuration.refine_limit + 1) or residuals.size
+                    ]
+                )
+            )
+        else:
+            tolerance = self.configuration.tolerance
 
+        result = numpy.nonzero(residuals > tolerance)
 
-    def _select_mismatches_worst(self, calculated_values, interpolated_values):
-        """Return y and y index of worst mismatch as 1-element arrays."""
+        self._logger.debug('Selected %d cells to refine', result[0].size)
 
-        abs_difference = numpy.absolute(calculated_values - interpolated_values)
-        worst_index = numpy.unravel_index(
-            numpy.argmax(
-                abs_difference,
-                axis=None
-            ),
-            calculated_values.shape
-        )
-
-        if abs_difference[worst_index] <= self.configuration.tolerance:
-            return numpy.array([], dtype=int), numpy.array([], dtype=int)
-
-        return tuple(numpy.array([ind]) for ind in worst_index)
+        return result
 
 
     def _get_mismatch_indices(self):
@@ -158,14 +164,7 @@ class Approximate2DFunction(RectBivariateSpline,
                     y_offset=y_offset
                 )
 
-                new_mismatches = getattr(
-                    self,
-                    (
-                        '_select_mismatches_'
-                        +
-                        self.configuration.grid_refine_algorithm
-                    )
-                )(
+                new_mismatches = self._select_mismatches(
                     calculated_values,
                     interpolated_values,
                 )
@@ -476,7 +475,8 @@ class Approximate2DFunction(RectBivariateSpline,
                  tolerance=1e-6,
                  min_grid_steps=None,
                  num_parallel_processes=1,
-                 grid_refine_algorithm='worst',
+                 grid_refine_limit=0,
+                 grid_refine_1d=None,
                  pickle_fname='approximate_2d.pkl',
                  debug_plots=None,
                  plot_labels=None,
@@ -509,17 +509,16 @@ class Approximate2DFunction(RectBivariateSpline,
                 launch when generating a new interpolation. Ignored if existing
                 interpolation is found.
 
-            grid_refine_algorithm(str):    The algorithm to use for selecting
-                which points to refine at each step. Currently supported
-                algorithms are:
+            grid_refine_limit(int):    At each step, only the
+                `grid_refine_limit` most discrepant cells are sub-divided. A
+                value of `0` results in no limit.
 
-                `'all'`:
-                    Refine all grid cells where the discrepancy exceeds the
-                    tolerance.
-
-                `'worst'`:
-                    Only refine the grid cell where the worst discrepancy
-                    occurs.
+            grid_refine_1d(bool):    If `None`, cells chosen for sub-division
+                are sub-divided along both x and y. If `'fewer_ind'`, only the
+                direction with fewer indices to refine is refined. If
+                `'wore_direction'` only  dimension that would improve the 1-D
+                interpolation that shows the bigger maximum discepancy is
+                refined.
 
             pickle_fname(str):    A filename which to check for pickle
                 approximations and store newly created one if none of those
@@ -560,18 +559,19 @@ class Approximate2DFunction(RectBivariateSpline,
             ),
             tolerance,
             spline_options,
-            (
-                'all'
-                if grid_refine_algorithm[:3] == '1d_' else
-                grid_refine_algorithm
-            ),
-            (
-                grid_refine_algorithm[3:] if grid_refine_algorithm[:3] == '1d_'
-                else False
-            )
+            grid_refine_limit,
+            grid_refine_1d
         )
         self.func = func
         self.support = support
+        self._logger.debug(
+            'Deriving approximation to %s(%s < x < %s, %s < y < %s) with '
+            'configuration: %s',
+            repr(func),
+            *tuple(support),
+            repr(self.configuration)
+        )
+
         self._x_grid, self._y_grid, self._values = (
             self.check_for_pickled(pickle_fname)
             or
