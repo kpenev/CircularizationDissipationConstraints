@@ -1016,7 +1016,6 @@ class PriorTransform:
         self.interpolator = manager.get_interpolator_by_name('default')
         FeHConditionalLikelihoodBase.set_interpolator(self.interpolator)
 
-        logging.basicConfig(level=logging.DEBUG)
         debug_plot = [('interpolation_performance', 'interp_performance.pdf')]
         teff = split_normal.freeze_error_bar(
             mode=self.means['stellar effective temperature'],
@@ -1051,13 +1050,10 @@ class PriorTransform:
         self.star_sampler = StarSampler(likelihood, config)
 
 
-
     def __call__(self, u):
         unit_cube = numpy.array([u[0], u[1], u[2]])
         stellar_metallicity, primary_mass, stellar_age = self.star_sampler.__call__(unit_cube)
-
-        interpolator = self.interpolator
-        primary_rad = interpolator('RADIUS', primary_mass, stellar_metallicity)
+        primary_rad = self.interpolator('RADIUS', primary_mass, stellar_metallicity)
         primary_radius = primary_rad(stellar_age)
         ratio_of_planet_to_stellar_radius = norm.ppf(u[3], loc = self.means['ratio of planet to stellar radius'], scale = (self.standard_deviations['ratio_of_planet_to_stellar_radius_upper_uncertainty']-self.standard_deviations['ratio_of_planet_to_stellar_radius_lower_uncertainty'])/2)
         secondary_radius = (ratio_of_planet_to_stellar_radius ** 0.5) * primary_radius * const.R_sun.value / const.R_earth.value
@@ -1099,8 +1095,11 @@ class LogLikelihood:
         self.initial_eccentricity = initial_eccentricity
         self.spin_frequency_breaks_for_planet = spin_frequency_breaks_for_planet
         self.spin_frequency_powers_for_planet = spin_frequency_powers_for_planet
-
         self.e_env = e_env
+        self.interpolator = prior_transform_instance.interpolator
+        #FeHConditionalLikelihoodBase.set_interpolator(self.interpolator)
+
+
 
     def priors(self,
                parameters_for_evolution):
@@ -1172,7 +1171,7 @@ class LogLikelihood:
         yes = False
         if yes:
             evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
-                                                  interpolator=self.prior_transform_instance.interpolator,
+                                                  interpolator=self.interpolator,
                                                   dissipation=dissipation,
                                                   max_age=stellar_age * u.Gyr,
                                                   initial_eccentricity=self.initial_eccentricity * u.dimensionless_unscaled,
@@ -1212,8 +1211,6 @@ class LogLikelihood:
         return None
 
 
-
-
     def draw_successful_walkers(self, nwalkers=32, ndim = 9):
         i = 0
         p0 = []
@@ -1231,9 +1228,6 @@ class LogLikelihood:
 
         p0 = self.draw_successful_walkers(nwalkers, ndim)
 
-        print('HHHHHHHHHHHHHHH***********')
-
-
         #sampler = emcee.EnsembleSampler(nwalkers,
                                         #ndim,
                                         #self.__call__)
@@ -1244,9 +1238,11 @@ class LogLikelihood:
             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool = pool)
             start = time.time()
             sampler.run_mcmc(p0, 10
-                             #, progress = True
+                             , progress = True
                              )
             end = time.time()
+
+
 
         #print('Serial processing time for running MCMC is ', (end1-start1))
         print('Parallel processing time for running MCMC is ', (end-start))
@@ -1263,9 +1259,6 @@ class LogLikelihood:
                                quantiles=[0.16, 0.5, 0.84],
                                show_titles=True, title_kwargs={"fontsize": 12})
         plt.show()
-
-
-
         return
 
     def __call__(self,u):
