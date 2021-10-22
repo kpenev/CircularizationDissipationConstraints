@@ -4,6 +4,9 @@ import sys
 import corner
 import time
 
+from stellar_evolution.manager import StellarEvolutionManager
+
+
 import matplotlib
 from bayesian.stellar_param_sampling.prepare import serialize_poet_likelihood
 from split_normal_distribution import split_normal
@@ -231,11 +234,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         if e > 1 or e < 0:
             return 0
         if e <= self.e_env:
-            value = self.cumulative_density_function_of_present_eccentricity(e)
-            if not math.isnan(value):
-                return value
-            else:
-                return math.nan
+            return self.cumulative_density_function_of_present_eccentricity(e)
         return 0
 
     def plot_probability_density_of_eccentricity_vs_eccentricity_graph(self):
@@ -356,7 +355,6 @@ class EnvelopeEccentricityDistribution:
     def __init__(self,
                  path='/home/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv',
                  file_name=b"/home/mmmahmud/poet/scripts/eccentricity_expansion_coef.txt",
-                 serialized_directory='/home/mmmahmud/poet/stellar_evolution_interpolators',
                  maximum_number_of_data_points=math.inf,
                  threshold_value_of_envelope_eccentricity=0.001,
                  constraints = constraints_for_eccentricity_envelope(),
@@ -365,15 +363,10 @@ class EnvelopeEccentricityDistribution:
 
         self.path = path
         self.file_name = file_name
-        self.serialized_directory = serialized_directory
-
         orbital_evolution_library.read_eccentricity_expansion_coefficients(
             file_name
         )
 
-        manager = StellarEvolutionManager(serialized_directory)
-
-        self.interpolator = manager.get_interpolator_by_name('default')
         ##############################################################################
         def read_nasa_planets(csv_filename,
                               eliminate=('SWEEPS-11',
@@ -1008,10 +1001,8 @@ class PriorTransform:
         self.min_initial_stellar_spin = min_initial_stellar_spin
 
         logging.basicConfig(level=logging.DEBUG)
-        orbital_evolution_library.read_eccentricity_expansion_coefficients(
-            eccentricity_expansion_fname
-        )
-        mp.set_start_method('forkserver')
+
+        #mp.set_start_method('forkserver')
         manager = StellarEvolutionManager(serialized_directory)
         self.interpolator = manager.get_interpolator_by_name('default')
         FeHConditionalLikelihoodBase.set_interpolator(self.interpolator)
@@ -1035,7 +1026,6 @@ class PriorTransform:
             abs_minus_error=-self.standard_deviations['stellar_density_lower_uncertainty'])
 
         config = Element(teff, feh, logg, mean_density, debug_plot)
-
         constraints = dict()
         constraints['teff'] = config.Teff
         constraints['logg'] = config.logg
@@ -1097,7 +1087,6 @@ class LogLikelihood:
         self.spin_frequency_powers_for_planet = spin_frequency_powers_for_planet
         self.e_env = e_env
         self.interpolator = prior_transform_instance.interpolator
-        #FeHConditionalLikelihoodBase.set_interpolator(self.interpolator)
 
 
 
@@ -1228,23 +1217,21 @@ class LogLikelihood:
 
         p0 = self.draw_successful_walkers(nwalkers, ndim)
 
-        #sampler = emcee.EnsembleSampler(nwalkers,
-                                        #ndim,
-                                        #self.__call__)
-        #start1 = time.time()
-        #sampler.run_mcmc(p0, 10)
-        #end1 = time.time()
+        sampler = emcee.EnsembleSampler(nwalkers,
+                                        ndim,
+                                        self.__call__)
+        start1 = time.time()
+        sampler.run_mcmc(p0, 100)
+        end1 = time.time()
         with Pool() as pool:
             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool = pool)
             start = time.time()
-            sampler.run_mcmc(p0, 10
+            sampler.run_mcmc(p0, 100
                              , progress = True
                              )
             end = time.time()
 
-
-
-        #print('Serial processing time for running MCMC is ', (end1-start1))
+        print('Serial processing time for running MCMC is ', (end1-start1))
         print('Parallel processing time for running MCMC is ', (end-start))
         blobs = sampler.get_blobs(flat = True)
         figure = corner.corner(blobs, labels=['primary mass',
