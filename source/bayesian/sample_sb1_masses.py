@@ -106,16 +106,24 @@ class SampleSB1Masses(SampleBinaryMasses):
                 m2_guess = secondary_masses[best_index]
                 guess_likelihood = likelihoods[best_index]
 
+        self._logger.debug(
+            'Searching for max likelihood around L(M1=%s, M2=%s) = %s',
+            repr(m1_guess),
+            repr(m2_guess),
+            repr(guess_likelihood)
+        )
+
         min_result = optimize.minimize(
             fun=lambda x: -self.joint_likelihood(*x),
             x0=[m2_guess, m1_guess],
             bounds=optimize.Bounds(*self.photometric_constraint.mass_range,
                                    keep_feasible=True),
+            method='SLSQP',
             options=dict(maxiter=1e6, disp=False)
         )
-        assert min_result.success
         self._logger.debug('Likelihood maximization result: %s',
                            repr(min_result))
+        assert min_result.success
         self.max_likelihood = dict(m2=min_result.x[0],
                                    m1=min_result.x[1],
                                    likelihood=float(-min_result.fun))
