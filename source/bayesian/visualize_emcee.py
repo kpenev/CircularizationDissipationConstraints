@@ -99,6 +99,7 @@ def parse_command_line():
         '--combined-constraint-lgQ-grid',
         default=numpy.linspace(5, 12, 100),
         action=ParseGrid,
+        nargs=3,
         metavar=('MIN_LGQ', 'MAX_LGQ', 'RES'),
         help='Set the range and resolution in log10(Q) on which to calculate '
         'cobined constraints.'
