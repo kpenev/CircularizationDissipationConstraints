@@ -45,12 +45,6 @@ def fit_all_binaries(photometry_interpolators,
                 print('No photometry for binary ' + repr(binary['PKM']))
                 continue
 
-            answer = ngc188_params[
-                ngc188_params['PKM'] == binary['PKM']
-            ]
-            if not answer.size:
-                continue
-
             if is_double_lined:
                 rv_params = dict(
                     observed_mass_ratio=binary['q'],
@@ -114,22 +108,27 @@ def fit_all_binaries(photometry_interpolators,
                     )
                 )
 
-            print(
-                (
-                    '%c Binary %d best fit masses: m1=%s (%s), m2=%s (%s), '
-                    'dV=%s '
-                ) % (
-                    ('v' if result.success else '*'),
-                    binary['PKM'],
-                    repr(primary_m),
-                    answer['l_M1'][0] + repr(answer['M1'][0]),
-                    repr(secondary_m),
-                    answer['l_M2'][0] + repr(answer['M2'][0]),
-                    repr(mag_diff)
+            answer = ngc188_params[
+                ngc188_params['PKM'] == binary['PKM']
+            ]
+
+            if answer.size:
+                print(
+                    (
+                        '%c Binary %d best fit masses: m1=%s (%s), m2=%s (%s), '
+                        'dV=%s '
+                    ) % (
+                        ('v' if result.success else '*'),
+                        binary['PKM'],
+                        repr(primary_m),
+                        answer['l_M1'][0] + repr(answer['M1'][0]),
+                        repr(secondary_m),
+                        answer['l_M2'][0] + repr(answer['M2'][0]),
+                        repr(mag_diff)
+                    )
+                    +
+                    mass_comparison
                 )
-                +
-                mass_comparison
-            )
             fit_results.append((binary['PKM'], primary_m, secondary_m))
 
     return fit_results
@@ -182,25 +181,36 @@ def plot_binary_fit(interpolator,
         )[
             interp_indices
         ]
-        literature_binary_photometry = (
-            interpolator.get_binary_magnitudes(literature_params['M1'],
-                                               literature_params['M2'])
-        )[
-            interp_indices
-        ]
         fit_individual_photometry = (
             interpolator(numpy.array([fit_m1, fit_m2]))[interp_indices]
         )
-        literature_individual_photometry = (
-            interpolator(numpy.array([float(literature_params['M1']),
-                                      float(literature_params['M2'])]))
-        )[
-            interp_indices
-        ]
 
         print('Fit individual star photometry: '
               +
               repr(fit_individual_photometry))
+
+        if literature_params.size:
+            literature_binary_photometry = (
+                interpolator.get_binary_magnitudes(literature_params['M1'],
+                                                   literature_params['M2'])
+            )[
+                interp_indices
+            ]
+            literature_individual_photometry = (
+                interpolator(numpy.array([float(literature_params['M1']),
+                                          float(literature_params['M2'])]))
+            )[
+                interp_indices
+            ]
+        else:
+            literature_individual_photometry = numpy.full(
+                fit_individual_photometry.shape,
+                numpy.nan
+            )
+            literature_binary_photometry = numpy.full(
+                fit_photometry.shape,
+                numpy.nan
+            )
 
         print('Literature individual star photometry: '
               +
@@ -249,6 +259,7 @@ def plot_binary_fit(interpolator,
             markeredgewidth=5,
             label='Best fit binary photometry'
         )
+
         pyplot.plot(
             [
                 literature_binary_photometry[0]

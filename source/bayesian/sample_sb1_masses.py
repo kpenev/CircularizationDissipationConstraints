@@ -4,7 +4,7 @@ import logging
 
 import numpy
 from scipy import optimize
-from astropy import units
+from astropy import units, constants
 
 from binary_utils import rv_semi_amplitude_scale, calculate_secondary_mass
 from sample_binary_masses import SampleBinaryMasses
@@ -66,6 +66,16 @@ class SampleSB1Masses(SampleBinaryMasses):
                 PDF is being calculated in solar masses.
         """
 
+        rvk_points = self.rv_likelihood.observed_rvk.ppf(
+            numpy.linspace(0.01, 0.99, 99)
+        )
+        rvk_points = rvk_points[
+            rvk_points < numpy.cbrt(
+                numpy.pi * constants.G * primary_mass * units.M_sun
+                /
+                (2.0 * self._orbital_period * units.day)
+            ).to_value(units.m / units.s)
+        ]
         return numpy.concatenate(
             (
                 self.photometric_constraint.secondary_mass_quad_points(
@@ -77,9 +87,7 @@ class SampleSB1Masses(SampleBinaryMasses):
                         self._orbital_period * units.day,
                         rvk * units.m / units.s
                     ).to_value(units.M_sun)
-                    for rvk in self.rv_likelihood.observed_rvk.ppf(
-                        numpy.linspace(0.01, 0.99, 99)
-                    )
+                    for rvk in rvk_points
                 ]
             )
         )

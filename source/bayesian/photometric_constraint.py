@@ -104,11 +104,14 @@ class PhotometricConstraint(SampleBinaryMasses):
             photometry=self._measured_photometry,
             min_mag_difference=min_magnitude_difference
         )
+        self._logger.debug('Max likelihood binay mass fit: %s',
+                           repr(likelihood_maximization))
+
+        assert likelihood_maximization.success
 
         while not self.check_constraints(*likelihood_maximization.x):
             likelihood_maximization.x[1] -= 1e-5
 
-        assert likelihood_maximization.success
 
         result = self.joint_likelihood(likelihood_maximization.x[1],
                                        likelihood_maximization.x[0])
@@ -119,6 +122,12 @@ class PhotometricConstraint(SampleBinaryMasses):
             repr(likelihood_maximization.x[1]),
             repr(result)
         )
+
+        if result == 0:
+            raise ValueError(
+                'Failed to find likely stellar masses given photometry'
+            )
+
         self.max_likelihood = dict(m1=likelihood_maximization.x[0],
                                    m2=likelihood_maximization.x[1],
                                    likelihood=result)

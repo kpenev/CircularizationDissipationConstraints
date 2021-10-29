@@ -219,9 +219,8 @@ def add_primary_args(parser, properties):
                       'possibly asymmetric.')
             )
 
-
-def add_binary_selection_args(parser):
-    """Add an argument to parses to choose a binary system to process."""
+def get_binary_ids():
+    """Return dictionary indexed by cluster containing binary IDs."""
 
     binaries = dict()
     binaries['NGC188'] = numpy.concatenate((
@@ -264,6 +263,14 @@ def add_binary_selection_args(parser):
         systems['WOCS'].to_numpy()
         for systems in m35_util.get_binary_data()
     ])
+
+    return binaries
+
+
+def add_binary_selection_args(parser):
+    """Add an argument to parses to choose a binary system to process."""
+
+    binaries = get_binary_ids()
 
     parser.add_argument(
         'system',

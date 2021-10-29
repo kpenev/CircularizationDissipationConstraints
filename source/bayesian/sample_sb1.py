@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Use dynesty to sample SB1 binary star system."""
+"""Sample SB1 binary star system."""
 
 import logging
 import traceback
