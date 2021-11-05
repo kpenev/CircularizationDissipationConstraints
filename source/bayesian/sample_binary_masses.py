@@ -49,6 +49,7 @@ class SampleBinaryMasses(Picklable):
             dense_output=True,
             **self._m1_solve_ivp_config
         )
+        self._logger.debug('M1 CDF solution: %s', repr(result))
         assert result.success
         return result.sol
 
@@ -116,6 +117,16 @@ class SampleBinaryMasses(Picklable):
 
         self._likelihood_pickle_entires = likelihood_pickle_entries
         super().__init__(len(likelihood_pickle_entries) + 4)
+
+        self._logger.debug(
+            'Sample binary masses M2 marginalization options: %s',
+            repr(m2_integration_config)
+        )
+        self._logger.debug(
+            'Sample binary masses M1 normalization calc options: %s',
+            repr(m1_solve_ivp_config)
+        )
+
 
         self._cumulative_m1_likelihood = self.check_for_pickled(pickle_fname)
         if self._cumulative_m1_likelihood is None:

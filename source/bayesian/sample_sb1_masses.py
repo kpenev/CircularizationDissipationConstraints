@@ -97,10 +97,12 @@ class SampleSB1Masses(SampleBinaryMasses):
         """Return the max likelihood M1, M2, and likelihood value."""
 
         guess_likelihood = -numpy.inf
-        for primary_mass in numpy.linspace(
-                *self.photometric_constraint.mass_range,
-                100
+        for primary_mass in numpy.vectorize(
+            self.photometric_constraint.primary_mass_ppf
+        )(
+            numpy.linspace(0, 1.0, 100)
         ):
+
             secondary_masses = self.secondary_mass_quad_points(primary_mass)
             likelihoods = numpy.vectorize(
                 self.joint_likelihood
@@ -115,10 +117,12 @@ class SampleSB1Masses(SampleBinaryMasses):
                 guess_likelihood = likelihoods[best_index]
 
         self._logger.debug(
-            'Searching for max likelihood around L(M1=%s, M2=%s) = %s',
+            'Searching for max likelihood around L(M1=%s, M2=%s) = %s within '
+            'bounds %s.',
             repr(m1_guess),
             repr(m2_guess),
-            repr(guess_likelihood)
+            repr(guess_likelihood),
+            repr(self.photometric_constraint.mass_range)
         )
 
         min_result = optimize.minimize(
@@ -126,15 +130,25 @@ class SampleSB1Masses(SampleBinaryMasses):
             x0=[m2_guess, m1_guess],
             bounds=optimize.Bounds(*self.photometric_constraint.mass_range,
                                    keep_feasible=True),
-            method='SLSQP',
+            method='Nelder-Mead',
             options=dict(maxiter=1e6, disp=False)
         )
         self._logger.debug('Likelihood maximization result: %s',
                            repr(min_result))
-        assert min_result.success
         self.max_likelihood = dict(m2=min_result.x[0],
                                    m1=min_result.x[1],
                                    likelihood=float(-min_result.fun))
+        self._logger.debug('Max SB1 likelihood found: %s',
+                           repr(self.max_likelihood))
+        self._logger.debug(
+            'Direct likelihood calcualtion at M1=%s, M2=%s: %s',
+            repr(self.max_likelihood['m1']),
+            repr(self.max_likelihood['m2']),
+            repr(self.joint_likelihood(self.max_likelihood['m2'],
+                                       self.max_likelihood['m1']))
+        )
+        assert min_result.success
+        assert -min_result.fun >= guess_likelihood
 
 
     def __init__(self,
