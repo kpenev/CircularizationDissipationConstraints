@@ -2,8 +2,12 @@
 
 """Functions to fit for single and binary star masses given photometry."""
 
+import logging
+
 import numpy
 import scipy.integrate
+
+_logger = logging.getLogger(__name__)
 
 def fit_single_mass(photometry_interp,
                     photometry,
@@ -349,6 +353,31 @@ def fit_binary_masses(photometry_interpolators,
         #pylint: enable=assignment-from-no-return
         result[update] -= observed.logpdf(predicted[update])
 
+    def mag_difference_constraints(masses):
+        """Return the secondary - primary mags for min mag constraints."""
+
+        min_defficiency = numpy.inf
+
+        for photometry_interp in photometry_interpolators:
+            magnitudes = photometry_interp(masses)
+            mag_differences = magnitudes[:, 1] - magnitudes[:, 0]
+
+            for filter_name, min_diff in min_mag_difference.items():
+                if filter_name in photometry_interp.available_filters:
+                    min_defficiency = numpy.minimum(
+                        min_defficiency,
+                        (
+                            mag_differences[
+                                photometry_interp.available_filters.index(
+                                    filter_name
+                                )
+                            ]
+                            -
+                            min_diff
+                        )
+                    )
+        return min_defficiency
+
     def negative_log_likelihood(masses):
         """Return -log(likelihood) of the data given stellar masses."""
 
@@ -395,30 +424,16 @@ def fit_binary_masses(photometry_interpolators,
                         )
         return result
 
-    def mag_difference_constraints(masses):
-        """Return the secondary - primary mags for min mag constraints."""
+    def constrained_negative_log_likelihood(masses, min_mass, max_mass):
+        """Same as `negative_log_likelihood`, but -inf if mag diff too small."""
 
-        min_defficiency = numpy.inf
+        if masses.min() < min_mass or masses.max() > max_mass:
+            return numpy.inf
 
-        for photometry_interp in photometry_interpolators:
-            magnitudes = photometry_interp(masses)
-            mag_differences = magnitudes[:, 1] - magnitudes[:, 0]
+        if min_mag_difference and float(mag_difference_constraints(masses)) < 0:
+            return numpy.inf
 
-            for filter_name, min_diff in min_mag_difference.items():
-                if filter_name in photometry_interp.available_filters:
-                    min_defficiency = numpy.minimum(
-                        min_defficiency,
-                        (
-                            mag_differences[
-                                photometry_interp.available_filters.index(
-                                    filter_name
-                                )
-                            ]
-                            -
-                            min_diff
-                        )
-                    )
-        return min_defficiency
+        return negative_log_likelihood(masses)
 
     def get_mass_grid(resolution=1e-10):
         """Pick a grid of masses to search for a starting point."""
@@ -455,7 +470,7 @@ def fit_binary_masses(photometry_interpolators,
 
         return mass_grid
 
-    def choose_starting_point(mass_grid):
+    def choose_starting_simplex(mass_grid):
         """Return a good starting point for the minimization."""
 
         mass_grid_2d = numpy.meshgrid(mass_grid, mass_grid)
@@ -466,25 +481,83 @@ def fit_binary_masses(photometry_interpolators,
             grid_constraints = mag_difference_constraints(mass_grid_2d)
             log_likelihood_grid[grid_constraints < 0] = numpy.inf
 
-        best_masses = mass_grid[
-            numpy.stack(
-                reversed(
-                    sorted(
-                        numpy.unravel_index(numpy.argmin(log_likelihood_grid),
-                                            log_likelihood_grid.shape)
-                    )
-                )
-            )
-        ]
-        print('Starting masses: ' + repr(best_masses))
+        best_index = numpy.unravel_index(numpy.argmin(log_likelihood_grid),
+                                         log_likelihood_grid.shape)
+        _logger.debug('Best starting point: %s, ln(L) = %s',
+                      repr(best_index),
+                      repr(log_likelihood_grid[best_index]))
 
-        return best_masses
+
+        m1_ind, m2_ind = reversed(sorted(best_index))
+
+        result = numpy.empty((3,2))
+        likelihoods = numpy.empty(3)
+
+        result[0] = mass_grid[[m1_ind, m2_ind]]
+        likelihoods[0] = log_likelihood_grid[m2_ind, m1_ind]
+
+        _logger.debug(
+            '-ln(likelihood) grid near min:\n%s',
+            repr(
+                log_likelihood_grid[m2_ind - 1: m2_ind + 2,
+                                    m1_ind - 1: m1_ind + 2]
+            )
+        )
+
+        done = False
+        retry = True
+        while retry:
+            retry = False
+            if (
+                    m1_ind > m2_ind
+                    and
+                    numpy.isfinite(log_likelihood_grid[m2_ind, m1_ind - 1])
+            ):
+                result[1] = mass_grid[[m1_ind - 1, m2_ind]]
+                likelihoods[1] = log_likelihood_grid[m2_ind, m1_ind - 1]
+            elif (
+                    m1_ind < mass_grid.size
+                    and
+                    numpy.isfinite(log_likelihood_grid[m2_ind, m1_ind + 1])
+            ):
+                result[1] = mass_grid[[m1_ind + 1, m2_ind]]
+                likelihoods[1] = log_likelihood_grid[m2_ind, m1_ind + 1]
+            else:
+                assert m2_ind > 0
+                assert numpy.isfinite(log_likelihood_grid[m2_ind - 1, m1_ind])
+                m2_ind -= 1
+                result[2] = mass_grid[[m1_ind, m2_ind]]
+                likelihoods[2] = log_likelihood_grid[m2_ind, m1_ind]
+                done = True
+                retry = True
+
+        if not done:
+            if (
+                    m2_ind > 0
+                    and
+                    numpy.isfinite(log_likelihood_grid[m2_ind - 1, m1_ind])
+            ):
+                result[2] = mass_grid[[m1_ind, m2_ind - 1]]
+                likelihoods[2] = log_likelihood_grid[m2_ind - 1, m1_ind]
+            else:
+                assert m2_ind < m1_ind
+                assert numpy.isfinite(log_likelihood_grid[m2_ind + 1, m1_ind])
+                result[2] = mass_grid[[m1_ind, m2_ind + 1]]
+                likelihoods[2] = log_likelihood_grid[m2_ind + 1, m1_ind]
+
+        _logger.debug('Starting masses: %s, %s, %s, -ln(L) = %s, %s, %s',
+                      *[repr(m12) for m12 in result],
+                      *[repr(lnl) for lnl in likelihoods])
+
+        return result
 
     mass_grid = get_mass_grid()
 
-    return scipy.optimize.minimize(
+    starting_simplex = choose_starting_simplex(mass_grid)
+
+    result = scipy.optimize.minimize(
         fun=negative_log_likelihood,
-        x0=choose_starting_point(mass_grid),
+        x0=starting_simplex[0],
         bounds=scipy.optimize.Bounds(
             lb=mass_grid[0],
             ub=mass_grid[-1],
@@ -500,3 +573,31 @@ def fit_binary_masses(photometry_interpolators,
         ),
         options=dict(maxiter=1e6, disp=False)
     )
+    _logger.debug('Mass fitting likelihood maximization:\n%s',
+                  repr(result))
+
+    if not result.success:
+        _logger.warning(
+            'Mass fitting default likelihood maximization failed, attempting '
+            'Nelder-Mead!'
+        )
+        result = scipy.optimize.minimize(
+            fun=constrained_negative_log_likelihood,
+            x0=starting_simplex[0],
+            args=(mass_grid[0], mass_grid[-1]),
+            bounds=scipy.optimize.Bounds(
+                lb=mass_grid[0],
+                ub=mass_grid[-1],
+                keep_feasible=True
+            ),
+            method='Nelder-Mead',
+            options=dict(initial_simplex=starting_simplex,
+                         maxiter=1e6,
+                         disp=False)
+        )
+        _logger.debug('Mass fitting Nelder-Mead result:\n%s',
+                      repr(result))
+
+        assert result.success
+
+    return result
