@@ -1087,6 +1087,7 @@ class LogLikelihood:
         self.spin_frequency_powers_for_planet = spin_frequency_powers_for_planet
         self.e_env = e_env
         self.interpolator = prior_transform_instance.interpolator
+        self.calculated_eccentricity_now = None
 
 
 
@@ -1157,7 +1158,7 @@ class LogLikelihood:
                 reference_phase_lag=phase_lag(reference_argument_of_phase_lag_function_for_planet)
             )
         )
-        yes = False
+        yes = True
         if yes:
             evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
                                                   interpolator=self.interpolator,
@@ -1212,26 +1213,26 @@ class LogLikelihood:
         return p0
 
     def MCMC(self,
-             nwalkers=18,
+             nwalkers=19,
              ndim=9):
 
         p0 = self.draw_successful_walkers(nwalkers, ndim)
 
-        sampler = emcee.EnsembleSampler(nwalkers,
-                                        ndim,
-                                        self.__call__)
-        start1 = time.time()
-        sampler.run_mcmc(p0, 100)
-        end1 = time.time()
+        #sampler = emcee.EnsembleSampler(nwalkers,
+                                        #ndim,
+                                        #self.__call__)
+        #start1 = time.time()
+        #sampler.run_mcmc(p0, 100)
+        #end1 = time.time()
         with Pool() as pool:
             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool = pool)
             start = time.time()
-            sampler.run_mcmc(p0, 100
+            sampler.run_mcmc(p0, 2
                              , progress = True
                              )
             end = time.time()
 
-        print('Serial processing time for running MCMC is ', (end1-start1))
+        #print('Serial processing time for running MCMC is ', (end1-start1))
         print('Parallel processing time for running MCMC is ', (end-start))
         blobs = sampler.get_blobs(flat = True)
         figure = corner.corner(blobs, labels=['primary mass',
@@ -1242,16 +1243,19 @@ class LogLikelihood:
                                               'initial stellar spin',
                                               'argument of phase lag function for planet',
                                               'tidal break point',
-                                              'power law argument'],
+                                              'power law argument',
+                                              'present eccentricity',
+                                              'log likelihood of present eccentricity'],
                                quantiles=[0.16, 0.5, 0.84],
                                show_titles=True, title_kwargs={"fontsize": 12})
         plt.show()
+        figure.savefig("MCMC.pdf", bbox_inches='tight')
         return
 
     def __call__(self,u):
         for i in range(0, 9):
             if u[i]>1 or u[i]<0:
-                return -np.inf, np.array([None, None, None, None, None, None, None, None,  None])
+                return -np.inf, np.array([None, None, None, None, None, None, None, None,  None, None, None])
         parameters_for_evolution = self.prior_transform_instance(u)
 
         params =np.array([parameters_for_evolution['primary mass'],
@@ -1265,7 +1269,8 @@ class LogLikelihood:
                   parameters_for_evolution['power law argument']])
         log_prob_parameters_for_evolution = self.log_prob(parameters_for_evolution)
         if np.isinf(-log_prob_parameters_for_evolution):
-            return -np.inf, np.array([None, None, None, None, None, None, None, None,  None])
+            return -np.inf, np.array([None, None, None, None, None, None, None, None,  None, None, None])
+        params = np.append(params, [self.calculated_eccentricity_now, log_prob_parameters_for_evolution] )
         return log_prob_parameters_for_evolution, params
 
 class SamplingPropertiesOfSystem:
