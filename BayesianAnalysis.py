@@ -1288,21 +1288,20 @@ class LogLikelihood:
 
 
     def draw_successful_walkers_aux(self,
-                                        number_of_discovered_walkers,
-                                        walkers,
-                                        ndim):
+                                    number_of_discovered_walkers,
+                                    walkers,
+                                    ndim):
         u = numpy.random.rand(ndim)
         log_likelihood, parameters_for_evolution = self.__call__(u)
         if log_likelihood != -math.inf and log_likelihood > -50:
             walkers.put(u)
             number_of_discovered_walkers.value +=1
 
-    def draw_successful_walkers(self, nwalkers=32, ndim=9, nprocessors = 8):
+    def draw_successful_walkers(self, nwalkers=32, ndim=9, nprocessors = 3):
         array_of_processes = []
         number_of_discovered_walkers = Value('i', 0)
         walkers = Queue()
-        k = -1
-
+        k = 0
         while number_of_discovered_walkers.value < nwalkers:
             for i in range(0, nprocessors):
                 process = Process(target=self.draw_successful_walkers_aux,
@@ -1310,15 +1309,17 @@ class LogLikelihood:
                                         walkers,
                                         ndim))
                 array_of_processes.append(process)
-            k +=1
-            array_of_processes[k].start()
-            if number_of_discovered_walkers.value == nwalkers:
-                break
+
+            for j in range(k, k + nprocessors):
+                array_of_processes[j].start()
+                if number_of_discovered_walkers.value == nwalkers:
+                    k = j
+                    break
+            if number_of_discovered_walkers.value < nwalkers:
+                k = k + nprocessors
 
         for i in range(0, k+1):
             array_of_processes[i].join()
-
-
         p0 = []
         while not walkers.empty():
             p0.append(walkers.get())
@@ -1351,11 +1352,12 @@ class LogLikelihood:
         # start1 = time.time()
         # sampler.run_mcmc(p0, 100)
         # end1 = time.time()
-        config = ConfigObjectForLogging(system='WASP-89 b')
-        with Pool(config.num_parallel_processes,
-                  initializer=setup_process,
-                  initargs=[config],
-                  maxtasksperchild=1) as pool:
+        #config = ConfigObjectForLogging(system='WASP-89 b')
+        #with Pool(config.num_parallel_processes,
+                  #initializer=setup_process,
+                  #initargs=[config],
+                  #maxtasksperchild=1) as pool:
+        with Pool() as pool:
             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool=pool)
             start = time.time()
             sampler.run_mcmc(p0, 2
