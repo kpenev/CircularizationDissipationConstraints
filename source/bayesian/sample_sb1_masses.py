@@ -128,10 +128,11 @@ class SampleSB1Masses(SampleBinaryMasses):
         min_result = optimize.minimize(
             fun=lambda x: -self.joint_likelihood(*x),
             x0=[m2_guess, m1_guess],
-            bounds=optimize.Bounds(*self.photometric_constraint.mass_range,
-                                   keep_feasible=True),
             method='Nelder-Mead',
-            options=dict(maxiter=1e6, disp=False)
+            options=dict(
+                maxiter=1e5,
+                disp=True
+            )
         )
         self._logger.debug('Likelihood maximization result: %s',
                            repr(min_result))
@@ -147,7 +148,18 @@ class SampleSB1Masses(SampleBinaryMasses):
             repr(self.joint_likelihood(self.max_likelihood['m2'],
                                        self.max_likelihood['m1']))
         )
-        assert min_result.success
+        for masses in min_result.final_simplex[0]:
+            self.photometric_constraint.log_required_magnitude_differences(
+                *masses
+            )
+        assert (
+            min_result.success
+            or
+            self.photometric_constraint.magnitude_difference_margin(
+                self.max_likelihood['m1'],
+                self.max_likelihood['m2']
+            ) < 1e-10
+        )
         assert -min_result.fun >= guess_likelihood
 
 

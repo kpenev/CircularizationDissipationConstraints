@@ -21,16 +21,10 @@ class PhotometricConstraint(SampleBinaryMasses):
 
     _logger = logging.getLogger(__name__)
 
-    def check_constraints(self, primary_mass, secondary_mass):
-        """Return True iff the given masses are allowed."""
+    def magnitude_difference_margin(self, primary_mass, secondary_mass):
+        """Return the margin by which system satisfies mag diff constraints."""
 
-        if (
-                min(primary_mass, secondary_mass) < self.mass_range[0]
-                or
-                max(primary_mass, secondary_mass) > self.mass_range[1]
-        ):
-            return False
-
+        result = numpy.inf
         for (
                 interpolator_index,
                 filter_index,
@@ -44,8 +38,10 @@ class PhotometricConstraint(SampleBinaryMasses):
                 )[
                     filter_index
                 ]
-                if secondary_mag - primary_mag < min_difference:
-                    return False
+                result = min(
+                    result,
+                    secondary_mag - primary_mag - min_difference
+                )
             except ValueError:
                 self._logger.critical(
                     'Invalid input masses to photometry interpolator: %s, %s',
@@ -53,6 +49,24 @@ class PhotometricConstraint(SampleBinaryMasses):
                     repr(secondary_mass)
                 )
                 raise
+        return result
+
+    def check_constraints(self, primary_mass, secondary_mass):
+        """Return True iff the given masses are allowed."""
+
+        if (
+                min(primary_mass, secondary_mass) < self.mass_range[0]
+                or
+                max(primary_mass, secondary_mass) > self.mass_range[1]
+                or
+                (
+                    self.magnitude_difference_margin(primary_mass,
+                                                     secondary_mass)
+                    <
+                    0
+                )
+        ):
+            return False
 
         return True
 
@@ -90,10 +104,13 @@ class PhotometricConstraint(SampleBinaryMasses):
         return result
 
 
+    #Signature set by parent
+    #pylint: disable=unused-argument
     def secondary_mass_quad_points(self, primary_mass):
         """Points arg to quad required for reliable marginalization oven m2."""
 
         return self._quad_points
+    #pylint: enable=unused-argument
 
 
     def _init_max_likelihood(self, min_magnitude_difference):
@@ -320,6 +337,51 @@ class PhotometricConstraint(SampleBinaryMasses):
             /
             surface_g
         ).to_value(units.R_sun)
+
+    def log_required_magnitude_differences(self,
+                                           primary_mass,
+                                           secondary_mass,
+                                           level='debug'):
+        """
+        Issue log message showing mag diff for filters with imposed contrast.
+
+        Args:
+            primary_mass(float):    The mass of the primary star
+
+            secondary_mass(float):    The mass of the secondary star
+
+            level(str):    The logging level to use for the message.
+
+        Returns:
+            None
+        """
+
+        report = []
+        for (
+                interpolator_index,
+                filter_index,
+                min_difference
+        ) in self._min_magnitude_difference:
+            interpolator = self._photometry_interpolators[interpolator_index]
+            primary_mag, secondary_mag = interpolator(
+                numpy.array([primary_mass, secondary_mass])
+            )[
+                filter_index
+            ]
+            report.append(
+                'd%s = %s (%s)' % (
+                    interpolator.available_filters[filter_index],
+                    primary_mag - secondary_mag,
+                    min_difference
+                )
+            )
+
+        getattr(self._logger, level)(
+            'Critical mag differences at m1 = %s, m2 = %s: %s',
+            repr(primary_mass),
+            repr(secondary_mass),
+            ', '.join(report),
+        )
 
 #pylint: enable=too-many-instance-attributes
 

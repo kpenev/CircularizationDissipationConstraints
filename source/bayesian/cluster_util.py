@@ -37,7 +37,7 @@ def get_rv_likelihood(observed_orbit,
             ) * 1000.0,
             scale=float(observed_orbit['e_K']) * 1000.0
         )
-        if signal_to_noise > 50 else
+        if signal_to_noise > 35 else
         stats.rice(
             b=signal_to_noise,
             scale=float(observed_orbit['e_K']) * 1000.0
@@ -49,6 +49,19 @@ def get_rv_likelihood(observed_orbit,
         *
         (envelope_eccentricity - float(observed_orbit['e']))
     )
+    if not interpolation_accuracy > 0:
+        raise RuntimeError(
+            ('Invalid interpolation accuracy requirement (%s) from '
+             'Kmean = %s, pdf(Kmean) = %s, e_env = %s, e_obs = %s')
+            %
+            (
+                repr(interpolation_accuracy),
+                repr(observed_rvk.mean()),
+                repr(observed_rvk.pdf(observed_rvk.mean())),
+                repr(envelope_eccentricity),
+                repr(float(observed_orbit['e']))
+            )
+        )
 
     #TODO: find better observed eccentricity distribution
     return ApproximateRVLikelihood(
