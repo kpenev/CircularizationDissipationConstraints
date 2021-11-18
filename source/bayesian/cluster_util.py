@@ -50,7 +50,7 @@ def get_rv_likelihood(observed_orbit,
         (envelope_eccentricity - float(observed_orbit['e']))
     )
     if not interpolation_accuracy > 0:
-        raise RuntimeError(
+        raise ValueError(
             ('Invalid interpolation accuracy requirement (%s) from '
              'Kmean = %s, pdf(Kmean) = %s, e_env = %s, e_obs = %s')
             %
