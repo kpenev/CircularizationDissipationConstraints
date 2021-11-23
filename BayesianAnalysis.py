@@ -28,7 +28,7 @@ from scipy.special import i0
 from scipy.integrate import nquad
 from bayesian.stellar_param_sampling.poet_interp_likelihood import POETInterpLikelihood
 from bayesian.stellar_param_sampling.star_sampler import StarSampler
-from random import random
+from random import random, randint
 import multiprocessing as mp
 from multiprocessing import Pool, Queue, Process, Value
 from datetime import datetime
@@ -1288,44 +1288,61 @@ class LogLikelihood:
 
 
     def draw_successful_walkers_aux(self,
+                                    u,
                                     number_of_discovered_walkers,
                                     walkers,
+                                    nwalkers,
                                     ndim):
-        u = numpy.random.rand(ndim)
-        log_likelihood, parameters_for_evolution = self.__call__(u)
-        if log_likelihood != -math.inf and log_likelihood > -50:
+        log_likelihood, parameters_for_evolution = self(u)
+        if not math.isinf(log_likelihood):
             walkers.put(u)
-            number_of_discovered_walkers.value +=1
+            number_of_discovered_walkers.value = number_of_discovered_walkers.value + 1
+            print('number of discovered walkers = ', number_of_discovered_walkers)
+            print('log likelihood ', log_likelihood)
+            print('parameters for evolution ', parameters_for_evolution)
+        if number_of_discovered_walkers.value < nwalkers:
+            y = randint(1,10)
+            for i in range(0, y):
+                u = numpy.random.rand(ndim)
+            self.draw_successful_walkers_aux(u,
+                                             number_of_discovered_walkers,
+                                             walkers,
+                                             nwalkers,
+                                             ndim)
 
-    def draw_successful_walkers(self, nwalkers=32, ndim=9, nprocessors = 3):
+
+
+    def draw_successful_walkers(self, nwalkers=32, ndim=9, nprocessors = 8):
         array_of_processes = []
         number_of_discovered_walkers = Value('i', 0)
+        a_process_has_finished = Value('i', 0)
         walkers = Queue()
-        k = 0
-        while number_of_discovered_walkers.value < nwalkers:
-            for i in range(0, nprocessors):
-                process = Process(target=self.draw_successful_walkers_aux,
-                                  args=(number_of_discovered_walkers,
-                                        walkers,
-                                        ndim))
-                array_of_processes.append(process)
 
-            for j in range(k, k + nprocessors):
-                array_of_processes[j].start()
-                if number_of_discovered_walkers.value == nwalkers:
-                    k = j
-                    break
-            if number_of_discovered_walkers.value < nwalkers:
-                k = k + nprocessors
+        i = 0
+        while i<nprocessors:
+            u = numpy.random.rand(ndim)
+            process = Process(target=self.draw_successful_walkers_aux,
+                              args=(u,
+                                    number_of_discovered_walkers,
+                                    walkers,
+                                    nwalkers,
+                                    ndim))
+            array_of_processes.append(process)
+            i = i+1
 
-        for i in range(0, k+1):
-            array_of_processes[i].join()
-        p0 = []
-        while not walkers.empty():
-            p0.append(walkers.get())
+        j = 0
+        while j<i:
+            array_of_processes[j].start()
+            j = j + 1
+
+        p0 = [walkers.get(block=True) for _ in range(nwalkers)]
+        for process in array_of_processes:
+            process.terminate()
+            process.join()
+
         return p0
 
-    def draw_successful_walkers_old(self, nwalkers=32, ndim=9, nprocessors = 8):
+    def draw_successful_walkers_old(self, nwalkers=32, ndim=9, nprocessors = 6):
         i = 0
         p0 = []
 
@@ -1343,22 +1360,67 @@ class LogLikelihood:
     def MCMC(self,
              nwalkers=19,
              ndim=9):
+        #first = time.time()
+        #p0 = self.draw_successful_walkers(nwalkers, ndim)
+        #second = time.time()
+        #print('p0 = ', p0)
+        p0 = [np.array([0.71308203, 0.90610494, 0.91440945, 0.1997531, 0.84079461,
+                     0.15036786, 0.31559824, 0.10179498, 0.79204953]),
+              np.array([0.92194612, 0.81642824, 0.66148696, 0.94454168, 0.07870542,
+                     0.90223607, 0.47919943, 0.86898269, 0.71352875]),
+              np.array([0.2827382, 0.84571375, 0.05273939, 0.42537987, 0.12282174,
+                     0.9992452, 0.8572412, 0.55780744, 0.55579581]),
+              np.array([0.71308203, 0.90610494, 0.91440945, 0.1997531, 0.84079461,
+                     0.15036786, 0.31559824, 0.10179498, 0.79204953]),
+              np.array([0.89669149, 0.58584233, 0.19602291, 0.42030086, 0.03320706,
+                     0.93092432, 0.36725414, 0.274658, 0.97774559]),
+              np.array([0.89669149, 0.58584233, 0.19602291, 0.42030086, 0.03320706,
+                     0.93092432, 0.36725414, 0.274658, 0.97774559]),
+              np.array([0.43600005, 0.41206972, 0.9218552, 0.66793065, 0.5236485,
+                     0.71808833, 0.74350964, 0.71076796, 0.62956057]),
+              np.array([0.80216069, 0.58696358, 0.51967322, 0.99502222, 0.7582028,
+                     0.56431787, 0.15536902, 0.88096377, 0.94368962]),
+              np.array([0.34439215, 0.90162532, 0.90649617, 0.5321296, 0.13670825,
+                     0.25393945, 0.71312293, 0.47807645, 0.86343277]),
+              np.array([0.55823613, 0.38699561, 0.11223542, 0.08508325, 0.92741295,
+                     0.04701482, 0.56428743, 0.70862706, 0.41752298]),
+              np.array([0.57314808, 0.36459298, 0.48746912, 0.0616988, 0.64825068,
+                     0.03841059, 0.64250931, 0.4467972, 0.31798161]),
+              np.array([0.71308203, 0.90610494, 0.91440945, 0.1997531, 0.84079461,
+                     0.15036786, 0.31559824, 0.10179498, 0.79204953]),
+              np.array([0.73695991, 0.20907602, 0.43522499, 0.76191137, 0.72178343,
+                     0.27626663, 0.64798984, 0.7979834, 0.93707632]),
+              np.array([0.89669149, 0.58584233, 0.19602291, 0.42030086, 0.03320706,
+                     0.93092432, 0.36725414, 0.274658, 0.97774559]),
+              np.array([0.70141684, 0.34970582, 0.18908514, 0.22895077, 0.52729556,
+                     0.11884659, 0.61851373, 0.59210252, 0.47447497]),
+              np.array([0.59892595, 0.49118966, 0.01259909, 0.22326391, 0.82614969,
+                     0.20496768, 0.19391448, 0.3163904, 0.06749424]),
+              np.array([0.75768132, 0.60176831, 0.6913386, 0.65852016, 0.81038335,
+                     0.28125441, 0.47341502, 0.9090404, 0.44020568]),
+              np.array([0.36363791, 0.18228264, 0.5559545, 0.59468997, 0.4889357,
+                     0.21367127, 0.93533487, 0.3309231, 0.67443948]),
+              np.array([0.37712106, 0.430148, 0.79995587, 0.60997802, 0.51637431,
+                     0.22429358, 0.43330749, 0.10886197, 0.50171915])]
 
-        p0 = self.draw_successful_walkers(nwalkers, ndim)
-
+        #print('time required to workout the walkers ', (second-first))
         # sampler = emcee.EnsembleSampler(nwalkers,
         # ndim,
         # self.__call__)
         # start1 = time.time()
         # sampler.run_mcmc(p0, 100)
         # end1 = time.time()
-        #config = ConfigObjectForLogging(system='WASP-89 b')
-        #with Pool(config.num_parallel_processes,
-                  #initializer=setup_process,
-                  #initargs=[config],
-                  #maxtasksperchild=1) as pool:
-        with Pool() as pool:
+        config = ConfigObjectForLogging(system='WASP-89 b')
+        with Pool(config.num_parallel_processes,
+                  initializer=setup_process,
+                  initargs=[config],
+                  maxtasksperchild=1) as pool:
+
+            #with Pool() as pool:
+            print('sampler ')
             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool=pool)
+            print('sampler: ', sampler)
+            
             start = time.time()
             sampler.run_mcmc(p0, 2
                              , progress=True
@@ -1366,23 +1428,24 @@ class LogLikelihood:
             end = time.time()
 
         # print('Serial processing time for running MCMC is ', (end1-start1))
-        print('Parallel processing time for running MCMC is ', (end - start))
-        blobs = sampler.get_blobs(flat=True)
-        figure = corner.corner(blobs, labels=['primary mass',
-                                              'stellar age',
-                                              'secondary radius',
-                                              'stellar metallicity',
-                                              'secondary mass',
-                                              'initial stellar spin',
-                                              'argument of phase lag function for planet',
-                                              'tidal break point',
-                                              'power law argument',
-                                              'present eccentricity',
-                                              'log likelihood of present eccentricity'],
-                               quantiles=[0.16, 0.5, 0.84],
-                               show_titles=True, title_kwargs={"fontsize": 12})
+            print('Parallel processing time for running MCMC is ', (end - start))
+            blobs = sampler.get_blobs(flat=True)
+            figure = corner.corner(blobs, labels=['primary mass',
+                                                  'stellar age',
+                                                  'secondary radius',
+                                                  'stellar metallicity',
+                                                  'secondary mass',
+                                                  'initial stellar spin',
+                                                  'argument of phase lag function for planet',
+                                                  'tidal break point',
+                                                  'power law argument',
+                                                  'present eccentricity',
+                                                  'log likelihood of present eccentricity'],
+                                   quantiles=[0.16, 0.5, 0.84],
+                                   show_titles=True, title_kwargs={"fontsize": 12})
         plt.show()
         figure.savefig("MCMC.pdf", bbox_inches='tight')
+
         return
 
     def __call__(self, u):
