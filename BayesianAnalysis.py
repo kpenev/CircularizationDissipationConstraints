@@ -179,7 +179,7 @@ def setup_process(config):
         handler.close()
     logging_config = dict(
         filename=logging_fname,
-        level=getattr(logging, logging.DEBUG),
+        level=config.logging_level,
         format=config.logging_message_format,
         )
     if config.logging_datetime_format is not None:
@@ -1403,13 +1403,6 @@ class LogLikelihood:
               np.array([0.37712106, 0.430148, 0.79995587, 0.60997802, 0.51637431,
                      0.22429358, 0.43330749, 0.10886197, 0.50171915])]
 
-        #print('time required to workout the walkers ', (second-first))
-        # sampler = emcee.EnsembleSampler(nwalkers,
-        # ndim,
-        # self.__call__)
-        # start1 = time.time()
-        # sampler.run_mcmc(p0, 100)
-        # end1 = time.time()
         config = ConfigObjectForLogging(system='WASP-89 b')
         with Pool(config.num_parallel_processes,
                   initializer=setup_process,
@@ -1428,7 +1421,10 @@ class LogLikelihood:
             end = time.time()
 
         # print('Serial processing time for running MCMC is ', (end1-start1))
-            print('Parallel processing time for running MCMC is ', (end - start))
+            f = open('time.txt', 'w+')
+            span = (end-start)
+            f.write('Parallel processing time for running MCMC is %f '%span)
+            f.close()
             blobs = sampler.get_blobs(flat=True)
             figure = corner.corner(blobs, labels=['primary mass',
                                                   'stellar age',
@@ -1478,8 +1474,9 @@ class ConfigObjectForLogging:
         self.std_out_err_fname = 'sampling_output/%(system)s_%(now)s_%(pid)d.outerr'
         self.logging_fname = 'logging/%(system)s_%(now)s_%(pid)d.logging'
         self.logging_datetime_format = "%m/%d/%Y"
-        self.num_parallel_processes = 8
+        self.num_parallel_processes = 6
         self.logging_message_format = '%(levelname)s %(asctime)s %(name)s: %(message)s | %(pathname)s.%(funcName)s:%(lineno)d'
+        self.logging_level = logging.WARNING
 
 
 class SamplingPropertiesOfSystem:
