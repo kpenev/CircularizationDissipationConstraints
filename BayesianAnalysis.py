@@ -3,6 +3,7 @@ import math
 import sys
 import corner
 import time
+import h5py
 
 from stellar_evolution.manager import StellarEvolutionManager
 
@@ -222,7 +223,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         second = rice.cdf((self.mean_e_now + self.e_now_lower_uncertainty), b,
                           scale=s) - self.percentile_for_e_now_lower_uncertainty
         if math.isnan(first) or math.isnan(second):
-            print('Iteration does not converge.')
+            logging.warning('Iteration does not converge')
             self.rice_parameters_are_found = False
         return [first, second]
 
@@ -231,7 +232,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         eqn = rice.cdf((self.mean_e_now + self.e_now_upper_uncertainty), 0,
                        scale=s) - self.percentile_for_e_now_upper_uncertainty
         if math.isnan(eqn):
-            print('Iteration does not converge.')
+            logging.warning('Iteration does not converge')
             self.rice_parameters_are_found = False
         return [eqn]
 
@@ -242,7 +243,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
                 s = fsolve(self.equation_to_be_solved_for_Rice_distribution_parameter_s_when_b_zero,
                            np.asarray([estimated_s]))
             except:
-                print('Rice parameters cannot be worked out')
+                logging.warning('Rice parameters cannot be worked out')
                 self.rice_parameters_are_found = False
                 return [math.nan, math.nan]
             else:
@@ -254,7 +255,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
             roots = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters,
                            np.asarray([estimated_b, estimated_s]))
         except:
-            print('Rice parameters cannot be worked out')
+            logging.warning('Rice parameters cannot be worked out')
             self.rice_parameters_are_found = False
         else:
             self.rice_parameters_are_found = True
@@ -276,7 +277,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
                 return math.inf
             value = self.cdf(e_now) / self.inv_norm
             return value
-        print(
+        logging.warning(
             'Cumulative density function of present eccentricity does not exist for the given e_now and its uncertainties')
         return math.nan
 
@@ -815,7 +816,6 @@ class EnvelopeEccentricityDistribution:
                             / (records_of_the_points_on_envelope[i][x_attribute]
                                - records_of_the_points_on_envelope[i - 1][x_attribute])
                             * (log_of_x - records_of_the_points_on_envelope[i][x_attribute]))
-            print('This situation is not possible')
             return
 
         def envelope_eccentricity_function_manual(x):
@@ -834,7 +834,6 @@ class EnvelopeEccentricityDistribution:
                 return threshold_value_of_envelope_eccentricity + (logx - crit1) * (
                             largest_acceptable_value_of_envelope_eccentricity - threshold_value_of_envelope_eccentricity) / (
                                    crit2 - crit1)
-            print('This situation is not possible')
             return
 
         if x_attribute == 'log of orbital period':
@@ -1186,10 +1185,7 @@ class LogLikelihood:
         priors = True
         for parameter_name in ['primary mass', 'secondary mass', 'stellar metallicity', 'stellar age']:
             priors = priors and prior_parameter(parameters_for_evolution[parameter_name], parameter_name)
-            print('smallest ', parameter_name, smallest[parameter_name])
-            print('largest ', parameter_name, largest[parameter_name])
-            print('value ', parameters_for_evolution[parameter_name])
-            print('priors ', priors)
+
         return priors
 
     def log_prob(self, parameters_for_evolution):
@@ -1280,10 +1276,10 @@ class LogLikelihood:
             if probability_density == 0:
                 return -np.inf
             if probability_density < 0:
-                print('Probability density cannot be less than zero.')
+                logging.warning('Probability density cannot be less than zero.')
                 return None
             return np.log(probability_density)
-        print('Calculated present eccentricity can neither be less than zero nor greater than one')
+        logging.warning('Calculated present eccentricity can neither be less than zero nor greater than one')
         return None
 
 
@@ -1297,9 +1293,7 @@ class LogLikelihood:
         if not math.isinf(log_likelihood):
             walkers.put(u)
             number_of_discovered_walkers.value = number_of_discovered_walkers.value + 1
-            print('number of discovered walkers = ', number_of_discovered_walkers)
-            print('log likelihood ', log_likelihood)
-            print('parameters for evolution ', parameters_for_evolution)
+
         if number_of_discovered_walkers.value < nwalkers:
             y = randint(1,10)
             for i in range(0, y):
@@ -1315,7 +1309,6 @@ class LogLikelihood:
     def draw_successful_walkers(self, nwalkers=32, ndim=9, nprocessors = 8):
         array_of_processes = []
         number_of_discovered_walkers = Value('i', 0)
-        a_process_has_finished = Value('i', 0)
         walkers = Queue()
 
         i = 0
@@ -1342,89 +1335,98 @@ class LogLikelihood:
 
         return p0
 
-    def draw_successful_walkers_old(self, nwalkers=32, ndim=9, nprocessors = 6):
-        i = 0
-        p0 = []
 
 
-        while i < nwalkers:
-            u = numpy.random.rand(ndim)
-
-            log_likelihood, parameters_for_evolution = self.__call__(u)  # , parameters_for_evolution
-
-            if log_likelihood != -math.inf:
-                i = i + 1
-                p0 = p0 + [u]
-        return p0
 
     def MCMC(self,
              nwalkers=19,
-             ndim=9):
-        #first = time.time()
-        #p0 = self.draw_successful_walkers(nwalkers, ndim)
-        #second = time.time()
-        #print('p0 = ', p0)
-        p0 = [np.array([0.71308203, 0.90610494, 0.91440945, 0.1997531, 0.84079461,
-                     0.15036786, 0.31559824, 0.10179498, 0.79204953]),
-              np.array([0.92194612, 0.81642824, 0.66148696, 0.94454168, 0.07870542,
-                     0.90223607, 0.47919943, 0.86898269, 0.71352875]),
-              np.array([0.2827382, 0.84571375, 0.05273939, 0.42537987, 0.12282174,
-                     0.9992452, 0.8572412, 0.55780744, 0.55579581]),
-              np.array([0.71308203, 0.90610494, 0.91440945, 0.1997531, 0.84079461,
-                     0.15036786, 0.31559824, 0.10179498, 0.79204953]),
-              np.array([0.89669149, 0.58584233, 0.19602291, 0.42030086, 0.03320706,
-                     0.93092432, 0.36725414, 0.274658, 0.97774559]),
-              np.array([0.89669149, 0.58584233, 0.19602291, 0.42030086, 0.03320706,
-                     0.93092432, 0.36725414, 0.274658, 0.97774559]),
-              np.array([0.43600005, 0.41206972, 0.9218552, 0.66793065, 0.5236485,
-                     0.71808833, 0.74350964, 0.71076796, 0.62956057]),
-              np.array([0.80216069, 0.58696358, 0.51967322, 0.99502222, 0.7582028,
-                     0.56431787, 0.15536902, 0.88096377, 0.94368962]),
-              np.array([0.34439215, 0.90162532, 0.90649617, 0.5321296, 0.13670825,
-                     0.25393945, 0.71312293, 0.47807645, 0.86343277]),
-              np.array([0.55823613, 0.38699561, 0.11223542, 0.08508325, 0.92741295,
-                     0.04701482, 0.56428743, 0.70862706, 0.41752298]),
-              np.array([0.57314808, 0.36459298, 0.48746912, 0.0616988, 0.64825068,
-                     0.03841059, 0.64250931, 0.4467972, 0.31798161]),
-              np.array([0.71308203, 0.90610494, 0.91440945, 0.1997531, 0.84079461,
-                     0.15036786, 0.31559824, 0.10179498, 0.79204953]),
-              np.array([0.73695991, 0.20907602, 0.43522499, 0.76191137, 0.72178343,
-                     0.27626663, 0.64798984, 0.7979834, 0.93707632]),
-              np.array([0.89669149, 0.58584233, 0.19602291, 0.42030086, 0.03320706,
-                     0.93092432, 0.36725414, 0.274658, 0.97774559]),
-              np.array([0.70141684, 0.34970582, 0.18908514, 0.22895077, 0.52729556,
-                     0.11884659, 0.61851373, 0.59210252, 0.47447497]),
-              np.array([0.59892595, 0.49118966, 0.01259909, 0.22326391, 0.82614969,
-                     0.20496768, 0.19391448, 0.3163904, 0.06749424]),
-              np.array([0.75768132, 0.60176831, 0.6913386, 0.65852016, 0.81038335,
-                     0.28125441, 0.47341502, 0.9090404, 0.44020568]),
-              np.array([0.36363791, 0.18228264, 0.5559545, 0.59468997, 0.4889357,
-                     0.21367127, 0.93533487, 0.3309231, 0.67443948]),
-              np.array([0.37712106, 0.430148, 0.79995587, 0.60997802, 0.51637431,
-                     0.22429358, 0.43330749, 0.10886197, 0.50171915])]
+             ndim=9,
+             system = 'WASP_89_b',
+             reset = True):
 
-        config = ConfigObjectForLogging(system='WASP-89 b')
+        p0 = [np.array([0.71308203, 0.90610494, 0.91440945, 0.1997531, 0.84079461,
+                        0.15036786, 0.31559824, 0.10179498, 0.79204953]),
+              np.array([0.92194612, 0.81642824, 0.66148696, 0.94454168, 0.07870542,
+                        0.90223607, 0.47919943, 0.86898269, 0.71352875]),
+              np.array([0.2827382, 0.84571375, 0.05273939, 0.42537987, 0.12282174,
+                        0.9992452, 0.8572412, 0.55780744, 0.55579581]),
+              np.array([0.71308203, 0.90610494, 0.91440945, 0.1997531, 0.84079461,
+                        0.15036786, 0.31559824, 0.10179498, 0.79204953]),
+              np.array([0.89669149, 0.58584233, 0.19602291, 0.42030086, 0.03320706,
+                        0.93092432, 0.36725414, 0.274658, 0.97774559]),
+              np.array([0.89669149, 0.58584233, 0.19602291, 0.42030086, 0.03320706,
+                        0.93092432, 0.36725414, 0.274658, 0.97774559]),
+              np.array([0.43600005, 0.41206972, 0.9218552, 0.66793065, 0.5236485,
+                        0.71808833, 0.74350964, 0.71076796, 0.62956057]),
+              np.array([0.80216069, 0.58696358, 0.51967322, 0.99502222, 0.7582028,
+                        0.56431787, 0.15536902, 0.88096377, 0.94368962]),
+              np.array([0.34439215, 0.90162532, 0.90649617, 0.5321296, 0.13670825,
+                        0.25393945, 0.71312293, 0.47807645, 0.86343277]),
+              np.array([0.55823613, 0.38699561, 0.11223542, 0.08508325, 0.92741295,
+                        0.04701482, 0.56428743, 0.70862706, 0.41752298]),
+              np.array([0.57314808, 0.36459298, 0.48746912, 0.0616988, 0.64825068,
+                        0.03841059, 0.64250931, 0.4467972, 0.31798161]),
+              np.array([0.71308203, 0.90610494, 0.91440945, 0.1997531, 0.84079461,
+                        0.15036786, 0.31559824, 0.10179498, 0.79204953]),
+              np.array([0.73695991, 0.20907602, 0.43522499, 0.76191137, 0.72178343,
+                        0.27626663, 0.64798984, 0.7979834, 0.93707632]),
+              np.array([0.89669149, 0.58584233, 0.19602291, 0.42030086, 0.03320706,
+                        0.93092432, 0.36725414, 0.274658, 0.97774559]),
+              np.array([0.70141684, 0.34970582, 0.18908514, 0.22895077, 0.52729556,
+                        0.11884659, 0.61851373, 0.59210252, 0.47447497]),
+              np.array([0.59892595, 0.49118966, 0.01259909, 0.22326391, 0.82614969,
+                        0.20496768, 0.19391448, 0.3163904, 0.06749424]),
+              np.array([0.75768132, 0.60176831, 0.6913386, 0.65852016, 0.81038335,
+                        0.28125441, 0.47341502, 0.9090404, 0.44020568]),
+              np.array([0.36363791, 0.18228264, 0.5559545, 0.59468997, 0.4889357,
+                        0.21367127, 0.93533487, 0.3309231, 0.67443948]),
+              np.array([0.37712106, 0.430148, 0.79995587, 0.60997802, 0.51637431,
+                        0.22429358, 0.43330749, 0.10886197, 0.50171915])]
+
+        config = ConfigObjectForLogging(system=system)
+        filename = '%(system)s_mcmc_progress.h5' % dict(system=system)
+        flag_file_name = '%(system)s_flag_file.txt' % dict(system=system) # This file stores the message on whether
+                                                                     # some samples are peviously drawn or not. If samples
+                                                                     # are previously drawn then the file stores 1.
+        print(flag_file_name)
+
+        flag_file_exists = os.path.exists(flag_file_name)
+
+        #if (not flag_file_exists) or reset:
+            #p0 = self.draw_successful_walkers(nwalkers, ndim)
+        if flag_file_exists and (not reset):
+            flag_file = open(flag_file_name, "r")
+            flag = flag_file.readline()
+            if (not flag) or int(flag)!=1:
+                #p0 = self.draw_successful_walkers(nwalkers, ndim)
+                print("")
+            flag_file.close()
+
         with Pool(config.num_parallel_processes,
                   initializer=setup_process,
                   initargs=[config],
                   maxtasksperchild=1) as pool:
+            backend = emcee.backends.HDFBackend(filename)
+            if reset:
+                backend.reset(nwalkers, ndim)
+            sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool=pool, backend=backend)
 
-            #with Pool() as pool:
-            print('sampler ')
-            sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool=pool)
-            print('sampler: ', sampler)
-            
-            start = time.time()
-            sampler.run_mcmc(p0, 2
-                             , progress=True
-                             )
-            end = time.time()
+            if flag_file_exists:
+                flag_file = open(flag_file_name, "r+")
+                flag = flag_file.readline()
+                if flag and int(flag)==1 and (not reset):
+                    sampler.run_mcmc(None, 2, progress=True)
+                else:
+                    sampler.run_mcmc(p0, 2, progress=True)
+                    print("1", flag_file)
+                flag_file.close()
+            else:
+                sampler.run_mcmc(p0, 2, progress=True)
+                flag_file = open(flag_file_name, "w")
+                print("1", flag_file)
+                flag_file.close()
 
-        # print('Serial processing time for running MCMC is ', (end1-start1))
-            f = open('time.txt', 'w+')
-            span = (end-start)
-            f.write('Parallel processing time for running MCMC is %f '%span)
-            f.close()
+
             blobs = sampler.get_blobs(flat=True)
             figure = corner.corner(blobs, labels=['primary mass',
                                                   'stellar age',
@@ -1439,8 +1441,9 @@ class LogLikelihood:
                                                   'log likelihood of present eccentricity'],
                                    quantiles=[0.16, 0.5, 0.84],
                                    show_titles=True, title_kwargs={"fontsize": 12})
-        plt.show()
-        figure.savefig("MCMC.pdf", bbox_inches='tight')
+            plt.show()
+            figfilename = "%(system)s_MCMC.pdf" % dict(system=system)
+            figure.savefig(figfilename, bbox_inches='tight')
 
         return
 
