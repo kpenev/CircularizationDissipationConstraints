@@ -1342,7 +1342,7 @@ class LogLikelihood:
              nwalkers=19,
              ndim=9,
              system = 'WASP_89_b',
-             reset = True):
+             reset = False):
 
         p0 = [np.array([0.71308203, 0.90610494, 0.91440945, 0.1997531, 0.84079461,
                         0.15036786, 0.31559824, 0.10179498, 0.79204953]),
@@ -1415,17 +1415,19 @@ class LogLikelihood:
                 flag_file = open(flag_file_name, "r+")
                 flag = flag_file.readline()
                 if flag and int(flag)==1 and (not reset):
+                    print("I should run from here now.")
                     sampler.run_mcmc(None, 2, progress=True)
                 else:
                     sampler.run_mcmc(p0, 2, progress=True)
-                    print("1", flag_file)
+                    flag_file.truncate(0)
+                    flag_file.seek(0)
+                    flag_file.writelines("1")
                 flag_file.close()
             else:
                 sampler.run_mcmc(p0, 2, progress=True)
                 flag_file = open(flag_file_name, "w")
-                print("1", flag_file)
+                flag_file.writelines("1")
                 flag_file.close()
-
 
             blobs = sampler.get_blobs(flat=True)
             figure = corner.corner(blobs, labels=['primary mass',
