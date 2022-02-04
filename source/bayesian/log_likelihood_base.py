@@ -180,7 +180,14 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
 
         evolve_parameters = self._parse_parameters(parameters, logger)
         failed = True
-        while failed and evolve_parameters['initial_eccentricity'] > 0.4:
+        logger.debug(
+            'Evolve parameters:\n\t%s',
+            '\n\t'.join(
+                repr(k) + ':' + repr(v) for k, v in evolve_parameters.items()
+            )
+        )
+
+        while failed and evolve_parameters['initial_eccentricity'] > 0.7:
             try:
                 #False positive: dissipation is included find_evolution_kwargs
                 #pylint: disable=no-value-for-parameter
@@ -189,7 +196,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 )
                 #pylint: enable=no-value-for-parameter
             except AssertionError:
-                evolve_parameters['initial_eccentricity'] -= 2e-2
+                evolve_parameters['initial_eccentricity'] -= 1e-2
                 logger.warning('Calculating evolution failed, trying e0 = %g.',
                                evolve_parameters['initial_eccentricity'])
             except ValueError as error:

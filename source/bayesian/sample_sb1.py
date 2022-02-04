@@ -168,10 +168,12 @@ def prepare_sampling(config):
     ).get_interpolator_by_name(
         'default'
     )
-    orbital_evolution_library.read_eccentricity_expansion_coefficients(
-        config.eccentricity_expansion_coefficients.encode('ascii')
+    orbital_evolution_library.prepare_eccentricity_expansion(
+        config.eccentricity_expansion_coefficients.encode('ascii'),
+        1e-4,
+        True,
+        True
     )
-
 
     for cluster in ['NGC188', 'NGC6819', 'M35']:
         if config.system.startswith(cluster + '_'):

@@ -506,7 +506,7 @@ def parse_command_line(description,
     parser.add_argument(
         '--eccentricity-expansion-coefficients', '--e-coef',
         default=os.path.expanduser(
-            '~/projects/git/poet/eccentricity_expansion_coef_O200.txt'
+            '~/projects/git/poet/eccentricity_expansion_coef_O400.sqlite'
         ),
         help='The file to read eccentricity expansion coefficients from.'
     )

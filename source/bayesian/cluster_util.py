@@ -18,7 +18,7 @@ def get_rv_likelihood(observed_orbit,
                       num_parallel_processes,
                       interpolation_accuracy=1e-4,
                       mismatch_plot=None):
-    """Return fully set-up RV semi-amplitude constraint for an NGC188 binary."""
+    """Return fully set-up RV semi-amplitude constraint for a cluster binary."""
 
     observed_eccentricity_distro = stats.norm(
         loc=float(observed_orbit['e']),
