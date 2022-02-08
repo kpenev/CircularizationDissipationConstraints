@@ -86,10 +86,12 @@ class LogLikelihoodSB1(LogLikelihoodBase):
                  rv_likelihood,
                  powerlaw_dissipation,
                  max_dissipative_mstar=1.2 * units.M_sun,
+                 prior_only=False,
                  **parent_kwargs):
 
         self.max_dissipative_mstar = max_dissipative_mstar
         self._rv_likelihood = rv_likelihood
+        self._prior_only = prior_only
 
         dissipation_parameters = [
             ('lgQ_min', units.dimensionless_unscaled),
@@ -110,6 +112,9 @@ class LogLikelihoodSB1(LogLikelihoodBase):
 
     def calculate_log_likelihood(self, parameters):
         """Evaluate the log-likelihood at the given model parameters."""
+
+        if(self._prior_only):
+            return 0.0
 
         final_eccentricity = super().calculate_final_eccentricity(parameters)
 

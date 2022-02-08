@@ -60,9 +60,10 @@ def add_dissipation_args(parser):
         nargs=2,
         type=float,
         default=None,
-        help='The range to use for the uniform prior in the break period '
-        '(`P0`). If not specified, the dissipation is assumed not to depend on '
-        'period, hence the `--lgQ-powerlaw-range` argument is ignored.'
+        help='The range to use for the break period (`P0`) assuming uniform '
+        'prior in log(P0). If not specified, the dissipation is assumed not to '
+        'depend on period, hence the `--lgQ-powerlaw-range` argument is '
+        'ignored.'
     )
     dissipation.add_argument(
         '--lgQ-powerlaw',
@@ -367,7 +368,7 @@ def add_sampling_parameters(parser):
     sampling.add_argument(
         '--initial-period-search-factor', '--period-search-factor',
         type=float,
-        default=1.2,
+        default=2.0,
         help='The factor by which to change the initial period guess while '
         'searching for a range surrounding the known present day orbital period'
     )
@@ -375,7 +376,7 @@ def add_sampling_parameters(parser):
         '--initial-period-scaled-guess', '--period-scaled-guess',
         type=float,
         default=2.0,
-        help='The search for initial period to bracked the observed final '
+        help='The search for initial period to bracket the observed final '
         'period will start from this value multiplied by the final orbital '
         'period.'
     )

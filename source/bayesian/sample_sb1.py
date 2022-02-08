@@ -60,12 +60,15 @@ def get_independent_priors(config, observed_orbit, custom_util):
             The independent parameters that will be sampled for this binary.
     """
 
-    def get_uniform_distribution(parameter):
+    def get_distribution(parameter, distro_name='uniform'):
         """
         Return a uniform distribution with correct support for given parameter.
 
         Args:
             parameter(str):    The name of the parameter to get the entry for.
+
+            distribution(str):    The name of the distribution to set for the
+                given parameter from the scipy.stats module.
 
         Returns:
             tuple:
@@ -77,7 +80,7 @@ def get_independent_priors(config, observed_orbit, custom_util):
         min_value, max_value = getattr(config, parameter)
         return (
             min_value if min_value == max_value
-            else stats.uniform(min_value, max_value - min_value)
+            else getattr(stats, distro_name)(min_value, max_value - min_value)
         )
 
     def get_dissipation_parameters():
@@ -86,7 +89,7 @@ def get_independent_priors(config, observed_orbit, custom_util):
         result = [
             (
                 param_name,
-                get_uniform_distribution(param_name),
+                get_distribution(param_name),
                 units.dimensionless_unscaled
             )
             for param_name in ['lgQ_min', 'lgQ_inertial_boost']
@@ -99,12 +102,12 @@ def get_independent_priors(config, observed_orbit, custom_util):
             result.extend([
                 (
                     'lgQ_break_period',
-                    get_uniform_distribution('lgQ_break_period'),
+                    get_distribution('lgQ_break_period', 'loguniform'),
                     units.day
                 ),
                 (
                     'lgQ_powerlaw',
-                    get_uniform_distribution('lgQ_powerlaw'),
+                    get_distribution('lgQ_powerlaw'),
                     units.dimensionless_unscaled
                 )
             ])
@@ -118,7 +121,7 @@ def get_independent_priors(config, observed_orbit, custom_util):
         [
             (
                 component + '_' + param_name,
-                get_uniform_distribution(component + '_' + param_name),
+                get_distribution(component + '_' + param_name),
                 param_units
             )
             for component in ['primary', 'secondary']
@@ -133,7 +136,7 @@ def get_independent_priors(config, observed_orbit, custom_util):
         [
             (
                 'disk_dissipation_age',
-                get_uniform_distribution('disk_dissipation_age'),
+                get_distribution('disk_dissipation_age'),
                 units.Myr
             ),
             (
@@ -154,7 +157,7 @@ def get_independent_priors(config, observed_orbit, custom_util):
             ),
             (
                 'initial_eccentricity',
-                get_uniform_distribution('initial_eccentricity'),
+                get_distribution('initial_eccentricity'),
                 units.dimensionless_unscaled
             )
         ]
@@ -208,7 +211,8 @@ def prepare_sampling(config):
                 ),
                 evolution_timeout=config.evolution_timeout,
                 period_search_factor=config.initial_period_search_factor,
-                scaled_period_guess=config.initial_period_scaled_guess
+                scaled_period_guess=config.initial_period_scaled_guess,
+                prior_only=config.sampling=='prior'
             )
             prior_transform = PriorTransformBinaryStars(
                 sample_binary_masses=SampleSB1Masses(
@@ -248,28 +252,29 @@ def main(config):
         num_params
     )
 
-    if config.sampling.lower() == 'prior':
-        inputs = numpy.random.rand(num_params * config.mcmc_nsteps).reshape((
-            config.mcmc_nsteps,
-            num_params
-        ))
-
-        with Pool(config.num_parallel_processes,
-                  initializer=setup_process,
-                  initargs=[config],
-                  maxtasksperchild=1) as workers:
-            result = pandas.DataFrame(
-                workers.map(prior_transform, inputs),
-                columns=[p[0] for p in log_likelihood.parameter_order]
-            )
-
-        make_corner_plot(
-            pandas.DataFrame(
-                result,
-                columns=[p[0] for p in log_likelihood.parameter_order]
-            )
-        )
-    elif config.sampling.lower() == 'nested':
+#    if config.sampling.lower() == 'prior':
+#        inputs = numpy.random.rand(num_params * config.mcmc_nsteps).reshape((
+#            config.mcmc_nsteps,
+#            num_params
+#        ))
+#
+#        with Pool(config.num_parallel_processes,
+#                  initializer=setup_process,
+#                  initargs=[config],
+#                  maxtasksperchild=1) as workers:
+#            result = pandas.DataFrame(
+#                workers.map(prior_transform, inputs),
+#                columns=[p[0] for p in log_likelihood.parameter_order]
+#            )
+#
+#        make_corner_plot(
+#            pandas.DataFrame(
+#                result,
+#                columns=[p[0] for p in log_likelihood.parameter_order]
+#            )
+#        )
+#    el
+    if config.sampling.lower() == 'nested':
         sampler = dynesty.NestedSampler(
             log_likelihood,
             prior_transform,

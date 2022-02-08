@@ -290,7 +290,7 @@ if __name__ == '__main__':
     set_start_method('forkserver')
     logging.basicConfig(level=logging.DEBUG,
                         format=default_logging_format)
-    _test_rv_likelihood(3871)
+    _test_rv_likelihood(5463)
 #    plot_eccentricity_likelihood(get_observed_orbit(4965),
 #                                 eccentricity_envelope)
     rcParams['font.size'] = 18
