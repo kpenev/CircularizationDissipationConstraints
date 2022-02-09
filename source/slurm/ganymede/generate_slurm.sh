@@ -2,7 +2,7 @@ SYSTEM=$1
 FLAVOR=$2
 
 if [ "$FLAVOR" == "" ]; then
-    FLAVOR="constQ"
+    FLAVOR="powerlaw_alllock"
 fi
 
 SLURM_DIR=~/projects/git/CircularizationDissipationConstraints/source/slurm
