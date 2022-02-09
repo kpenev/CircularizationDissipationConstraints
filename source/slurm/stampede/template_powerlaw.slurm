@@ -29,7 +29,7 @@ OUTPUT_DIR=${OUTPUT_ROOT}/sampling_output
 for SYSID in @@SYS1@@ @@SYS2@@ @@SYS3@@; do 
     python3 \
         ${SOURCE_DIR}/bayesian/sample_sb1.py @@CLUSTER@@_${SYSID} \
-        -c ${SOURCE_DIR}/sampling_config/open_cluster_powerlaw_nolock.cfg\
+        -c ${SOURCE_DIR}/sampling_config/open_cluster_powerlaw_alllock.cfg\
         --std-out-err-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.outerr'\
         --logging-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.log'\
         --samples-fname '/home1/05392/kpenev/%(system)s_%(sampling)s_powerlawlgQ_samples'\
