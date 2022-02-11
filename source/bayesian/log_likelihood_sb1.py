@@ -34,23 +34,30 @@ class LogLikelihoodSB1(LogLikelihoodBase):
                                    'lgQ_break_period'
                                ).to_value(units.day))
             powerlaw = self.get_parameter_value(parameters, 'lgQ_powerlaw')
+
             if powerlaw > 0:
-                star_dissipation['tidal_frequency_powers'] = numpy.array([
-                    powerlaw,
-                    0.0
-                ])
-                star_dissipation['tidal_frequency_breaks'] = numpy.array([
-                    break_frequency
-                ])
-            else:
-                star_dissipation['tidal_frequency_powers'] = numpy.array([
-                    1.0,
-                    0.0,
-                    powerlaw
-                ])
                 star_dissipation['tidal_frequency_breaks'] = numpy.array([
                     2.0 * numpy.pi / 50.0,
                     break_frequency
+                ])
+                star_dissipation['tidal_frequency_powers'] = numpy.array([
+                    0.0,
+                    powerlaw,
+                    0.0
+                ])
+                star_dissipation['reference_phase_lag'] *= numpy.power(
+                    star_dissipation['tidal_frequency_breaks'][0]
+                    /
+                    star_dissipation['tidal_frequency_breaks'][1],
+                    powerlaw
+                )
+            else:
+                star_dissipation['tidal_frequency_breaks'] = numpy.array([
+                    break_frequency
+                ])
+                star_dissipation['tidal_frequency_powers'] = numpy.array([
+                    0.0,
+                    powerlaw
                 ])
         else:
             star_dissipation['tidal_frequency_breaks'] = None
@@ -79,10 +86,12 @@ class LogLikelihoodSB1(LogLikelihoodBase):
                  rv_likelihood,
                  powerlaw_dissipation,
                  max_dissipative_mstar=1.2 * units.M_sun,
+                 prior_only=False,
                  **parent_kwargs):
 
         self.max_dissipative_mstar = max_dissipative_mstar
         self._rv_likelihood = rv_likelihood
+        self._prior_only = prior_only
 
         dissipation_parameters = [
             ('lgQ_min', units.dimensionless_unscaled),
@@ -103,6 +112,9 @@ class LogLikelihoodSB1(LogLikelihoodBase):
 
     def calculate_log_likelihood(self, parameters):
         """Evaluate the log-likelihood at the given model parameters."""
+
+        if(self._prior_only):
+            return 0.0
 
         final_eccentricity = super().calculate_final_eccentricity(parameters)
 

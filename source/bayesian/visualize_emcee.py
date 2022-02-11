@@ -97,7 +97,7 @@ def parse_command_line():
     )
     parser.add_argument(
         '--combined-constraint-lgQ-grid',
-        default=numpy.linspace(5, 12, 100),
+        default=numpy.linspace(4, 12, 100),
         action=ParseGrid,
         nargs=3,
         metavar=('MIN_LGQ', 'MAX_LGQ', 'RES'),
@@ -106,13 +106,12 @@ def parse_command_line():
     )
     parser.add_argument(
         '--combined-constraint-heat-map',
-        default=False,
-        action='store_true',
-        help='Plot a heat map of the combined log-likelihood in the frequnecy '
-        'dependence plot. If enabled, the confidence interval is shown using '
+        default=None,
+        choices=('log', 'lin'),
+        help='Plot a heat map of the combined (log-)likelihood in the frequnecy'
+        ' dependence plot. If enabled, the confidence interval is shown using '
         'lines only (not filled).'
     )
-
     parser.add_argument(
         '--combined-constraint-kernel-scale',
         default=1.0,
@@ -239,7 +238,11 @@ def save_corner_plot(samples, log_probability, config):
     include_params = [
         param
         for param in samples.dtype.names
-        if samples[param].min() != samples[param].max()
+        if (
+            samples[param].min() != samples[param].max()
+            and
+            numpy.isfinite(samples[param]).any()
+        )
     ]
     plot_data_frame = pandas.DataFrame(samples[include_params])
     plot_data_frame.insert(len(include_params), 'lnP', log_probability)
@@ -276,12 +279,7 @@ def save_trace_plot(samples, log_probability, config):
     pyplot.savefig(config.trace_plot_fname)
 
 class FrequencyDependencePlotterBase(ABC):
-    """
-    Create a plot showing the constraint of lgQ vs tidal frequency.
-
-    If multiple MCMC chain files are specified, all are overplotted on the same
-    axes.
-    """
+    """Create a plot showing the constraint of lgQ vs tidal frequency."""
 
     def __init__(self, config):
 
@@ -333,6 +331,7 @@ class FrequencyDependencePlotterBase(ABC):
         """Overplot another chain of samples."""
 
         evaluated_lgq = self.evaluate_lgq(samples)
+        print('lgQ (%d x %d): ' % evaluated_lgq.shape + repr(evaluated_lgq))
 
         if not self.config.frequency_dependence_plot_no_lines:
             pyplot.plot(
@@ -391,7 +390,20 @@ class FrequencyDependencePlotterBase(ABC):
                             color=color)
 
     def plot_combined_constraint(self, label=None, color_list=None):
-        """Add a plot of the cobmined constraint collected so far."""
+        """
+        Add a plot of the cobmined constraint collected so far.
+
+        Plots potentially multiple confidence intervals with different colors.
+
+        Args:
+            label(str):    The label to use for the plot.
+
+            color_list([matplotlib color]):    Set and order of Colors to use
+                for different confidence intervals.
+
+        Returns:
+            None
+        """
 
         def get_interval(cdf_slice, confidence):
             """Return shortest lgQ confidence interval for fix P slice."""
@@ -412,14 +424,8 @@ class FrequencyDependencePlotterBase(ABC):
         pdf = self.combined_pdf()
         cdf = numpy.cumsum(pdf, 0) - 0.5 * pdf
 
-        if self.config.combined_constraint_heat_map:
-            logpdf = numpy.log(pdf)
-            pyplot.pcolormesh(self.config.ptide_grid,
-                              self.config.combined_constraint_lgQ_grid,
-                              logpdf,
-                              vmax=logpdf.max(),
-                              vmin=max(logpdf.max()-10, logpdf.min()),
-                              zorder=10)
+        if self.config.combined_constraint_heat_map is not None:
+            self.plot_combined_pdf_heat_map()
 
         for color_index, confidence in enumerate(
                 self.config.plot_confidence
@@ -480,6 +486,55 @@ class FrequencyDependencePlotterBase(ABC):
 
         if self.config.combined_constraint_heat_map:
             pyplot.colorbar()
+
+    def plot_combined_pdf_heat_map(self):
+        """
+        Create a 2-D plot of lgQ vs Ptide color coding KDE of PDF.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
+        period_boundaries = numpy.empty(self.config.ptide_grid.size + 1)
+        lgq_boundaries = numpy.empty(
+            self.config.combined_constraint_lgQ_grid.size
+            +
+            1
+        )
+        for boundaries, grid in [
+                (period_boundaries, self.config.ptide_grid),
+                (lgq_boundaries, self.config.combined_constraint_lgQ_grid)
+        ]:
+            boundaries[1:-1] = 0.5 * (grid[1:] + grid[:-1])
+            boundaries[0] = 1.5 * grid[0] - 0.5 * grid[1]
+            boundaries[-1] = 1.5 * grid[-1] - 0.5 * grid[-2]
+
+        plot_z = self.combined_pdf()
+
+        plot_args = dict(shading='flat', zorder=10)
+
+        if self.config.combined_constraint_heat_map == 'log':
+            plot_z = numpy.log10(plot_z)
+            plot_args['vmax'] = plot_z.max()
+            plot_args['vmin'] = max(plot_z.max() - 10, plot_z.min())
+
+        print('P grid: ' + repr(self.config.ptide_grid))
+        print('lg(Q) grid: ' + repr(self.config.combined_constraint_lgQ_grid))
+        print('P boundaries: ' + repr(period_boundaries))
+        print('lg(Q) boundaries: ' + repr(lgq_boundaries))
+        print('Plot z: ' + repr(plot_z))
+
+        pyplot.pcolormesh(
+            period_boundaries,
+            lgq_boundaries,
+            plot_z,
+            **plot_args
+        )
+        pyplot.xlabel('Tidal Period [d]')
+        pyplot.ylabel(r"$\log_{10}Q_\star'$")
 
     def save(self):
         """Save the plot to the file sepecified by the init configuration."""
@@ -563,8 +618,10 @@ def main(config):
         log_probability = backend.get_log_prob(discard=burn_in)
         if config.corner_plot_fname:
             save_corner_plot(samples, log_probability, config)
+            pyplot.clf()
         if config.trace_plot_fname:
             save_trace_plot(samples, log_probability, config)
+            pyplot.clf()
         if config.frequency_dependence_plot_fname:
             frequency_dependence_plotter.add_chain(
                 samples,
@@ -573,7 +630,7 @@ def main(config):
         if config.errorbar_plot:
             add_errorbar(samples, config)
 
-    pyplot.ylim(5.0, 12.0)
+    pyplot.ylim(4.0, 12.0)
     pyplot.legend()
 
     if config.frequency_dependence_plot_fname:

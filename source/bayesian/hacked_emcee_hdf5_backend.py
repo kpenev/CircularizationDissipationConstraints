@@ -68,6 +68,8 @@ class HDFBackend(Backend):
         saved_iterations = 0
         if os.path.exists(self.filename):
             with self.open('r+' if pending_steps else 'r') as progress_file:
+                if self.name not in progress_file:
+                    return
                 saved_iterations = progress_file[self.name].attrs['iteration']
                 if pending_steps:
                     with open(self.unsaved_steps_fname, 'rb') as \
