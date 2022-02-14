@@ -34,7 +34,8 @@ cluster_age_distribution = stats.norm(7.0, 0.5)
 cluster_feh_distribution = stats.norm(0.21, 0.03)
 eccentricity_envelope = LinearEccentricityEnvelope(min_period=3.0,
                                                    max_period=20.0,
-                                                   max_eccentricity=0.6)
+                                                   max_eccentricity=0.6,
+                                                   extrapolate_to_e=0.8)
 
 
 def get_photometry_distributions(photometry, min_stddev=0.0):

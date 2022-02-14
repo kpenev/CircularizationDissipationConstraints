@@ -397,7 +397,7 @@ def plot_eccentricity_vs_period(binaries, eccentricity_envelope):
 #                            fmt='o',
 #                            markeredgecolor=color,
 #                            markerfacecolor='none')
-    envelope_x = 2.0**numpy.linspace(1, 6, 1000)
+    envelope_x = 2.0**numpy.linspace(1, 8, 1000)
     pyplot.plot(envelope_x,
                 eccentricity_envelope(envelope_x),
                 '-k')

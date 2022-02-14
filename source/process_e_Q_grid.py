@@ -47,13 +47,15 @@ class LinearEccentricityEnvelope:
                  min_period=0.8,
                  max_period=5.0,
                  min_eccenticity=0.0,
-                 max_eccentricity=0.6):
+                 max_eccentricity=0.6,
+                 extrapolate_to_e=None):
         """Setup envelope going from 0 to max_e in the given period range."""
 
         self.min_period = min_period
         self.max_period = max_period
         self.min_eccenticity = min_eccenticity
         self.max_eccentricity = max_eccentricity
+        self._extrapolate_to_e = extrapolate_to_e or max_eccentricity
 
     def __call__(self, orbital_period):
         """Return the eccentricity envelovpe at the given orbital period."""
@@ -61,21 +63,17 @@ class LinearEccentricityEnvelope:
         try:
             if orbital_period < self.min_period:
                 return self.min_eccenticity
-            if orbital_period < self.max_period:
-                return self._eccentricity_envelope_line(orbital_period)
-            return self.max_eccentricity
+            return min(self._eccentricity_envelope_line(orbital_period),
+                       self._extrapolate_to_e)
         except ValueError:
             result = numpy.full(orbital_period.shape,
                                 self.min_eccenticity,
                                 dtype=float)
-            partial_circularization = numpy.logical_and(
-                orbital_period > self.min_period,
-                orbital_period < self.max_period
-            )
+            partial_circularization = orbital_period > self.min_period
             result[partial_circularization] = self._eccentricity_envelope_line(
                 orbital_period[partial_circularization]
             )
-            result[orbital_period >= self.max_period] = self.max_eccentricity
+            result[result > self._extrapolate_to_e] = self._extrapolate_to_e
             return result
 
     def get_period(self, eccentricity):
