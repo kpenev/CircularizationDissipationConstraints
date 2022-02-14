@@ -20,7 +20,7 @@ for f in $(ls ${SLURM_DIR}/NGC*.slurm ${SLURM_DIR}/M35*.slurm ${SLURM_DIR}/*.slu
 
     for SYS_ID in $(echo "$JOBNAME"|sed -e 's%NGC[0-9]*_\([0-9]*\)/\([0-9]*\)/\([0-9]*\)_.*$%\1 \2 \3%' -e 's%M35_\([0-9]*\)/\([0-9]*\)/\([0-9]*\)_.*$%\1 \2 \3%'); do
             H5FNAME=${CLUSTER}_${SYS_ID}_mcmc_powerlawlgQ_samples.h5
-            test -e $H5FNAME || break
+            test -e $H5FNAME || continue
             for((CHAIN_IND=0; 1; ++CHAIN_IND)); do 
                 CHAIN=$(awk -v c=$CHAIN_IND 'BEGIN{printf("chain%05d\n", c);}')
                 E_INIT=$(h5dump -a ${CHAIN}/initial_eccentricity $H5FNAME \
