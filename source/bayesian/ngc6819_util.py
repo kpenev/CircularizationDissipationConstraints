@@ -27,7 +27,8 @@ cluster_feh_distribution = stats.norm(0.09, 0.03)
 eccentricity_envelope = LinearEccentricityEnvelope(min_period=8.0,
                                                    max_period=14.0,
                                                    min_eccenticity=0.05,
-                                                   max_eccentricity=0.6)
+                                                   max_eccentricity=0.6,
+                                                   extrapolate_to_e=0.8)
 
 _logger = logging.getLogger(__name__)
 
