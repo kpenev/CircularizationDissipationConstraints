@@ -290,7 +290,7 @@ if __name__ == '__main__':
     set_start_method('forkserver')
     logging.basicConfig(level=logging.DEBUG,
                         format=default_logging_format)
-    _test_rv_likelihood(5463)
+#    _test_rv_likelihood(5463)
 #    plot_eccentricity_likelihood(get_observed_orbit(4965),
 #                                 eccentricity_envelope)
     rcParams['font.size'] = 18
@@ -302,10 +302,14 @@ if __name__ == '__main__':
 
     plot_eccentricity_vs_period(
         get_binary_data(),
-        LinearEccentricityEnvelope(min_period=7.0,
-                                   max_period=45.0,
-                                   max_eccentricity=0.71)
+        LinearEccentricityEnvelope(min_period=3.0,
+                                   max_period=37.64144115524114,
+                                   max_eccentricity=0.8)
         #eccentricity_envelope
+    )
+    plot_eccentricity_vs_period(
+        get_binary_data(),
+        eccentricity_envelope
     )
     pyplot.text(s='NGC 188',
                 x=2.2, y=0.68,

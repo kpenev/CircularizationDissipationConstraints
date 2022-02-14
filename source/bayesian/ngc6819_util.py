@@ -4,6 +4,7 @@
 import os.path
 import logging
 
+from matplotlib import pyplot, rcParams
 import pandas
 from scipy import stats
 
@@ -14,7 +15,8 @@ from process_e_Q_grid import LinearEccentricityEnvelope
 from bayesian.photometric_constraint import PhotometricConstraint
 from bayesian.cluster_util import\
     select_binary_data,\
-    plot_rv_likelihood
+    plot_rv_likelihood,\
+    plot_eccentricity_vs_period
 
 #https://ui.adsabs.harvard.edu/abs/2011ApJ...729L..10B/abstract
 cluster_age_distribution = stats.norm(2.4, 0.3)
@@ -129,4 +131,24 @@ def _test_rv_likelihood(binary_wocs_id):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    _test_rv_likelihood(66004)
+
+    rcParams['font.size'] = 18
+    rcParams['figure.figsize'] = [26.0, 4.8 * 4]
+    rcParams['figure.subplot.bottom'] = 0.15
+    rcParams['figure.subplot.top'] = 0.98
+    rcParams['figure.subplot.left'] = 0.13
+    rcParams['figure.subplot.right'] = 0.965
+
+    plot_eccentricity_vs_period(
+        get_binary_data(),
+        eccentricity_envelope
+    )
+    pyplot.text(s='NGC 6819',
+                x=2.2, y=0.68,
+                fontsize='large',
+                ha='left',
+                va='top',
+                fontweight='semibold')
+    pyplot.savefig('ngc6819_period_eccentricity.pdf')
+    #_test_rvk_constraint(3732)
+#    _test_rv_likelihood(66004)
