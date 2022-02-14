@@ -16,7 +16,8 @@ from cmd_utils import CMDPhotometryInterpolator
 from process_e_Q_grid import LinearEccentricityEnvelope
 from bayesian.cluster_util import\
     select_binary_data,\
-    plot_rv_likelihood
+    plot_rv_likelihood,\
+    plot_eccentricity_vs_period
 from bayesian.photometric_constraint import\
     PhotometricConstraint,\
     plot_joint_pdf
@@ -25,9 +26,9 @@ cluster_age_distribution = stats.norm(0.15, 0.03)
 cluster_feh_distribution = stats.norm(-0.18, 0.03)
 
 eccentricity_envelope = LinearEccentricityEnvelope(min_period=8.0,
-                                                   max_period=12.0,
+                                                   max_period=13.906390842036254,
                                                    min_eccenticity=0.05,
-                                                   max_eccentricity=0.6)
+                                                   max_eccentricity=0.8)
 
 def get_photometry():
     """Return a pandas DataFrame containing M35 V and B-V photometry."""
@@ -180,7 +181,10 @@ if __name__ == '__main__':
     pandas.set_option('display.max_rows', None)
 #    plot_color_magnitude_diagram()
 #    pyplot.show()
-#    plot_eccentricity_vs_period(get_binary_data(), eccentricity_envelope)
+    plot_eccentricity_vs_period(get_binary_data(), eccentricity_envelope)
+    plot_eccentricity_vs_period(get_binary_data(),
+                                )
+
     pyplot.show()
 #    _test_photometric_constraint(23043)
 #    pyplot.show()
