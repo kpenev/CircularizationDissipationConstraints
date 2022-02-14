@@ -1,72 +1,42 @@
 SLURM_DIR=~/projects/git/CircularizationDissipationConstraints/source/slurm/ganymede
-for f in ${SLURM_DIR}/NGC*.slurm; do 
-    sys=$(basename ${f%.slurm})
-    if [ "$sys" == "NGC188_4618" ]; then
-        chain='chain00010'
+for f in $(ls ${SLURM_DIR}/*.slurm ${SLURM_DIR}/*.slurm.disabled 2>/dev/null) ; do 
+    SYS=$(basename ${f%.slurm})
+    JOBNAME=$(grep '^#SBATCH -J' $f|awk '{print $3;}')
+    H5FNAME=~/${SYS}_mcmc_samples.h5
+
+    test -e $H5FNAME || continue
+
+    if [ "${f#*.slurm}" == ".disabled" ] ; then
+        JOB_INFO="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
     else
-        chain='chain00000'
+        JOB_INFO=$(
+            squeue -n $JOBNAME -o '%.15i %.9P %.15j %.2t %.10M %R'\
+            |\
+            egrep 'NGC|M35'
+        )
     fi
-    nsamples=$(\
-        h5dump -a "${chain}/iteration" ~/${sys}_mcmc_samples.h5\
-        |\
-        grep '(0)'\
-        |\
-        awk '{print $2;}'\
-    )
-    echo -n "$(awk -v sys="$sys" -v nsamples="$nsamples" 'BEGIN{printf("%23s (%3d):", sys, nsamples);}') $(squeue -n $sys -o '%.8i %.9P %.18j %.2t %.10M %R'|grep NGC)" 
-    if [ \
-            "$sys" == "NGC188_4080" \
-            -o \
-            "$sys" == "NGC188_4289" \
-            -o \
-            "$sys" == "NGC188_4618" \
-            -o \
-            "$sys" == "NGC188_4904"\
-            -o \
-            "$sys" == "NGC188_4965"\
-            -o \
-            "$sys" == "NGC188_4999" \
-            -o \
-            "$sys" == "NGC188_5463" \
-            -o \
-            "$sys" == "NGC188_5601" \
-            -o \
-            "$sys" == "NGC188_5647" \
-            -o \
-            "$sys" == "NGC188_5733"\
-            -o \
-            "$sys" == "NGC188_5738"\
-            -o \
-            "$sys" == "NGC188_5797"\
-            -o \
-            "$sys" == "NGC188_6171"\
-            -o \
-            "$sys" == "NGC188_6292"\
-            -o \
-            "$sys" == "NGC188_8775"\
-            -o \
-            "$sys" == "NGC188_880"\
-            -o \
-            "$sys" == "NGC6819_33002"\
-            -o \
-            "$sys" == "NGC6819_57004"\
-            -o \
-            "$sys" == "NGC6819_59003"\
-            -o \
-            "$sys" == "NGC188_4618_powerlaw"\
-            -o \
-            "$sys" == "NGC188_5601_powerlaw"\
-            -o \
-            "$sys" == "NGC188_5738_powerlaw"\
-            -o \
-            "$sys" == "NGC188_6171_powerlaw"\
-            -o \
-            "$sys" == "NGC188_8775_powerlaw"\
-            -o \
-            "$sys" == "NGC6819_59003_powerlaw"\
-    ]; then
-        echo "-----------------------------------------------------------------"
-    else
-        echo ""
-    fi
+
+    for((CHAIN_IND=0; 1; ++CHAIN_IND)); do 
+        CHAIN=$(awk -v c=$CHAIN_IND 'BEGIN{printf("chain%05d\n", c);}')
+        E_INIT=$(h5dump -a ${CHAIN}/initial_eccentricity $H5FNAME 2>/dev/null\
+            |grep '(0)'\
+            |awk '{print $NF;}'
+        )
+        if [ "$E_INIT" == "0.8" ]; then 
+                NSAMPLES=$(\
+                    h5dump -a "${CHAIN}/iteration" $H5FNAME\
+                    |\
+                    grep '(0)'\
+                    |\
+                    awk '{print $2;}'\
+                )
+                echo "${SYS} ($NSAMPLES): $JOB_INFO"
+                break;
+        fi
+        if [ "$E_INIT" == "" ]; then
+            NSAMPLES=0
+            echo "${SYS} ($NSAMPLES): $JOB_INFO"
+            break;
+        fi
+    done
 done
