@@ -389,7 +389,7 @@ def add_sampling_parameters(parser):
     )
     sampling.add_argument(
         '--rv-likelihood-pickle-fname',
-        default='pickles/%(system)_rv_likelihood.pkl',
+        default='pickles/%(system)s_rv_likelihood.pkl',
         help='Filename under which to store pickled RV likelihood '
         'interpolations. Can contain %%(system)s substitution which gets '
         'replaced by the system name, and %%(sampling) - replaced by the '
@@ -397,14 +397,14 @@ def add_sampling_parameters(parser):
     )
     sampling.add_argument(
         '--photometric-constraint-pickle-fname',
-        default='pickles/%(system)_photometric_constraints.pkl',
+        default='pickles/%(system)s_photometric_constraints.pkl',
         help='Filename under which to store pickled photometric constraint.'
         'Can contain %%(system)s substitution which gets replaced by the '
         'system name, and %%(sampling) - replaced by the sampling method.'
     )
     sampling.add_argument(
         '--mass-sampling-pickle-fname',
-        default='pickles/%(system)_sample_sb1_masses.pkl',
+        default='pickles/%(system)s_sample_sb1_masses.pkl',
         help='Filename under which to store pickled stellar mass sampler.'
         'Can contain %%(system)s substitution which gets replaced by the '
         'system name, and %%(sampling) - replaced by the sampling method.'
