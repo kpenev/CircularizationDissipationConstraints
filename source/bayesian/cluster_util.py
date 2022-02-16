@@ -17,7 +17,8 @@ def get_rv_likelihood(observed_orbit,
                       eccentricity_envelope,
                       num_parallel_processes,
                       interpolation_accuracy=1e-4,
-                      mismatch_plot=None):
+                      mismatch_plot=None,
+                      pickle_fname='rv_likelihood.pkl'):
     """Return fully set-up RV semi-amplitude constraint for a cluster binary."""
 
     observed_eccentricity_distro = stats.norm(
@@ -79,7 +80,8 @@ def get_rv_likelihood(observed_orbit,
         grid_refine_limit=16,
         grid_refine_1d='worse_direction',
         debug_plots=(None if mismatch_plot is None
-                     else dict(interpolation_performance=mismatch_plot))
+                     else dict(interpolation_performance=mismatch_plot)),
+        pickle_fname=pickle_fname
     )
 
 def select_binary_data(single_lined_data, _, id_column, binary_id):

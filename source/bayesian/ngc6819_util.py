@@ -98,7 +98,8 @@ def get_observed_orbit(binary_wocs_id):
 
     return select_binary_data(*get_binary_data(), 'WOCS', binary_wocs_id)
 
-def get_photometric_constraint(binary_wocs_id):
+def get_photometric_constraint(binary_wocs_id,
+                               pickle_fname='photometric_constraints.pkl'):
     """Return a fully set-up photometric constraint for an NGC6811 binary."""
 
     photometry = get_photometry()
@@ -116,7 +117,7 @@ def get_photometric_constraint(binary_wocs_id):
     return PhotometricConstraint(
         [interpolator],
         selected_photometry,
-        'photometric_constraints.pkl',
+        pickle_fname,
         min_magnitude_difference=dict(V=2.0)
     )
 

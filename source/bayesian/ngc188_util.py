@@ -208,7 +208,8 @@ def get_observed_orbit(binary_pkm_id):
 
     return  result
 
-def get_photometric_constraint(binary_pkm_id):
+def get_photometric_constraint(binary_pkm_id,
+                               pickle_fname='photometric_constraints.pkl'):
     """Return a fully set-up photometric constraint for an NGC188 binary."""
 
     photometry = get_photometry()
@@ -240,7 +241,7 @@ def get_photometric_constraint(binary_pkm_id):
     return PhotometricConstraint(
         [interpolators['UBVRIJHK'], interpolators['usno']],
         selected_photometry,
-        'photometric_constraints.pkl',
+        pickle_fname,
         min_magnitude_difference=dict(V=2.5)
     )
 

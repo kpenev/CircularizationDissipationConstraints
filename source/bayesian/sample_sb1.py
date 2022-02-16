@@ -178,6 +178,8 @@ def prepare_sampling(config):
         True
     )
 
+    pickle_substitutions = dict(system=config.system,
+                                sampling=config.sampling)
     for cluster in ['NGC188', 'NGC6819', 'M35']:
         if config.system.startswith(cluster + '_'):
             binary_id = int(config.system[len(cluster) + 1:])
@@ -185,7 +187,11 @@ def prepare_sampling(config):
             binary_orbit = custom_util.get_observed_orbit(binary_id)
 
             photometric_constraint = custom_util.get_photometric_constraint(
-                binary_id
+                binary_id,
+                pickle_fname=(config.photometric_constraint_pickle_fname
+                              %
+                              pickle_substitutions)
+
             )
             rv_likelihood = get_rv_likelihood(
                 observed_orbit=binary_orbit,
@@ -199,7 +205,10 @@ def prepare_sampling(config):
                     )
                     if config.rvk_show_interpolation else
                     None
-                )
+                ),
+                pickle_fname=(config.rv_likelihood_pickle_fname
+                              %
+                              pickle_substitutions)
             )
             log_likelihood = LogLikelihoodSB1(
                 interpolator=interpolator,
@@ -219,6 +228,9 @@ def prepare_sampling(config):
                     rv_likelihood=rv_likelihood,
                     photometric_constraint=photometric_constraint,
                     orbital_period=float(binary_orbit['Per']),
+                    pickle_fname=(config.mass_sampling_pickle_fname
+                                  %
+                                  pickle_substitutions)
                 ),
                 independent_parameter_distributions=get_independent_priors(
                     config,

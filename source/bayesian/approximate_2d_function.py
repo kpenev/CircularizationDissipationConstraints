@@ -440,20 +440,32 @@ class Approximate2DFunction(RectBivariateSpline,
     def _check_pickle(self):
         """Check if given file contains a re-usable pickle of desired approx."""
 
-        if (
-                self.func == self._load_pickle_object()
-                and
-                self.support == self._load_pickle_object()
-                and
-                self.configuration == self._load_pickle_object()
-        ):
-            return (
-                self._load_pickle_object(),
-                self._load_pickle_object(),
-                self._load_pickle_object(),
-            )
+        pickled = self._load_pickle_object()
+        if self.func != pickled:
+            self._logger.debug('Pickled function %s does not match %s',
+                               repr(pickled),
+                               repr(self.func))
+            return None
 
-        return None
+        pickled = self._load_pickle_object()
+        if self.support != pickled:
+            self._logger.debug('Pickled support %s does not match %s',
+                               repr(pickled),
+                               repr(self.support))
+            return None
+
+        pickled = self._load_pickle_object()
+        if self.configuration != pickled:
+            self._logger.debug('Pickled configuration %s does not match %s',
+                               repr(pickled),
+                               repr(self.configuration))
+            return None
+
+        return (
+            self._load_pickle_object(),
+            self._load_pickle_object(),
+            self._load_pickle_object(),
+        )
 
     def _get_initial_grid(self):
         """Return an initial grid from which to start refining interpolation."""

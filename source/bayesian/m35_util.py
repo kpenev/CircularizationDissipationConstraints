@@ -81,7 +81,8 @@ def get_photometry_interpolator():
         9.53
     )
 
-def get_photometric_constraint(binary_wocs_id):
+def get_photometric_constraint(binary_wocs_id,
+                               pickle_fname='photometric_constraints.pkl'):
     """Return a fully set-up photometric constraint for an M35 binary."""
 
     selected_photometry = get_observed_orbit(binary_wocs_id).squeeze()
@@ -101,7 +102,7 @@ def get_photometric_constraint(binary_wocs_id):
     return PhotometricConstraint(
         [interpolator],
         selected_photometry,
-        'photometric_constraints.pkl',
+        pickle_fname,
         min_magnitude_difference=dict(V=1.0)
     )
 
@@ -182,8 +183,7 @@ if __name__ == '__main__':
 #    plot_color_magnitude_diagram()
 #    pyplot.show()
     plot_eccentricity_vs_period(get_binary_data(), eccentricity_envelope)
-    plot_eccentricity_vs_period(get_binary_data(),
-                                )
+#    plot_eccentricity_vs_period(get_binary_data())
 
     pyplot.show()
 #    _test_photometric_constraint(23043)
