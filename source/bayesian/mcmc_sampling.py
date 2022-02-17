@@ -30,7 +30,10 @@ _mutable_config_params = set(['mcmc_nsteps',
                               'logging_verbosity',
                               'logging_datetime_format',
                               'logging_message_format',
-                              'config_file'])
+                              'config_file',
+                              'rv_likelihood_pickle_fname',
+                              'mass_sampling_pickle_fname',
+                              'photometric_constraint_pickle_fname'])
 
 _logger = logging.getLogger(__name__)
 
