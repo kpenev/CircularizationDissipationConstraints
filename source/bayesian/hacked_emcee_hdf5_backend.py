@@ -11,6 +11,7 @@ import os.path
 from tempfile import NamedTemporaryFile
 import pickle
 import logging
+from time import sleep
 
 import numpy as np
 
@@ -289,7 +290,21 @@ class HDFBackend(Backend):
                 or not the proposal for each walker was accepted.
 
         """
-        self._check(state, accepted)
+
+        retry_check = 10
+        while retry_check > 0:
+            try:
+                self._check(state, accepted)
+                retry_check = 0
+            except BlockingIOError:
+                retry_check -= 1
+                if retry_check > 0:
+                    logging.getLogger(__name__).error(
+                        'Failed to _check step for saving. Retry in 1 min'
+                    )
+                    sleep(60)
+                else:
+                    raise
 
         with open(self.unsaved_steps_fname, 'ab') as unsaved_steps_file:
             pickle.dump((state, accepted), unsaved_steps_file)
