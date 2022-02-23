@@ -22,7 +22,11 @@ for f in $(ls ${SLURM_DIR}/*.slurm ${SLURM_DIR}/*.slurm.disabled 2>/dev/null) ; 
             |grep '(0)'\
             |awk '{print $NF;}'
         )
-        if [ "$E_INIT" == "0.8" ]; then 
+        TDISK=$(h5dump -a ${CHAIN}/disk_dissipation_age $H5FNAME 2>/dev/null\
+            |grep '(0)'\
+            |awk '{print $NF;}'
+        )
+        if [ "$E_INIT" == "0.8" -a "$TDISK" == "2" ]; then 
                 NSAMPLES=$(\
                     h5dump -a "${CHAIN}/iteration" $H5FNAME\
                     |\
