@@ -121,7 +121,7 @@ class LogLikelihoodSB1(LogLikelihoodBase):
         if (
                 final_eccentricity is None
                 or
-                final_eccentricity > self.envelope_eccentricity
+                not (final_eccentricity <= self.envelope_eccentricity)
         ):
             return -numpy.inf
 
