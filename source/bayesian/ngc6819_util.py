@@ -134,23 +134,16 @@ def _test_rv_likelihood(binary_wocs_id):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
 
-    rcParams['font.size'] = 18
-    rcParams['figure.figsize'] = [26.0, 4.8 * 4]
-    rcParams['figure.subplot.bottom'] = 0.15
-    rcParams['figure.subplot.top'] = 0.98
-    rcParams['figure.subplot.left'] = 0.13
-    rcParams['figure.subplot.right'] = 0.965
-
     plot_eccentricity_vs_period(
         get_binary_data(),
         eccentricity_envelope
     )
-    pyplot.text(s='NGC 6819',
-                x=2.2, y=0.68,
-                fontsize='large',
-                ha='left',
-                va='top',
-                fontweight='semibold')
+#    pyplot.text(s='NGC 6819',
+#                x=2.2, y=0.68,
+#                fontsize='large',
+#                ha='left',
+#                va='top',
+#                fontweight='semibold')
     pyplot.savefig('ngc6819_period_eccentricity.pdf')
     #_test_rvk_constraint(3732)
 #    _test_rv_likelihood(66004)
