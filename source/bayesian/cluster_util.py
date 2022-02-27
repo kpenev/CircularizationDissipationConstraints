@@ -2,7 +2,7 @@
 
 import logging
 
-from matplotlib import pyplot
+from matplotlib import pyplot, rcParams
 from scipy import stats
 import numpy
 from astropy import units
@@ -353,6 +353,11 @@ def plot_eccentricity_vs_period(binaries, eccentricity_envelope):
 #                m2_mult * (1.0 - binary_class['M2']**m2_pwrlaw)
 #            )
 #        )
+
+    rcParams['font.size'] = 16
+    rcParams['figure.subplot.bottom'] = 0.13
+    rcParams['figure.subplot.top'] = 0.99
+    rcParams['figure.subplot.right'] = 0.97
 
     binaries = [
         binary_class[
