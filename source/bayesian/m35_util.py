@@ -185,8 +185,8 @@ if __name__ == '__main__':
     plot_eccentricity_vs_period(get_binary_data(), eccentricity_envelope)
 #    plot_eccentricity_vs_period(get_binary_data())
 
-    pyplot.show()
+    pyplot.savefig('M35_period_eccentricity.eps')
 #    _test_photometric_constraint(23043)
 #    pyplot.show()
-    _test_rv_likelihood(23043)
+#    _test_rv_likelihood(23043)
 #    pyplot.show()

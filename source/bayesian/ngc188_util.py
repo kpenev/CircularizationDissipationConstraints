@@ -295,29 +295,33 @@ if __name__ == '__main__':
 #    _test_rv_likelihood(5463)
 #    plot_eccentricity_likelihood(get_observed_orbit(4965),
 #                                 eccentricity_envelope)
-    rcParams['font.size'] = 18
-    rcParams['figure.figsize'] = [26.0, 4.8 * 4]
-    rcParams['figure.subplot.bottom'] = 0.15
-    rcParams['figure.subplot.top'] = 0.98
-    rcParams['figure.subplot.left'] = 0.13
-    rcParams['figure.subplot.right'] = 0.965
+#    rcParams['font.size'] = 18
+#    rcParams['figure.figsize'] = [26.0, 4.8 * 4]
+#    rcParams['figure.subplot.bottom'] = 0.15
+#    rcParams['figure.subplot.top'] = 0.98
+#    rcParams['figure.subplot.left'] = 0.13
+#    rcParams['figure.subplot.right'] = 0.965
 
-    plot_eccentricity_vs_period(
-        get_binary_data(),
-        LinearEccentricityEnvelope(min_period=3.0,
-                                   max_period=37.64144115524114,
-                                   max_eccentricity=0.8)
-        #eccentricity_envelope
+#    plot_eccentricity_vs_period(
+#        get_binary_data(),
+#        LinearEccentricityEnvelope(min_period=3.0,
+#                                   max_period=37.64144115524114,
+#                                   max_eccentricity=0.8)
+#    )
+    binary_data = get_binary_data()
+    binary_data = tuple(
+        binaries[numpy.logical_not(binaries['PKM'] == 5733)]
+        for binaries in binary_data
     )
     plot_eccentricity_vs_period(
-        get_binary_data(),
+        binary_data,
         eccentricity_envelope
     )
-    pyplot.text(s='NGC 188',
-                x=2.2, y=0.68,
-                fontsize='large',
-                ha='left',
-                va='top',
-                fontweight='semibold')
+#    pyplot.text(s='NGC 188',
+#                x=2.2, y=0.68,
+#                fontsize='large',
+#                ha='left',
+#                va='top',
+#                fontweight='semibold')
     pyplot.savefig('ngc188_period_eccentricity.pdf')
     #_test_rvk_constraint(3732)

@@ -1,5 +1,7 @@
 """Define the secondary mass distribution from photometry given primary mass."""
 
+import logging
+
 from scipy import integrate, optimize
 from scipy.stats import rv_continuous
 import numpy
@@ -12,6 +14,8 @@ class ConditionalSecondaryMassDistribution(rv_continuous):
 
     Pre-computes whatever possible to speed-up the provided methods."
     """
+
+    _logger = logging.getLogger(__name__)
 
     #base class adapats to signature
     #pylint: disable=arguments-differ
@@ -61,6 +65,9 @@ class ConditionalSecondaryMassDistribution(rv_continuous):
             method='bounded'
         )
         assert minimization.success
+        self._logger.debug('Finding CDF(M2) in range %s, with atol = %s.',
+                           repr(self.support()),
+                           repr(1e-9 * numpy.exp(minimization.fun)))
         solved_ode = integrate.solve_ivp(
             self._cumulative_ode,
             self.support(),
