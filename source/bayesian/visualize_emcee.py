@@ -22,65 +22,37 @@ from combined_mcmc_constraint import CombinedMCMCConstraint
 
 from visuals import make_corner_plot
 
-def parse_command_line():
-    """Parse the command line for what and how to plot."""
+#Interface specified by argparse module.
+#pylint: disable=too-few-public-methods
+class ParseGrid(ArgparseAction):
+    """Action for parsing linspace arguments."""
 
-    #Interface specified by argparse module.
-    #pylint: disable=too-few-public-methods
-    class ParseGrid(ArgparseAction):
-        """Action for parsing linspace arguments."""
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Parse a grid option to a numpy.arary()."""
 
-        def __call__(self, parser, namespace, values, option_string=None):
-            """Parse a grid option to a numpy.arary()."""
+        setattr(namespace,
+                self.dest,
+                numpy.linspace(float(values[0]),
+                               float(values[1]),
+                               int(values[2])))
+#pylint: enable=too-few-public-methods
 
-            setattr(namespace,
-                    self.dest,
-                    numpy.linspace(float(values[0]),
-                                   float(values[1]),
-                                   int(values[2])))
-    #pylint: enable=too-few-public-methods
+def add_frequency_dependence_plot_config(parser):
+    """Add command line arguments configuring the frequence dependence plots."""
 
-    parser = ArgumentParser(
-        description=__doc__,
-        default_config_files=['visualize_emcee.cfg'],
-        formatter_class=DefaultsFormatter,
-        ignore_unknown_config_file_keys=False
-    )
     parser.add_argument(
-        'samples_fnames',
-        nargs='+',
-        help='The filename(s) containing the stored emcee chain(s) to plot. For'
-        ' now only frequency dependence plots support plotting multiple '
-        'constraints on top of each other. All other plots only plot the chain '
-        'from the last file.'
-    )
-    parser.add_argument(
-        '--chain-name', '--chain',
-        default=None,
-        help='Select which chain in the given file to plot. By default, plots '
-        'the longest chain in the input file. Append ":<number>" after a '
-        'filename to specify a burn-in number of samples.'
-    )
-    parser.add_argument(
-        '--corner-plot-fname', '--corner-plot', '--corner',
-        default=None,
-        help='If specified, a coner plot is created and saved with the given '
-        'filename.'
-    )
-    parser.add_argument(
-        '--trace-plot-fname', '--traces-plot', '--traces',
-        default=None,
-        help='If specified, a trace plot is generated and saved with the given '
-        'filaname.'
-    )
-    parser.add_argument(
-        '--frequency-dependence-plot-fname',
-        '--frequency-dependence-plot',
-        '--frequency',
-        default=None,
-        help='If specified, a plot of the confidence interval of lgQ vs tidal '
-        'frequency is generated and saved with the given filename. Inertial '
-        'mode enhancement is ignored.'
+        '--chain-condition',
+        default=[],
+        nargs=2,
+        action='append',
+        metavar=('ATTRIBUTE', 'VALUE'),
+        help='Select which chain in the given file to plot by imposing a '
+        'condition on on of the attributes of the chain group. The condition '
+        'can be a single value in which case the attribute should have '
+        'either just that value or be a pair of identical values. '
+        'Alternatively, the condition can be multiple values that must match '
+        'exactly in the order specified. By default, plots the first chain in '
+        'the input file.'
     )
     parser.add_argument(
         '--frequency-dependence-hatch',
@@ -113,12 +85,83 @@ def parse_command_line():
         'lines only (not filled).'
     )
     parser.add_argument(
+        '--heat-map-contrast',
+        default=1e-3,
+        help='The smallest value to plot on the heat map is this factor times '
+        'the maximum value.'
+    )
+
+    parser.add_argument(
         '--combined-constraint-kernel-scale',
         default=1.0,
         type=float,
         help='A scaling to apply to the width of the kernel that gets convolved'
         ' with the samples for calculating combined constraints.'
     )
+    parser.add_argument(
+        '--plot-confidence',
+        type=float,
+        nargs='+',
+        default=[stats.norm.cdf(2.0) - stats.norm.cdf(-2.0)],
+        help='Specify the confidence to display in the dissipation vs tidal '
+        'frequency plot (see --frequency-dependence-plot-fname argument).'
+    )
+    parser.add_argument(
+        '--ptide-grid',
+        nargs=3,
+        default=numpy.logspace(0.0, numpy.log10(20.0), 100),
+        action=ParseGrid,
+        metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES'),
+        help='Set the range and resolution of the tidal period to include in '
+        'the frequency dependence plot (see --frequency-dependence-plot-fname '
+        'argument).'
+    )
+    parser.add_argument(
+        '--frequency-dependence-plot-no-lines',
+        action='store_true',
+        help='If passed, the frequency dependence plot will not include '
+        'individual lines.'
+    )
+
+def parse_command_line():
+    """Parse the command line for what and how to plot."""
+
+    parser = ArgumentParser(
+        description=__doc__,
+        default_config_files=['visualize_emcee.cfg'],
+        formatter_class=DefaultsFormatter,
+        ignore_unknown_config_file_keys=False
+    )
+    parser.add_argument(
+        'samples_fnames',
+        nargs='+',
+        help='The filename(s) containing the stored emcee chain(s) to plot. For'
+        ' now only frequency dependence plots support plotting multiple '
+        'constraints on top of each other. All other plots only plot the chain '
+        'from the last file.'
+    )
+    parser.add_argument(
+        '--corner-plot-fname', '--corner-plot', '--corner',
+        default=None,
+        help='If specified, a coner plot is created and saved with the given '
+        'filename.'
+    )
+    parser.add_argument(
+        '--trace-plot-fname', '--traces-plot', '--traces',
+        default=None,
+        help='If specified, a trace plot is generated and saved with the given '
+        'filaname.'
+    )
+    parser.add_argument(
+        '--frequency-dependence-plot-fname',
+        '--frequency-dependence-plot',
+        '--frequency',
+        default=None,
+        help='If specified, a plot of the confidence interval of lgQ vs tidal '
+        'frequency is generated and saved with the given filename. Inertial '
+        'mode enhancement is ignored.'
+    )
+    add_frequency_dependence_plot_config(parser)
     parser.add_argument(
         '--errorbar-plot',
         nargs=3,
@@ -137,60 +180,56 @@ def parse_command_line():
         'walkers will results in more panels in the plot).'
     )
     parser.add_argument(
-        '--plot-confidence',
-        type=float,
-        nargs='+',
-        default=[stats.norm.cdf(1.0) - stats.norm.cdf(-1.0)],
-        help='Specify the confidence to display in the dissipation vs tidal '
-        'frequency plot (see --frequency-dependence-plot-fname argument).'
-    )
-    parser.add_argument(
-        '--ptide-grid',
-        nargs=3,
-        default=numpy.linspace(1.0, 20.0, 100),
-        action=ParseGrid,
-        metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES'),
-        help='Set the range and resolution of the tidal period to include in '
-        'the frequency dependence plot (see --frequency-dependence-plot-fname '
-        'argument).'
-    )
-    parser.add_argument(
-        '--frequency-dependence-plot-no-lines',
-        action='store_true',
-        help='If passed, the frequency dependence plot will not include '
-        'individual lines.'
-    )
-    parser.add_argument(
         '--log-x',
         action='store_true',
         help='Switch the x-axis to log-scale.'
     )
     return parser.parse_args()
 
-def get_backend(samples_fname, chain_name):
+def get_backend(samples_fname, chain_conditions):
     """Return the chain to plot."""
 
-    if chain_name is None:
-        with h5py.File(samples_fname, 'r') as chain_file:
-            available_chains = list(chain_file.keys())
-        longest_chain = 0
-        for try_chain_name in available_chains:
-            backend = emcee.backends.HDFBackend(samples_fname,
-                                                name=try_chain_name,
-                                                read_only=True)
-            if backend.iteration > longest_chain:
-                selected_backend = backend
-                chain_name = try_chain_name
-                longest_chain = backend.iteration
-        if longest_chain == 0:
-            return None, None
-    else:
-        selected_backend = emcee.backends.HDFBackend(samples_fname,
-                                                     name=chain_name,
-                                                     read_only=True)
     with h5py.File(samples_fname, 'r') as chain_file:
-        system_name = chain_file[chain_name].attrs['system']
-    return selected_backend, system_name
+        chain_name = None
+        for try_chain_name in chain_file.keys():
+            match = True
+            for attr_name, expected_value in chain_conditions:
+                match = (
+                    match
+                    and
+                    (
+                        chain_file[try_chain_name].attrs[attr_name]
+                        ==
+                        numpy.array(float(expected_value))
+                    ).all()
+                    and
+                    chain_file[try_chain_name].attrs['iteration'] > 0
+                )
+            if match:
+                if chain_name is not None:
+                    raise RuntimeError(
+                        'Multiple chains found in %s that satisify %s: %s and %s'
+                        %
+                        (
+                            repr(samples_fname),
+                            repr(chain_conditions),
+                            repr(chain_name),
+                            repr(try_chain_name)
+                        )
+                    )
+                chain_name = try_chain_name
+                system_name = chain_file[chain_name].attrs['system']
+        if chain_name is None:
+            return None, None
+
+    backend = emcee.backends.HDFBackend(samples_fname,
+                                        name=chain_name,
+                                        read_only=True)
+    chain_length = backend.iteration
+    if chain_length == 0:
+        return None, None
+
+    return backend, system_name
 
 def get_confidence_interval(samples, confidence):
     """
@@ -281,12 +320,24 @@ def save_trace_plot(samples, log_probability, config):
 class FrequencyDependencePlotterBase(ABC):
     """Create a plot showing the constraint of lgQ vs tidal frequency."""
 
-    def __init__(self, config):
+    def __init__(self, num_chains, config):
+        """
+        Prepare for plotting.
+
+        Args:
+            num_chains:    The expected number of chains that will be combined
+                (only sets transparency)
+
+            config:    The configuration for plotting (parsed command line).
+
+        Returns:
+            None
+        """
 
         self.config = config
         self.transparency = 1.0 / (len(config.plot_confidence)
                                    *
-                                   len(config.samples_fnames))
+                                   num_chains)
         self._constraint_index = 0
         self._hatch_list = ['\\\\',
                             '//',
@@ -418,8 +469,7 @@ class FrequencyDependencePlotterBase(ABC):
             lower_bound, upper_bound = self.config.combined_constraint_lgQ_grid[
                 [lower_indices[selected], upper_indices[selected]]
             ]
-            return (lower_bound - max(0, (5.8 - lower_bound)),
-                    upper_bound + max(0, (upper_bound - 7.0)))
+            return lower_bound, upper_bound
 
         pdf = self.combined_pdf()
         cdf = numpy.cumsum(pdf, 0) - 0.5 * pdf
@@ -513,13 +563,18 @@ class FrequencyDependencePlotterBase(ABC):
             boundaries[-1] = 1.5 * grid[-1] - 0.5 * grid[-2]
 
         plot_z = self.combined_pdf()
+        plot_z_min = max(plot_z.max() * self.config.heat_map_contrast,
+                         plot_z.min())
 
         plot_args = dict(shading='flat', zorder=10)
 
         if self.config.combined_constraint_heat_map == 'log':
             plot_z = numpy.log10(plot_z)
-            plot_args['vmax'] = plot_z.max()
-            plot_args['vmin'] = max(plot_z.max() - 10, plot_z.min())
+            plot_args['vmin'] = numpy.log10(plot_z_min)
+        else:
+            plot_args['vmin'] = plot_z_min
+
+        plot_args['vmax'] = plot_z.max()
 
         print('P grid: ' + repr(self.config.ptide_grid))
         print('lg(Q) grid: ' + repr(self.config.combined_constraint_lgQ_grid))
@@ -536,13 +591,14 @@ class FrequencyDependencePlotterBase(ABC):
         pyplot.xlabel('Tidal Period [d]')
         pyplot.ylabel(r"$\log_{10}Q_\star'$")
 
-    def save(self):
+    def save(self, filename=None):
         """Save the plot to the file sepecified by the init configuration."""
 
+        pyplot.figure(figsize=(11, 8.5))
         self.plot_combined_constraint()
         pyplot.xlabel(r'$P_{tide}$ [days]')
         pyplot.ylabel(r"$\log_{10}Q_\star'$")
-        pyplot.savefig(self.config.frequency_dependence_plot_fname)
+        pyplot.savefig(filename or self.config.frequency_dependence_plot_fname)
 
 class PowerlawLgQDependencePlotter(FrequencyDependencePlotterBase):
     """Plot lgQ constrant from chains assuming a single saturating powerlaw."""
@@ -598,37 +654,53 @@ def add_errorbar(samples, config):
         line_width += 2
 #pylint: enable=too-many-locals
 
+def get_plot_data(samples_fname, burn_in, config):
+    """Return the samples to use for plotting for a single system."""
+
+    backend, system_name = get_backend(samples_fname, config.chain_condition)
+    assert backend is not None
+    return (
+        system_name,
+        backend.get_blobs(discard=burn_in),
+        backend.get_log_prob(discard=burn_in)
+    )
+
 def main(config):
     """"Avoid polluting global namespace."""
 
     if config.log_x:
         pyplot.gca().set_xscale('log')
 
-    frequency_dependence_plotter = PowerlawLgQDependencePlotter(config)
+    frequency_dependence_plotter = PowerlawLgQDependencePlotter(
+        len(config.samples_fnames),
+        config
+    )
     for samples_fname in config.samples_fnames:
         burn_in = 0
         if ':' in samples_fname:
             samples_fname, burn_in = samples_fname.split(':')
             burn_in = int(burn_in)
-        backend, system_name = get_backend(samples_fname, config.chain_name)
-        if backend is None:
+
+        try:
+            system_name, samples, log_probability = get_plot_data(samples_fname,
+                                                                  burn_in,
+                                                                  config)
+
+            if config.corner_plot_fname:
+                save_corner_plot(samples, log_probability, config)
+                pyplot.clf()
+            if config.trace_plot_fname:
+                save_trace_plot(samples, log_probability, config)
+                pyplot.clf()
+            if config.frequency_dependence_plot_fname:
+                frequency_dependence_plotter.add_chain(
+                    samples,
+                    system_name.replace('_', ' ')
+                )
+            if config.errorbar_plot:
+                add_errorbar(samples, config)
+        except RuntimeError:
             print('Empty chain in %s, skipping!' % samples_fname)
-            continue
-        samples = backend.get_blobs(discard=burn_in)
-        log_probability = backend.get_log_prob(discard=burn_in)
-        if config.corner_plot_fname:
-            save_corner_plot(samples, log_probability, config)
-            pyplot.clf()
-        if config.trace_plot_fname:
-            save_trace_plot(samples, log_probability, config)
-            pyplot.clf()
-        if config.frequency_dependence_plot_fname:
-            frequency_dependence_plotter.add_chain(
-                samples,
-                system_name.replace('_', ' ')
-            )
-        if config.errorbar_plot:
-            add_errorbar(samples, config)
 
     pyplot.ylim(4.0, 12.0)
     pyplot.legend()
