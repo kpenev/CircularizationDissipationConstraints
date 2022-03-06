@@ -1,3 +1,5 @@
+*.h5
+*.unsaved_steps
 .idea
 # Analysis by-products.
 *.tmp
