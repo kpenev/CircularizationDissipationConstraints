@@ -6,6 +6,7 @@ from subprocess import call
 from os import path, listdir
 
 from matplotlib import pyplot
+from matplotlib.backends.backend_pdf import PdfPages
 from configargparse import\
     ArgumentParser,\
     DefaultsFormatter,\
@@ -15,7 +16,10 @@ from bayesian.visualize_emcee import\
     add_frequency_dependence_plot_config,\
     get_plot_data,\
     PowerlawLgQDependencePlotter
+#False positive, not sure why only m35 fails!
+#pylint: disable=unused-import
 from bayesian.m35_util import get_binary_data as get_m35_binary_data
+#pylint: enable=unused-import
 from bayesian.ngc6819_util import get_binary_data as get_ngc6819_binary_data
 from bayesian.ngc188_util import get_binary_data as get_ngc188_binary_data
 from bayesian.cluster_util import select_binary_data
@@ -85,6 +89,14 @@ def parse_command_line():
         'if passed once with the combined list of arguments. Later values '
         'overwrite earlier ones.'
     )
+    parser.add_argument(
+        '--individual-plot-mode', '--individual-plots',
+        choices=['pages', 'subplots'],
+        default='subplots',
+        help='Choose whether plots of individual systems will be saved each on '
+        'a separate page in a multi-page PDF file (`pages`) or as grid of '
+        'sub-plots in a single figure (`subplots`).'
+    )
     add_frequency_dependence_plot_config(parser)
 
     return parser.parse_args()
@@ -153,6 +165,48 @@ def get_plotting_order(system_list):
 
     return result
 
+def plot_individual_constraints(plot_data, config):
+    """Create plots showing the lgQ(Ptide) constraint for indivdiual systems."""
+
+    plotting_order = get_plotting_order(plot_data.keys())
+
+    pyplot.xscale('log')
+
+    config.combined_constraint_heat_map = 'log'
+
+
+    for cluster in ['M35', 'NGC6819', 'NGC188']:
+        output_fname = cluster + '_lgQ_period.pdf'
+        if config.individual_plot_mode == 'subplots':
+            _, axes = pyplot.subplots(4, 5, sharex=True, sharey=True)
+            axes = axes.flatten()
+        else:
+            pdf = PdfPages(output_fname)
+        for binary_index, binary in enumerate(plotting_order[cluster]):
+            plot_single_constraint(
+                plot_data[binary][0],
+                binary,
+                (
+                    axes[binary_index]
+                    if config.individual_plot_mode == 'subplots' else
+                    pyplot.gca()
+                ),
+                config
+            )
+            if config.individual_plot_mode == 'pages':
+                pyplot.figtitle(binary)
+                pdf.savefig()
+                pyplot.close()
+
+        if config.individual_plot_mode == 'subplots':
+            pyplot.savefig(cluster + '_lgQ_period.pdf')
+        else:
+            pdf.close()
+
+
+def plot_quantile_convergence(plot_data, config):
+    """Create plots of how quantiles evolve with MCMC steps."""
+
 def main(config):
     """Avoid polluting global namespace."""
 
@@ -160,20 +214,8 @@ def main(config):
         download_latest_samples(config.samples_dir)
 
     plot_data = get_sampling_data(config)
-    plotting_order = get_plotting_order(plot_data.keys())
+    plot_individual_constraints(plot_data, config)
 
-    pyplot.xscale('log')
-
-    config.combined_constraint_heat_map = 'log'
-
-    for cluster in ['M35', 'NGC6819', 'NGC188']:
-        figure, axes = pyplot.subplots(4, 5, sharex=True, sharey=True)
-        for binary, plot_axis in zip(plotting_order[cluster], axes.flatten()):
-            plot_single_constraint(plot_data[binary][0],
-                                   binary,
-                                   plot_axis,
-                                   config)
-        pyplot.savefig(cluster + '_lgQ_period.pdf')
 
 if __name__ == '__main__':
     main(parse_command_line())
