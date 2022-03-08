@@ -317,7 +317,41 @@ def save_trace_plot(samples, log_probability, config):
 
     pyplot.savefig(config.trace_plot_fname)
 
-class FrequencyDependencePlotterBase(ABC):
+
+def evaluate_lgq(samples, ptide_grid):
+    """
+    Evaluate the dissipation model that was sampled as function of period.
+
+    Args:
+        samples:    The samples directly as returned from the backend.
+
+        ptide_grid:    The grid of tidal periods to evaluate lgQ at.
+
+    Returns:
+        2-D array:
+            The first index corresponds to `ptide_grid`. The second index
+            iterates over points in the MCMC chain.
+    """
+
+    return (
+        samples['lgQ_min'].flatten()[None, :]
+        +
+        numpy.maximum(
+            0.0,
+            (
+                samples['lgQ_powerlaw'].flatten()[None, :]
+                *
+                numpy.log10(
+                    ptide_grid[:, None]
+                    /
+                    samples['lgQ_break_period'].flatten()[None, :]
+                )
+            )
+        )
+    )
+
+
+class FrequencyDependencePlotter:
     """Create a plot showing the constraint of lgQ vs tidal frequency."""
 
     def __init__(self, num_chains, config):
@@ -364,24 +398,10 @@ class FrequencyDependencePlotterBase(ABC):
             config.combined_constraint_kernel_scale
         )
 
-    @abstractmethod
-    def evaluate_lgq(self, samples):
-        """
-        Evaluate the dissipation model that was sampled as function of period.
-
-        Args:
-            samples:    The samples directly as returned from the backend.
-
-        Returns:
-            2-D array:
-                The first index should corresponding to `self.config.ptide_grid`
-                The second index should iterate over points in the MCMC chain.
-        """
-
     def add_chain(self, samples, label):
         """Overplot another chain of samples."""
 
-        evaluated_lgq = self.evaluate_lgq(samples)
+        evaluated_lgq = evaluate_lgq(samples, self.config.ptide_grid)
         print('lgQ (%d x %d): ' % evaluated_lgq.shape + repr(evaluated_lgq))
 
         if not self.config.frequency_dependence_plot_no_lines:
@@ -591,6 +611,9 @@ class FrequencyDependencePlotterBase(ABC):
         pyplot.xlabel('Tidal Period [d]')
         pyplot.ylabel(r"$\log_{10}Q_\star'$")
 
+    def plot_quantile_convergence(self):
+        """ """
+
     def save(self, filename=None):
         """Save the plot to the file sepecified by the init configuration."""
 
@@ -600,27 +623,6 @@ class FrequencyDependencePlotterBase(ABC):
         pyplot.ylabel(r"$\log_{10}Q_\star'$")
         pyplot.savefig(filename or self.config.frequency_dependence_plot_fname)
 
-class PowerlawLgQDependencePlotter(FrequencyDependencePlotterBase):
-    """Plot lgQ constrant from chains assuming a single saturating powerlaw."""
-
-    def evaluate_lgq(self, samples):
-
-        return (
-            samples['lgQ_min'].flatten()[None, :]
-            +
-            numpy.maximum(
-                0.0,
-                (
-                    samples['lgQ_powerlaw'].flatten()[None, :]
-                    *
-                    numpy.log10(
-                        self.config.ptide_grid[:, None]
-                        /
-                        samples['lgQ_break_period'].flatten()[None, :]
-                    )
-                )
-            )
-        )
 
 #Simplifying would make things less readable
 #pylint: disable=too-many-locals
@@ -671,7 +673,7 @@ def main(config):
     if config.log_x:
         pyplot.gca().set_xscale('log')
 
-    frequency_dependence_plotter = PowerlawLgQDependencePlotter(
+    frequency_dependence_plotter = FrequencyDependencePlotter(
         len(config.samples_fnames),
         config
     )
