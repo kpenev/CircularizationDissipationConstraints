@@ -20,6 +20,9 @@ from bayesian.visualize_emcee import\
     get_plot_data,\
     FrequencyDependencePlotter,\
     evaluate_lgq
+from bayesian.emcee_autocorrelation import\
+    max_likelihood_autocorr,\
+    average_autocorr
 #False positive, not sure why only m35 fails!
 #pylint: disable=unused-import
 from bayesian.m35_util import get_binary_data as get_m35_binary_data
@@ -40,13 +43,13 @@ def parse_command_line():
             """Parse a list of burn-in arguments."""
 
             for arg in values:
-                system = 'default'
+                binary = 'default'
                 try:
                     burnin = int(arg)
                 except ValueError:
-                    system, burnin = arg.split(':')
+                    binary, burnin = arg.split(':')
                     burnin = int(burnin)
-                getattr(namespace, self.dest)[system] = burnin
+                getattr(namespace, self.dest)[binary] = burnin
     #pylint: enable=too-few-public-methods
 
 
@@ -163,7 +166,7 @@ def get_sampling_data(config):
 
     return result
 
-def plot_single_lgq_period(samples, _, axis, config):
+def plot_single_lgq_period(_, samples, __, axis, config):
     """Plot the constraint for a single system."""
 
     pyplot.xscale('log')
@@ -177,6 +180,7 @@ def plot_single_lgq_period(samples, _, axis, config):
 
 
 def plot_single_convergence(*,
+                            binary,
                             samples,
                             ptide,
                             quantity,
@@ -195,7 +199,22 @@ def plot_single_convergence(*,
     plot_y = numpy.empty((plot_x.size, len(values)),
                           dtype=float)
 
-    print('Samples (%d x %d): ' % lgq_values.shape + repr(lgq_values))
+    try:
+        print(
+            '\t\t\t%s: autocorrelation = %f (%f), chain length = %d'
+            %
+            (
+                binary,
+                max_likelihood_autocorr(lgq_values.T, 1),
+                average_autocorr(lgq_values.T, 1),
+                shape[0]
+            )
+        )
+    except ValueError:
+        print('%s: Failed to determine autocorrelation, chain length = %d'
+              %
+              (binary, shape[0]))
+
     for x_ind, lgq_values_end in enumerate(plot_x):
         lgq_values_start = (
             0 if combine_nsteps == 0
@@ -206,17 +225,16 @@ def plot_single_convergence(*,
             rdist(c=4, scale=0.05)
         )
         plot_y[x_ind, :] = getattr(kde, quantity)(values)
-        print('Progress: %d/%d' % (x_ind, plot_x.size))
 
-    print('Plot y: ' + repr(plot_y))
     axis.plot(plot_x, plot_y, '-x')
 
 
 
-def plot_single_lgq_quantiles(samples, ptide, axis, config):
+def plot_single_lgq_quantiles(binary, samples, ptide, axis, config):
     """Plot lgQ @ quantiles vs step number for a single system/tidal period."""
 
-    plot_single_convergence(samples=samples,
+    plot_single_convergence(binary=binary,
+                            samples=samples,
                             ptide=ptide,
                             quantity='ppf',
                             values=config.convergence_quantiles,
@@ -224,10 +242,11 @@ def plot_single_lgq_quantiles(samples, ptide, axis, config):
                             axis=axis)
 
 
-def plot_single_quantiles_lgq(samples, ptide, axis, config):
+def plot_single_quantiles_lgq(binary, samples, ptide, axis, config):
     """Plot quantile(lgQ) vs step number for a single system/tidal period."""
 
-    plot_single_convergence(samples=samples,
+    plot_single_convergence(binary=binary,
+                            samples=samples,
                             ptide=ptide,
                             quantity='cdf',
                             values=config.convergence_lgQ,
@@ -235,7 +254,37 @@ def plot_single_quantiles_lgq(samples, ptide, axis, config):
                             axis=axis)
 
 
-def get_plotting_order(system_list):
+def plot_single_autocorrelation(binary, samples, ptide, axis, config):
+    """Plot the autocorrelation of lg[Q(Ptide)] for a single system/Ptide."""
+
+    lgq_values = evaluate_lgq(
+        samples,
+        numpy.array([ptide])
+    ).reshape(
+        samples.shape
+    )
+    autocorr = average_autocorr(lgq_values.T, time=False)
+    axis.plot(numpy.arange(autocorr.size), autocorr, '-o')
+
+
+def plot_single_autocorrelation_time(binary, samples, ptide, axis, config):
+    """Plot the autocorrelation of lg[Q(Ptide)] for a single system/Ptide."""
+
+    lgq_values = evaluate_lgq(
+        samples,
+        numpy.array([ptide])
+    ).reshape(
+        samples.shape
+    )
+    plot_x = numpy.arange(max(int(0.1 * lgq_values.shape[0]), 10),
+                          lgq_values.shape[0] - 1)
+    plot_y = numpy.empty(plot_x.shape)
+    for ind, eval_nsamples in enumerate(plot_x):
+        plot_y[ind] = average_autocorr(lgq_values[:eval_nsamples].T)
+    axis.plot(plot_x, plot_y, '-o')
+
+
+def get_plotting_order(binary_list):
     """Split the given systems by cluster and order them  by orbital period."""
 
     result = dict()
@@ -253,7 +302,7 @@ def get_plotting_order(system_list):
                                        int(binary.split('_')[1]))['Per']),
                 binary
             )
-            for binary in system_list if binary.startswith(cluster)
+            for binary in binary_list if binary.startswith(cluster)
         ]
         result[cluster] = [entry[1] for entry in sorted(period_binary)]
 
@@ -268,11 +317,20 @@ def plot_individual_constraints(plot_data, config):
 
     plot_type_split = dict(lgQ_period=[None],
                            lgQ_quantiles=config.convergence_ptide_grid,
-                           quantiles_lgQ=config.convergence_ptide_grid)
+                           quantiles_lgQ=config.convergence_ptide_grid,
+                           autocorrelation=config.convergence_ptide_grid,
+                           autocorrelation_time=config.convergence_ptide_grid)
 
-    for plot_type in ['lgQ_quantiles', 'quantiles_lgQ']:#['lgQ_period', 'lgQ_quantiles']:
+    for plot_type in [#'lgQ_period',
+                      #'lgQ_quantiles',
+                      #'quantiles_lgQ',
+                      #'autocorrelation',
+                      'autocorrelation_time']:
+        print('Plot type: ' + plot_type)
         for cluster in ['M35', 'NGC6819', 'NGC188']:
+            print('\tCluster: ' + cluster)
             for plot_split in plot_type_split[plot_type]:
+                print('\t\tSplit: ' + repr(plot_split))
                 output_fname = cluster + '_' + plot_type
                 if plot_split is not None:
                     output_fname += '_' + str(plot_split)
@@ -283,7 +341,9 @@ def plot_individual_constraints(plot_data, config):
                 else:
                     pdf = PdfPages(output_fname)
                 for binary_index, binary in enumerate(plotting_order[cluster]):
+                    print('\t\t\tBinary: ' + repr(binary))
                     globals()['plot_single_' + plot_type.lower()](
+                        binary,
                         plot_data[binary][0],
                         plot_split,
                         (

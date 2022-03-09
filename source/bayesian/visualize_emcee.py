@@ -402,7 +402,6 @@ class FrequencyDependencePlotter:
         """Overplot another chain of samples."""
 
         evaluated_lgq = evaluate_lgq(samples, self.config.ptide_grid)
-        print('lgQ (%d x %d): ' % evaluated_lgq.shape + repr(evaluated_lgq))
 
         if not self.config.frequency_dependence_plot_no_lines:
             pyplot.plot(
@@ -589,18 +588,13 @@ class FrequencyDependencePlotter:
         plot_args = dict(shading='flat', zorder=10)
 
         if self.config.combined_constraint_heat_map == 'log':
-            plot_z = numpy.log10(plot_z)
+            with np.errstate(divide = 'ignore'):
+                plot_z = numpy.log10(plot_z)
             plot_args['vmin'] = numpy.log10(plot_z_min)
         else:
             plot_args['vmin'] = plot_z_min
 
         plot_args['vmax'] = plot_z.max()
-
-        print('P grid: ' + repr(self.config.ptide_grid))
-        print('lg(Q) grid: ' + repr(self.config.combined_constraint_lgQ_grid))
-        print('P boundaries: ' + repr(period_boundaries))
-        print('lg(Q) boundaries: ' + repr(lgq_boundaries))
-        print('Plot z: ' + repr(plot_z))
 
         pyplot.pcolormesh(
             period_boundaries,

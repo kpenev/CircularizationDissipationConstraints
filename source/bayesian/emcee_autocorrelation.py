@@ -37,7 +37,6 @@ def autocorr_func_1d(chain, norm=True):
     # Optionally normalize
     if norm:
         acf /= acf[0]
-
     return acf
 
 def auto_window(cumulative_autocorr, scale):
@@ -49,21 +48,34 @@ def auto_window(cumulative_autocorr, scale):
     return len(cumulative_autocorr) - 1
 
 
-def autocorr_gw2010(all_chains, scale=5.0):
+def autocorr_gw2010(all_chains, scale=5.0, time=True):
     """Combine walkers to estimate autocorr. per Goodman & Weare (2010)."""
     autocorr_mean = autocorr_func_1d(numpy.mean(all_chains, axis=0))
+    if not time:
+        return autocorr_mean
+
     taus = 2.0 * numpy.cumsum(autocorr_mean) - 1.0
     window = auto_window(taus, scale)
     return taus[window]
 
 
-def average_autocorr(all_chains, scale=5.0):
+def average_autocorr(all_chains, scale=5.0, time=True):
     """Average the autocerrelation of individual walkers."""
 
     mean_autocorr = numpy.zeros(all_chains.shape[1])
+    nchains = 0
     for chain in all_chains:
-        mean_autocorr += autocorr_func_1d(chain)
-    mean_autocorr /= len(all_chains)
+        if numpy.unique(chain).size > 1:
+            mean_autocorr += autocorr_func_1d(chain)
+            nchains += 1
+        else:
+            print('Chain of %d constan values = %s found'
+                  %
+                  (chain.size, repr(chain[0])))
+    mean_autocorr /= nchains
+    if not time:
+        return mean_autocorr
+
     taus = 2.0 * numpy.cumsum(mean_autocorr) - 1.0
     window = auto_window(taus, scale)
     return taus[window]
@@ -78,9 +90,6 @@ def max_likelihood_autocorr(all_chains, thin, scale=5.0):
 
     # Build the GP model
     tau = max(1.0, init / thin)
-    print('init: ' + repr(init))
-    print('tau: ' + repr(tau))
-    print('nsamples: ' + repr(nsamples))
     kernel = terms.RealTerm(
         numpy.log(0.9 * numpy.var(thinned_chains)),
         -numpy.log(tau),
