@@ -154,7 +154,7 @@ def get_sampling_data(config):
             system, samples, log_probability = get_plot_data(
                 path.join(config.samples_dir, samples_fname),
                 0,
-                config
+                config.chain_condition
             )
             burn_in = config.burn_in.get(system, config.burn_in['default'])
             result[system] = (samples[burn_in:], log_probability[burn_in:])

@@ -656,10 +656,10 @@ def add_errorbar(samples, config):
         line_width += 2
 #pylint: enable=too-many-locals
 
-def get_plot_data(samples_fname, burn_in, config):
+def get_plot_data(samples_fname, burn_in, chain_condition):
     """Return the samples to use for plotting for a single system."""
 
-    backend, system_name = get_backend(samples_fname, config.chain_condition)
+    backend, system_name = get_backend(samples_fname, chain_condition)
     assert backend is not None
     return (
         system_name,
@@ -684,9 +684,11 @@ def main(config):
             burn_in = int(burn_in)
 
         try:
-            system_name, samples, log_probability = get_plot_data(samples_fname,
-                                                                  burn_in,
-                                                                  config)
+            system_name, samples, log_probability = get_plot_data(
+                samples_fname,
+                burn_in,
+                config.chain_condition
+            )
 
             if config.corner_plot_fname:
                 save_corner_plot(samples, log_probability, config)
