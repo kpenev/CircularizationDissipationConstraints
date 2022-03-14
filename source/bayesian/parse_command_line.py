@@ -316,7 +316,8 @@ def add_sampling_parameters(parser):
         type=int,
         default=1000,
         help='The number of MCMC steps to generate. Ignored if nested sampling '
-        'is used.'
+        'is used. A value of zero results in attempting to flush any unsaved '
+        'steps and exit'
     )
     sampling.add_argument(
         '--mcmc-min-initial-log-probability',

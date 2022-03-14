@@ -638,6 +638,8 @@ def run(config,
         prior_transform,
         num_params
     )
+    if config.mcmc_nsteps <= 0:
+        return
 
     if config.mcmc_starting_positions_only:
         _logger.info('Found initial positions for all walkers, exiting!')
