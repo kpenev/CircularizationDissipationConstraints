@@ -9,6 +9,27 @@
 #SBATCH -t 48:00:00
 #SBATCH -p skx-normal
 
+run_system() {
+    source_dir=/home1/05392/kpenev/projects/git/CircularizationDissipationConstraints/source
+    output_root=/work2/05392/kpenev/stampede2/open_cluster_circularization
+    output_dir=${output_root}/sampling_output
+    sysid=$1
+
+    cd /home1/05392/kpenev/
+
+    while true; do
+        python3 \
+            ${source_dir}/bayesian/sample_sb1.py @@CLUSTER@@_${sysid} \
+            -c ${source_dir}/sampling_config/open_cluster_powerlaw_alllock.cfg\
+            --std-out-err-fname ${output_dir}'/%(system)s_%(now)s_%(pid)d.outerr'\
+            --logging-fname ${output_dir}'/%(system)s_%(now)s_%(pid)d.log'\
+            --samples-fname '/home1/05392/kpenev/%(system)s_%(sampling)s_powerlawlgQ_samples'\
+            >\
+            ${output_dir}/sample_@@CLUSTER@@_${sysid}_1.outerr\
+            2>&1
+    done
+}
+
 source /home1/05392/kpenev/module_load_order.txt
 
 export PYTHONPATH=/home1/05392/kpenev/projects/git/poet/PythonPackage:/home1/05392/kpenev/projects/git/CircularizationDissipationConstraints/source:/home1/05392/kpenev/projects/git/general_purpose_python_modules
@@ -22,21 +43,8 @@ done
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home1/05392/kpenev/lib
 export LIBRARY_PATH=$LIBRARY_PATH:/home1/05392/kpenev/lib
 
-SOURCE_DIR=/home1/05392/kpenev/projects/git/CircularizationDissipationConstraints/source
-OUTPUT_ROOT=/work2/05392/kpenev/stampede2/open_cluster_circularization
-OUTPUT_DIR=${OUTPUT_ROOT}/sampling_output
-
 for SYSID in @@SYS1@@ @@SYS2@@ @@SYS3@@; do 
-    python3 \
-        ${SOURCE_DIR}/bayesian/sample_sb1.py @@CLUSTER@@_${SYSID} \
-        -c ${SOURCE_DIR}/sampling_config/open_cluster_powerlaw_alllock.cfg\
-        --std-out-err-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.outerr'\
-        --logging-fname ${OUTPUT_DIR}'/%(system)s_%(now)s_%(pid)d.log'\
-        --samples-fname '/home1/05392/kpenev/%(system)s_%(sampling)s_powerlawlgQ_samples'\
-        >\
-        ${OUTPUT_DIR}/sample_@@CLUSTER@@_${SYSID}_1.outerr\
-        2>&1\
-        &
+    run_system $SYSID &
 done
 
 wait
