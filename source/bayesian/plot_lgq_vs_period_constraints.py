@@ -15,14 +15,16 @@ from scipy.stats import rdist
 import numpy
 from kde import KDEDistribution
 
+from emcee_autocorrelation import\
+    max_likelihood_autocorr,\
+    average_autocorr
+from mcmc_quantile_convergence import get_raftery_lewis_diagnostics
+
 from bayesian.visualize_emcee import\
     add_frequency_dependence_plot_config,\
     get_plot_data,\
     FrequencyDependencePlotter,\
     evaluate_lgq
-from bayesian.emcee_autocorrelation import\
-    max_likelihood_autocorr,\
-    average_autocorr
 #False positive, not sure why only m35 fails!
 #pylint: disable=unused-import
 from bayesian.m35_util import get_binary_data as get_m35_binary_data
@@ -128,6 +130,14 @@ def parse_command_line():
         'overwrite earlier ones.'
     )
     parser.add_argument(
+        '--auto-burn-in-tolerance',
+        type=float,
+        default=1e-4,
+        help='Automatically determined burn-in requires that the stationary '
+        'probability for quantile indicator chains is reached to within this '
+        'precision. See Raftery & Lewis (1995).'
+    )
+    parser.add_argument(
         '--individual-plot-mode', '--individual-plots',
         choices=['pages', 'subplots'],
         default='subplots',
@@ -229,7 +239,6 @@ def plot_single_convergence(*,
     axis.plot(plot_x, plot_y, '-x')
 
 
-
 def plot_single_lgq_quantiles(binary, samples, ptide, axis, config):
     """Plot lgQ @ quantiles vs step number for a single system/tidal period."""
 
@@ -254,7 +263,7 @@ def plot_single_quantiles_lgq(binary, samples, ptide, axis, config):
                             axis=axis)
 
 
-def plot_single_autocorrelation(binary, samples, ptide, axis, config):
+def plot_single_autocorrelation(_, samples, ptide, axis, __):
     """Plot the autocorrelation of lg[Q(Ptide)] for a single system/Ptide."""
 
     lgq_values = evaluate_lgq(
@@ -267,7 +276,7 @@ def plot_single_autocorrelation(binary, samples, ptide, axis, config):
     axis.plot(numpy.arange(autocorr.size), autocorr, '-o')
 
 
-def plot_single_autocorrelation_time(binary, samples, ptide, axis, config):
+def plot_single_autocorrelation_time(_, samples, ptide, axis, __):
     """Plot the autocorrelation of lg[Q(Ptide)] for a single system/Ptide."""
 
     lgq_values = evaluate_lgq(
@@ -282,6 +291,71 @@ def plot_single_autocorrelation_time(binary, samples, ptide, axis, config):
     for ind, eval_nsamples in enumerate(plot_x):
         plot_y[ind] = average_autocorr(lgq_values[:eval_nsamples].T)
     axis.plot(plot_x, plot_y, '-o')
+
+
+#pylint: disable=too-many-locals
+def plot_single_raftery_lewis_diagnostics(_,
+                                          samples,
+                                          ptide,
+                                          axis_list,
+                                          config):
+    """Create plots of CDF(mean, var, thin, burnin) of quantiles per walker."""
+
+    num_walkers = samples['lgQ_min'].shape[1]
+
+    lgq_values = evaluate_lgq(samples, numpy.array([ptide]))
+
+    quantiles = KDEDistribution(
+        lgq_values,
+        rdist(c=4, scale=0.05)
+    ).ppf(
+        config.convergence_quantiles
+    )
+    lgq_values = lgq_values.reshape(samples['lgQ_min'].shape)
+
+    axis_list[3].set_xscale('log')
+    plot_data = [
+        numpy.empty(num_walkers + 1, dtype=float),
+        numpy.empty(num_walkers + 1, dtype=float),
+        numpy.empty(num_walkers + 1, dtype=int),
+        numpy.empty(num_walkers + 1, dtype=int),
+    ]
+    plot_y = numpy.arange(num_walkers + 1, dtype=float) / num_walkers
+    for quantile_q, quantile in zip(quantiles, config.convergence_quantiles):
+        binary_chain = (lgq_values < quantile_q).astype(int)
+        plot_data[0][:-1] = binary_chain.mean(axis=0) - quantile
+        print('Mean diff (q=%.5f, Q = %s): %s'
+              %
+              (quantile, repr(quantile_q),  repr(binary_chain.mean())))
+        for walker in range(num_walkers):
+            (
+                plot_data[1][walker],
+                plot_data[2][walker],
+                plot_data[3][walker]
+            ) = get_raftery_lewis_diagnostics(binary_chain[:, walker],
+                                              config.auto_burn_in_tolerance)
+#            print('Got plot data for q=%.4f, walker %d.'
+#                  %
+#                  (quantile, walker))
+        for axis, plot_quantity in zip(axis_list, plot_data):
+            plot_quantity[-1] = plot_quantity[:-1].max()
+            plot_quantity = plot_quantity[numpy.isfinite(plot_quantity)]
+            axis.step(
+                numpy.sort(plot_quantity),
+                (
+                    numpy.arange(plot_quantity.size, dtype=float)
+                    /
+                    plot_quantity.size
+                ),
+                label=('q=%.4f' % quantile)
+            )
+
+    for title, axis in zip(['Mean - q', 'Variance', 'Thin', 'Burnin'],
+                           axis_list):
+        axis.set_title(title)
+        axis.legend()
+    axis_list[3].axvline(x=samples.shape[0])
+#pylint: enable=too-many-locals
 
 
 def get_plotting_order(binary_list):
@@ -308,6 +382,7 @@ def get_plotting_order(binary_list):
 
     return result
 
+
 def plot_individual_constraints(plot_data, config):
     """Create plots showing the lgQ(Ptide) constraint for indivdiual systems."""
 
@@ -315,17 +390,21 @@ def plot_individual_constraints(plot_data, config):
 
     config.combined_constraint_heat_map = 'log'
 
-    plot_type_split = dict(lgQ_period=[None],
-                           lgQ_quantiles=config.convergence_ptide_grid,
-                           quantiles_lgQ=config.convergence_ptide_grid,
-                           autocorrelation=config.convergence_ptide_grid,
-                           autocorrelation_time=config.convergence_ptide_grid)
+    plot_type_split = dict(
+        lgQ_period=[None],
+        lgQ_quantiles=config.convergence_ptide_grid,
+        quantiles_lgQ=config.convergence_ptide_grid,
+        autocorrelation=config.convergence_ptide_grid,
+        autocorrelation_time=config.convergence_ptide_grid,
+        raftery_lewis_diagnostics=config.convergence_ptide_grid
+    )
 
     for plot_type in [#'lgQ_period',
                       #'lgQ_quantiles',
                       #'quantiles_lgQ',
                       #'autocorrelation',
-                      'autocorrelation_time']:
+                      #'autocorrelation_time',
+                      'raftery_lewis_diagnostics']:
         print('Plot type: ' + plot_type)
         for cluster in ['M35', 'NGC6819', 'NGC188']:
             print('\tCluster: ' + cluster)
@@ -342,19 +421,33 @@ def plot_individual_constraints(plot_data, config):
                     pdf = PdfPages(output_fname)
                 for binary_index, binary in enumerate(plotting_order[cluster]):
                     print('\t\t\tBinary: ' + repr(binary))
-                    globals()['plot_single_' + plot_type.lower()](
-                        binary,
-                        plot_data[binary][0],
-                        plot_split,
-                        (
-                            axes[binary_index]
-                            if config.individual_plot_mode == 'subplots' else
-                            pyplot.gca()
-                        ),
-                        config
-                    )
+                    if plot_type == 'raftery_lewis_diagnostics':
+                        assert config.individual_plot_mode == 'pages'
+                        plot_single_raftery_lewis_diagnostics(
+                            binary,
+                            plot_data[binary][0],
+                            plot_split,
+                            pyplot.subplots(2, 2)[1].flatten(),
+                            config
+                        )
+                    else:
+                        globals()['plot_single_' + plot_type.lower()](
+                            binary,
+                            plot_data[binary][0],
+                            plot_split,
+                            (
+                                axes[binary_index]
+                                if config.individual_plot_mode == 'subplots'
+                                else pyplot.gca()
+                            ),
+                            config
+                        )
                     if config.individual_plot_mode == 'pages':
-                        pyplot.title(binary)
+                        pyplot.suptitle(binary
+                                        +
+                                        ': %d steps'
+                                        %
+                                        plot_data[binary][0].shape[0])
                         pdf.savefig()
                         pyplot.close()
 
