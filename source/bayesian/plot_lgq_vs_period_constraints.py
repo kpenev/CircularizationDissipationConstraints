@@ -7,10 +7,7 @@ from os import path, listdir
 
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
-from configargparse import\
-    ArgumentParser,\
-    DefaultsFormatter,\
-    Action as ArgparseAction
+from configargparse import ArgumentParser, DefaultsFormatter
 from scipy.stats import rdist
 import numpy
 from kde import KDEDistribution
@@ -19,6 +16,7 @@ from emcee_autocorrelation import\
     max_likelihood_autocorr,\
     average_autocorr
 from mcmc_quantile_convergence import get_raftery_lewis_diagnostics
+from emcee_quantile_convergence import find_emcee_quantiles
 
 from bayesian.visualize_emcee import\
     add_frequency_dependence_plot_config,\
@@ -35,26 +33,6 @@ from bayesian.cluster_util import select_binary_data
 
 def parse_command_line():
     """Parse command line for plotting configuration."""
-
-    #Interface specified by argparse module.
-    #pylint: disable=too-few-public-methods
-    class ParseBurnIn(ArgparseAction):
-        """Action for parsing burn-in arguments."""
-
-        def __call__(self, parser, namespace, values, option_string=None):
-            """Parse a list of burn-in arguments."""
-
-            for arg in values:
-                binary = 'default'
-                try:
-                    burnin = int(arg)
-                except ValueError:
-                    binary, burnin = arg.split(':')
-                    burnin = int(burnin)
-                getattr(namespace, self.dest)[binary] = burnin
-    #pylint: enable=too-few-public-methods
-
-
 
     parser = ArgumentParser(
         description=__doc__,
@@ -102,14 +80,6 @@ def parse_command_line():
         'convergence plots.'
     )
     parser.add_argument(
-        '--convergence-lgQ',
-        default=numpy.arange(5.0, 13.0, 1.0),
-        nargs='+',
-        type=float,
-        help='The lg(Q) values whose quantile evolution to display on the '
-        'convergence plots.'
-    )
-    parser.add_argument(
         '--convergence-combine-nsteps',
         default=10,
         type=int,
@@ -118,24 +88,20 @@ def parse_command_line():
         'the x value instead of a fixed width window.'
     )
     parser.add_argument(
-        '--burn-in',
-        nargs='+',
-        default=dict(default=0),
-        action=ParseBurnIn,
-        help='Specify burn-in to use for all or some of the systems. Isolated '
-        'numbers set default burn-in (applied to systems for which no specific '
-        'burn-in is set) and entries of the form <cluster_name>:<number> '
-        'specify burn-in for a given system. If passed multiple times it is as '
-        'if passed once with the combined list of arguments. Later values '
-        'overwrite earlier ones.'
-    )
-    parser.add_argument(
-        '--auto-burn-in-tolerance',
+        '--burn-in-tolerance',
         type=float,
-        default=1e-4,
+        default=1e-3,
         help='Automatically determined burn-in requires that the stationary '
         'probability for quantile indicator chains is reached to within this '
         'precision. See Raftery & Lewis (1995).'
+    )
+    parser.add_argument(
+        '--variance-realizations',
+        type=int,
+        default=10000,
+        help='Variance of the estimated CDF is calculated by generating this '
+        'many independent random realizations of the best fit Markov process to'
+        ' the thinned chain of number of walkers below each quantile.'
     )
     parser.add_argument(
         '--individual-plot-mode', '--individual-plots',
@@ -149,17 +115,20 @@ def parse_command_line():
 
     return parser.parse_args()
 
+
 def download_latest_samples(destination):
     """Download the latest samples files from stampede2 and ganymede."""
 
     for source in [
-            'kxp174430@ganymede:~/*_powerlaw_alllock_*mcmc_samples.h5',
-            'kpenev@stampede2.tacc.utexas.edu:~/*_mcmc_powerlawlgQ_samples.h5'
+            'kxp174430@ganymede:~/M35*_powerlaw_alllock_*mcmc_samples.h5',
+            'kpenev@stampede2.tacc.utexas.edu:~/'
+            'NGC*_mcmc_powerlawlgQ_samples.h5'
     ]:
         call(['rsync', '-avz', '--progress', source, destination])
 
+
 def get_sampling_data(config):
-    """Return dictionary with system keys containing the samples and logprob."""
+    """Return dictionary index by system of samples, likelihood, & quantile."""
 
     result = dict()
     for samples_fname in listdir(config.samples_dir):
@@ -169,30 +138,62 @@ def get_sampling_data(config):
                 0,
                 config.chain_condition
             )
-            burn_in = config.burn_in.get(system, config.burn_in['default'])
-            result[system] = (samples[burn_in:], log_probability[burn_in:])
         except AssertionError:
-            pass
+            continue
+        print(system)
+        quantiles = [
+            [
+                find_emcee_quantiles(
+                    evaluate_lgq(
+                        samples,
+                        numpy.array([ptide])
+                    ).reshape(
+                        samples['lgQ_min'].shape
+                    ),
+                    cdf_value,
+                    config.burn_in_tolerance,
+                    config.variance_realizations
+                )
+                for cdf_value in config.convergence_quantiles
+            ]
+            for ptide in config.convergence_ptide_grid
+        ]
+        result[system] = (samples, log_probability, quantiles)
 
     return result
 
-def plot_single_lgq_period(_, samples, __, axis, config):
+
+def plot_single_lgq_period(_, system_data, __, axis, config):
     """Plot the constraint for a single system."""
 
     pyplot.xscale('log')
     orig_axis = pyplot.gca()
     pyplot.sca(axis)
     frequency_dependence_plotter = FrequencyDependencePlotter(1, config)
-    frequency_dependence_plotter.add_chain(samples, None)
+    frequency_dependence_plotter.add_chain(system_data[0], None)
     pyplot.ylim(4.0, 12.0)
     frequency_dependence_plotter.plot_combined_pdf_heat_map()
+    pyplot.plot(
+        config.convergence_ptide_grid,
+        [
+            [
+                system_data[2][ptide_ind][quantile_ind][0]
+                for quantile_ind in range(len(config.convergence_quantiles))
+            ]
+            for ptide_ind in range(len(config.convergence_ptide_grid))
+        ],
+        'xk',
+        zorder=20
+    )
+
     pyplot.sca(orig_axis)
 
 
 def plot_single_convergence(*,
                             binary,
-                            samples,
+                            system_data,
                             ptide,
+                            ptide_ind,
                             quantity,
                             values,
                             combine_nsteps,
@@ -201,8 +202,13 @@ def plot_single_convergence(*,
 
     pyplot.xscale('linear')
 
-    shape = samples['lgQ_min'].shape
-    lgq_values = evaluate_lgq(samples, numpy.array([ptide])).reshape(shape)
+    shape = system_data[0].shape
+    lgq_values = evaluate_lgq(
+        system_data[0],
+        numpy.array([ptide])
+    ).reshape(
+        shape
+    )
 
     plot_x = numpy.arange(combine_nsteps + 1,
                           len(lgq_values))
@@ -236,54 +242,92 @@ def plot_single_convergence(*,
         )
         plot_y[x_ind, :] = getattr(kde, quantity)(values)
 
-    axis.plot(plot_x, plot_y, '-x')
+
+    for dset_i in range(len(values)):
+        axis.set_prop_cycle(None)
+        min_x = 0
+        for max_x, size in [
+                (system_data[2][ptide_ind][dset_i][-1], 3),
+                (system_data[2][ptide_ind][dset_i][-1] + combine_nsteps, 6),
+                (plot_x.size, 9)
+        ]:
+            axis.plot(
+                plot_x[min_x : max_x + 1],
+                plot_y[min_x : max_x + 1, dset_i],
+                '-x',
+                markersize=size
+            )
+            min_x = max_x
 
 
-def plot_single_lgq_quantiles(binary, samples, ptide, axis, config):
+def plot_single_lgq_quantiles(binary, system_data, ptide, axis, config):
     """Plot lgQ @ quantiles vs step number for a single system/tidal period."""
 
-    plot_single_convergence(binary=binary,
-                            samples=samples,
-                            ptide=ptide,
-                            quantity='ppf',
-                            values=config.convergence_quantiles,
-                            combine_nsteps=config.convergence_combine_nsteps,
-                            axis=axis)
+    ptide_index = config.convergence_ptide_grid.index(ptide)
+    plot_single_convergence(
+        binary=binary,
+        system_data=system_data,
+        ptide=ptide,
+        ptide_ind=ptide_index,
+        quantity='ppf',
+        values=config.convergence_quantiles,
+        combine_nsteps=config.convergence_combine_nsteps,
+        axis=axis
+    )
+    for quantile_diag in system_data[2][ptide_index]:
+        axis.axhline(y=quantile_diag[0], zorder=0, color='black')
 
 
-def plot_single_quantiles_lgq(binary, samples, ptide, axis, config):
+def plot_single_quantiles_lgq(binary, system_data, ptide, axis, config):
     """Plot quantile(lgQ) vs step number for a single system/tidal period."""
 
-    plot_single_convergence(binary=binary,
-                            samples=samples,
-                            ptide=ptide,
-                            quantity='cdf',
-                            values=config.convergence_lgQ,
-                            combine_nsteps=config.convergence_combine_nsteps,
-                            axis=axis)
+    ptide_index = config.convergence_ptide_grid.index(ptide)
+    plot_single_convergence(
+        binary=binary,
+        system_data=system_data,
+        ptide=ptide,
+        ptide_ind=ptide_index,
+        quantity='cdf',
+        values=[
+            quantile_diag[0] for quantile_diag in system_data[2][ptide_index]
+        ],
+        combine_nsteps=config.convergence_combine_nsteps,
+        axis=axis
+    )
+    for target_cdf, quantile_diag in zip(config.convergence_quantiles,
+                                         system_data[2][ptide_index]):
+        axis.axhspan(ymin=(target_cdf - quantile_diag[2]),
+                     ymax=(target_cdf + quantile_diag[2]),
+                     zorder=0,
+                     facecolor='lightgray')
+        extra_args = dict()
+        for estimate in quantile_diag[1]:
+            extra_args['color'] = axis.axhline(
+                y=estimate,
+                **extra_args
+            ).get_color()
 
-
-def plot_single_autocorrelation(_, samples, ptide, axis, __):
+def plot_single_autocorrelation(_, system_data, ptide, axis, __):
     """Plot the autocorrelation of lg[Q(Ptide)] for a single system/Ptide."""
 
     lgq_values = evaluate_lgq(
-        samples,
+        system_data[0],
         numpy.array([ptide])
     ).reshape(
-        samples.shape
+        system_data[0].shape
     )
     autocorr = average_autocorr(lgq_values.T, time=False)
     axis.plot(numpy.arange(autocorr.size), autocorr, '-o')
 
 
-def plot_single_autocorrelation_time(_, samples, ptide, axis, __):
+def plot_single_autocorrelation_time(_, system_data, ptide, axis, __):
     """Plot the autocorrelation of lg[Q(Ptide)] for a single system/Ptide."""
 
     lgq_values = evaluate_lgq(
-        samples,
+        system_data[0],
         numpy.array([ptide])
     ).reshape(
-        samples.shape
+        system_data[0].shape
     )
     plot_x = numpy.arange(max(int(0.1 * lgq_values.shape[0]), 10),
                           lgq_values.shape[0] - 1)
@@ -293,69 +337,96 @@ def plot_single_autocorrelation_time(_, samples, ptide, axis, __):
     axis.plot(plot_x, plot_y, '-o')
 
 
-#pylint: disable=too-many-locals
-def plot_single_raftery_lewis_diagnostics(_,
-                                          samples,
-                                          ptide,
-                                          axis_list,
-                                          config):
-    """Create plots of CDF(mean, var, thin, burnin) of quantiles per walker."""
+def get_raftery_lewis_plot_data(binary_chain,
+                                quantile,
+                                num_walkers,
+                                burn_in_tolerance):
+    """Return the data to plot for the given quantile."""
 
-    num_walkers = samples['lgQ_min'].shape[1]
-
-    lgq_values = evaluate_lgq(samples, numpy.array([ptide]))
-
-    quantiles = KDEDistribution(
-        lgq_values,
-        rdist(c=4, scale=0.05)
-    ).ppf(
-        config.convergence_quantiles
-    )
-    lgq_values = lgq_values.reshape(samples['lgQ_min'].shape)
-
-    axis_list[3].set_xscale('log')
     plot_data = [
         numpy.empty(num_walkers + 1, dtype=float),
         numpy.empty(num_walkers + 1, dtype=float),
         numpy.empty(num_walkers + 1, dtype=int),
         numpy.empty(num_walkers + 1, dtype=int),
     ]
-    plot_y = numpy.arange(num_walkers + 1, dtype=float) / num_walkers
-    for quantile_q, quantile in zip(quantiles, config.convergence_quantiles):
-        binary_chain = (lgq_values < quantile_q).astype(int)
-        plot_data[0][:-1] = binary_chain.mean(axis=0) - quantile
-        print('Mean diff (q=%.5f, Q = %s): %s'
-              %
-              (quantile, repr(quantile_q),  repr(binary_chain.mean())))
-        for walker in range(num_walkers):
-            (
-                plot_data[1][walker],
-                plot_data[2][walker],
-                plot_data[3][walker]
-            ) = get_raftery_lewis_diagnostics(binary_chain[:, walker],
-                                              config.auto_burn_in_tolerance)
+
+    plot_data[0][:-1] = binary_chain.mean(axis=0) - quantile
+    print('Mean binary chain (q=%.5f): %s'
+          %
+          (quantile, repr(binary_chain.mean())))
+    for walker in range(num_walkers):
+        (
+            plot_data[1][walker],
+            plot_data[2][walker],
+            plot_data[3][walker]
+        ) = get_raftery_lewis_diagnostics(binary_chain[:, walker],
+                                          burn_in_tolerance)
+    plot_data[1] /= num_walkers**0.5
+    return plot_data
+
+
+def plot_single_raftery_lewis_diagnostics(_,
+                                          system_data,
+                                          ptide,
+                                          axis_list,
+                                          config):
+    """Create plots of CDF(mean, var, thin, burnin) of quantiles per walker."""
+
+    ptide_ind = config.convergence_ptide_grid.index(ptide)
+    lgq_values = evaluate_lgq(system_data[0], numpy.array([ptide]))
+
+    lgq_values = lgq_values.reshape(system_data[0].shape)
+
+    axis_list[3].set_xscale('log')
+    for quantile_diagnostics, quantile_cdf in zip(system_data[2][ptide_ind],
+                                                  config.convergence_quantiles):
+        binary_chain = (lgq_values < quantile_diagnostics[0]).astype(int)
+        plot_data = get_raftery_lewis_plot_data(binary_chain,
+                                                quantile_diagnostics[1][0],
+                                                system_data[0].shape[1],
+                                                config.burn_in_tolerance)
+        print('Combined diagnostics: ' + repr(quantile_diagnostics))
 #            print('Got plot data for q=%.4f, walker %d.'
 #                  %
 #                  (quantile, walker))
-        for axis, plot_quantity in zip(axis_list, plot_data):
+        label = 'q=%d%%' % int(numpy.round(100 * quantile_cdf))
+        for axis, plot_quantity, combined in zip(axis_list,
+                                                 plot_data,
+                                                 quantile_diagnostics[1:]):
+
             plot_quantity[-1] = plot_quantity[:-1].max()
             plot_quantity = plot_quantity[numpy.isfinite(plot_quantity)]
-            axis.step(
+            color = axis.step(
                 numpy.sort(plot_quantity),
                 (
                     numpy.arange(plot_quantity.size, dtype=float)
                     /
                     plot_quantity.size
                 ),
-                label=('q=%.4f' % quantile)
-            )
+                label=label,
+                zorder=10
+            )[0].get_color()
+
+            if (
+                    combined is not None
+                    and
+                    numpy.isfinite(numpy.asarray(combined)).any()
+            ):
+                if label is not None:
+                    combined -= quantile_cdf
+                for line_x in numpy.atleast_1d(combined):
+                    axis.axvline(x=line_x, color=color, zorder=20)
+
+            label=None
+
+    axis_list[3].axvspan(xmin=axis_list[3].get_xlim()[0],
+                         xmax=system_data[0].shape[0],
+                         facecolor='lightgray',
+                         zorder=0)
 
     for title, axis in zip(['Mean - q', 'Variance', 'Thin', 'Burnin'],
                            axis_list):
         axis.set_title(title)
-        axis.legend()
-    axis_list[3].axvline(x=samples.shape[0])
-#pylint: enable=too-many-locals
 
 
 def get_plotting_order(binary_list):
@@ -400,8 +471,8 @@ def plot_individual_constraints(plot_data, config):
     )
 
     for plot_type in [#'lgQ_period',
-                      #'lgQ_quantiles',
-                      #'quantiles_lgQ',
+                      'lgQ_quantiles',
+                      'quantiles_lgQ',
                       #'autocorrelation',
                       #'autocorrelation_time',
                       'raftery_lewis_diagnostics']:
@@ -425,15 +496,16 @@ def plot_individual_constraints(plot_data, config):
                         assert config.individual_plot_mode == 'pages'
                         plot_single_raftery_lewis_diagnostics(
                             binary,
-                            plot_data[binary][0],
+                            plot_data[binary],
                             plot_split,
                             pyplot.subplots(2, 2)[1].flatten(),
                             config
                         )
+                        pyplot.figlegend()
                     else:
                         globals()['plot_single_' + plot_type.lower()](
                             binary,
-                            plot_data[binary][0],
+                            plot_data[binary],
                             plot_split,
                             (
                                 axes[binary_index]
