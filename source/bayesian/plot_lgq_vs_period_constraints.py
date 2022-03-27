@@ -178,11 +178,12 @@ def get_sampling_data(config):
         preprocessed_data = dict()
 
     result = dict()
-    for samples_fname in listdir(config.samples_dir)[:1]:
+    for samples_fname in listdir(config.samples_dir):
         if add_preprocessed_data(samples_fname,
                                  preprocessed_data,
                                  result,
                                  config):
+            print('Reusing pickled data for: ' + repr(samples_fname))
             continue
         try:
             system, samples, log_probability = get_plot_data(
@@ -228,7 +229,6 @@ def get_sampling_data(config):
     with open(config.data_pickle, 'wb') as pickle_file:
         pickle.dump(preprocessed_data, pickle_file)
 
-    exit(1)
     return result
 
 
@@ -510,11 +510,13 @@ def plot_single_raftery_lewis_diagnostics(_,
 #pylint: enable=too-many-locals
 
 
-def get_plotting_order(binary_list):
+def get_plotting_order(binary_list, cluster=None):
     """Split the given systems by cluster and order them  by orbital period."""
 
     result = dict()
-    for cluster in ['M35', 'NGC6819', 'NGC188']:
+    cluster_list = (['M35', 'NGC6819', 'NGC188'] if cluster is None
+                    else [cluster])
+    for cluster in cluster_list:
         sb1_orbits = globals()['get_'
                                +
                                cluster.lower()
@@ -532,7 +534,9 @@ def get_plotting_order(binary_list):
         ]
         result[cluster] = [entry[1] for entry in sorted(period_binary)]
 
-    return result
+    if cluster is None:
+        return result
+    return result[cluster]
 
 
 def plot_individual_constraints(plot_data, config):
