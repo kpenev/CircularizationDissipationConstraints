@@ -179,6 +179,9 @@ def get_sampling_data(config):
 
     result = dict()
     for samples_fname in listdir(config.samples_dir):
+        if not path.splitext(samples_fname)[1] == '.h5':
+            print('Skipping ' + repr(samples_fname))
+            continue
         if add_preprocessed_data(samples_fname,
                                  preprocessed_data,
                                  result,
@@ -186,6 +189,7 @@ def get_sampling_data(config):
             print('Reusing pickled data for: ' + repr(samples_fname))
             continue
         try:
+            print('Reading: ' + repr(samples_fname))
             system, samples, log_probability = get_plot_data(
                 path.join(config.samples_dir, samples_fname),
                 0,
@@ -225,9 +229,8 @@ def get_sampling_data(config):
                 system=system,
                 system_data=result[system]
             )
-
-    with open(config.data_pickle, 'wb') as pickle_file:
-        pickle.dump(preprocessed_data, pickle_file)
+            with open(config.data_pickle, 'wb') as pickle_file:
+                pickle.dump(preprocessed_data, pickle_file)
 
     return result
 
@@ -510,12 +513,12 @@ def plot_single_raftery_lewis_diagnostics(_,
 #pylint: enable=too-many-locals
 
 
-def get_plotting_order(binary_list, cluster=None):
+def get_plotting_order(binary_list, restrict_to_cluster=None):
     """Split the given systems by cluster and order them  by orbital period."""
 
     result = dict()
-    cluster_list = (['M35', 'NGC6819', 'NGC188'] if cluster is None
-                    else [cluster])
+    cluster_list = (['M35', 'NGC6819', 'NGC188'] if restrict_to_cluster is None
+                    else [restrict_to_cluster])
     for cluster in cluster_list:
         sb1_orbits = globals()['get_'
                                +
@@ -534,7 +537,7 @@ def get_plotting_order(binary_list, cluster=None):
         ]
         result[cluster] = [entry[1] for entry in sorted(period_binary)]
 
-    if cluster is None:
+    if restrict_to_cluster is None:
         return result
     return result[cluster]
 
@@ -604,7 +607,7 @@ def plot_individual_constraints(plot_data, config):
                                         +
                                         ': %d steps'
                                         %
-                                        plot_data[binary][0].shape[0])
+                                        plot_data[binary]['samples'].shape[0])
                         pdf.savefig()
                         pyplot.close()
 
