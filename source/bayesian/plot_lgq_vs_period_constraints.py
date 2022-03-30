@@ -167,6 +167,26 @@ def add_preprocessed_data(samples_fname, preprocessed_data, result, config):
     return False
 
 
+def add_orbit_data(sampling_data):
+    """Add orbit data to `sampling_data`."""
+
+    sb1_orbits = dict()
+    for cluster in ['M35', 'NGC6819', 'NGC188']:
+        sb1_orbits[cluster] = globals()['get_'
+                                        +
+                                        cluster.lower()
+                                        +
+                                        '_binary_data']()[0]
+    for binary in sampling_data.keys():
+        cluster = binary.split('_')[0]
+        sampling_data[binary]['orbit'] = select_binary_data(
+            sb1_orbits[cluster],
+            None,
+            'PKM' if cluster == 'NGC188' else 'WOCS',
+            int(binary.split('_')[1])
+        )
+
+
 def get_sampling_data(config):
     """Return dictionary index by system of samples, likelihood, & quantile."""
 
@@ -232,6 +252,7 @@ def get_sampling_data(config):
             with open(config.data_pickle, 'wb') as pickle_file:
                 pickle.dump(preprocessed_data, pickle_file)
 
+    add_orbit_data(result)
     return result
 
 
@@ -513,27 +534,16 @@ def plot_single_raftery_lewis_diagnostics(_,
 #pylint: enable=too-many-locals
 
 
-def get_plotting_order(binary_list, restrict_to_cluster=None):
+def get_plotting_order(plot_data, restrict_to_cluster=None):
     """Split the given systems by cluster and order them  by orbital period."""
 
     result = dict()
     cluster_list = (['M35', 'NGC6819', 'NGC188'] if restrict_to_cluster is None
                     else [restrict_to_cluster])
     for cluster in cluster_list:
-        sb1_orbits = globals()['get_'
-                               +
-                               cluster.lower()
-                               +
-                               '_binary_data']()[0]
         period_binary = [
-            (
-                min(select_binary_data(sb1_orbits,
-                                       None,
-                                       'PKM' if cluster == 'NGC188' else 'WOCS',
-                                       int(binary.split('_')[1]))['Per']),
-                binary
-            )
-            for binary in binary_list if binary.startswith(cluster)
+            (min(data['orbit']['Per']), binary)
+            for binary, data in plot_data.items() if binary.startswith(cluster)
         ]
         result[cluster] = [entry[1] for entry in sorted(period_binary)]
 
@@ -545,7 +555,7 @@ def get_plotting_order(binary_list, restrict_to_cluster=None):
 def plot_individual_constraints(plot_data, config):
     """Create plots showing the lgQ(Ptide) constraint for indivdiual systems."""
 
-    plotting_order = get_plotting_order(plot_data.keys())
+    plotting_order = get_plotting_order(plot_data)
 
     config.combined_constraint_heat_map = 'log'
 
