@@ -6,6 +6,7 @@ from subprocess import call
 from os import path, listdir
 import hashlib
 import pickle
+from multiprocessing import Pool
 
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
@@ -122,6 +123,12 @@ def parse_command_line(quantiles_only=False):
         'a separate page in a multi-page PDF file (`pages`) or as grid of '
         'sub-plots in a single figure (`subplots`).'
     )
+    parser.add_argument(
+        '--nthreads',
+        default=16,
+        help='The maximum number of parallel threads to use for calculating '
+        'quantile diagnostics (the only slow part of preparing plotting data).'
+    )
     if not quantiles_only:
         add_frequency_dependence_plot_config(parser)
 
@@ -187,6 +194,41 @@ def add_orbit_data(sampling_data):
         )
 
 
+def get_single_quantile(cdf_value, ptide, samples, config):
+    """Return the quantile and diagnostics for given ptide and CDF value."""
+
+    return find_emcee_quantiles(
+        evaluate_lgq(
+            samples,
+            numpy.array([ptide])
+        ).reshape(
+            samples['lgQ_min'].shape
+        ),
+        cdf_value,
+        config.burn_in_tolerance,
+        config.variance_realizations
+    )
+
+
+def get_quantiles(samples, config):
+    """Return the quantiles with diagnostics based on the given samples."""
+
+    with Pool(config.nthreads) as workers:
+        flattened_quantiles =workers.starmap(
+            get_single_quantile,
+            [
+                (cdf_value, ptide, samples, config)
+                for ptide in config.convergence_ptide_grid
+                for cdf_value in config.convergence_quantiles
+            ]
+        )
+    nquantiles = len(config.convergence_quantiles)
+    return [
+        flattened_quantiles[p_i * nquantiles : p_i * nquantiles + nquantiles]
+        for p_i in range(len(config.convergence_ptide_grid))
+    ]
+
+
 def get_sampling_data(config):
     """Return dictionary index by system of samples, likelihood, & quantile."""
 
@@ -218,23 +260,7 @@ def get_sampling_data(config):
         except AssertionError:
             continue
         print(system)
-        quantiles = [
-            [
-                find_emcee_quantiles(
-                    evaluate_lgq(
-                        samples,
-                        numpy.array([ptide])
-                    ).reshape(
-                        samples['lgQ_min'].shape
-                    ),
-                    cdf_value,
-                    config.burn_in_tolerance,
-                    config.variance_realizations
-                )
-                for cdf_value in config.convergence_quantiles
-            ]
-            for ptide in config.convergence_ptide_grid
-        ]
+        quantiles = get_quantiles(samples, config)
         result[system] = dict(samples=samples,
                               log_probability=log_probability,
                               quantiles=quantiles)
@@ -278,6 +304,10 @@ def plot_single_lgq_period(_, system_data, __, axis, config):
         'xk',
         zorder=20
     )
+    pyplot.axvline(x=min(system_data['orbit']['Per']),
+                   color='black',
+                   linewidth=5,
+                   zorder=20)
 
     pyplot.sca(orig_axis)
 
@@ -568,12 +598,14 @@ def plot_individual_constraints(plot_data, config):
         raftery_lewis_diagnostics=config.convergence_ptide_grid
     )
 
-    for plot_type in [#'lgQ_period',
-                      'lgQ_quantiles',
-                      'quantiles_lgQ',
-                      #'autocorrelation',
-                      #'autocorrelation_time',
-                      'raftery_lewis_diagnostics']:
+    for plot_type in [
+            'lgQ_period',
+            'lgQ_quantiles',
+            'quantiles_lgQ',
+            'autocorrelation',
+            'autocorrelation_time',
+            'raftery_lewis_diagnostics'
+    ]:
         print('Plot type: ' + plot_type)
         for cluster in ['M35', 'NGC6819', 'NGC188']:
             print('\tCluster: ' + cluster)
