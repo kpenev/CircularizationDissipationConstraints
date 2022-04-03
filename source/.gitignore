@@ -1,4 +1,6 @@
 .*.swp
+.*.swn
+.*.swo
 *.out
 *.pickle
 *.outerr

@@ -87,21 +87,22 @@ def add_frequency_dependence_plot_config(parser):
     parser.add_argument(
         '--heat-map-contrast',
         default=1e-3,
+        type=float,
         help='The smallest value to plot on the heat map is this factor times '
         'the maximum value.'
     )
 
     parser.add_argument(
-        '--combined-constraint-kernel-scale',
-        default=1.0,
+        '--combined-constraint-kernel-width',
+        default=0.1,
         type=float,
-        help='A scaling to apply to the width of the kernel that gets convolved'
-        ' with the samples for calculating combined constraints.'
+        help='The width of the kernel that gets convolved with the samples for '
+        'calculating combined constraints.'
     )
     parser.add_argument(
         '--plot-confidence',
         type=float,
-        nargs='+',
+        nargs='*',
         default=[stats.norm.cdf(2.0) - stats.norm.cdf(-2.0)],
         help='Specify the confidence to display in the dissipation vs tidal '
         'frequency plot (see --frequency-dependence-plot-fname argument).'
@@ -109,7 +110,7 @@ def add_frequency_dependence_plot_config(parser):
     parser.add_argument(
         '--ptide-grid',
         nargs=3,
-        default=numpy.logspace(0.0, numpy.log10(20.0), 100),
+        default=numpy.logspace(0.0, numpy.log10(100.0), 100),
         action=ParseGrid,
         metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES'),
         help='Set the range and resolution of the tidal period to include in '
@@ -369,9 +370,12 @@ class FrequencyDependencePlotter:
         """
 
         self.config = config
-        self.transparency = 1.0 / (len(config.plot_confidence)
-                                   *
-                                   num_chains)
+        self.transparency = (
+            1.0 / (len(config.plot_confidence)
+                   *
+                   num_chains)
+            if config.plot_confidence else None
+        )
         self._constraint_index = 0
         self._hatch_list = ['\\\\',
                             '//',
@@ -395,13 +399,17 @@ class FrequencyDependencePlotter:
                             'tab:cyan']
         self.combined_pdf = CombinedMCMCConstraint(
             config.combined_constraint_lgQ_grid,
-            config.combined_constraint_kernel_scale
+            config.combined_constraint_kernel_width
         )
 
-    def add_chain(self, samples, label):
+    def add_chain(self, samples, label, prior_range=(-numpy.inf, numpy.inf)):
         """Overplot another chain of samples."""
 
         evaluated_lgq = evaluate_lgq(samples, self.config.ptide_grid)
+
+        assert numpy.isfinite(evaluated_lgq).all()
+        self.combined_pdf.add_samples(evaluated_lgq, prior_range)
+
 
         if not self.config.frequency_dependence_plot_no_lines:
             pyplot.plot(
@@ -431,9 +439,6 @@ class FrequencyDependencePlotter:
                                            len(self._hatch_list)],
                     linewidth=0
                 )
-            else:
-                self.combined_pdf.add_samples(evaluated_lgq)
-
             self._constraint_index += 1
 
             if conf_index == 0:
@@ -582,8 +587,9 @@ class FrequencyDependencePlotter:
             boundaries[-1] = 1.5 * grid[-1] - 0.5 * grid[-2]
 
         plot_z = self.combined_pdf()
-        plot_z_min = max(plot_z.max() * self.config.heat_map_contrast,
-                         plot_z.min())
+        plot_z_min = plot_z.min()
+        if not plot_z_min > plot_z.max() * self.config.heat_map_contrast:
+            plot_z_min = plot_z.max() * self.config.heat_map_contrast
 
         plot_args = dict(shading='flat', zorder=10)
 

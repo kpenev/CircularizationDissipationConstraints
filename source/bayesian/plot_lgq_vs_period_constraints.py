@@ -282,6 +282,42 @@ def get_sampling_data(config):
     return result
 
 
+def plot_single_diagnostic_period(quantile_data,
+                                  diagnostic,
+                                  axis,
+                                  config,
+                                  *,
+                                  fmt='o',
+                                  label=True,
+                                  zorder=None):
+    """Plot some diagnostic of the quantiles of lgQ(Ptide) vs Ptide."""
+
+    diagnostic_ind = ['quantile', 'cdf', 'std', 'thin', 'burnin'].index(
+        diagnostic
+    )
+    pyplot.xscale('log')
+
+    kwargs=dict()
+    if label is not None:
+        kwargs['label'] = label
+    if zorder is not None:
+        kwargs['zorder'] = zorder
+
+    for quantile_ind, quantile in enumerate(config.convergence_quantiles):
+        if label is True:
+            kwargs['label'] = 'CDF=%.3f' % quantile
+
+        axis.plot(
+            config.convergence_ptide_grid,
+            [
+                quantile_data[ptide_ind][quantile_ind][diagnostic_ind]
+                for ptide_ind in range(len(config.convergence_ptide_grid))
+            ],
+            fmt,
+            **kwargs
+        )
+
+
 def plot_single_lgq_period(_, system_data, __, axis, config):
     """Plot the constraint for a single system."""
 
@@ -292,18 +328,13 @@ def plot_single_lgq_period(_, system_data, __, axis, config):
     frequency_dependence_plotter.add_chain(system_data['samples'], None)
     pyplot.ylim(4.0, 12.0)
     frequency_dependence_plotter.plot_combined_pdf_heat_map()
-    pyplot.plot(
-        config.convergence_ptide_grid,
-        [
-            [
-                system_data['quantiles'][ptide_ind][quantile_ind][0]
-                for quantile_ind in range(len(config.convergence_quantiles))
-            ]
-            for ptide_ind in range(len(config.convergence_ptide_grid))
-        ],
-        'xk',
-        zorder=20
-    )
+    plot_single_diagnostic_period(system_data['quantiles'],
+                                  'quantile',
+                                  axis,
+                                  config,
+                                  fmt='xk',
+                                  label=None,
+                                  zorder=20)
     pyplot.axvline(x=min(system_data['orbit']['Per']),
                    color='black',
                    linewidth=5,
@@ -564,6 +595,27 @@ def plot_single_raftery_lewis_diagnostics(_,
 #pylint: enable=too-many-locals
 
 
+def plot_single_burnin_period(_, system_data, __, axis, config):
+    """Plot the required burnin for each quantile of lgQ(Ptide) vs Ptide."""
+
+    plot_single_diagnostic_period(system_data['quantiles'],
+                                  'burnin',
+                                  axis,
+                                  config)
+    axis.axhline(y=system_data['samples'].shape[0], color='black')
+    axis.legend()
+
+
+def plot_single_cdfstd_period(_, system_data, __, axis, config):
+    """Plot the required burnin for each quantile of lgQ(Ptide) vs Ptide."""
+
+    plot_single_diagnostic_period(system_data['quantiles'],
+                                  'std',
+                                  axis,
+                                  config)
+    axis.legend()
+
+
 def get_plotting_order(plot_data, restrict_to_cluster=None):
     """Split the given systems by cluster and order them  by orbital period."""
 
@@ -595,16 +647,20 @@ def plot_individual_constraints(plot_data, config):
         quantiles_lgQ=config.convergence_ptide_grid,
         autocorrelation=config.convergence_ptide_grid,
         autocorrelation_time=config.convergence_ptide_grid,
-        raftery_lewis_diagnostics=config.convergence_ptide_grid
+        raftery_lewis_diagnostics=config.convergence_ptide_grid,
+        burnin_period=[None],
+        cdfstd_period=[None],
     )
 
     for plot_type in [
-            'lgQ_period',
-            'lgQ_quantiles',
-            'quantiles_lgQ',
-            'autocorrelation',
-            'autocorrelation_time',
-            'raftery_lewis_diagnostics'
+            #'lgQ_period',
+            #'lgQ_quantiles',
+            #'quantiles_lgQ',
+            #'autocorrelation',
+            #'autocorrelation_time',
+            #'raftery_lewis_diagnostics',
+            'burnin_period',
+            'cdfstd_period'
     ]:
         print('Plot type: ' + plot_type)
         for cluster in ['M35', 'NGC6819', 'NGC188']:
@@ -659,6 +715,102 @@ def plot_individual_constraints(plot_data, config):
                     pdf.close()
 
 
+def plot_cluster_constraints(plot_data, config):
+    """Plot heat-map of joint constraint from all systems in a cluster."""
+
+    config.combined_constraint_heat_map = 'log'
+    include_binaries = dict(
+        M35=[
+            ('M35_%d' % binid, burnin) for binid, burnin in [(54027, 200),
+                                                             (16016, 260),
+                                                             (23043, 200),
+                                                             (54054, 320),
+                                                             (35045, 145),
+                                                             (40015, 220),
+                                                             (33054, 180),
+                                                             (34036, 150),
+                                                             (41032, 100)]
+        ],
+        NGC6819=[
+            ('NGC6819_%d' % binid, burnin) for binid, burnin in [(49002, 110),
+                                                                 (66004, 200),
+                                                                 (13001, 300),
+                                                                 (60006, 100),
+                                                                 (46013, 280),
+                                                                 (59003, 150),
+                                                                 (53003, 240)]
+        ],
+        NGC188=[
+            ('NGC188_%d' % binid, burnin) for binid, burnin in [(4618, 120),
+                                                                (5015, 100),
+                                                                (6171, 75),
+                                                                (5463, 100),
+                                                                (5601, 50),
+                                                                (4904, 100),
+                                                                (4289, 60),
+                                                                (5738, 90),
+                                                                (6292, 100),
+                                                                (4965, 70),
+                                                                (5797, 80),
+                                                                (5647, 100),
+                                                                (880, 110),
+                                                                (4080, 120),
+                                                                (5040, 100),
+                                                                (4673, 110),
+                                                                (5381, 80)]
+
+        ]
+    )
+
+    numpy.set_printoptions(precision=16, floatmode='fixed', linewidth=100)
+    all_combined_plotter = FrequencyDependencePlotter(0, config)
+
+    fully_combined_n = 1
+
+    for cluster in ['M35', 'NGC6819', 'NGC188']:
+        print(cluster + ':')
+        cluster_plotter = FrequencyDependencePlotter(
+            len(include_binaries[cluster]),
+            config
+        )
+        for nadded, (binary, burnin) in enumerate(include_binaries[cluster]):
+            samples = plot_data[binary]['samples']
+            cluster_plotter.add_chain(
+                samples[burnin:],
+                None,
+                (4 if samples['lgQ_min'].min() < 5 else 5, numpy.inf)
+            )
+            all_combined_plotter.add_chain(
+                samples[burnin:],
+                None,
+                (4 if samples['lgQ_min'].min() < 5 else 5, numpy.inf)
+            )
+
+            for output_fname, plotter in [
+                    (
+                        cluster + '_combined_lgQ_period_%d.png' % (nadded + 1),
+                        cluster_plotter
+                    ),
+                    (
+                        'fully_combined_lgQ_period_%d.png' % fully_combined_n,
+                        all_combined_plotter
+                    )
+            ]:
+                pyplot.figure(figsize=(11, 8.5), dpi=300, tight_layout=True)
+                pyplot.xscale('log')
+                print('    Adding ' + repr(binary))
+                pyplot.ylim(4.0, 9.0)
+                plotter.plot_combined_pdf_heat_map()
+                pyplot.colorbar()
+                print('    Plotting')
+                pyplot.savefig(output_fname)
+                print('    Created: ' + repr(output_fname))
+                pyplot.cla()
+                pyplot.clf()
+
+            fully_combined_n += 1
+
+
 def main(config):
     """Avoid polluting global namespace."""
 
@@ -667,6 +819,7 @@ def main(config):
 
     plot_data = get_sampling_data(config)
     plot_individual_constraints(plot_data, config)
+#    plot_cluster_constraints(plot_data, config)
 
 
 if __name__ == '__main__':
