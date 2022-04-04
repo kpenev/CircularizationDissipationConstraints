@@ -8,7 +8,7 @@ import hashlib
 import pickle
 from multiprocessing import Pool
 
-from matplotlib import pyplot
+from matplotlib import pyplot, cm, colors
 from matplotlib.backends.backend_pdf import PdfPages
 from configargparse import ArgumentParser, DefaultsFormatter
 from scipy.stats import rdist
@@ -632,27 +632,41 @@ def get_plotting_order(plot_data, restrict_to_cluster=None):
         ]
         result[cluster] = [entry[1] for entry in sorted(period_binary)]
 
-    for bad_binary in ['M35_15012',
-                       'M35_41032',
-                       'M35_49043']:
-        result['M35'].remove(bad_binary)
+    if restrict_to_cluster is None or restrict_to_cluster == 'M35':
+        for bad_binary in ['M35_15012',
+                           'M35_41032',
+                           'M35_49043']:
+            result['M35'].remove(bad_binary)
 
     if restrict_to_cluster is None:
         return result
     return result[cluster]
 
 
-def get_subplots(num_systems):
+def get_subplots(num_systems, add_colorbar, config):
     """Return a properly configured subplots for all systems in a cluster."""
 
-    _, axes = pyplot.subplots(6, 3,
+    figure, axes = pyplot.subplots(6, 3,
                               sharex='col',
                               sharey='row',
                               figsize=(8.5,11))
-    axes = axes[:,::-1].flatten()
-    for ax in axes[ : 18 - num_systems]:
+    axes = axes.flatten()
+
+    for ax in axes[num_systems:]:
         pyplot.delaxes(ax)
-    axes = axes[18 - num_systems : ]
+    axes = axes[:num_systems]
+
+    if add_colorbar:
+        figure.colorbar(
+            cm.ScalarMappable(
+                norm=colors.LogNorm(vmin=config.heat_map_contrast, vmax=1)
+            ),
+            ax=axes,
+            location='bottom',
+            aspect=40,
+            pad=0.07
+        )
+
     return axes
 
 
@@ -694,14 +708,16 @@ def plot_individual_constraints(plot_data, config):
                     output_fname += '_' + str(plot_split)
                 output_fname += '.pdf'
                 if config.individual_plot_mode == 'subplots':
-                    axes = get_subplots(len(plotting_order[cluster]))
+                    axes = get_subplots(len(plotting_order[cluster]),
+                                        plot_type=='lgQ_period',
+                                        config)
                 else:
                     pdf = PdfPages(output_fname)
                 for binary_index, binary in enumerate(plotting_order[cluster]):
                     config.left = (
                         config.individual_plot_mode == 'pages'
                         or
-                        (len(plotting_order[cluster]) - binary_index) % 3 == 1
+                        (len(plotting_order[cluster]) + binary_index) % 3 == 0
                     )
                     config.bottom = (
                         config.individual_plot_mode == 'pages'
@@ -741,7 +757,9 @@ def plot_individual_constraints(plot_data, config):
                         pyplot.close()
 
                 if config.individual_plot_mode == 'subplots':
-                    pyplot.savefig(output_fname)
+                    pyplot.savefig(output_fname,
+                                   bbox_inches='tight',
+                                   pad_inches=0)
                 else:
                     pdf.close()
 
