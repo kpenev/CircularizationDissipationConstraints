@@ -318,7 +318,7 @@ def plot_single_diagnostic_period(quantile_data,
         )
 
 
-def plot_single_lgq_period(_, system_data, __, axis, config):
+def plot_single_lgq_period(binary, system_data, __, axis, config):
     """Plot the constraint for a single system."""
 
     pyplot.xscale('log')
@@ -326,18 +326,21 @@ def plot_single_lgq_period(_, system_data, __, axis, config):
     pyplot.sca(axis)
     frequency_dependence_plotter = FrequencyDependencePlotter(1, config)
     frequency_dependence_plotter.add_chain(system_data['samples'], None)
-    pyplot.ylim(4.0, 12.0)
-    frequency_dependence_plotter.plot_combined_pdf_heat_map()
+    pyplot.ylim(4.0 if binary.startswith('M35_') else 5.0, 12.0)
+    frequency_dependence_plotter.plot_combined_pdf_heat_map(
+        xlabel=config.bottom,
+        ylabel=config.left
+    )
     plot_single_diagnostic_period(system_data['quantiles'],
                                   'quantile',
                                   axis,
                                   config,
-                                  fmt='xk',
+                                  fmt='-k',
                                   label=None,
                                   zorder=20)
     pyplot.axvline(x=min(system_data['orbit']['Per']),
                    color='black',
-                   linewidth=5,
+                   linewidth=3,
                    zorder=20)
 
     pyplot.sca(orig_axis)
@@ -629,9 +632,28 @@ def get_plotting_order(plot_data, restrict_to_cluster=None):
         ]
         result[cluster] = [entry[1] for entry in sorted(period_binary)]
 
+    for bad_binary in ['M35_15012',
+                       'M35_41032',
+                       'M35_49043']:
+        result['M35'].remove(bad_binary)
+
     if restrict_to_cluster is None:
         return result
     return result[cluster]
+
+
+def get_subplots(num_systems):
+    """Return a properly configured subplots for all systems in a cluster."""
+
+    _, axes = pyplot.subplots(6, 3,
+                              sharex='col',
+                              sharey='row',
+                              figsize=(8.5,11))
+    axes = axes[:,::-1].flatten()
+    for ax in axes[ : 18 - num_systems]:
+        pyplot.delaxes(ax)
+    axes = axes[18 - num_systems : ]
+    return axes
 
 
 def plot_individual_constraints(plot_data, config):
@@ -653,14 +675,14 @@ def plot_individual_constraints(plot_data, config):
     )
 
     for plot_type in [
-            #'lgQ_period',
+            'lgQ_period',
             #'lgQ_quantiles',
             #'quantiles_lgQ',
             #'autocorrelation',
             #'autocorrelation_time',
             #'raftery_lewis_diagnostics',
-            'burnin_period',
-            'cdfstd_period'
+            #'burnin_period',
+            #'cdfstd_period'
     ]:
         print('Plot type: ' + plot_type)
         for cluster in ['M35', 'NGC6819', 'NGC188']:
@@ -672,11 +694,20 @@ def plot_individual_constraints(plot_data, config):
                     output_fname += '_' + str(plot_split)
                 output_fname += '.pdf'
                 if config.individual_plot_mode == 'subplots':
-                    _, axes = pyplot.subplots(4, 5, sharex=True, sharey=True)
-                    axes = axes.flatten()
+                    axes = get_subplots(len(plotting_order[cluster]))
                 else:
                     pdf = PdfPages(output_fname)
                 for binary_index, binary in enumerate(plotting_order[cluster]):
+                    config.left = (
+                        config.individual_plot_mode == 'pages'
+                        or
+                        (len(plotting_order[cluster]) - binary_index) % 3 == 1
+                    )
+                    config.bottom = (
+                        config.individual_plot_mode == 'pages'
+                        or
+                        binary_index >= len(plotting_order[cluster]) - 3
+                    )
                     print('\t\t\tBinary: ' + repr(binary))
                     if plot_type == 'raftery_lewis_diagnostics':
                         assert config.individual_plot_mode == 'pages'

@@ -94,7 +94,7 @@ def add_frequency_dependence_plot_config(parser):
 
     parser.add_argument(
         '--combined-constraint-kernel-width',
-        default=0.1,
+        default=0.2,
         type=float,
         help='The width of the kernel that gets convolved with the samples for '
         'calculating combined constraints.'
@@ -561,7 +561,7 @@ class FrequencyDependencePlotter:
         if self.config.combined_constraint_heat_map:
             pyplot.colorbar()
 
-    def plot_combined_pdf_heat_map(self):
+    def plot_combined_pdf_heat_map(self, xlabel=True, ylabel=True):
         """
         Create a 2-D plot of lgQ vs Ptide color coding KDE of PDF.
 
@@ -591,7 +591,7 @@ class FrequencyDependencePlotter:
         if not plot_z_min > plot_z.max() * self.config.heat_map_contrast:
             plot_z_min = plot_z.max() * self.config.heat_map_contrast
 
-        plot_args = dict(shading='flat', zorder=10)
+        plot_args = dict(shading='flat', cmap='viridis', zorder=10)
 
         if self.config.combined_constraint_heat_map == 'log':
             with numpy.errstate(divide = 'ignore'):
@@ -608,8 +608,10 @@ class FrequencyDependencePlotter:
             plot_z,
             **plot_args
         )
-        pyplot.xlabel('Tidal Period [d]')
-        pyplot.ylabel(r"$\log_{10}Q_\star'$")
+        if xlabel:
+            pyplot.xlabel('Tidal Period [d]')
+        if ylabel:
+            pyplot.ylabel(r"$\log_{10}Q_\star'$")
 
     def plot_quantile_convergence(self):
         """ """
