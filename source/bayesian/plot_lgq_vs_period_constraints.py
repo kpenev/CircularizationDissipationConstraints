@@ -12,7 +12,7 @@ import matplotlib
 from matplotlib import pyplot, cm, colors
 from matplotlib.backends.backend_pdf import PdfPages
 from configargparse import ArgumentParser, DefaultsFormatter
-from scipy.stats import rdist
+from scipy.stats import rdist, norm
 import numpy
 from kde import KDEDistribution
 
@@ -33,6 +33,11 @@ from bayesian.m35_util import get_binary_data as get_m35_binary_data
 #pylint: enable=unused-import
 from bayesian.ngc6819_util import get_binary_data as get_ngc6819_binary_data
 from bayesian.ngc188_util import get_binary_data as get_ngc188_binary_data
+from bayesian.m35_util import get_photometry as get_m35_photometry
+#pylint: enable=unused-import
+from bayesian.ngc6819_util import get_photometry as get_ngc6819_photometry
+from bayesian.ngc188_util import get_photometry as get_ngc188_photometry
+
 from bayesian.cluster_util import select_binary_data
 
 def parse_command_line(quantiles_only=False):
@@ -79,14 +84,14 @@ def parse_command_line(quantiles_only=False):
     )
     parser.add_argument(
         '--convergence-ptide-grid',
-        default=[1.0, 2.0, 4.0, 8.0, 16.0],
+        default=list(numpy.logspace(0, numpy.log10(50), 30)),
         nargs='+',
         type=float,
         help='The tidal periods at which to generate convergence plots.'
     )
     parser.add_argument(
         '--convergence-quantiles',
-        default=[0.1, 0.2, 0.4, 0.6, 0.8, 0.9],
+        default=list(norm.cdf([-2.0, -1.0, 1.0, 2.0])),
         nargs='+',
         type=float,
         help='The quantiles for which to display the lgQ evolution on the '
@@ -182,24 +187,35 @@ def add_preprocessed_data(samples_fname, preprocessed_data, result, config):
     return False
 
 
-def add_orbit_data(sampling_data):
+def add_orbit_and_photometry(sampling_data):
     """Add orbit data to `sampling_data`."""
 
     sb1_orbits = dict()
+    photometry = dict()
     for cluster in ['M35', 'NGC6819', 'NGC188']:
         sb1_orbits[cluster] = globals()['get_'
                                         +
                                         cluster.lower()
                                         +
                                         '_binary_data']()[0]
+        photometry[cluster] = globals()['get_'
+                                        +
+                                        cluster.lower()
+                                        +
+                                        '_photometry']()
     for binary in sampling_data.keys():
         cluster = binary.split('_')[0]
+        id_column = ('PKM' if cluster == 'NGC188' else 'WOCS')
+        binary_id = int(binary.split('_')[1])
         sampling_data[binary]['orbit'] = select_binary_data(
             sb1_orbits[cluster],
             None,
-            'PKM' if cluster == 'NGC188' else 'WOCS',
-            int(binary.split('_')[1])
+            id_column,
+            binary_id
         )
+        sampling_data[binary]['photometry'] = photometry[cluster][
+            photometry[cluster][id_column] == binary_id
+        ]
 
 
 def get_single_quantile(cdf_value, ptide, samples, config):
@@ -237,7 +253,7 @@ def get_quantiles(samples, config):
     ]
 
 
-def get_sampling_data(config):
+def get_sampling_data(config, add_quantiles=True):
     """Return dictionary index by system of samples, likelihood, & quantile."""
 
 
@@ -268,25 +284,26 @@ def get_sampling_data(config):
         except AssertionError:
             continue
         print(system)
-        quantiles = get_quantiles(samples, config)
         result[system] = dict(samples=samples,
-                              log_probability=log_probability,
-                              quantiles=quantiles)
-        with open(
-            path.join(config.samples_dir, samples_fname),
-            'rb'
-        ) as samples_f:
-            preprocessed_data[samples_fname] = dict(
-                checksum=hashlib.md5(samples_f.read()).hexdigest(),
-                ptide_grid=config.convergence_ptide_grid,
-                quantiles=config.convergence_quantiles,
-                system=system,
-                system_data=result[system]
-            )
-            with open(config.data_pickle, 'wb') as pickle_file:
-                pickle.dump(preprocessed_data, pickle_file)
+                              log_probability=log_probability)
+        if add_quantiles:
+            quantiles = get_quantiles(samples, config)
+            result[system]['quantiles'] = quantiles
+            with open(
+                path.join(config.samples_dir, samples_fname),
+                'rb'
+            ) as samples_f:
+                preprocessed_data[samples_fname] = dict(
+                    checksum=hashlib.md5(samples_f.read()).hexdigest(),
+                    ptide_grid=config.convergence_ptide_grid,
+                    quantiles=config.convergence_quantiles,
+                    system=system,
+                    system_data=result[system]
+                )
+                with open(config.data_pickle, 'wb') as pickle_file:
+                    pickle.dump(preprocessed_data, pickle_file)
 
-    add_orbit_data(result)
+    add_orbit_and_photometry(result)
     return result
 
 
@@ -761,13 +778,13 @@ def plot_individual_constraints(plot_data, config):
 
     for plot_type in [
             'lgQ_period',
-            #'lgQ_quantiles',
-            #'quantiles_lgQ',
-            #'autocorrelation',
-            #'autocorrelation_time',
-            #'raftery_lewis_diagnostics',
-            #'burnin_period',
-            #'cdfstd_period'
+            'lgQ_quantiles',
+            'quantiles_lgQ',
+            'autocorrelation',
+            'autocorrelation_time',
+            'raftery_lewis_diagnostics',
+            'burnin_period',
+            'cdfstd_period'
     ]:
         print('Plot type: ' + plot_type)
         for cluster in ['M35', 'NGC6819', 'NGC188']:
