@@ -8,6 +8,7 @@ import hashlib
 import pickle
 from multiprocessing import Pool
 
+import matplotlib
 from matplotlib import pyplot, cm, colors
 from matplotlib.backends.backend_pdf import PdfPages
 from configargparse import ArgumentParser, DefaultsFormatter
@@ -90,6 +91,13 @@ def parse_command_line(quantiles_only=False):
         type=float,
         help='The quantiles for which to display the lgQ evolution on the '
         'convergence plots.'
+    )
+    parser.add_argument(
+        '--constraint-validity-threshold',
+        default=0.7,
+        type=float,
+        help='Constraints are considered valid if the highest quantile does '
+        'not exceed this value + its minimum over tidal period.'
     )
     parser.add_argument(
         '--convergence-combine-nsteps',
@@ -214,7 +222,7 @@ def get_quantiles(samples, config):
     """Return the quantiles with diagnostics based on the given samples."""
 
     with Pool(config.nthreads) as workers:
-        flattened_quantiles =workers.starmap(
+        flattened_quantiles = workers.starmap(
             get_single_quantile,
             [
                 (cdf_value, ptide, samples, config)
@@ -318,6 +326,27 @@ def plot_single_diagnostic_period(quantile_data,
         )
 
 
+def mark_valid_constraint_range(quantiles, axis, config):
+    """Add two vertical lines showing Ptide range where constraint is valid."""
+
+    upper_quantile_ind = numpy.argmax(config.convergence_quantiles)
+    upper_quantile = numpy.array([entry[upper_quantile_ind][0]
+                                  for entry in quantiles])
+    first_valid, last_valid = numpy.nonzero(
+        upper_quantile
+        <
+        upper_quantile.min() + config.constraint_validity_threshold
+    )[0][[0, -1]]
+    axis.axvline(x=config.convergence_ptide_grid[first_valid],
+                   linewidth=1,
+                   color='red',
+                   zorder=30)
+    axis.axvline(x=config.convergence_ptide_grid[last_valid],
+                   linewidth=1,
+                   color='red',
+                   zorder=30)
+
+
 def plot_single_lgq_period(binary, system_data, __, axis, config):
     """Plot the constraint for a single system."""
 
@@ -342,6 +371,40 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
                    color='black',
                    linewidth=3,
                    zorder=20)
+    mark_valid_constraint_range(system_data['quantiles'],
+                                axis,
+                                config)
+    if config.bottom:
+        axis.tick_params(axis='x',
+                         which='both',
+                         bottom=True,
+                         labelbottom=True)
+
+        axis.get_xaxis().set_major_formatter(
+            matplotlib.ticker.ScalarFormatter()
+        )
+        axis.get_xaxis().set_minor_formatter(
+            matplotlib.ticker.ScalarFormatter()
+        )
+
+        axis.set_xticklabels(
+            [str(int(val)) for val in axis.get_xticks(minor=False)],
+            minor=False
+        )
+
+        axis.set_xticklabels(
+            [
+                str(int(val)) if int(val) in [50] else ''
+                for val in axis.get_xticks(minor=True)
+            ],
+            minor=True
+        )
+
+    if config.left:
+        if binary.startswith('M35'):
+            axis.set_yticks([4,6,8,10,12])
+        else:
+            axis.set_yticks([5,7,9,11])
 
     pyplot.sca(orig_axis)
 
@@ -606,6 +669,10 @@ def plot_single_burnin_period(_, system_data, __, axis, config):
                                   axis,
                                   config)
     axis.axhline(y=system_data['samples'].shape[0], color='black')
+    mark_valid_constraint_range(system_data['quantiles'],
+                                axis,
+                                config)
+
     axis.legend()
 
 
@@ -616,6 +683,9 @@ def plot_single_cdfstd_period(_, system_data, __, axis, config):
                                   'std',
                                   axis,
                                   config)
+    mark_valid_constraint_range(system_data['quantiles'],
+                                axis,
+                                config)
     axis.legend()
 
 
@@ -628,7 +698,8 @@ def get_plotting_order(plot_data, restrict_to_cluster=None):
     for cluster in cluster_list:
         period_binary = [
             (min(data['orbit']['Per']), binary)
-            for binary, data in plot_data.items() if binary.startswith(cluster)
+            for binary, data in plot_data.items()
+            if binary.startswith(cluster) and min(data['orbit']['Per']) < 50.0
         ]
         result[cluster] = [entry[1] for entry in sorted(period_binary)]
 
@@ -717,7 +788,7 @@ def plot_individual_constraints(plot_data, config):
                     config.left = (
                         config.individual_plot_mode == 'pages'
                         or
-                        (len(plotting_order[cluster]) + binary_index) % 3 == 0
+                        binary_index % 3 == 0
                     )
                     config.bottom = (
                         config.individual_plot_mode == 'pages'
