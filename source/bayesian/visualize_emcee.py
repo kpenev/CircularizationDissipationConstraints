@@ -2,7 +2,6 @@
 
 """Create plots of emcee sampling results."""
 
-from abc import ABC, abstractmethod
 import logging
 
 import matplotlib
@@ -110,7 +109,7 @@ def add_frequency_dependence_plot_config(parser):
     parser.add_argument(
         '--ptide-grid',
         nargs=3,
-        default=numpy.logspace(0.0, numpy.log10(100.0), 100),
+        default=numpy.logspace(0.0, numpy.log10(50.0), 100),
         action=ParseGrid,
         metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES'),
         help='Set the range and resolution of the tidal period to include in '
@@ -174,6 +173,20 @@ def parse_command_line():
         'the given file name.'
     )
     parser.add_argument(
+        '--corner-plot-params',
+        default=None,
+        nargs='+',
+        help='If specified, only the listed parameters are included the corner '
+        'plot.'
+    )
+    parser.add_argument(
+        '--corner-plot-log-param',
+        default=[],
+        action='append',
+        help='Specify that a log(parameter) should be plotted in corner plot.'
+    )
+
+    parser.add_argument(
         '--max-traces-per-plot',
         type=int,
         default=5,
@@ -209,7 +222,8 @@ def get_backend(samples_fname, chain_conditions):
             if match:
                 if chain_name is not None:
                     raise RuntimeError(
-                        'Multiple chains found in %s that satisify %s: %s and %s'
+                        'Multiple chains found in %s that satisify %s: '
+                        '%s and %s'
                         %
                         (
                             repr(samples_fname),
@@ -270,12 +284,27 @@ def get_confidence_interval(samples, confidence):
                                   axis=1).flatten()
     return lower, upper
 
+def get_tex_label(quantity):
+    """The TeX label to use for the given quantity in corner plots."""
+
+    if quantity == 'lgQ_min':
+        return r'$\log_{10}Q_0$'
+    if quantity == 'lgQ_break_period':
+        return r'$\log_{10}P_0$'
+    if quantity == 'lgQ_powerlaw':
+        return r'$\alpha$'
+    if quantity == 'e_f':
+        return r'$e_{max}$'
+    if quantity == 'lnP':
+        return r'$\ln\mathcal{P}$'
+    return quantity
+
 def save_corner_plot(samples, log_probability, config):
     """Create the corner plot specified on the command line."""
 
     samples = samples.flatten()
     log_probability = log_probability.flatten()
-    include_params = [
+    include_params = config.corner_plot_params or [
         param
         for param in samples.dtype.names
         if (
@@ -284,9 +313,18 @@ def save_corner_plot(samples, log_probability, config):
             numpy.isfinite(samples[param]).any()
         )
     ]
-    plot_data_frame = pandas.DataFrame(samples[include_params])
+    print('Corner plot parameters: ' + repr(include_params))
+    plot_data = samples[include_params]
+    for param_name in config.corner_plot_log_param:
+        plot_data[param_name] = numpy.log10(plot_data[param_name])
+    labels = [get_tex_label(q) for q in include_params + ['lnP']]
+    plot_data_frame = pandas.DataFrame(plot_data)
     plot_data_frame.insert(len(include_params), 'lnP', log_probability)
-    make_corner_plot(plot_data_frame, config.corner_plot_fname)
+    make_corner_plot(plot_data_frame,
+                     corner_plot_fname=config.corner_plot_fname,
+                     labels=labels,
+                     plot_contours=False,
+                     bins=30)
 
 def save_trace_plot(samples, log_probability, config):
     """Create the trace plot specified on the command line."""
@@ -613,8 +651,6 @@ class FrequencyDependencePlotter:
         if ylabel:
             pyplot.ylabel(r"$\log_{10}Q_\star'$")
 
-    def plot_quantile_convergence(self):
-        """ """
 
     def save(self, filename=None):
         """Save the plot to the file sepecified by the init configuration."""
