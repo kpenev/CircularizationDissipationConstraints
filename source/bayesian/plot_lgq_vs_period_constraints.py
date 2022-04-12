@@ -312,7 +312,7 @@ def plot_single_diagnostic_period(quantile_data,
                                   axis,
                                   config,
                                   *,
-                                  fmt='o',
+                                  fmt='-',
                                   label=True,
                                   zorder=None):
     """Plot some diagnostic of the quantiles of lgQ(Ptide) vs Ptide."""
@@ -320,7 +320,8 @@ def plot_single_diagnostic_period(quantile_data,
     diagnostic_ind = ['quantile', 'cdf', 'std', 'thin', 'burnin'].index(
         diagnostic
     )
-    pyplot.xscale('log')
+    axis.set_xscale('log')
+    axis.set_xlim(1, 50)
 
     kwargs=dict()
     if label is not None:
@@ -355,11 +356,11 @@ def mark_valid_constraint_range(quantiles, axis, config):
         upper_quantile.min() + config.constraint_validity_threshold
     )[0][[0, -1]]
     axis.axvline(x=config.convergence_ptide_grid[first_valid],
-                   linewidth=1,
+                   linewidth=1.5,
                    color='red',
                    zorder=30)
     axis.axvline(x=config.convergence_ptide_grid[last_valid],
-                   linewidth=1,
+                   linewidth=1.5,
                    color='red',
                    zorder=30)
 
@@ -367,7 +368,7 @@ def mark_valid_constraint_range(quantiles, axis, config):
 def plot_single_lgq_period(binary, system_data, __, axis, config):
     """Plot the constraint for a single system."""
 
-    pyplot.xscale('log')
+    axis.set_xscale('log')
     orig_axis = pyplot.gca()
     pyplot.sca(axis)
     frequency_dependence_plotter = FrequencyDependencePlotter(1, config)
@@ -391,38 +392,11 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
     mark_valid_constraint_range(system_data['quantiles'],
                                 axis,
                                 config)
-    if config.bottom:
-        axis.tick_params(axis='x',
-                         which='both',
-                         bottom=True,
-                         labelbottom=True)
-
-        axis.get_xaxis().set_major_formatter(
-            matplotlib.ticker.ScalarFormatter()
-        )
-        axis.get_xaxis().set_minor_formatter(
-            matplotlib.ticker.ScalarFormatter()
-        )
-
-        axis.set_xticklabels(
-            [str(int(val)) for val in axis.get_xticks(minor=False)],
-            minor=False
-        )
-
-        axis.set_xticklabels(
-            [
-                str(int(val)) if int(val) in [50] else ''
-                for val in axis.get_xticks(minor=True)
-            ],
-            minor=True
-        )
-
-    if config.left:
-        if binary.startswith('M35'):
-            axis.set_yticks([4,6,8,10,12])
-        else:
-            axis.set_yticks([5,7,9,11])
-
+    decorate_subplot(
+        axis,
+        config,
+        [4, 6, 8, 10, 12] if binary.startswith('M35') else [5, 7, 9, 11]
+    )
     pyplot.sca(orig_axis)
 
 
@@ -678,32 +652,103 @@ def plot_single_raftery_lewis_diagnostics(_,
 #pylint: enable=too-many-locals
 
 
-def plot_single_burnin_period(_, system_data, __, axis, config):
+def decorate_subplot(axis, config, yticks=None):
+    """Make sure the given subplot displays appropriate ticks/labels etc."""
+
+    if config.bottom:
+        axis.tick_params(axis='x',
+                         which='both',
+                         bottom=True,
+                         labelbottom=True)
+
+        axis.get_xaxis().set_major_formatter(
+            matplotlib.ticker.ScalarFormatter()
+        )
+        axis.get_xaxis().set_minor_formatter(
+            matplotlib.ticker.ScalarFormatter()
+        )
+
+        axis.set_xticklabels(
+            [str(int(val)) for val in axis.get_xticks(minor=False)],
+            minor=False
+        )
+
+        axis.set_xticklabels(
+            [
+                str(int(val)) if int(val) in [5, 50] else ''
+                for val in axis.get_xticks(minor=True)
+            ],
+            minor=True
+        )
+
+    if config.left and yticks is not None:
+        axis.set_yticks(yticks)
+
+
+def plot_single_burnin_period(binary, system_data, __, axis, config):
     """Plot the required burnin for each quantile of lgQ(Ptide) vs Ptide."""
 
-    plot_single_diagnostic_period(system_data['quantiles'],
-                                  'burnin',
-                                  axis,
-                                  config)
-    axis.axhline(y=system_data['samples'].shape[0], color='black')
+    axis.set_yscale('log')
+    plot_single_diagnostic_period(
+        system_data['quantiles'],
+        'burnin',
+        axis,
+        config,
+        label=(
+            None if getattr(plot_single_burnin_period,
+                            'labeled_cluster',
+                            None) == binary.split('_')[0]
+            else True
+        )
+    )
+
+    axis.axhspan(ymax=system_data['samples'].shape[0], ymin=0, color='black')
+
+    if config.individual_plot_mode == 'subplots':
+        plot_single_burnin_period.labeled_cluster = binary.split('_')[0]
+
     mark_valid_constraint_range(system_data['quantiles'],
                                 axis,
                                 config)
+    axis.set_ylim(10, 1000)
+    decorate_subplot(axis, config)
+    if config.left:
+        axis.set_ylabel('emcee steps')
+    if config.bottom:
+        axis.set_xlabel('Tidal Period [days]')
+    if config.individual_plot_mode == 'pages':
+        axis.legend()
 
-    axis.legend()
 
-
-def plot_single_cdfstd_period(_, system_data, __, axis, config):
+def plot_single_cdfstd_period(binary, system_data, __, axis, config):
     """Plot the required burnin for each quantile of lgQ(Ptide) vs Ptide."""
 
-    plot_single_diagnostic_period(system_data['quantiles'],
-                                  'std',
-                                  axis,
-                                  config)
+    axis.set_yscale('log')
+    plot_single_diagnostic_period(
+        system_data['quantiles'],
+        'std',
+        axis,
+        config,
+        label=(
+            None if getattr(plot_single_cdfstd_period,
+                            'labeled_cluster',
+                            None) == binary.split('_')[0]
+            else True
+        )
+    )
+    if config.individual_plot_mode == 'subplots':
+        plot_single_cdfstd_period.labeled_cluster = binary.split('_')[0]
     mark_valid_constraint_range(system_data['quantiles'],
                                 axis,
                                 config)
-    axis.legend()
+    axis.set_ylim(1e-3, 0.03)
+    decorate_subplot(axis, config)
+    if config.left:
+        axis.set_ylabel(r'$\sigma_{CDF}$')
+    if config.bottom:
+        axis.set_xlabel('Tidal Period [days]')
+    if config.individual_plot_mode == 'pages':
+        axis.legend()
 
 
 def get_plotting_order(plot_data, restrict_to_cluster=None):
@@ -731,20 +776,22 @@ def get_plotting_order(plot_data, restrict_to_cluster=None):
     return result[cluster]
 
 
-def get_subplots(num_systems, add_colorbar, config):
+def get_subplots(num_systems, plot_type, config):
     """Return a properly configured subplots for all systems in a cluster."""
 
-    figure, axes = pyplot.subplots(6, 3,
-                              sharex='col',
-                              sharey='row',
-                              figsize=(8.5,11))
+    figure, axes = pyplot.subplots(
+        6, 3,
+        sharex='col',
+        sharey=('row' if plot_type == 'burnin_period' else 'row'),
+        figsize=(8.5,11)
+    )
     axes = axes.flatten()
 
-    for ax in axes[num_systems:]:
-        pyplot.delaxes(ax)
+    for rm_ax in axes[num_systems:]:
+        pyplot.delaxes(rm_ax)
     axes = axes[:num_systems]
 
-    if add_colorbar:
+    if plot_type == 'lgQ_period':
         figure.colorbar(
             cm.ScalarMappable(
                 norm=colors.LogNorm(vmin=config.heat_map_contrast, vmax=1)
@@ -777,12 +824,12 @@ def plot_individual_constraints(plot_data, config):
     )
 
     for plot_type in [
-            'lgQ_period',
-            'lgQ_quantiles',
-            'quantiles_lgQ',
-            'autocorrelation',
-            'autocorrelation_time',
-            'raftery_lewis_diagnostics',
+            #'lgQ_period',
+            #'lgQ_quantiles',
+            #'quantiles_lgQ',
+            #'autocorrelation',
+            #'autocorrelation_time',
+            #'raftery_lewis_diagnostics',
             'burnin_period',
             'cdfstd_period'
     ]:
@@ -797,7 +844,7 @@ def plot_individual_constraints(plot_data, config):
                 output_fname += '.pdf'
                 if config.individual_plot_mode == 'subplots':
                     axes = get_subplots(len(plotting_order[cluster]),
-                                        plot_type=='lgQ_period',
+                                        plot_type,
                                         config)
                 else:
                     pdf = PdfPages(output_fname)
@@ -843,6 +890,10 @@ def plot_individual_constraints(plot_data, config):
                                         plot_data[binary]['samples'].shape[0])
                         pdf.savefig()
                         pyplot.close()
+                    elif plot_type in ['burnin_period', 'cdfstd_period']:
+                        pyplot.figlegend(loc='upper center',
+                                         ncol=4,
+                                         borderaxespad=3)
 
                 if config.individual_plot_mode == 'subplots':
                     pyplot.savefig(output_fname,
