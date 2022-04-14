@@ -440,13 +440,24 @@ class FrequencyDependencePlotter:
             config.combined_constraint_kernel_width
         )
 
-    def add_chain(self, samples, label, prior_range=(-numpy.inf, numpy.inf)):
+    def add_chain(self,
+                  samples,
+                  label,
+                  prior_range=(-numpy.inf, numpy.inf),
+                  period_range=(-numpy.inf, numpy.inf)):
         """Overplot another chain of samples."""
 
         evaluated_lgq = evaluate_lgq(samples, self.config.ptide_grid)
 
         assert numpy.isfinite(evaluated_lgq).all()
-        self.combined_pdf.add_samples(evaluated_lgq, prior_range)
+        self.combined_pdf.add_samples(
+            evaluated_lgq,
+            prior_range,
+            numpy.logical_and(
+                self.config.ptide_grid >= period_range[0],
+                self.config.ptide_grid <= period_range[1],
+            )
+        )
 
 
         if not self.config.frequency_dependence_plot_no_lines:
@@ -467,16 +478,16 @@ class FrequencyDependencePlotter:
             color = self._color_list[self._constraint_index
                                      %
                                      len(self._color_list)]
-            if self.config.frequency_dependence_hatch:
-                plot_kwargs = dict(
-                    #alpha=self.transparency,
-                    edgecolor=color,
-                    facecolor='none',
-                    hatch=self._hatch_list[self._constraint_index
-                                           %
-                                           len(self._hatch_list)],
-                    linewidth=0
-                )
+#            if self.config.frequency_dependence_hatch:
+#                plot_kwargs = dict(
+#                    #alpha=self.transparency,
+#                    edgecolor=color,
+#                    facecolor='none',
+#                    hatch=self._hatch_list[self._constraint_index
+#                                           %
+#                                           len(self._hatch_list)],
+#                    linewidth=0
+#                )
             self._constraint_index += 1
 
             if conf_index == 0:

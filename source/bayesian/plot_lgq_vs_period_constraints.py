@@ -21,6 +21,7 @@ from emcee_autocorrelation import\
     average_autocorr
 from mcmc_quantile_convergence import get_raftery_lewis_diagnostics
 from emcee_quantile_convergence import find_emcee_quantiles
+from combined_mcmc_constraint import CombinedMCMCConstraint
 
 from bayesian.visualize_emcee import\
     add_frequency_dependence_plot_config,\
@@ -135,6 +136,14 @@ def parse_command_line(quantiles_only=False):
         help='Choose whether plots of individual systems will be saved each on '
         'a separate page in a multi-page PDF file (`pages`) or as grid of '
         'sub-plots in a single figure (`subplots`).'
+    )
+    parser.add_argument(
+        '--combined-constraint-period-range', '--combined-prange',
+        nargs=2,
+        type=float,
+        default=(2.0, 10.0),
+        help='The range of tidal periods to show in the combined constraint '
+        'plot.'
     )
     parser.add_argument(
         '--nthreads',
@@ -344,25 +353,70 @@ def plot_single_diagnostic_period(quantile_data,
         )
 
 
-def mark_valid_constraint_range(quantiles, axis, config):
-    """Add two vertical lines showing Ptide range where constraint is valid."""
+def get_valid_ptide_indices(quantiles, config):
+    """Indicate well constrained entries of convergence Ptide grid."""
 
     upper_quantile_ind = numpy.argmax(config.convergence_quantiles)
     upper_quantile = numpy.array([entry[upper_quantile_ind][0]
                                   for entry in quantiles])
-    first_valid, last_valid = numpy.nonzero(
+    if upper_quantile.min() > 9:
+        return None
+    return numpy.nonzero(
         upper_quantile
         <
         upper_quantile.min() + config.constraint_validity_threshold
-    )[0][[0, -1]]
-    axis.axvline(x=config.convergence_ptide_grid[first_valid],
-                   linewidth=1.5,
-                   color='red',
-                   zorder=30)
-    axis.axvline(x=config.convergence_ptide_grid[last_valid],
-                   linewidth=1.5,
-                   color='red',
-                   zorder=30)
+    )[0]
+
+
+def mark_valid_constraint_range(quantiles, axis, config):
+    """Add two vertical lines showing Ptide range where constraint is valid."""
+
+    try:
+        first_valid, last_valid = get_valid_ptide_indices(
+            quantiles,
+            config
+        )[[0,-1]]
+        axis.axvline(x=config.convergence_ptide_grid[first_valid],
+                     linewidth=1.5,
+                     color='red',
+                     zorder=30)
+        axis.axvline(x=config.convergence_ptide_grid[last_valid],
+                     linewidth=1.5,
+                     color='red',
+                     zorder=30)
+    except TypeError:
+        pass
+
+
+def get_burnin(system_data, config, binary=''):
+    """Return the burnin to use for this system."""
+
+    burnin = 0
+    valid_ptide_indices = get_valid_ptide_indices(system_data['quantiles'],
+                                                  config)
+    if valid_ptide_indices is None:
+        valid_ptide_indices = numpy.arange(
+            len(config.convergence_ptide_grid)
+        )
+
+    for ptide_ind in valid_ptide_indices:
+        ptide_burnin = max(
+            quantiles[4]
+            for quantiles in system_data['quantiles'][ptide_ind]
+        )
+        burnin = max(burnin, ptide_burnin)
+        if burnin > system_data['samples'].shape[0] - 100:
+            print(
+                'Burn-in period for %(binary)s leaves < %(minsteps)d steps,'
+                'using last %(minsteps)d steps!'
+                %
+                dict(binary=binary, minsteps=100)
+            )
+            return system_data['samples'].shape[0] - 100
+    print('%(binary)s burn-in: %(burnin)d'
+          %
+          dict(binary=binary, burnin=burnin))
+    return burnin
 
 
 def plot_single_lgq_period(binary, system_data, __, axis, config):
@@ -372,7 +426,10 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
     orig_axis = pyplot.gca()
     pyplot.sca(axis)
     frequency_dependence_plotter = FrequencyDependencePlotter(1, config)
-    frequency_dependence_plotter.add_chain(system_data['samples'], None)
+    frequency_dependence_plotter.add_chain(
+        system_data['samples'][get_burnin(system_data, config, binary):],
+        None
+    )
     pyplot.ylim(4.0 if binary.startswith('M35_') else 5.0, 12.0)
     frequency_dependence_plotter.plot_combined_pdf_heat_map(
         xlabel=config.bottom,
@@ -394,6 +451,7 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
                                 config)
     decorate_subplot(
         axis,
+        r"$\log_{10}Q_\star'$",
         config,
         [4, 6, 8, 10, 12] if binary.startswith('M35') else [5, 7, 9, 11]
     )
@@ -426,22 +484,6 @@ def plot_single_convergence(*,
                           len(lgq_values))
     plot_y = numpy.empty((plot_x.size, len(values)),
                           dtype=float)
-
-    try:
-        print(
-            '\t\t\t%s: autocorrelation = %f (%f), chain length = %d'
-            %
-            (
-                binary,
-                max_likelihood_autocorr(lgq_values.T, 1),
-                average_autocorr(lgq_values.T, 1),
-                shape[0]
-            )
-        )
-    except ValueError:
-        print('%s: Failed to determine autocorrelation, chain length = %d'
-              %
-              (binary, shape[0]))
 
     for x_ind, lgq_values_end in enumerate(plot_x):
         lgq_values_start = (
@@ -494,6 +536,7 @@ def plot_single_lgq_quantiles(binary, system_data, ptide, axis, config):
     )
     for quantile_diag in system_data['quantiles'][ptide_index]:
         axis.axhline(y=quantile_diag[0], zorder=0, color='black')
+    decorate_subplot(axis, r"$\log_{10}Q_\star'$", config, xlabel='emcee step')
 
 
 def plot_single_quantiles_lgq(binary, system_data, ptide, axis, config):
@@ -525,6 +568,10 @@ def plot_single_quantiles_lgq(binary, system_data, ptide, axis, config):
                 y=estimate,
                 **extra_args
             ).get_color()
+    decorate_subplot(axis,
+                     r"$CDF(\log_{10}Q_\star')$",
+                     config,
+                     xlabel='emcee step')
 
 def plot_single_autocorrelation(_, system_data, ptide, axis, __):
     """Plot the autocorrelation of lg[Q(Ptide)] for a single system/Ptide."""
@@ -652,7 +699,13 @@ def plot_single_raftery_lewis_diagnostics(_,
 #pylint: enable=too-many-locals
 
 
-def decorate_subplot(axis, config, yticks=None):
+def decorate_subplot(axis,
+                     ylabel,
+                     config,
+                     *,
+                     xticks=None,
+                     yticks=None,
+                     xlabel='Tidal Period [days]'):
     """Make sure the given subplot displays appropriate ticks/labels etc."""
 
     if config.bottom:
@@ -668,8 +721,14 @@ def decorate_subplot(axis, config, yticks=None):
             matplotlib.ticker.ScalarFormatter()
         )
 
+        if xticks is not None:
+            axis.set_xticks(xticks)
+
         axis.set_xticklabels(
-            [str(int(val)) for val in axis.get_xticks(minor=False)],
+            [
+                str(int(val) if val - int(val) == 0 else val)
+                for val in axis.get_xticks(minor=False)
+            ],
             minor=False
         )
 
@@ -680,9 +739,12 @@ def decorate_subplot(axis, config, yticks=None):
             ],
             minor=True
         )
+        axis.set_xlabel(xlabel)
 
-    if config.left and yticks is not None:
-        axis.set_yticks(yticks)
+    if config.left:
+        axis.set_ylabel(ylabel)
+        if yticks is not None:
+            axis.set_yticks(yticks)
 
 
 def plot_single_burnin_period(binary, system_data, __, axis, config):
@@ -711,11 +773,7 @@ def plot_single_burnin_period(binary, system_data, __, axis, config):
                                 axis,
                                 config)
     axis.set_ylim(10, 1000)
-    decorate_subplot(axis, config)
-    if config.left:
-        axis.set_ylabel('emcee steps')
-    if config.bottom:
-        axis.set_xlabel('Tidal Period [days]')
+    decorate_subplot(axis, 'emcee steps', config)
     if config.individual_plot_mode == 'pages':
         axis.legend()
 
@@ -742,11 +800,7 @@ def plot_single_cdfstd_period(binary, system_data, __, axis, config):
                                 axis,
                                 config)
     axis.set_ylim(1e-3, 0.03)
-    decorate_subplot(axis, config)
-    if config.left:
-        axis.set_ylabel(r'$\sigma_{CDF}$')
-    if config.bottom:
-        axis.set_xlabel('Tidal Period [days]')
+    decorate_subplot(axis, r'$\sigma_{CDF}$', config)
     if config.individual_plot_mode == 'pages':
         axis.legend()
 
@@ -805,6 +859,34 @@ def get_subplots(num_systems, plot_type, config):
     return axes
 
 
+def plot_single_tightest_lgq_posterior(_, system_data, __, axis, config):
+    """Plot PDF(lgQ) at the tidal period with smallest upper quantile."""
+
+    upper_quantile_ind = numpy.argmax(config.convergence_quantiles)
+    plot_ptide_ind = numpy.array(
+        [entry[upper_quantile_ind][0] for entry in system_data['quantiles']]
+    ).argmin()
+    evaluated_lgq = evaluate_lgq(
+        system_data['samples'],
+        numpy.array([config.convergence_ptide_grid[plot_ptide_ind]])
+    )
+    plot_lgq = numpy.linspace(4.0, 12.0, 1000)
+    pdf = CombinedMCMCConstraint(
+        plot_lgq,
+        config.combined_constraint_kernel_width
+    )
+    pdf.add_samples(evaluated_lgq)
+    axis.plot(plot_lgq, pdf() / (pdf().sum() * (plot_lgq[1] - plot_lgq[0])))
+    decorate_subplot(axis,
+                     'PDF',
+                     config,
+                     xlabel=r"$\log_{10}Q_\star'$",
+                     xticks=[4,6,8,10,12])
+    axis.set_xticks([5,7,9,11], minor=True)
+    axis.set_xticklabels(['']*4, minor=True)
+    axis.grid(visible=True, which='both')
+
+
 def plot_individual_constraints(plot_data, config):
     """Create plots showing the lgQ(Ptide) constraint for indivdiual systems."""
 
@@ -821,17 +903,19 @@ def plot_individual_constraints(plot_data, config):
         raftery_lewis_diagnostics=config.convergence_ptide_grid,
         burnin_period=[None],
         cdfstd_period=[None],
+        tightest_lgQ_posterior=[None],
     )
 
     for plot_type in [
             #'lgQ_period',
             #'lgQ_quantiles',
-            #'quantiles_lgQ',
+            'quantiles_lgQ',
             #'autocorrelation',
             #'autocorrelation_time',
             #'raftery_lewis_diagnostics',
             'burnin_period',
-            'cdfstd_period'
+            'cdfstd_period',
+            'tightest_lgQ_posterior'
     ]:
         print('Plot type: ' + plot_type)
         for cluster in ['M35', 'NGC6819', 'NGC188']:
@@ -903,75 +987,98 @@ def plot_individual_constraints(plot_data, config):
                     pdf.close()
 
 
-def plot_cluster_constraints(plot_data, config):
+def plot_combined_constraints(plot_data, config):
     """Plot heat-map of joint constraint from all systems in a cluster."""
 
     config.combined_constraint_heat_map = 'log'
-    include_binaries = dict(
-        M35=[
-            ('M35_%d' % binid, burnin) for binid, burnin in [(54027, 200),
-                                                             (16016, 260),
-                                                             (23043, 200),
-                                                             (54054, 320),
-                                                             (35045, 145),
-                                                             (40015, 220),
-                                                             (33054, 180),
-                                                             (34036, 150),
-                                                             (41032, 100)]
-        ],
-        NGC6819=[
-            ('NGC6819_%d' % binid, burnin) for binid, burnin in [(49002, 110),
-                                                                 (66004, 200),
-                                                                 (13001, 300),
-                                                                 (60006, 100),
-                                                                 (46013, 280),
-                                                                 (59003, 150),
-                                                                 (53003, 240)]
-        ],
-        NGC188=[
-            ('NGC188_%d' % binid, burnin) for binid, burnin in [(4618, 120),
-                                                                (5015, 100),
-                                                                (6171, 75),
-                                                                (5463, 100),
-                                                                (5601, 50),
-                                                                (4904, 100),
-                                                                (4289, 60),
-                                                                (5738, 90),
-                                                                (6292, 100),
-                                                                (4965, 70),
-                                                                (5797, 80),
-                                                                (5647, 100),
-                                                                (880, 110),
-                                                                (4080, 120),
-                                                                (5040, 100),
-                                                                (4673, 110),
-                                                                (5381, 80)]
-
-        ]
-    )
+    include_binaries = get_plotting_order(plot_data)
+#    dict(
+#        M35=[
+#            ('M35_%d' % binid, burnin) for binid, burnin in [(54027, 200),
+#                                                             (16016, 260),
+#                                                             (23043, 200),
+#                                                             (54054, 320),
+#                                                             (35045, 145),
+#                                                             (40015, 220),
+#                                                             (33054, 180),
+#                                                             (34036, 150),
+#                                                             (41032, 100)]
+#        ],
+#        NGC6819=[
+#            ('NGC6819_%d' % binid, burnin) for binid, burnin in [(49002, 110),
+#                                                                 (66004, 200),
+#                                                                 (13001, 300),
+#                                                                 (60006, 100),
+#                                                                 (46013, 280),
+#                                                                 (59003, 150),
+#                                                                 (53003, 240)]
+#        ],
+#        NGC188=[
+#            ('NGC188_%d' % binid, burnin) for binid, burnin in [(4618, 120),
+#                                                                (5015, 100),
+#                                                                (6171, 75),
+#                                                                (5463, 100),
+#                                                                (5601, 50),
+#                                                                (4904, 100),
+#                                                                (4289, 60),
+#                                                                (5738, 90),
+#                                                                (6292, 100),
+#                                                                (4965, 70),
+#                                                                (5797, 80),
+#                                                                (5647, 100),
+#                                                                (880, 110),
+#                                                                (4080, 120),
+#                                                                (5040, 100),
+#                                                                (4673, 110),
+#                                                                (5381, 80)]
+#
+#        ]
+#    )
 
     numpy.set_printoptions(precision=16, floatmode='fixed', linewidth=100)
+    config.combined_constraint_lgQ_grid = numpy.linspace(4, 7, 100)
+    config.ptide_grid = numpy.linspace(*config.combined_constraint_period_range,
+                                       100)
     all_combined_plotter = FrequencyDependencePlotter(0, config)
 
     fully_combined_n = 1
 
-    for cluster in ['M35', 'NGC6819', 'NGC188']:
+    assert include_binaries['NGC188'][6] == 'NGC188_4904'
+    include_binaries['NGC188'][6] = include_binaries['NGC188'][-1]
+    include_binaries['NGC188'][-1] = 'NGC188_4904'
+
+    for cluster in ['NGC6819', 'NGC188', 'M35']:
         print(cluster + ':')
         cluster_plotter = FrequencyDependencePlotter(
             len(include_binaries[cluster]),
             config
         )
-        for nadded, (binary, burnin) in enumerate(include_binaries[cluster]):
+        for nadded, binary in enumerate(include_binaries[cluster]):
+            burnin = get_burnin(plot_data[binary], config, binary)
             samples = plot_data[binary]['samples']
+            valid_ptide_indices = get_valid_ptide_indices(
+                plot_data[binary]['quantiles'],
+                config
+            )
+            if valid_ptide_indices is None:
+                period_range = (-numpy.inf, numpy.inf)
+            else:
+                period_range = numpy.array(config.convergence_ptide_grid)[
+                    valid_ptide_indices[[0,-1]]
+                ]
+            min_lgq = 4 if samples['lgQ_min'].min() < 5 else 5
+
             cluster_plotter.add_chain(
                 samples[burnin:],
                 None,
-                (4 if samples['lgQ_min'].min() < 5 else 5, numpy.inf)
+                (4 if samples['lgQ_min'].min() < 5 else 5, numpy.inf),
+                period_range
             )
             all_combined_plotter.add_chain(
                 samples[burnin:],
                 None,
-                (4 if samples['lgQ_min'].min() < 5 else 5, numpy.inf)
+                (min_lgq, numpy.inf),
+                period_range
             )
 
             for output_fname, plotter in [
@@ -987,8 +1094,24 @@ def plot_cluster_constraints(plot_data, config):
                 pyplot.figure(figsize=(11, 8.5), dpi=300, tight_layout=True)
                 pyplot.xscale('log')
                 print('    Adding ' + repr(binary))
-                pyplot.ylim(4.0, 9.0)
+                pyplot.ylim(min_lgq, 7.0)
+                pyplot.xlim(*config.combined_constraint_period_range)
                 plotter.plot_combined_pdf_heat_map()
+                pyplot.gca().set_xticklabels(
+                    [
+                        str(int(val) if val - int(val) == 0 else val)
+                        for val in pyplot.gca().get_xticks(minor=False)
+                    ],
+                    minor=False
+                )
+                pyplot.gca().set_xticklabels(
+                    [
+                        str(int(val) if val - int(val) == 0 else val)
+                        for val in pyplot.gca().get_xticks(minor=True)
+                    ],
+                    minor=True
+                )
+
                 pyplot.colorbar()
                 print('    Plotting')
                 pyplot.savefig(output_fname)
@@ -999,6 +1122,43 @@ def plot_cluster_constraints(plot_data, config):
             fully_combined_n += 1
 
 
+def plot_tightest_constraints(plot_data, config):
+    """Plot tightest constraints as error bars vs tidal period."""
+
+    include_binaries = get_plotting_order(plot_data)
+    for cluster in ['NGC6819', 'NGC188']:
+        cluster_quantiles = numpy.empty((len(config.convergence_quantiles),
+                                         len(include_binaries[cluster])))
+        cluster_ptide = numpy.empty(len(include_binaries[cluster]))
+        for binary_ind, binary in enumerate(include_binaries[cluster]):
+            upper_quantile_ind = numpy.argmax(config.convergence_quantiles)
+            ptide_ind = numpy.array([
+                entry[upper_quantile_ind][0]
+                for entry in plot_data[binary]['quantiles']
+            ]).argmin()
+            cluster_ptide[binary_ind] = config.convergence_ptide_grid[ptide_ind]
+            cluster_quantiles[:, binary_ind] = [
+                q[0] for q in plot_data[binary]['quantiles'][ptide_ind]
+            ]
+
+        elinewidth = 2
+        ecolor = None
+        while cluster_quantiles.shape[0] > 1:
+            ecolor = pyplot.errorbar(
+                cluster_ptide,
+                0.5 * (cluster_quantiles[-1] + cluster_quantiles[0]),
+                yerr=0.5 * (cluster_quantiles[-1] - cluster_quantiles[0]),
+                fmt='none',
+                elinewidth=elinewidth,
+                ecolor=ecolor,
+                label=(cluster if elinewidth == 2 else None),
+            )[2][0].get_color()
+            elinewidth += 2
+            cluster_quantiles = cluster_quantiles[1:-1]
+    pyplot.legend()
+    pyplot.savefig('tightest_constraints.pdf')
+
+
 def main(config):
     """Avoid polluting global namespace."""
 
@@ -1006,8 +1166,9 @@ def main(config):
         download_latest_samples(config.samples_dir)
 
     plot_data = get_sampling_data(config)
-    plot_individual_constraints(plot_data, config)
-#    plot_cluster_constraints(plot_data, config)
+#    plot_individual_constraints(plot_data, config)
+#    plot_combined_constraints(plot_data, config)
+    plot_tightest_constraints(plot_data, config)
 
 
 if __name__ == '__main__':
