@@ -1083,18 +1083,18 @@ def plot_combined_constraints(plot_data, config):
 
             for output_fname, plotter in [
                     (
-                        cluster + '_combined_lgQ_period_%d.png' % (nadded + 1),
+                        cluster + '_combined_lgQ_period_%d.pdf' % (nadded + 1),
                         cluster_plotter
                     ),
                     (
-                        'fully_combined_lgQ_period_%d.png' % fully_combined_n,
+                        'fully_combined_lgQ_period_%d.pdf' % fully_combined_n,
                         all_combined_plotter
                     )
             ]:
                 pyplot.figure(figsize=(11, 8.5), dpi=300, tight_layout=True)
                 pyplot.xscale('log')
                 print('    Adding ' + repr(binary))
-                pyplot.ylim(min_lgq, 7.0)
+                pyplot.ylim(min_lgq, 6.0 if cluster == 'M35' else 7.0)
                 pyplot.xlim(*config.combined_constraint_period_range)
                 plotter.plot_combined_pdf_heat_map()
                 pyplot.gca().set_xticklabels(
@@ -1167,7 +1167,7 @@ def main(config):
 
     plot_data = get_sampling_data(config)
 #    plot_individual_constraints(plot_data, config)
-#    plot_combined_constraints(plot_data, config)
+    plot_combined_constraints(plot_data, config)
     plot_tightest_constraints(plot_data, config)
 
 
