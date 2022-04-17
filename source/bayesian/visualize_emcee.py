@@ -440,6 +440,7 @@ class FrequencyDependencePlotter:
             config.combined_constraint_kernel_width
         )
 
+
     def add_chain(self,
                   samples,
                   label,
@@ -610,6 +611,7 @@ class FrequencyDependencePlotter:
         if self.config.combined_constraint_heat_map:
             pyplot.colorbar()
 
+
     def plot_combined_pdf_heat_map(self, xlabel=True, ylabel=True):
         """
         Create a 2-D plot of lgQ vs Ptide color coding KDE of PDF.
@@ -661,6 +663,23 @@ class FrequencyDependencePlotter:
             pyplot.xlabel('Tidal Period [d]')
         if ylabel:
             pyplot.ylabel(r"$\log_{10}Q_\star'$")
+
+
+    def plot_combined_quantiles(self,
+                                cdf_values,
+                                fmt='-',
+                                label_fmt='CDF=%.3f'):
+        """Plot the specified percentiles."""
+
+        for cdf in cdf_values:
+            pyplot.plot(
+                self.config.ptide_grid,
+                self.combined_pdf.ppf(cdf),
+                fmt,
+                label=label_fmt % cdf,
+                linewidth=3,
+                zorder=20
+            )
 
 
     def save(self, filename=None):

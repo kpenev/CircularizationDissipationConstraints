@@ -9,7 +9,7 @@ import pickle
 from multiprocessing import Pool
 
 import matplotlib
-from matplotlib import pyplot, cm, colors
+from matplotlib import pyplot, cm, colors, rcParams
 from matplotlib.backends.backend_pdf import PdfPages
 from configargparse import ArgumentParser, DefaultsFormatter
 from scipy.stats import rdist, norm
@@ -451,9 +451,10 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
                                 config)
     decorate_subplot(
         axis,
+        binary,
         r"$\log_{10}Q_\star'$",
         config,
-        [4, 6, 8, 10, 12] if binary.startswith('M35') else [5, 7, 9, 11]
+        yticks=[4, 6, 8, 10, 12] if binary.startswith('M35') else [5, 7, 9, 11]
     )
     pyplot.sca(orig_axis)
 
@@ -536,7 +537,11 @@ def plot_single_lgq_quantiles(binary, system_data, ptide, axis, config):
     )
     for quantile_diag in system_data['quantiles'][ptide_index]:
         axis.axhline(y=quantile_diag[0], zorder=0, color='black')
-    decorate_subplot(axis, r"$\log_{10}Q_\star'$", config, xlabel='emcee step')
+    decorate_subplot(axis,
+                     binary,
+                     r"$\log_{10}Q_\star'$",
+                     config,
+                     xlabel='emcee step')
 
 
 def plot_single_quantiles_lgq(binary, system_data, ptide, axis, config):
@@ -569,6 +574,7 @@ def plot_single_quantiles_lgq(binary, system_data, ptide, axis, config):
                 **extra_args
             ).get_color()
     decorate_subplot(axis,
+                     binary,
                      r"$CDF(\log_{10}Q_\star')$",
                      config,
                      xlabel='emcee step')
@@ -700,6 +706,7 @@ def plot_single_raftery_lewis_diagnostics(_,
 
 
 def decorate_subplot(axis,
+                     binary,
                      ylabel,
                      config,
                      *,
@@ -746,6 +753,12 @@ def decorate_subplot(axis,
         if yticks is not None:
             axis.set_yticks(yticks)
 
+    cluster, binary_id = binary.split('_')
+    axis.set_title(
+        ('PKM ' if cluster == 'NGC188' else 'WOCS ') + binary_id,
+        pad=3
+    )
+
 
 def plot_single_burnin_period(binary, system_data, __, axis, config):
     """Plot the required burnin for each quantile of lgQ(Ptide) vs Ptide."""
@@ -773,7 +786,7 @@ def plot_single_burnin_period(binary, system_data, __, axis, config):
                                 axis,
                                 config)
     axis.set_ylim(10, 1000)
-    decorate_subplot(axis, 'emcee steps', config)
+    decorate_subplot(axis, binary, 'emcee steps', config)
     if config.individual_plot_mode == 'pages':
         axis.legend()
 
@@ -800,7 +813,7 @@ def plot_single_cdfstd_period(binary, system_data, __, axis, config):
                                 axis,
                                 config)
     axis.set_ylim(1e-3, 0.03)
-    decorate_subplot(axis, r'$\sigma_{CDF}$', config)
+    decorate_subplot(axis, binary, r'$\sigma_{CDF}$', config)
     if config.individual_plot_mode == 'pages':
         axis.legend()
 
@@ -837,6 +850,7 @@ def get_subplots(num_systems, plot_type, config):
         6, 3,
         sharex='col',
         sharey=('row' if plot_type == 'burnin_period' else 'row'),
+        gridspec_kw=dict(wspace=0.05, hspace=0.25),
         figsize=(8.5,11)
     )
     axes = axes.flatten()
@@ -859,7 +873,7 @@ def get_subplots(num_systems, plot_type, config):
     return axes
 
 
-def plot_single_tightest_lgq_posterior(_, system_data, __, axis, config):
+def plot_single_tightest_lgq_posterior(binary, system_data, _, axis, config):
     """Plot PDF(lgQ) at the tidal period with smallest upper quantile."""
 
     upper_quantile_ind = numpy.argmax(config.convergence_quantiles)
@@ -878,6 +892,7 @@ def plot_single_tightest_lgq_posterior(_, system_data, __, axis, config):
     pdf.add_samples(evaluated_lgq)
     axis.plot(plot_lgq, pdf() / (pdf().sum() * (plot_lgq[1] - plot_lgq[0])))
     decorate_subplot(axis,
+                     binary,
                      'PDF',
                      config,
                      xlabel=r"$\log_{10}Q_\star'$",
@@ -907,15 +922,15 @@ def plot_individual_constraints(plot_data, config):
     )
 
     for plot_type in [
-            #'lgQ_period',
+            'lgQ_period',
             #'lgQ_quantiles',
-            'quantiles_lgQ',
+            #'quantiles_lgQ',
             #'autocorrelation',
             #'autocorrelation_time',
             #'raftery_lewis_diagnostics',
             'burnin_period',
             'cdfstd_period',
-            'tightest_lgQ_posterior'
+            #'tightest_lgQ_posterior'
     ]:
         print('Plot type: ' + plot_type)
         for cluster in ['M35', 'NGC6819', 'NGC188']:
@@ -977,7 +992,7 @@ def plot_individual_constraints(plot_data, config):
                     elif plot_type in ['burnin_period', 'cdfstd_period']:
                         pyplot.figlegend(loc='upper center',
                                          ncol=4,
-                                         borderaxespad=3)
+                                         borderaxespad=1)
 
                 if config.individual_plot_mode == 'subplots':
                     pyplot.savefig(output_fname,
@@ -990,50 +1005,10 @@ def plot_individual_constraints(plot_data, config):
 def plot_combined_constraints(plot_data, config):
     """Plot heat-map of joint constraint from all systems in a cluster."""
 
+    orig_font_size = rcParams['font.size']
+    rcParams['font.size'] = '24'
     config.combined_constraint_heat_map = 'log'
     include_binaries = get_plotting_order(plot_data)
-#    dict(
-#        M35=[
-#            ('M35_%d' % binid, burnin) for binid, burnin in [(54027, 200),
-#                                                             (16016, 260),
-#                                                             (23043, 200),
-#                                                             (54054, 320),
-#                                                             (35045, 145),
-#                                                             (40015, 220),
-#                                                             (33054, 180),
-#                                                             (34036, 150),
-#                                                             (41032, 100)]
-#        ],
-#        NGC6819=[
-#            ('NGC6819_%d' % binid, burnin) for binid, burnin in [(49002, 110),
-#                                                                 (66004, 200),
-#                                                                 (13001, 300),
-#                                                                 (60006, 100),
-#                                                                 (46013, 280),
-#                                                                 (59003, 150),
-#                                                                 (53003, 240)]
-#        ],
-#        NGC188=[
-#            ('NGC188_%d' % binid, burnin) for binid, burnin in [(4618, 120),
-#                                                                (5015, 100),
-#                                                                (6171, 75),
-#                                                                (5463, 100),
-#                                                                (5601, 50),
-#                                                                (4904, 100),
-#                                                                (4289, 60),
-#                                                                (5738, 90),
-#                                                                (6292, 100),
-#                                                                (4965, 70),
-#                                                                (5797, 80),
-#                                                                (5647, 100),
-#                                                                (880, 110),
-#                                                                (4080, 120),
-#                                                                (5040, 100),
-#                                                                (4673, 110),
-#                                                                (5381, 80)]
-#
-#        ]
-#    )
 
     numpy.set_printoptions(precision=16, floatmode='fixed', linewidth=100)
     config.combined_constraint_lgQ_grid = numpy.linspace(4, 7, 100)
@@ -1097,6 +1072,11 @@ def plot_combined_constraints(plot_data, config):
                 pyplot.ylim(min_lgq, 6.0 if cluster == 'M35' else 7.0)
                 pyplot.xlim(*config.combined_constraint_period_range)
                 plotter.plot_combined_pdf_heat_map()
+                plotter.plot_combined_quantiles(config.convergence_quantiles,
+                                                fmt='-k')
+#                pyplot.figlegend(loc='lower center',
+#                                 ncol=2,
+#                                 bbox_to_anchor=(0.5, 1.0))
                 pyplot.gca().set_xticklabels(
                     [
                         str(int(val) if val - int(val) == 0 else val)
@@ -1114,7 +1094,9 @@ def plot_combined_constraints(plot_data, config):
 
                 pyplot.colorbar()
                 print('    Plotting')
-                pyplot.savefig(output_fname)
+                pyplot.savefig(output_fname,
+                               bbox_inches='tight',
+                               pad_inches=0.0)
                 print('    Created: ' + repr(output_fname))
                 pyplot.cla()
                 pyplot.clf()
@@ -1166,9 +1148,9 @@ def main(config):
         download_latest_samples(config.samples_dir)
 
     plot_data = get_sampling_data(config)
-#    plot_individual_constraints(plot_data, config)
-    plot_combined_constraints(plot_data, config)
-    plot_tightest_constraints(plot_data, config)
+    plot_individual_constraints(plot_data, config)
+#    plot_combined_constraints(plot_data, config)
+#    plot_tightest_constraints(plot_data, config)
 
 
 if __name__ == '__main__':
