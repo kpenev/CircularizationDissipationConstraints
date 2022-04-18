@@ -425,12 +425,14 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
     axis.set_xscale('log')
     orig_axis = pyplot.gca()
     pyplot.sca(axis)
+    lgq_range = (4.0 if binary.startswith('M35_') else 5.0, 12)
+    config.combined_constraint_lgQ_grid = numpy.linspace(*lgq_range, 50)
     frequency_dependence_plotter = FrequencyDependencePlotter(1, config)
     frequency_dependence_plotter.add_chain(
         system_data['samples'][get_burnin(system_data, config, binary):],
         None
     )
-    pyplot.ylim(4.0 if binary.startswith('M35_') else 5.0, 12.0)
+    pyplot.ylim(*lgq_range)
     frequency_dependence_plotter.plot_combined_pdf_heat_map(
         xlabel=config.bottom,
         ylabel=config.left
@@ -992,7 +994,7 @@ def plot_individual_constraints(plot_data, config):
                     elif plot_type in ['burnin_period', 'cdfstd_period']:
                         pyplot.figlegend(loc='upper center',
                                          ncol=4,
-                                         borderaxespad=1)
+                                         borderaxespad=3)
 
                 if config.individual_plot_mode == 'subplots':
                     pyplot.savefig(output_fname,
