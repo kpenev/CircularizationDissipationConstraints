@@ -1024,6 +1024,8 @@ def plot_combined_constraints(plot_data, config):
     include_binaries['NGC188'][6] = include_binaries['NGC188'][-1]
     include_binaries['NGC188'][-1] = 'NGC188_4904'
 
+    selected_quantiles = dict(ptide_grid=config.ptide_grid)
+
     for cluster in ['NGC6819', 'NGC188', 'M35']:
         print(cluster + ':')
         cluster_plotter = FrequencyDependencePlotter(
@@ -1104,13 +1106,27 @@ def plot_combined_constraints(plot_data, config):
                 pyplot.clf()
 
             fully_combined_n += 1
+        if cluster == 'M35':
+            selected_quantiles[cluster] = [
+                cluster_plotter.combined_pdf.ppf(cdf)
+                for cdf in config.convergence_quantiles
+            ]
+        else:
+            selected_quantiles['NGC6819'] = selected_quantiles['NGC188'] = [
+                all_combined_plotter.combined_pdf.ppf(cdf)
+                for cdf in config.convergence_quantiles
+            ]
+    return selected_quantiles
 
 
-def plot_tightest_constraints(plot_data, config):
+def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
     """Plot tightest constraints as error bars vs tidal period."""
 
     include_binaries = get_plotting_order(plot_data)
-    for cluster in ['NGC6819', 'NGC188']:
+    offsets = numpy.zeros(len(config.convergence_ptide_grid), dtype=int)
+    for cluster in ['M35', 'NGC6819', 'NGC188']:
+        pyplot.xscale('log')
+        lgq_range = ((4, 8) if cluster == 'M35' else (5, 9))
         cluster_quantiles = numpy.empty((len(config.convergence_quantiles),
                                          len(include_binaries[cluster])))
         cluster_ptide = numpy.empty(len(include_binaries[cluster]))
@@ -1120,10 +1136,30 @@ def plot_tightest_constraints(plot_data, config):
                 entry[upper_quantile_ind][0]
                 for entry in plot_data[binary]['quantiles']
             ]).argmin()
-            cluster_ptide[binary_ind] = config.convergence_ptide_grid[ptide_ind]
+            cluster_ptide[binary_ind] = (
+                config.convergence_ptide_grid[ptide_ind]
+                *
+                1.1**(
+                    numpy.ceil(offsets[ptide_ind] / 2)
+                    *
+                    (-1)**(offsets[ptide_ind] % 2 + 1)
+                )
+            )
+            offsets[ptide_ind] += 1
+
             cluster_quantiles[:, binary_ind] = [
                 q[0] for q in plot_data[binary]['quantiles'][ptide_ind]
             ]
+            print(
+                '%s: best Ptide = %s (%d), lgQ = %s'
+                %
+                (
+                    binary,
+                    repr(cluster_ptide[binary_ind]),
+                    ptide_ind,
+                    repr(cluster_quantiles[:, binary_ind])
+                )
+            )
 
         elinewidth = 2
         ecolor = None
@@ -1139,8 +1175,29 @@ def plot_tightest_constraints(plot_data, config):
             )[2][0].get_color()
             elinewidth += 2
             cluster_quantiles = cluster_quantiles[1:-1]
-    pyplot.legend()
-    pyplot.savefig('tightest_constraints.pdf')
+        if combined_quantiles is not None:
+            for plot_y, cdf in zip(combined_quantiles[cluster],
+                                   config.convergence_quantiles):
+                pyplot.plot(
+                    combined_quantiles['ptide_grid'],
+                    plot_y,
+                    '-k',
+                    label='CDF=%.3f' % cdf,
+                    linewidth=3,
+                    zorder=20
+                )
+
+        pyplot.xlabel('Tidal Period [days]')
+        pyplot.ylabel(r"$\log_{10}Q_\star'$")
+        pyplot.ylim(*lgq_range)
+#        pyplot.legend()
+        pyplot.gca().set_xticks(range(2, 11))
+        pyplot.gca().set_xticklabels([str(i) for i in range(2, 11)])
+
+        pyplot.savefig(cluster + '_tightest_constraints.pdf',
+                       bbox_inches='tight',
+                       pad_inches=0)
+        pyplot.clf()
 
 
 def main(config):
@@ -1150,9 +1207,10 @@ def main(config):
         download_latest_samples(config.samples_dir)
 
     plot_data = get_sampling_data(config)
-    plot_individual_constraints(plot_data, config)
-#    plot_combined_constraints(plot_data, config)
-#    plot_tightest_constraints(plot_data, config)
+    combined_quantiles = None
+#    plot_individual_constraints(plot_data, config)
+    combined_quantiles = plot_combined_constraints(plot_data, config)
+    plot_tightest_constraints(plot_data, config, combined_quantiles)
 
 
 if __name__ == '__main__':
