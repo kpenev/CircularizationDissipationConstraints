@@ -128,7 +128,9 @@ def compare_chain_configuration(config, chain_group):
         'track_final_eccentricity': False
     }
 
-    config_set = set(vars(config).keys())
+    config_dict = vars(config)
+    del config_dict['reseed_random_number_generator']
+    config_set = set(config_dict.keys())
     config_set -= set(chain_group.attrs.keys())
     config_set -= _mutable_config_params
     config_set -= set(config_param_defaults.keys())
@@ -137,7 +139,7 @@ def compare_chain_configuration(config, chain_group):
                       config_set,
                       chain_group.name)
         return False
-    for param, config_value in vars(config).items():
+    for param, config_value in config_dict.items():
         if param in _mutable_config_params:
             continue
         try:
@@ -654,7 +656,7 @@ def run(config,
         ) as workers:
             sampler = emcee.EnsembleSampler(**sampler_config,
                                             pool=UnchunkedPool(workers))
-            if config.reseed_rondom_number_generator:
+            if config.reseed_random_number_generator:
                 #Bad indeed
                 #pylint: disable=protected-access
                 sampler._random.seed()

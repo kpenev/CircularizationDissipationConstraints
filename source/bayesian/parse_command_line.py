@@ -536,7 +536,7 @@ def parse_command_line(description,
         help='The file to read eccentricity expansion coefficients from.'
     )
     parser.add_argument(
-        '--reseed-rondom-number-generator',
+        '--reseed-random-number-generator',
         default=False,
         action='store_true',
         help='In an ideal world, this should not be done. If this argument is '
