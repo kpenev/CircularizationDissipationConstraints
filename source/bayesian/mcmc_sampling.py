@@ -654,6 +654,11 @@ def run(config,
         ) as workers:
             sampler = emcee.EnsembleSampler(**sampler_config,
                                             pool=UnchunkedPool(workers))
+            if config.reseed_rondom_number_genertor:
+                #Bad indeed
+                #pylint: disable=protected-access
+                sampler._random.seed()
+                #pylint: enable=protected-access
             sampler.run_mcmc(initial_state, config.mcmc_nsteps)
     else:
         sampler = emcee.EnsembleSampler(**sampler_config)

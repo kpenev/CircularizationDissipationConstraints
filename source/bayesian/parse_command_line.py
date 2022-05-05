@@ -535,6 +535,16 @@ def parse_command_line(description,
         ),
         help='The file to read eccentricity expansion coefficients from.'
     )
+    parser.add_argument(
+        '--reseed-rondom-number-genertor',
+        default=False,
+        action='store',
+        help='In an ideal world, this should not be done. If this argument is '
+        'passed, the internal random number generator object within ``emcee`` '
+        'is re-seeded after the sampler is created. This is only useful if '
+        'sampling encounters a state that causes extremely rare crashes '
+        'that we don\'t have time to fix.'
+    )
 
     add_sampling_parameters(parser)
     add_output_parameters(parser)
