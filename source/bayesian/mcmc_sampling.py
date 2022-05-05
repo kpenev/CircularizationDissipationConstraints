@@ -128,7 +128,7 @@ def compare_chain_configuration(config, chain_group):
         'track_final_eccentricity': False
     }
 
-    config_dict = vars(config)
+    config_dict = dict(vars(config))
     del config_dict['reseed_random_number_generator']
     config_set = set(config_dict.keys())
     config_set -= set(chain_group.attrs.keys())
