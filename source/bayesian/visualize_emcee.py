@@ -200,8 +200,9 @@ def parse_command_line():
     )
     return parser.parse_args()
 
-def get_backend(samples_fname, chain_conditions):
-    """Return the chain to plot."""
+
+def get_chain_name(samples_fname, chain_conditions):
+    """Return the name of the chain satisfying the given conditions."""
 
     with h5py.File(samples_fname, 'r') as chain_file:
         chain_name = None
@@ -236,12 +237,17 @@ def get_backend(samples_fname, chain_conditions):
                 system_name = chain_file[chain_name].attrs['system']
         if chain_name is None:
             return None, None
+        return chain_name, system_name
 
+
+def get_backend(samples_fname, chain_conditions):
+    """Return the chain to plot."""
+
+    chain_name, system_name = get_chain_name(samples_fname, chain_conditions)
     backend = emcee.backends.HDFBackend(samples_fname,
                                         name=chain_name,
                                         read_only=True)
-    chain_length = backend.iteration
-    if chain_length == 0:
+    if chain_name is None or backend.iteration == 0:
         return None, None
 
     return backend, system_name
