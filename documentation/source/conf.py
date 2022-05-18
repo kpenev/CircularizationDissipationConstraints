@@ -12,9 +12,20 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+from os import path
+import sys
+sys.path.append(
+    path.join(
+        path.dirname(
+            path.dirname(
+                path.dirname(
+                    path.abspath(__file__)
+                )
+            )
+        ),
+        'source'
+    )
+)
 
 
 # -- Project information -----------------------------------------------------
