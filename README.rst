@@ -16,8 +16,7 @@ and planets for which eccentricity data is available. The argument is as follows
       circularized to at least below that envelope.
       
 This can be applied system by system to exoplanet systems and binary stars and
-can cover a broader range of parameters than what we proposed in the funder 2017
-ATP.
+can cover a broader range of parameters.
 
 Relevant articles:
 
