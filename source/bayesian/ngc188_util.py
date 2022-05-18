@@ -147,7 +147,7 @@ def get_binary_data(
             )
         )
 ):
-    """Return NGC188 SB1 and SB2 systems as :class:`pandas.DataFrame`s."""
+    """Return NGC188 SB1 and SB2 systems as :class:`pandas.DataFrame` objs."""
 
     physical_parameters = pandas.DataFrame(
         read_cds_pipe_table(physical_parameters_fname)

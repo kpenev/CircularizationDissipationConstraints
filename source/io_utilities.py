@@ -573,10 +573,10 @@ def load_progress_pickle(progress_file):
         progress_file:    An already opened file containing pickles of
             previously calculated eccentricities. It should contain sequences of
             pickles containing:
-                * system host star name (e.g. 'HATS-18')
-                * lgQ (e.g. 6.0)
-                * initial eccentricity (e.g. 0.55)
-                * final eccentricity (e.g. 0.3214)
+            * system host star name (e.g. 'HATS-18')
+            * lgQ (e.g. 6.0)
+            * initial eccentricity (e.g. 0.55)
+            * final eccentricity (e.g. 0.3214)
 
     Returns:
         dict:

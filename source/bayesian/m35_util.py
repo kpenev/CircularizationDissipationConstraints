@@ -54,7 +54,7 @@ def get_binary_data(
             )
         )
 ):
-    """Return M35 SB1 and SB2 systems as :class:`pandas.DataFrame`s."""
+    """Return M35 SB1 and SB2 systems as :class:`pandas.DataFrame` instances."""
 
     photometry = get_photometry()
     return (

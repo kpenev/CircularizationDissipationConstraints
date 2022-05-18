@@ -11,8 +11,8 @@ from planetary_system_io import read_cds_pipe_table
 
 #False positive (hanhdled in __init__.py).
 #pylint: disable=import-error
-import praesepe_binaries
-import hyades_binaries
+#import praesepe_binaries
+#import hyades_binaries
 from command_line_utilities import data_dir
 from bayesian import m35_util
 from bayesian.basic_util import default_logging_format

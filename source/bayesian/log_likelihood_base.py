@@ -256,7 +256,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         self._stash = True
 
     def stop_stashing(self):
-        """Stop stashing future :meth:`__call__`s but keep current stash."""
+        """Stop stashing future :meth:`__call__` but keep current stash."""
 
         self._stash = False
 
