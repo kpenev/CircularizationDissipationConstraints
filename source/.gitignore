@@ -6,5 +6,6 @@
 *.outerr
 *.avi
 *.mp4
+*.mrt
 eccentricity_envelope_frames
 test.py

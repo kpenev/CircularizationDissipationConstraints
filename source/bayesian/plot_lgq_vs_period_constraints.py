@@ -15,6 +15,8 @@ from configargparse import ArgumentParser, DefaultsFormatter
 from scipy.stats import rdist, norm
 import numpy
 from kde import KDEDistribution
+from astropy.table import Table
+from cdspyreadme import CDSTablesMaker
 
 from emcee_autocorrelation import\
     max_likelihood_autocorr,\
@@ -150,6 +152,12 @@ def parse_command_line(quantiles_only=False):
         default=16,
         help='The maximum number of parallel threads to use for calculating '
         'quantile diagnostics (the only slow part of preparing plotting data).'
+    )
+    parser.add_argument(
+        '--mrt-author',
+        default='Penev, K. and Schussler, J.',
+        help='The author to specify for the generated data behind the figures '
+        'tables.'
     )
     if not quantiles_only:
         add_frequency_dependence_plot_config(parser)
@@ -338,19 +346,43 @@ def plot_single_diagnostic_period(quantile_data,
     if zorder is not None:
         kwargs['zorder'] = zorder
 
-    for quantile_ind, quantile in enumerate(config.convergence_quantiles):
+    quantile_labels =[
+        'CDF={0:.3f}'.format(cdf) for cdf in config.convergence_quantiles
+    ]
+    description_quantity = dict(
+        quantile="value of log10(Q')",
+        std="standard deviation of the CDF",
+        burnin="burnin period"
+    )
+    data_behind = Table(
+        [config.convergence_ptide_grid],
+        names=['Ptide'],
+        dtype=[float],
+        descriptions=["The tidal period at which Q' was evaluated"],
+    )
+    for quantile_ind, label in enumerate(quantile_labels):
         if label is True:
-            kwargs['label'] = 'CDF=%.3f' % quantile
+            kwargs['label'] = label
 
+        plot_y = [
+            quantile_data[ptide_ind][quantile_ind][diagnostic_ind]
+            for ptide_ind in range(len(config.convergence_ptide_grid))
+        ]
+
+        data_behind[label] = plot_y
+        data_behind[label].description = (
+            "The {quantity} at the {label} quantile".format(
+                quantity=description_quantity[diagnostic],
+                label=label
+            )
+        )
         axis.plot(
             config.convergence_ptide_grid,
-            [
-                quantile_data[ptide_ind][quantile_ind][diagnostic_ind]
-                for ptide_ind in range(len(config.convergence_ptide_grid))
-            ],
+            plot_y,
             fmt,
             **kwargs
         )
+    return data_behind
 
 
 def get_valid_ptide_indices(quantiles, config):
@@ -437,13 +469,13 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
         xlabel=config.bottom,
         ylabel=config.left
     )
-    plot_single_diagnostic_period(system_data['quantiles'],
-                                  'quantile',
-                                  axis,
-                                  config,
-                                  fmt='-k',
-                                  label=None,
-                                  zorder=20)
+    data_behind = plot_single_diagnostic_period(system_data['quantiles'],
+                                                'quantile',
+                                                axis,
+                                                config,
+                                                fmt='-k',
+                                                label=None,
+                                                zorder=20)
     pyplot.axvline(x=min(system_data['orbit']['Per']),
                    color='black',
                    linewidth=3,
@@ -459,11 +491,12 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
         yticks=[4, 6, 8, 10, 12] if binary.startswith('M35') else [5, 7, 9, 11]
     )
     pyplot.sca(orig_axis)
+    return data_behind
 
 
 #pylint: disable=too-many-locals
 def plot_single_convergence(*,
-                            binary,
+                            _,
                             system_data,
                             ptide,
                             ptide_ind,
@@ -766,7 +799,7 @@ def plot_single_burnin_period(binary, system_data, __, axis, config):
     """Plot the required burnin for each quantile of lgQ(Ptide) vs Ptide."""
 
     axis.set_yscale('log')
-    plot_single_diagnostic_period(
+    data_behind = plot_single_diagnostic_period(
         system_data['quantiles'],
         'burnin',
         axis,
@@ -787,17 +820,18 @@ def plot_single_burnin_period(binary, system_data, __, axis, config):
     mark_valid_constraint_range(system_data['quantiles'],
                                 axis,
                                 config)
-    axis.set_ylim(10, 1000)
+    axis.set_ylim(10, 2000)
     decorate_subplot(axis, binary, 'emcee steps', config)
     if config.individual_plot_mode == 'pages':
         axis.legend()
+    return data_behind
 
 
 def plot_single_cdfstd_period(binary, system_data, __, axis, config):
     """Plot the required burnin for each quantile of lgQ(Ptide) vs Ptide."""
 
     axis.set_yscale('log')
-    plot_single_diagnostic_period(
+    data_behind = plot_single_diagnostic_period(
         system_data['quantiles'],
         'std',
         axis,
@@ -818,6 +852,7 @@ def plot_single_cdfstd_period(binary, system_data, __, axis, config):
     decorate_subplot(axis, binary, r'$\sigma_{CDF}$', config)
     if config.individual_plot_mode == 'pages':
         axis.legend()
+    return data_behind
 
 
 def get_plotting_order(plot_data, restrict_to_cluster=None):
@@ -837,8 +872,9 @@ def get_plotting_order(plot_data, restrict_to_cluster=None):
     if restrict_to_cluster is None or restrict_to_cluster == 'M35':
         for bad_binary in ['M35_15012',
                            'M35_41032',
-                           'M35_49043']:
-            result['M35'].remove(bad_binary)
+                           'M35_49043',
+                           'NGC188_4999']:
+            result[bad_binary.split('_')[0]].remove(bad_binary)
 
     if restrict_to_cluster is None:
         return result
@@ -904,6 +940,34 @@ def plot_single_tightest_lgq_posterior(binary, system_data, _, axis, config):
     axis.grid(visible=True, which='both')
 
 
+def save_individual_data_behind_figure(data, plot_type, binary, config):
+    """Return a ready-to-use table maker that can save to AAS MRT format."""
+
+    cluster, binary_id = binary.split('_')
+    quantity = dict(
+        lgQ_period="Quantiles of log10(Q*') vs tidal period",
+        burnin_period="Burn-in period for each quantile vs tidal period",
+        cdfstd_period=("Standard deviation of the CDF at each quantile vs "
+                       "tidal period")
+    )
+    title_info = dict(
+        cluster=('NGC ' + cluster[3:] if cluster.startswith('NGC')
+                 else 'M ' + cluster[1:]),
+        id_type=('PKM' if cluster == 'NGC188' else 'WOCS'),
+        binary_id=binary_id,
+        quantity=quantity[plot_type]
+    )
+    tablemaker = CDSTablesMaker()
+    tablemaker.title = (
+        '{quantity} for {cluster} binary {id_type} {binary_id}'.format_map(
+            title_info
+        )
+    )
+    tablemaker.author, tablemaker.authors = config.mrt_author.split(' and ', 1)
+    tablemaker.addTable(data, name=binary + '_' + plot_type + '.mrt')
+    tablemaker.toMRT()
+
+
 def plot_individual_constraints(plot_data, config):
     """Create plots showing the lgQ(Ptide) constraint for indivdiual systems."""
 
@@ -963,6 +1027,7 @@ def plot_individual_constraints(plot_data, config):
                     print('\t\t\tBinary: ' + repr(binary))
                     if plot_type == 'raftery_lewis_diagnostics':
                         assert config.individual_plot_mode == 'pages'
+                        data_behind = None
                         plot_single_raftery_lewis_diagnostics(
                             binary,
                             plot_data[binary],
@@ -972,7 +1037,9 @@ def plot_individual_constraints(plot_data, config):
                         )
                         pyplot.figlegend()
                     else:
-                        globals()['plot_single_' + plot_type.lower()](
+                        data_behind = globals()[
+                            'plot_single_' + plot_type.lower()
+                        ](
                             binary,
                             plot_data[binary],
                             plot_split,
@@ -995,6 +1062,11 @@ def plot_individual_constraints(plot_data, config):
                         pyplot.figlegend(loc='upper center',
                                          ncol=4,
                                          borderaxespad=3)
+                    if data_behind is not None:
+                        save_individual_data_behind_figure(data_behind,
+                                                           plot_type,
+                                                           binary,
+                                                           config)
 
                 if config.individual_plot_mode == 'subplots':
                     pyplot.savefig(output_fname,
@@ -1002,6 +1074,37 @@ def plot_individual_constraints(plot_data, config):
                                    pad_inches=0)
                 else:
                     pdf.close()
+
+
+def save_combined_data_behind_figure(data,
+                                     included_clusters,
+                                     ncombined,
+                                     config):
+    """Return a ready-to-use table maker that can save to AAS MRT format."""
+
+    tablemaker = CDSTablesMaker()
+    tablemaker.title = (
+        (
+            "Quantiles of the combined distribution of log10(Q*') vs tidal "
+            "period for {0} binaries".format(
+                ', '.join(included_clusters[:-1])
+                +
+                (',' if len(included_clusters) > 2 else '')
+                +
+                (
+                    ' and ' + included_clusters[-1]
+                    if len(included_clusters) > 1 else
+                    included_clusters[0]
+                )
+            )
+        )
+    )
+    tablemaker.author, tablemaker.authors = config.mrt_author.split(' and ', 1)
+    tablemaker.addTable(
+        data,
+        name='_'.join(included_clusters + [str(ncombined), 'combined_lgQ.mrt'])
+    )
+    tablemaker.toMRT()
 
 
 def plot_combined_constraints(plot_data, config):
@@ -1026,8 +1129,10 @@ def plot_combined_constraints(plot_data, config):
 
     selected_quantiles = dict(ptide_grid=config.ptide_grid)
 
+    combined_clusters = []
     for cluster in ['NGC6819', 'NGC188', 'M35']:
         print(cluster + ':')
+        combined_clusters.append(cluster)
         cluster_plotter = FrequencyDependencePlotter(
             len(include_binaries[cluster]),
             config
@@ -1060,14 +1165,18 @@ def plot_combined_constraints(plot_data, config):
                 period_range
             )
 
-            for output_fname, plotter in [
+            for output_fname, plotter, included_clusters, ncombined in [
                     (
                         cluster + '_combined_lgQ_period_%d.pdf' % (nadded + 1),
-                        cluster_plotter
+                        cluster_plotter,
+                        [cluster],
+                        (nadded + 1)
                     ),
                     (
                         'fully_combined_lgQ_period_%d.pdf' % fully_combined_n,
-                        all_combined_plotter
+                        all_combined_plotter,
+                        combined_clusters,
+                        fully_combined_n
                     )
             ]:
                 pyplot.figure(figsize=(11, 8.5), dpi=300, tight_layout=True)
@@ -1076,8 +1185,10 @@ def plot_combined_constraints(plot_data, config):
                 pyplot.ylim(min_lgq, 6.0 if cluster == 'M35' else 7.0)
                 pyplot.xlim(*config.combined_constraint_period_range)
                 plotter.plot_combined_pdf_heat_map()
-                plotter.plot_combined_quantiles(config.convergence_quantiles,
-                                                fmt='-k')
+                data_behind = plotter.plot_combined_quantiles(
+                    config.convergence_quantiles,
+                    fmt='-k'
+                )
 #                pyplot.figlegend(loc='lower center',
 #                                 ncol=2,
 #                                 bbox_to_anchor=(0.5, 1.0))
@@ -1102,6 +1213,10 @@ def plot_combined_constraints(plot_data, config):
                                bbox_inches='tight',
                                pad_inches=0.0)
                 print('    Created: ' + repr(output_fname))
+                save_combined_data_behind_figure(data_behind,
+                                                 included_clusters,
+                                                 ncombined,
+                                                 config)
                 pyplot.cla()
                 pyplot.clf()
 
@@ -1129,14 +1244,34 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
         lgq_range = ((4, 8) if cluster == 'M35' else (5, 9))
         cluster_quantiles = numpy.empty((len(config.convergence_quantiles),
                                          len(include_binaries[cluster])))
-        cluster_ptide = numpy.empty(len(include_binaries[cluster]))
+        plot_ptide = numpy.empty(len(include_binaries[cluster]))
+        data_behind = Table(
+            [
+                [b.split('_')[1] for b in include_binaries[cluster]],
+                numpy.empty(len(include_binaries[cluster]))
+            ],
+            names=[
+                ('PKM' if cluster == 'NGC188' else 'WOCS'),
+                'Ptide'
+            ],
+            descriptions=[
+                "Binary identifier",
+                (
+                    "The tidal period at which the {0:.1f}% quantile of "
+                    "log10(Q') of the binary is smallest."
+                ).format(100.0 * config.convergence_quantiles.max())
+            ]
+        )
         for binary_ind, binary in enumerate(include_binaries[cluster]):
             upper_quantile_ind = numpy.argmax(config.convergence_quantiles)
             ptide_ind = numpy.array([
                 entry[upper_quantile_ind][0]
                 for entry in plot_data[binary]['quantiles']
             ]).argmin()
-            cluster_ptide[binary_ind] = (
+            data_behind['Ptide'][binary_ind] = (
+                config.convergence_ptide_grid[ptide_ind]
+            )
+            plot_ptide[binary_ind] = (
                 config.convergence_ptide_grid[ptide_ind]
                 *
                 1.1**(
@@ -1155,17 +1290,30 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
                 %
                 (
                     binary,
-                    repr(cluster_ptide[binary_ind]),
+                    repr(plot_ptide[binary_ind]),
                     ptide_ind,
                     repr(cluster_quantiles[:, binary_ind])
                 )
             )
 
+        cdf_labels = [
+            'CDF={0:.3f}'.format(cdf) for cdf in config.convergence_quantiles
+        ]
+        data_behind.add_columns(
+            cluster_quantiles,
+            names=cdf_labels
+        )
+        for label, cdf in zip(cdf_labels, config.convergence_quantiles):
+            data_behind[label].description = (
+                "The {0:.1f}% quantile of log10(Q') at the tidal period with "
+                "smallest {1:.1f}% quantile."
+            ).format(100.0 * cdf, 100.0 * config.convergence_quantiles.max())
+            <++>
         elinewidth = 2
         ecolor = None
         while cluster_quantiles.shape[0] > 1:
             ecolor = pyplot.errorbar(
-                cluster_ptide,
+                plot_ptide,
                 0.5 * (cluster_quantiles[-1] + cluster_quantiles[0]),
                 yerr=0.5 * (cluster_quantiles[-1] - cluster_quantiles[0]),
                 fmt='none',
@@ -1176,13 +1324,13 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
             elinewidth += 2
             cluster_quantiles = cluster_quantiles[1:-1]
         if combined_quantiles is not None:
-            for plot_y, cdf in zip(combined_quantiles[cluster],
-                                   config.convergence_quantiles):
+            for plot_y, label in zip(combined_quantiles[cluster],
+                                     cdf_labels):
                 pyplot.plot(
                     combined_quantiles['ptide_grid'],
                     plot_y,
                     '-k',
-                    label='CDF=%.3f' % cdf,
+                    label=label,
                     linewidth=3,
                     zorder=20
                 )
@@ -1210,7 +1358,7 @@ def main(config):
     combined_quantiles = None
 #    plot_individual_constraints(plot_data, config)
     combined_quantiles = plot_combined_constraints(plot_data, config)
-    plot_tightest_constraints(plot_data, config, combined_quantiles)
+#    plot_tightest_constraints(plot_data, config, combined_quantiles)
 
 
 if __name__ == '__main__':

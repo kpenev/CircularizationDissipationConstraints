@@ -16,6 +16,7 @@ import h5py
 import pandas
 from scipy import stats
 from asteval import Interpreter
+from astropy.table import Table
 
 from combined_mcmc_constraint import CombinedMCMCConstraint
 
@@ -674,18 +675,36 @@ class FrequencyDependencePlotter:
     def plot_combined_quantiles(self,
                                 cdf_values,
                                 fmt='-',
-                                label_fmt='CDF=%.3f'):
+                                label_fmt='CDF={0:.3f}'):
         """Plot the specified percentiles."""
 
+        data_behind = Table(
+            [self.config.ptide_grid],
+            names=['Ptide'],
+            dtype=[float],
+            descriptions=["The tidal period at which the combined Q' constraint"
+                          " was evaluated"],
+        )
+
         for cdf in cdf_values:
+            label = label_fmt.format(cdf)
+            plot_y = self.combined_pdf.ppf(cdf)
             pyplot.plot(
                 self.config.ptide_grid,
-                self.combined_pdf.ppf(cdf),
+                plot_y,
                 fmt,
-                label=label_fmt % cdf,
+                label=label,
                 linewidth=3,
                 zorder=20
             )
+            data_behind[label] = plot_y
+            data_behind[label].description = (
+                (
+                    "The value of log10(Q') at the {0} quantile of the combined"
+                    " distribution from all binaries"
+                ).format(label)
+            )
+        return data_behind
 
 
     def save(self, filename=None):
