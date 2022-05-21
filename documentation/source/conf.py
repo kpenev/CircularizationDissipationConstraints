@@ -14,6 +14,8 @@
 #
 from os import path
 import sys
+import inspect
+
 sys.path.append(
     path.join(
         path.dirname(
@@ -30,7 +32,7 @@ sys.path.append(
 
 # -- Project information -----------------------------------------------------
 
-project = 'Constraining Tidal Dissipation from Observed Circularization'
+project = 'System by System Tidal Dissipation Constraints from Eccentricity'
 copyright = '2022, Kaloyan Penev'
 author = 'Kaloyan Penev'
 
@@ -57,7 +59,8 @@ extensions = [
     'sphinx.ext.ifconfig',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
-    'sphinx.ext.napoleon'
+    'sphinx.ext.napoleon',
+    'sphinx.ext.inheritance_diagram',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -93,7 +96,7 @@ pygments_style = None
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'alabaster'
+html_theme = 'sphinx_rtd_theme'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -120,7 +123,7 @@ html_static_path = ['_static']
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'ConstrainingTidalDissipationfromObservedCircularizationdoc'
+htmlhelp_basename = 'SystembySystemTidalDissipationConstraintsfromEccentricitydoc'
 
 
 # -- Options for LaTeX output ------------------------------------------------
@@ -147,8 +150,15 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'ConstrainingTidalDissipationfromObservedCircularization.tex', 'Constraining Tidal Dissipation from Observed Circularization Documentation',
-     'Kaloyan Penev', 'manual'),
+    (
+        master_doc,
+        'SystembySystemTidalDissipationConstraintsfromEccentricity.tex',
+        (
+            'System by System Tidal Dissipation Constraints from Eccentricity'
+            ' Documentation'
+        ),
+        'Kaloyan Penev',
+        'manual'),
 ]
 
 
@@ -157,8 +167,13 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'constrainingtidaldissipationfromobservedcircularization', 'Constraining Tidal Dissipation from Observed Circularization Documentation',
-     [author], 1)
+    (
+        master_doc,
+        'systembysystemtidaldissipationconstraintsfromeccentricity',
+        'System by System Tidal Dissipation Constraints from Eccentricity',
+        [author],
+        1
+    )
 ]
 
 
@@ -168,9 +183,18 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'ConstrainingTidalDissipationfromObservedCircularization', 'Constraining Tidal Dissipation from Observed Circularization Documentation',
-     author, 'ConstrainingTidalDissipationfromObservedCircularization', 'One line description of project.',
-     'Miscellaneous'),
+    (
+        master_doc,
+        'SystembySystemTidalDissipationConstraintsfromEccentricity',
+        (
+            'System by System Tidal Dissipation Constraints from Eccentricity'
+            ' Documentation'
+        ),
+        author,
+        'SystembySystemTidalDissipationConstraintsfromEccentricity',
+        'One line description of project.',
+        'Miscellaneous'
+    ),
 ]
 
 
@@ -198,3 +222,52 @@ epub_exclude_files = ['search.html']
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
+
+# -- Options for autodoc extension -------------------------------------------
+
+autodoc_default_flags = ['members',
+                         'undoc-members',
+                         'show-inheritance']
+
+#Napolean extension defined names.
+#pylint: disable=invalid-name
+napoleon_include_private_with_doc = True
+napoleon_include_special_with_doc = True
+napoleon_include_init_with_doc = True
+#pylint: enable=invalid-name
+
+inheritance_graph_attrs = dict(rankdir="TB",
+                               fontsize="24",
+                               ratio='auto',
+                               size='120')
+
+#Call signature defined by SPHINX autodoc plugin.
+#pylint: disable=too-many-arguments
+#pylint: disable=unused-argument
+def add_inheritance_diagram(app, what, name, obj, options, lines):
+    """Add an inheritance diagram for all classes."""
+
+    if what == 'module':
+        class_list = [member[0]
+                      for member in inspect.getmembers(sys.modules[name],
+                                                       inspect.isclass)]
+        if class_list:
+            lines.insert(0, '')
+            lines.insert(
+                0, '.. inheritance-diagram:: '
+                +
+                ' '.join(class_list)
+            )
+            lines.insert(0, '=========================')
+            lines.insert(0, 'Class Inheritance Diagram')
+    elif what == 'class':
+        lines.insert(0, '')
+        lines.insert(0,
+                     '.. inheritance-diagram:: ' + name)
+#pylint: enable=too-many-arguments
+
+def setup(app):
+    """Connect handler for adding inheritance diagrams."""
+
+    app.add_stylesheet('unlimited_width.css')
+    app.connect('autodoc-process-docstring', add_inheritance_diagram)

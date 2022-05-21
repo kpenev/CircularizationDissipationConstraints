@@ -8,19 +8,27 @@ SPHINXAPIDOC	= sphinx-apidoc
 SOURCEDIR     = source
 BUILDDIR      = build
 MODULEDIR     	= ../source/
+APIDOCSEXCLUDE  = $(MODULEDIR)/test*\
+				  $(MODULEDIR)/*utils*\
+				  $(MODULEDIR)/*utilities*\
+				  $(MODULEDIR)/*e_Q_grid*\
+				  $(MODULEDIR)/update_search_paths.py
 APIDOCOPTS  	= --force -M --separate
 
 
 # Put it first so that "make" without argument is like "make help".
 help:
-	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) 
 
 .PHONY: help Makefile
 
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-%: Makefile
+%: Makefile clean
+	$(SPHINXAPIDOC) "$(MODULEDIR)" $(APIDOCSEXCLUDE) $(APIDOCOPTS) -o "$(SOURCEDIR)/_implementation" 
+	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+
+clean:
 	rm -rf $(BUILDDIR)
 	rm -rf "$(SOURCEDIR)/_implementation"
-	$(SPHINXAPIDOC) "$(MODULEDIR)" $(APIDOCOPTS) -o "$(SOURCEDIR)/_implementation" 
-	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+
