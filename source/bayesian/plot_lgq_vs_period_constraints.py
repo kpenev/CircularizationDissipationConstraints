@@ -13,6 +13,7 @@ from matplotlib import pyplot, cm, colors, rcParams
 from matplotlib.backends.backend_pdf import PdfPages
 from configargparse import ArgumentParser, DefaultsFormatter
 from scipy.stats import rdist, norm
+from scipy.interpolate import interp1d
 import numpy
 from kde import KDEDistribution
 from astropy.table import Table
@@ -76,6 +77,13 @@ def parse_command_line(quantiles_only=False):
         default=path.join(
             default_samples_dir,
             'processed_sampling_data.pkl'
+        )
+    )
+    parser.add_argument(
+        '--combined-quantiles-pickle',
+        default=path.join(
+            default_samples_dir,
+            'combined_quantiles.pkl'
         )
     )
     parser.add_argument(
@@ -940,6 +948,18 @@ def plot_single_tightest_lgq_posterior(binary, system_data, _, axis, config):
     axis.grid(visible=True, which='both')
 
 
+def save_data_behind_figure(data, title, filename, config):
+    """Create a data behind the figure MRT file."""
+
+    tablemaker = CDSTablesMaker()
+    tablemaker.title = title
+    tablemaker.author, tablemaker.authors = config.mrt_author.split(' and ', 1)
+    tablemaker.addTable(data,
+                        name=filename,
+                        nullvalue=-1)
+    tablemaker.toMRT()
+
+
 def save_individual_data_behind_figure(data, plot_type, binary, config):
     """Return a ready-to-use table maker that can save to AAS MRT format."""
 
@@ -957,15 +977,13 @@ def save_individual_data_behind_figure(data, plot_type, binary, config):
         binary_id=binary_id,
         quantity=quantity[plot_type]
     )
-    tablemaker = CDSTablesMaker()
-    tablemaker.title = (
+    save_data_behind_figure(
+        data,
         '{quantity} for {cluster} binary {id_type} {binary_id}'.format_map(
             title_info
-        )
+        ),
+        binary + '_' + plot_type + '.mrt'
     )
-    tablemaker.author, tablemaker.authors = config.mrt_author.split(' and ', 1)
-    tablemaker.addTable(data, name=binary + '_' + plot_type + '.mrt')
-    tablemaker.toMRT()
 
 
 def plot_individual_constraints(plot_data, config):
@@ -1259,7 +1277,7 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
                 (
                     "The tidal period at which the {0:.1f}% quantile of "
                     "log10(Q') of the binary is smallest."
-                ).format(100.0 * config.convergence_quantiles.max())
+                ).format(100.0 * max(config.convergence_quantiles))
             ]
         )
         for binary_ind, binary in enumerate(include_binaries[cluster]):
@@ -1297,7 +1315,8 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
             )
 
         cdf_labels = [
-            'CDF={0:.3f}'.format(cdf) for cdf in config.convergence_quantiles
+            'CDF-1({0:.1f}%)'.format(100.0 * cdf)
+            for cdf in config.convergence_quantiles
         ]
         data_behind.add_columns(
             cluster_quantiles,
@@ -1307,8 +1326,7 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
             data_behind[label].description = (
                 "The {0:.1f}% quantile of log10(Q') at the tidal period with "
                 "smallest {1:.1f}% quantile."
-            ).format(100.0 * cdf, 100.0 * config.convergence_quantiles.max())
-            <++>
+            ).format(100.0 * cdf, 100.0 * max(config.convergence_quantiles))
         elinewidth = 2
         ecolor = None
         while cluster_quantiles.shape[0] > 1:
@@ -1324,8 +1342,9 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
             elinewidth += 2
             cluster_quantiles = cluster_quantiles[1:-1]
         if combined_quantiles is not None:
-            for plot_y, label in zip(combined_quantiles[cluster],
-                                     cdf_labels):
+            for plot_y, label, cdf in zip(combined_quantiles[cluster],
+                                          cdf_labels,
+                                          config.convergence_quantiles):
                 pyplot.plot(
                     combined_quantiles['ptide_grid'],
                     plot_y,
@@ -1334,6 +1353,19 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
                     linewidth=3,
                     zorder=20
                 )
+                data_behind['Comb. ' + label] = interp1d(
+                    combined_quantiles['ptide_grid'],
+                    plot_y,
+                    bounds_error=False,
+                    fill_value=-1
+                )(
+                    plot_ptide
+                )
+                data_behind['Comb. ' + label].description = (
+                    "The {0:.1f}% quantile of the combined log10(Q') constraint"
+                    " at the tidal period with smallest {1:.1f}% quantile."
+                ).format(100.0 * cdf,
+                         100.0 * max(config.convergence_quantiles))
 
         pyplot.xlabel('Tidal Period [days]')
         pyplot.ylabel(r"$\log_{10}Q_\star'$")
@@ -1346,6 +1378,59 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
                        bbox_inches='tight',
                        pad_inches=0)
         pyplot.clf()
+        if cluster == 'M35':
+            data_behind.remove_columns(['Comb. CDF-1(2.3%)',
+                                        'Comb. CDF-1(15.9%)'])
+        save_data_behind_figure(
+            data_behind,
+            'Comparison between the combined constraints and the individual '
+            'constraints for the {0} binaries'.format(cluster),
+            cluster + '_individual_vs_combined_constraints.mrt',
+            config
+        )
+        data_behind.rename_columns(
+            data_behind.colnames,
+            [
+                r'\multicolumn{{1}}{{c}}{{\textbf{{{0}}}}}'.format(
+                    colname.replace(
+                        'CDF-1(', ''
+                    ).replace(
+                        'Comb. ', ' '
+                    ).replace(
+                        ')', ''
+                    ).replace(
+                        '%', '\%'
+                    )
+                )
+                for colname in data_behind.colnames
+            ]
+        )
+        data_behind.write(
+            cluster + '_individual_vs_combined_constraints.tex',
+            format='latex',
+            latexdict=dict(
+                tabletype=None,
+                col_align=10*'c',
+                header_start=(
+                    r'&&\multicolumn{4}{c}{\textbf{Individual CDF$^{-1}$}} & '
+                    +
+                    r'\multicolumn{'
+                    +
+                    ('2' if cluster == 'M35' else '4')
+                    +
+                    r'}{c}{\textbf{Combined CDF$^{-1}$}}\\'
+                ),
+                header_end='\\hline\n\\hline'
+            ),
+            formats={
+                colname: (
+                    '%6s' if ('{PKM}' in colname or '{WOCS}' in colname)
+                    else '%5.2f'
+                )
+                for colname in data_behind.colnames
+            },
+            overwrite=True
+        )
 
 
 def main(config):
@@ -1357,8 +1442,18 @@ def main(config):
     plot_data = get_sampling_data(config)
     combined_quantiles = None
 #    plot_individual_constraints(plot_data, config)
-    combined_quantiles = plot_combined_constraints(plot_data, config)
-#    plot_tightest_constraints(plot_data, config, combined_quantiles)
+    #combined_quantiles = plot_combined_constraints(plot_data, config)
+    if (
+            combined_quantiles is None
+            and
+            path.exists(config.combined_quantiles_pickle)
+    ):
+        with open(config.combined_quantiles_pickle, 'rb') as quanntile_pickle:
+            combined_quantiles = pickle.load(quanntile_pickle)
+    elif combined_quantiles is not None:
+        with open(config.combined_quantiles_pickle, 'wb') as quanntile_pickle:
+            pickle.dump(combined_quantiles, quanntile_pickle)
+    plot_tightest_constraints(plot_data, config, combined_quantiles)
 
 
 if __name__ == '__main__':

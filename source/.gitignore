@@ -7,5 +7,6 @@
 *.avi
 *.mp4
 *.mrt
+*.tex
 eccentricity_envelope_frames
 test.py
