@@ -1252,6 +1252,69 @@ def plot_combined_constraints(plot_data, config):
     return selected_quantiles
 
 
+def create_tightest_constraint_latex(data_behind, config):
+    """Save individual tightest vs global constraints as latex table."""
+
+    latex_columns = []
+    for colname in data_behind.colnames:
+        latex_columns.append(
+            r'\multicolumn{{1}}{{c@{{{0}}}}}{{\textbf{{{1}}}}}'.format(
+                (
+                    r'\quad\quad\quad' if colname in ['PKM',
+                                                      'WOCS',
+                                                      'Ptide',
+                                                      'CDF-1(97.7%)']
+                    else ''
+                ),
+                colname.replace(
+                    'CDF-1(', ''
+                ).replace(
+                    'Comb. ', ' '
+                ).replace(
+                    ')', ''
+                ).replace(
+                    '%', r'\%'
+                )
+            )
+        )
+    data_behind.rename_columns(
+        data_behind.colnames,
+        latex_columns
+    )
+    data_behind.write(
+        cluster + '_individual_vs_combined_constraints.tex',
+        format='latex',
+        latexdict=dict(
+            tabletype=None,
+            col_align=(
+                r'c@{\quad\quad\quad}c@{\quad\quad\quad}'
+                +
+                r'cccc@{\quad\quad\quad}'
+                +
+                'c'*(2 if cluster == 'M35' else 4)
+            ),
+            header_start=(
+                r'&&\multicolumn{4}{c@{\quad\quad\quad}}{\textbf{Individual CDF$^{-1}$}} & '
+                +
+                r'\multicolumn{'
+                +
+                ('2' if cluster == 'M35' else '4')
+                +
+                r'}{c}{\textbf{Combined CDF$^{-1}$}}\\'
+            ),
+            header_end='\\hline\n\\hline'
+        ),
+        formats={
+            colname: (
+                '%6s' if ('{PKM}' in colname or '{WOCS}' in colname)
+                else '%5.2f'
+            )
+            for colname in data_behind.colnames
+        },
+        overwrite=True
+    )
+
+
 def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
     """Plot tightest constraints as error bars vs tidal period."""
 
@@ -1388,49 +1451,7 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
             cluster + '_individual_vs_combined_constraints.mrt',
             config
         )
-        data_behind.rename_columns(
-            data_behind.colnames,
-            [
-                r'\multicolumn{{1}}{{c}}{{\textbf{{{0}}}}}'.format(
-                    colname.replace(
-                        'CDF-1(', ''
-                    ).replace(
-                        'Comb. ', ' '
-                    ).replace(
-                        ')', ''
-                    ).replace(
-                        '%', '\%'
-                    )
-                )
-                for colname in data_behind.colnames
-            ]
-        )
-        data_behind.write(
-            cluster + '_individual_vs_combined_constraints.tex',
-            format='latex',
-            latexdict=dict(
-                tabletype=None,
-                col_align=10*'c',
-                header_start=(
-                    r'&&\multicolumn{4}{c}{\textbf{Individual CDF$^{-1}$}} & '
-                    +
-                    r'\multicolumn{'
-                    +
-                    ('2' if cluster == 'M35' else '4')
-                    +
-                    r'}{c}{\textbf{Combined CDF$^{-1}$}}\\'
-                ),
-                header_end='\\hline\n\\hline'
-            ),
-            formats={
-                colname: (
-                    '%6s' if ('{PKM}' in colname or '{WOCS}' in colname)
-                    else '%5.2f'
-                )
-                for colname in data_behind.colnames
-            },
-            overwrite=True
-        )
+        create_tightest_constraint_latex(data_behind, config)
 
 
 def main(config):
