@@ -4,6 +4,7 @@ import sys
 import corner
 import time
 import h5py
+from datetime import datetime
 
 from stellar_evolution.manager import StellarEvolutionManager
 
@@ -16,7 +17,7 @@ print(sys.path)
 import planetary_system_io
 import numpy as np
 import matplotlib.pyplot as plt
-from astropy import units as u
+from astropy import units as un
 from abc import ABCMeta, abstractmethod
 import emcee
 import sys
@@ -353,13 +354,13 @@ class System:
         self.age = age
 
     def printing(self):
-        print('Primary mass = ', self.primary_mass, '=', self.primary_mass.to(u.kg))
-        print('Secondary mass = ', self.secondary_mass, '=', self.secondary_mass.to(u.kg))
-        print('Secondary radius = ', self.secondary_radius, '=', self.secondary_radius.to(u.m))
-        print('Stellar metallicity = ', self.feh.to(u.dimensionless_unscaled))
-        print('Orbital period = ', self.orbital_period, '=', self.orbital_period.to(u.s))
-        print('Obliquity = ', self.obliquity.to(u.deg))
-        print('Age = ', self.age, '=', self.age.to(u.s))
+        print('Primary mass = ', self.primary_mass, '=', self.primary_mass.to(un.kg))
+        print('Secondary mass = ', self.secondary_mass, '=', self.secondary_mass.to(un.kg))
+        print('Secondary radius = ', self.secondary_radius, '=', self.secondary_radius.to(un.m))
+        print('Stellar metallicity = ', self.feh.to(un.dimensionless_unscaled))
+        print('Orbital period = ', self.orbital_period, '=', self.orbital_period.to(un.s))
+        print('Obliquity = ', self.obliquity.to(un.deg))
+        print('Age = ', self.age, '=', self.age.to(un.s))
 
 
 ############################################################
@@ -409,7 +410,7 @@ class EnvelopeEccentricityDistribution:
 
     def __init__(self,
                  path='/home/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv',
-                 file_name=b"/home/mmmahmud/poet/scripts/eccentricity_expansion_coef.txt",
+                 file_name=b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite",
                  maximum_number_of_data_points=math.inf,
                  threshold_value_of_envelope_eccentricity=0.001,
                  constraints=constraints_for_eccentricity_envelope(),
@@ -418,9 +419,13 @@ class EnvelopeEccentricityDistribution:
 
         self.path = path
         self.file_name = file_name
-        orbital_evolution_library.read_eccentricity_expansion_coefficients(
-            file_name
+        orbital_evolution_library.prepare_eccentricity_expansion(
+            file_name,
+            1e-4,
+            True,
+            True
         )
+
 
         ##############################################################################
         def read_nasa_planets(csv_filename,
@@ -867,31 +872,40 @@ class EnvelopeEccentricityDistribution:
                             records_of_x_attribute_and_eccentricity_now[-1][x_attribute],
                             50)
         ydata = []
+        xdata_ = []
         for i in range(0, len(xdata)):
             ydata = ydata + [envelope_eccentricity_function(10 ** xdata[i])]
+        for i in range(0, len(xdata)):
+            xdata_ = xdata_ + [10**(xdata[i] + 4.37023)]
+
         x_1 = []
         eccentricity_now_1 = []
         x_2 = []
         eccentricity_now_2 = []
         for i in range(0, len(records_of_x_attribute_and_eccentricity_now)):
             if primary_mass[i] < 1.2:
-                x_1 = x_1 + [x[i]]
+                x_1 = x_1 + [10**(x[i] + 4.37023)]
                 eccentricity_now_1 = eccentricity_now_1 + [eccentricity_now[i]]
 
             else:
-                x_2 = x_2 + [x[i]]
+                x_2 = x_2 + [10**(x[i]+4.37023)]
                 eccentricity_now_2 = eccentricity_now_2 + [eccentricity_now[i]]
         plt.plot(x_1, eccentricity_now_1, 'x')
         plt.plot(x_2, eccentricity_now_2, 'o')
-        plt.plot(xdata, ydata)
-        plt.plot(x_on_envelope, eccentricity_now_on_envelope, '.')
+        plt.plot(xdata_, ydata)
+        #plt.plot(x_on_envelope, eccentricity_now_on_envelope, '.')
         # naming the x axis
-        plt.xlabel(x_attribute)
+        if x_attribute == 'log of semi major axis over planetary radius':
+            x_attribute_ = 'Semi major axis over planetary radius'
+        else:
+            x_attribute_ = x_attribute
+        plt.xlabel(x_attribute_)
         # naming the y axis
         plt.ylabel('Present Eccentricity')
         # giving a title to my graph
-        string = 'Present Eccentricity vs. ' + x_attribute
-        plt.title(string)
+        #string = 'Present Eccentricity vs. ' + x_attribute_
+        #plt.title(string)
+        plt.xscale("log")
         plt.show()
         return
 
@@ -1050,11 +1064,11 @@ class PriorTransform:
                  means,
                  standard_deviations,
                  serialized_directory='/home/mmmahmud/poet/stellar_evolution_interpolators',
-                 eccentricity_expansion_fname=b"/home/mmmahmud/poet/scripts/eccentricity_expansion_coef.txt",
+                 eccentricity_expansion_fname=b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite",
                  max_argument_of_phase_lag_function_for_planet=6,
                  min_argument_of_phase_lag_function_for_planet=5,
-                 min_tidal_break_period=0.5,
-                 max_tidal_break_period=10,
+                 min_log_tidal_break_period=math.log(0.5,10),
+                 max_log_tidal_break_period=1,
                  min_power_law_argument=-5,
                  max_power_law_argument=5,
                  max_initial_stellar_spin=15,
@@ -1064,8 +1078,8 @@ class PriorTransform:
         self.standard_deviations = standard_deviations
         self.max_argument_of_phase_lag_function_for_planet = max_argument_of_phase_lag_function_for_planet
         self.min_argument_of_phase_lag_function_for_planet = min_argument_of_phase_lag_function_for_planet
-        self.min_tidal_break_period = min_tidal_break_period
-        self.max_tidal_break_period = max_tidal_break_period
+        self.min_log_tidal_break_period = min_log_tidal_break_period
+        self.max_log_tidal_break_period = max_log_tidal_break_period
         self.min_power_law_argument = min_power_law_argument
         self.max_power_law_argument = max_power_law_argument
         self.max_initial_stellar_spin = max_initial_stellar_spin
@@ -1130,8 +1144,8 @@ class PriorTransform:
                     self.max_initial_stellar_spin - self.min_initial_stellar_spin)
         argument_of_phase_lag_function_for_planet = self.min_argument_of_phase_lag_function_for_planet + u[6] * (
                     self.max_argument_of_phase_lag_function_for_planet - self.min_argument_of_phase_lag_function_for_planet)
-        tidal_break_period = self.min_tidal_break_period + u[7] * (
-                    self.max_tidal_break_period - self.min_tidal_break_period)
+        tidal_break_period = 10**(self.min_log_tidal_break_period + u[7] * (
+                    self.max_log_tidal_break_period - self.min_log_tidal_break_period))
         power_law_argument = self.min_power_law_argument + u[8] * (
                     self.max_power_law_argument - self.min_power_law_argument)
 
@@ -1158,7 +1172,8 @@ class LogLikelihood:
                  initial_eccentricity=0.5,
                  constraints=constraints(),
                  spin_frequency_breaks_for_planet=None,
-                 spin_frequency_powers_for_planet=np.array([0.0])
+                 spin_frequency_powers_for_planet=np.array([0.0]),
+                 Q0 = 5
                  ):
         self.prior_transform_instance = prior_transform_instance
         self.orbital_period = orbital_period
@@ -1171,6 +1186,7 @@ class LogLikelihood:
         self.e_env = e_env
         self.interpolator = prior_transform_instance.interpolator
         self.calculated_eccentricity_now = None
+        self.Q0 = Q0
 
     def priors(self,
                parameters_for_evolution):
@@ -1200,6 +1216,17 @@ class LogLikelihood:
         tidal_break_period = parameters_for_evolution['tidal break period']
         power_law_argument = parameters_for_evolution['power law argument']
 
+        print('The parameters for evolution are: ')
+        print('primary mass = ', primary_mass)
+        print('stellar age = ', stellar_age)
+        print('secondary radius = ', secondary_radius)
+        print('stellar metallicity = ', stellar_metallicity)
+        print('secondary mass = ', secondary_mass)
+        print('initial stellar spin = ', initial_stellar_spin)
+        print('argument of phase lag function for planet = ', argument_of_phase_lag_function_for_planet)
+        print('tidal break period = ', tidal_break_period)
+        print('power law argument = ', power_law_argument)
+
         priors = self.priors({'primary mass': primary_mass,
                               'secondary mass': secondary_mass,
                               'stellar metallicity': stellar_metallicity,
@@ -1208,27 +1235,38 @@ class LogLikelihood:
         if not priors:
             return -np.inf
 
-        star_exoplanet_binary_system = System(primary_mass=primary_mass * u.solMass,
-                                              secondary_mass=secondary_mass * u.earthMass,
-                                              secondary_radius=secondary_radius * u.earthRad,
-                                              feh=stellar_metallicity * u.dimensionless_unscaled,
-                                              orbital_period=self.orbital_period * u.d,
-                                              obliquity=self.obliquity * u.deg,
-                                              age=stellar_age * u.Gyr)
-
-        tidal_frequency_breaks_for_planet = np.array([2 * math.pi / 20, 2 * math.pi / tidal_break_period])
+        star_exoplanet_binary_system = System(primary_mass=primary_mass * un.solMass,
+                                              secondary_mass=secondary_mass * un.earthMass,
+                                              secondary_radius=secondary_radius * un.earthRad,
+                                              feh=stellar_metallicity * un.dimensionless_unscaled,
+                                              orbital_period=self.orbital_period * un.d,
+                                              obliquity=self.obliquity * un.deg,
+                                              age=stellar_age * un.Gyr)
+        break_frequency = 2 * math.pi / tidal_break_period
+        tidal_frequency_breaks_for_planet = None
         tidal_frequency_powers_for_planet = None
-        reference_argument_of_phase_lag_function_for_planet = None
+        reference_argument_of_phase_lag_function_for_planet = argument_of_phase_lag_function_for_planet
         if power_law_argument < 0:
-            tidal_frequency_powers_for_planet = np.array([1.0, 0.0, power_law_argument])
-            reference_argument_of_phase_lag_function_for_planet = argument_of_phase_lag_function_for_planet
-        if power_law_argument > 0:
-            reference_argument_of_phase_lag_function_for_planet = argument_of_phase_lag_function_for_planet + power_law_argument * (
-                        math.log(20.0, 10) - math.log(tidal_break_period, 10))
-            tidal_frequency_powers_for_planet = np.array([1.0, power_law_argument, 0.0])
-        if power_law_argument == 0:
-            reference_argument_of_phase_lag_function_for_planet = argument_of_phase_lag_function_for_planet
-            tidal_frequency_powers_for_planet = np.array([1.0, 0.0])
+            tidal_frequency_breaks_for_planet = np.array([break_frequency])
+            tidal_frequency_powers_for_planet = np.array([0.0, power_law_argument])
+
+            # tidal_frequency_breaks_for_planet = np.array([2 * math.pi / 20, break_frequency])
+            # tidal_frequency_powers_for_planet = np.array([1.0, 0.0, power_law_argument])
+
+        if power_law_argument > 0 or power_law_argument == 0:
+            tidal_frequency_breaks_for_planet = np.array([2 * math.pi / 20, break_frequency])
+            tidal_frequency_powers_for_planet = np.array([0.0, power_law_argument, 0.0])
+            reference_argument_of_phase_lag_function_for_planet += power_law_argument * (math.log(tidal_frequency_breaks_for_planet[0], 10) - math.log(tidal_frequency_breaks_for_planet[1], 10))
+
+            # tidal_frequency_powers_for_planet = np.array([1.0, power_law_argument, 0.0])
+            # reference_argument_of_phase_lag_function_for_planet = argument_of_phase_lag_function_for_planet + power_law_argument * (
+            # math.log(20.0, 10) - math.log(tidal_break_period, 10))
+
+
+
+        #if power_law_argument == 0:
+            #reference_argument_of_phase_lag_function_for_planet = argument_of_phase_lag_function_for_planet
+            #tidal_frequency_powers_for_planet = np.array([1.0, 0.0])
 
         dissipation = dict(
             primary=None,
@@ -1245,17 +1283,17 @@ class LogLikelihood:
             evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
                                                   interpolator=self.interpolator,
                                                   dissipation=dissipation,
-                                                  max_age=stellar_age * u.Gyr,
-                                                  initial_eccentricity=self.initial_eccentricity * u.dimensionless_unscaled,
+                                                  max_age=stellar_age * un.Gyr,
+                                                  initial_eccentricity=self.initial_eccentricity * un.dimensionless_unscaled,
                                                   initial_obliquity=0.0,
-                                                  disk_period=initial_stellar_spin * u.d,
-                                                  disk_dissipation_age=2e-2 * u.Gyr,
+                                                  disk_period=initial_stellar_spin * un.d,
+                                                  disk_dissipation_age=2e-2 * un.Gyr,
                                                   primary_wind_strength=0.17,
                                                   primary_wind_saturation=2.78,
-                                                  primary_core_envelope_coupling_timescale=0.05 * u.Gyr,
+                                                  primary_core_envelope_coupling_timescale=0.05 * un.Gyr,
                                                   secondary_wind_strength=0.0,
                                                   secondary_wind_saturation=100.0,
-                                                  secondary_core_envelope_coupling_timescale=0.05 * u.Gyr,
+                                                  secondary_core_envelope_coupling_timescale=0.05 * un.Gyr,
                                                   orbital_period_tolerance=1e-6,
                                                   solve=True,
                                                   secondary_is_star=False)
@@ -1283,43 +1321,120 @@ class LogLikelihood:
         return None
 
 
-    def draw_successful_walkers_aux(self,
+    def generate_successful_walkers_aux(self,
                                     u,
                                     number_of_discovered_walkers,
+                                    p0_file_is_being_updated,
                                     walkers,
                                     nwalkers,
-                                    ndim):
+                                    ndim,
+                                    p0_file_name
+                                    ):
+
+        system = 'WASP-89b_p0_'
+        pid = os.getpid()
+        date_time = datetime.now().strftime('%Y%m%d%H%M%S')
+
+        filename = 'logging/' + system + '_processor_' + str(pid)  + 'date_time_' + date_time + '.logging'
+        msg_file_name = 'logging/msg_'+str(pid)+ 'date_time_' + date_time + '_.txt'
+        msg_file = os.open(msg_file_name,
+                           os.O_WRONLY | os.O_TRUNC | os.O_CREAT | os.O_DSYNC,
+                           mode=0o666
+                           )
+
+        os.dup2(msg_file, 1)
+        os.dup2(msg_file, 2)
+
+        logging.basicConfig(
+            filename=filename,
+            level=logging.DEBUG,
+            format='%(levelname)s %(asctime)s %(name)s: %(message)s | %(pathname)s.%(funcName)s:%(lineno)d'
+        )
+
         log_likelihood, parameters_for_evolution = self(u)
+        print('u  = ', u)
+        print('log p = ', log_likelihood)
+
+        p0_file_exists = os.path.exists(p0_file_name)
+
         if not math.isinf(log_likelihood):
-            walkers.put(u)
-            number_of_discovered_walkers.value = number_of_discovered_walkers.value + 1
+            print('number of discovered walkers = ', number_of_discovered_walkers.value)
+            if p0_file_exists:
+                print(p0_file_name, ' file was previously created and now being updated.')
+                while True:
+                    print('I am here at 1')
+                    if  ((p0_file_is_being_updated.value == 0) and (number_of_discovered_walkers.value < nwalkers)):
+                        p0_file_is_being_updated.value = 1
+                        print('Green signal for updating = ', p0_file_is_being_updated.value)
+                        p0_file = open(p0_file_name, 'rb')
+                        p0 = np.load(p0_file)
+                        p0_file.close()
+                        p0_file = open(p0_file_name, 'wb')
+                        p0 = np.vstack((p0, u))
+                        np.save(p0_file, p0)
+                        p0_file.close()
+                        walkers.put(u)
+                        number_of_discovered_walkers.value = number_of_discovered_walkers.value + 1
+                        p0_file_is_being_updated.value = 0
+                        break
+                    if not (number_of_discovered_walkers.value < nwalkers):
+                        break
+            else:
+                print(p0_file_name, ' file did not previously exist. It will be created now and first walker will be loaded now.')
+                while True:
+                    print('I am here at 2')
+                    if ((p0_file_is_being_updated.value == 0) and (number_of_discovered_walkers.value < nwalkers)):
+                        p0_file_is_being_updated.value = 1
+                        print('Green signal for updating = ', p0_file_is_being_updated.value)
+                        p0_file = open(p0_file_name, 'wb')
+                        np.save(p0_file, u)
+                        p0_file.close()
+                        walkers.put(u)
+                        number_of_discovered_walkers.value = number_of_discovered_walkers.value + 1
+                        p0_file_is_being_updated.value = 0
+                        break
+                    if not (number_of_discovered_walkers.value < nwalkers):
+                        break
+
+
 
         if number_of_discovered_walkers.value < nwalkers:
             y = randint(1,10)
             for i in range(0, y):
                 u = numpy.random.rand(ndim)
-            self.draw_successful_walkers_aux(u,
+            self.generate_successful_walkers_aux(u,
                                              number_of_discovered_walkers,
+                                             p0_file_is_being_updated,
                                              walkers,
                                              nwalkers,
-                                             ndim)
+                                             ndim,
+                                             p0_file_name
+                                             )
 
 
 
-    def draw_successful_walkers(self, nwalkers=32, ndim=9, nprocessors = 8):
+    def generate_successful_walkers(self,
+                                p0_file_name,
+                                nwalkers=32,
+                                ndim=9,
+                                nprocessors = 6):
         array_of_processes = []
         number_of_discovered_walkers = Value('i', 0)
         walkers = Queue()
+        p0_file_is_being_updated = Value('i', 0)
 
         i = 0
         while i<nprocessors:
             u = numpy.random.rand(ndim)
-            process = Process(target=self.draw_successful_walkers_aux,
+            process = Process(target=self.generate_successful_walkers_aux,
                               args=(u,
                                     number_of_discovered_walkers,
+                                    p0_file_is_being_updated,
                                     walkers,
                                     nwalkers,
-                                    ndim))
+                                    ndim,
+                                    p0_file_name
+                                    ))
             array_of_processes.append(process)
             i = i+1
 
@@ -1336,117 +1451,80 @@ class LogLikelihood:
         return p0
 
 
-
-
     def MCMC(self,
-             nwalkers=19,
+             nwalkers=25,
              ndim=9,
              system = 'WASP_89_b',
-             reset = False):
-
-        p0 = [np.array([0.71308203, 0.90610494, 0.91440945, 0.1997531, 0.84079461,
-                        0.15036786, 0.31559824, 0.10179498, 0.79204953]),
-              np.array([0.92194612, 0.81642824, 0.66148696, 0.94454168, 0.07870542,
-                        0.90223607, 0.47919943, 0.86898269, 0.71352875]),
-              np.array([0.2827382, 0.84571375, 0.05273939, 0.42537987, 0.12282174,
-                        0.9992452, 0.8572412, 0.55780744, 0.55579581]),
-              np.array([0.71308203, 0.90610494, 0.91440945, 0.1997531, 0.84079461,
-                        0.15036786, 0.31559824, 0.10179498, 0.79204953]),
-              np.array([0.89669149, 0.58584233, 0.19602291, 0.42030086, 0.03320706,
-                        0.93092432, 0.36725414, 0.274658, 0.97774559]),
-              np.array([0.89669149, 0.58584233, 0.19602291, 0.42030086, 0.03320706,
-                        0.93092432, 0.36725414, 0.274658, 0.97774559]),
-              np.array([0.43600005, 0.41206972, 0.9218552, 0.66793065, 0.5236485,
-                        0.71808833, 0.74350964, 0.71076796, 0.62956057]),
-              np.array([0.80216069, 0.58696358, 0.51967322, 0.99502222, 0.7582028,
-                        0.56431787, 0.15536902, 0.88096377, 0.94368962]),
-              np.array([0.34439215, 0.90162532, 0.90649617, 0.5321296, 0.13670825,
-                        0.25393945, 0.71312293, 0.47807645, 0.86343277]),
-              np.array([0.55823613, 0.38699561, 0.11223542, 0.08508325, 0.92741295,
-                        0.04701482, 0.56428743, 0.70862706, 0.41752298]),
-              np.array([0.57314808, 0.36459298, 0.48746912, 0.0616988, 0.64825068,
-                        0.03841059, 0.64250931, 0.4467972, 0.31798161]),
-              np.array([0.71308203, 0.90610494, 0.91440945, 0.1997531, 0.84079461,
-                        0.15036786, 0.31559824, 0.10179498, 0.79204953]),
-              np.array([0.73695991, 0.20907602, 0.43522499, 0.76191137, 0.72178343,
-                        0.27626663, 0.64798984, 0.7979834, 0.93707632]),
-              np.array([0.89669149, 0.58584233, 0.19602291, 0.42030086, 0.03320706,
-                        0.93092432, 0.36725414, 0.274658, 0.97774559]),
-              np.array([0.70141684, 0.34970582, 0.18908514, 0.22895077, 0.52729556,
-                        0.11884659, 0.61851373, 0.59210252, 0.47447497]),
-              np.array([0.59892595, 0.49118966, 0.01259909, 0.22326391, 0.82614969,
-                        0.20496768, 0.19391448, 0.3163904, 0.06749424]),
-              np.array([0.75768132, 0.60176831, 0.6913386, 0.65852016, 0.81038335,
-                        0.28125441, 0.47341502, 0.9090404, 0.44020568]),
-              np.array([0.36363791, 0.18228264, 0.5559545, 0.59468997, 0.4889357,
-                        0.21367127, 0.93533487, 0.3309231, 0.67443948]),
-              np.array([0.37712106, 0.430148, 0.79995587, 0.60997802, 0.51637431,
-                        0.22429358, 0.43330749, 0.10886197, 0.50171915])]
+             reset_backend = True):
 
         config = ConfigObjectForLogging(system=system)
-        filename = '%(system)s_mcmc_progress.h5' % dict(system=system)
-        flag_file_name = '%(system)s_flag_file.txt' % dict(system=system) # This file stores the message on whether
-                                                                     # some samples are peviously drawn or not. If samples
-                                                                     # are previously drawn then the file stores 1.
-        print(flag_file_name)
+        mcmc_progress_file_name = '%(system)s_mcmc_progress.h5' % dict(system=system)
+        p0_file_name = '%(system)s_p0_file.npy' % dict(system=system)
 
-        flag_file_exists = os.path.exists(flag_file_name)
+        p0_file_exists = os.path.exists(p0_file_name)
+        backend_file_exists = os.path.exists(mcmc_progress_file_name)
 
-        #if (not flag_file_exists) or reset:
-            #p0 = self.draw_successful_walkers(nwalkers, ndim)
-        if flag_file_exists and (not reset):
-            flag_file = open(flag_file_name, "r")
-            flag = flag_file.readline()
-            if (not flag) or int(flag)!=1:
-                #p0 = self.draw_successful_walkers(nwalkers, ndim)
-                print("")
-            flag_file.close()
+
+        if (not p0_file_exists):
+            print('Initially the file ', p0_file_name, ' did not exist.')
+            print('The walkers are going to be generated for the first time.')
+            print('The file ', p0_file_name, ' will be created and the walkers will be stored there.')
+
+            p0 = self.generate_successful_walkers(p0_file_name,
+                                              nwalkers,
+                                              ndim)
+        else:
+            print('The file ', p0_file_name, ' existed previously.')
+            print('Previously worked out walkers will be loaded in the code for running MCMC.')
+            p0_file = open(p0_file_name, 'rb')
+            p0 = np.load(p0_file)
+            p0_file.close()
+            print('The already discovered walkers are: ', p0)
+            number_of_already_stored_walkers = p0.size/ndim
+            number_of_walkers_yet_to_be_found =(int) (nwalkers - number_of_already_stored_walkers)
+            if number_of_walkers_yet_to_be_found > 0:
+                print('New walkers are going to be discovered')
+                p0 = np.vstack((p0, self.generate_successful_walkers(p0_file_name,
+                                                                     number_of_walkers_yet_to_be_found,
+                                                                     ndim)))
+                print('All walkers are: ', p0)
+            if number_of_walkers_yet_to_be_found < 0:
+                p0 = p0[0:nwalkers]
 
         with Pool(config.num_parallel_processes,
                   initializer=setup_process,
                   initargs=[config],
                   maxtasksperchild=1) as pool:
-            backend = emcee.backends.HDFBackend(filename)
-            if reset:
+            backend = emcee.backends.HDFBackend(mcmc_progress_file_name)
+            if reset_backend:
                 backend.reset(nwalkers, ndim)
             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool=pool, backend=backend)
 
-            if flag_file_exists:
-                flag_file = open(flag_file_name, "r+")
-                flag = flag_file.readline()
-                if flag and int(flag)==1 and (not reset):
-                    print("I should run from here now.")
-                    sampler.run_mcmc(None, 2, progress=True)
-                else:
-                    sampler.run_mcmc(p0, 2, progress=True)
-                    flag_file.truncate(0)
-                    flag_file.seek(0)
-                    flag_file.writelines("1")
-                flag_file.close()
+            if backend_file_exists:
+                print('backend file exists.')
+                sampler.run_mcmc(None, 5, progress = True)
             else:
-                sampler.run_mcmc(p0, 2, progress=True)
-                flag_file = open(flag_file_name, "w")
-                flag_file.writelines("1")
-                flag_file.close()
+                sampler.run_mcmc(p0, 5, progress = True)
+
 
             blobs = sampler.get_blobs(flat=True)
-            figure = corner.corner(blobs, labels=['primary mass',
-                                                  'stellar age',
-                                                  'secondary radius',
-                                                  'stellar metallicity',
-                                                  'secondary mass',
-                                                  'initial stellar spin',
-                                                  'argument of phase lag function for planet',
+
+            figure = corner.corner(blobs, labels=['M*', #Mass of the parent star
+                                                  'age', #Age
+                                                  'Rp', #Planetary radius
+                                                  'Fe/H_*', #Stellar Metallicity
+                                                  'Mp', #Planetary mass
+                                                  'initSpin*', #Initial stellar spin
+                                                  'Qpl', #Log of the tidal quality factor for planet, i.e. argument of phase lag function
                                                   'tidal break point',
-                                                  'power law argument',
-                                                  'present eccentricity',
-                                                  'log likelihood of present eccentricity'],
+                                                  'alpha',
+                                                  'e_now', #Present eccentricity
+                                                  'log(f(e_now))'], #log likelihood of present eccentricity
                                    quantiles=[0.16, 0.5, 0.84],
                                    show_titles=True, title_kwargs={"fontsize": 12})
             plt.show()
             figfilename = "%(system)s_MCMC.pdf" % dict(system=system)
             figure.savefig(figfilename, bbox_inches='tight')
-
         return
 
     def __call__(self, u):
@@ -1570,7 +1648,6 @@ class SamplingPropertiesOfSystem:
                                                          spin_frequency_powers_for_planet
                                                          )
 
-            # self.testing_log_prob(9)
 
             self.log_likelihood_instance.MCMC()
 
@@ -1659,6 +1736,89 @@ class SamplingPropertiesOfSystem:
 
 
 if __name__ == '__main__':
+    system = 'WASP_89_b'
+    p0_file_name = '%(system)s_p0_file_for_testinga.npy' % dict(system=system)
+
+    exists = os.path.exists(p0_file_name)
+    if exists:
+        print('exists')
+    else:
+        print('does not exist.')
+
+    reset = False
+
+    if exists:
+        p0_file = open(p0_file_name, 'rb')
+        u = np.load(p0_file)
+        print('u', u)
+        p0_file.close()
+
+
+
+    p0_file = open(p0_file_name, 'wb')
+    if exists:
+        u = np.vstack((u, np.random.rand(3)))
+    else:
+        u = np.random.rand(3)
+    print('u ', u)
+    np.save(p0_file, u)
+    p0_file.close()
+
+    p0_file = open(p0_file_name, 'rb')
+    u = np.load(p0_file)
+    print('u', u)
+    p0_file.close()
+
+    p0_file = open(p0_file_name, 'wb')
+    u = np.vstack((u, np.random.rand(3)))
+    print('u ', u)
+    np.save(p0_file, u)
+    p0_file.close()
+
+    p0_file = open(p0_file_name, 'rb')
+    u = np.load(p0_file)
+    print('u', u)
+    p0_file.close()
+
+    p0_file = open(p0_file_name, 'wb')
+    u = np.vstack((u, np.random.rand(3)))
+    print('u ', u)
+    np.save(p0_file, u)
+    p0_file.close()
+
+    p0_file = open(p0_file_name, 'rb')
+    u = np.load(p0_file)
+    print('u', u)
+    p0_file.close()
+
+    p0_file = open(p0_file_name, 'wb')
+    u = np.vstack((u, np.random.rand(3)))
+    print('u ', u)
+    np.save(p0_file, u)
+    p0_file.close()
+
+    p0_file = open(p0_file_name, 'rb')
+    u = np.load(p0_file)
+    print('u', u)
+    p0_file.close()
+
+    exists = os.path.exists(p0_file_name)
+    if exists:
+        print('now it exists')
+    else:
+        print('still does not exist.')
+
+
+
+    system = 'WASP-89b_p0_'
+    filename = 'logging/' + system + 'start.logging'
+
+    logging.basicConfig(
+        filename=filename,
+        level=logging.DEBUG
+
+    )
+
     # analysis_on_Nasa_exoplanet_data()
     print('**********************************************************')
     test1 = EccentricityDistribution(mean_e_now=0.39,
