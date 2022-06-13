@@ -31,6 +31,7 @@ import update_search_paths
 import ngc188_util
 import ngc6819_util
 import m35_util
+import hyadespraesepe_util
 #pylint: enable=unused-import
 from cluster_util import get_rv_likelihood
 #pylint: enable=import-error
@@ -180,7 +181,7 @@ def prepare_sampling(config):
 
     pickle_substitutions = dict(system=config.system,
                                 sampling=config.sampling)
-    for cluster in ['NGC188', 'NGC6819', 'M35']:
+    for cluster in ['NGC188', 'NGC6819', 'M35','HyadesPraesepe']:
         if config.system.startswith(cluster + '_'):
             binary_id = int(config.system[len(cluster) + 1:])
             custom_util = globals()[cluster.lower() + '_util']
