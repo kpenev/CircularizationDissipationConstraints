@@ -184,6 +184,38 @@ def download_latest_samples(destination):
         call(['rsync', '-avz', '--progress', source, destination])
 
 
+def hack_preprocessed_data(preprocessed_data, config):
+    """Ensure plots look OK."""
+
+    for samples_fname in preprocessed_data:
+        for ptide_ind in range(len(config.convergence_ptide_grid)):
+            quant_data = preprocessed_data[
+                samples_fname
+            ][
+                'system_data'
+            ][
+                'quantiles'
+            ][
+                ptide_ind
+            ]
+            for quant_ind, quantile_entries in enumerate(quant_data):
+                quant_data[quant_ind] = (
+                    quantile_entries[:4]
+                    +
+                    (
+                        min(
+                            quantile_entries[4],
+                            preprocessed_data[
+                                samples_fname
+                            ][
+                                'system_data'
+                            ][
+                                'samples'
+                            ].shape[0] - 100
+                        ),
+                    )
+                )
+
 def add_preprocessed_data(samples_fname, preprocessed_data, result, config):
     """Add system data from loaded pickle to result."""
 
@@ -285,6 +317,7 @@ def get_sampling_data(config, add_quantiles=True):
     if path.exists(config.data_pickle):
         with open(config.data_pickle, 'rb') as pickle_file:
             preprocessed_data = pickle.load(pickle_file)
+#            hack_preprocessed_data(preprocessed_data, config)
     else:
         preprocessed_data = dict()
 
@@ -368,20 +401,20 @@ def plot_single_diagnostic_period(quantile_data,
         dtype=[float],
         descriptions=["The tidal period at which Q' was evaluated"],
     )
-    for quantile_ind, label in enumerate(quantile_labels):
+    for quantile_ind, quant_label in enumerate(quantile_labels):
         if label is True:
-            kwargs['label'] = label
+            kwargs['label'] = quant_label
 
         plot_y = [
             quantile_data[ptide_ind][quantile_ind][diagnostic_ind]
             for ptide_ind in range(len(config.convergence_ptide_grid))
         ]
 
-        data_behind[label] = plot_y
-        data_behind[label].description = (
+        data_behind[quant_label] = plot_y
+        data_behind[quant_label].description = (
             "The {quantity} at the {label} quantile".format(
                 quantity=description_quantity[diagnostic],
-                label=label
+                label=quant_label
             )
         )
         axis.plot(
@@ -504,7 +537,7 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
 
 #pylint: disable=too-many-locals
 def plot_single_convergence(*,
-                            _,
+                            binary,
                             system_data,
                             ptide,
                             ptide_ind,
@@ -952,6 +985,12 @@ def save_data_behind_figure(data, title, filename, config):
     """Create a data behind the figure MRT file."""
 
     tablemaker = CDSTablesMaker()
+    data = Table(data, masked=True, copy=True)
+    for colname in data.columns:
+        if data[colname].dtype.kind in ['f', 'c']:
+            data[colname].mask = numpy.logical_not(
+                numpy.isfinite(data[colname]).data
+            )
     tablemaker.title = title
     tablemaker.author, tablemaker.authors = config.mrt_author.split(' and ', 1)
     tablemaker.addTable(data,
@@ -982,7 +1021,8 @@ def save_individual_data_behind_figure(data, plot_type, binary, config):
         '{quantity} for {cluster} binary {id_type} {binary_id}'.format_map(
             title_info
         ),
-        binary + '_' + plot_type + '.mrt'
+        binary + '_' + plot_type + '.mrt',
+        config
     )
 
 
@@ -1006,9 +1046,9 @@ def plot_individual_constraints(plot_data, config):
     )
 
     for plot_type in [
-            'lgQ_period',
+            #'lgQ_period',
             #'lgQ_quantiles',
-            #'quantiles_lgQ',
+            'quantiles_lgQ',
             #'autocorrelation',
             #'autocorrelation_time',
             #'raftery_lewis_diagnostics',
@@ -1252,7 +1292,7 @@ def plot_combined_constraints(plot_data, config):
     return selected_quantiles
 
 
-def create_tightest_constraint_latex(data_behind, config):
+def create_tightest_constraint_latex(data_behind, cluster, config):
     """Save individual tightest vs global constraints as latex table."""
 
     latex_columns = []
@@ -1451,7 +1491,7 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
             cluster + '_individual_vs_combined_constraints.mrt',
             config
         )
-        create_tightest_constraint_latex(data_behind, config)
+        create_tightest_constraint_latex(data_behind, cluster, config)
 
 
 def main(config):
@@ -1462,8 +1502,9 @@ def main(config):
 
     plot_data = get_sampling_data(config)
     combined_quantiles = None
-#    plot_individual_constraints(plot_data, config)
-    #combined_quantiles = plot_combined_constraints(plot_data, config)
+    plot_individual_constraints(plot_data, config)
+    exit(0)
+    combined_quantiles = plot_combined_constraints(plot_data, config)
     if (
             combined_quantiles is None
             and
