@@ -15,6 +15,7 @@ from planetary_system_io import read_cds_pipe_table
 #import hyades_binaries
 from command_line_utilities import data_dir
 from bayesian import m35_util
+from bayesian import hyadespraesepe_util
 from bayesian.basic_util import default_logging_format
 #pylint: enable=import-error
 
@@ -254,11 +255,10 @@ def get_binary_ids():
         )['WOCS']
     ))
 
-    binaries['Praesepe/Hyades'] = numpy.array(
-        [system['ID'] for system in praesepe_binaries.read_systems()]
-        +
-        [system['ID'] for system in hyades_binaries.systems]
-    )
+    binaries['HyadesPraesepe'] = numpy.concatenate([
+        systems['ID'].to_numpy()
+        for systems in hyadespraesepe_util.get_binary_data()
+    ])
 
     binaries['M35'] = numpy.concatenate([
         systems['WOCS'].to_numpy()
