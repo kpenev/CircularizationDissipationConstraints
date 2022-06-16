@@ -296,7 +296,7 @@ class HDFBackend(Backend):
             try:
                 self._check(state, accepted)
                 retry_check = 0
-            except BlockingIOError:
+            except (BlockingIOError, OSError):
                 retry_check -= 1
                 if retry_check > 0:
                     logging.getLogger(__name__).error(
