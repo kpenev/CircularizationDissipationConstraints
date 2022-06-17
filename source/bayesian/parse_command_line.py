@@ -256,7 +256,10 @@ def get_binary_ids():
     ))
 
     binaries['HyadesPraesepe'] = numpy.concatenate([
-        systems['ID'].to_numpy()
+        [
+            int(id)
+            for id in systems['ID'].to_numpy()
+        ]
         for systems in hyadespraesepe_util.get_binary_data()
     ])
 

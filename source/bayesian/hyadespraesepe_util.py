@@ -63,7 +63,7 @@ def get_photometry_distributions(photometry):
             scale=0.1
         ),
         B=stats.norm(
-            loc=float(photometry['B-V'] - photometry['Vmag']),
+            loc=float(photometry['B-V'] + photometry['Vmag']),
             scale=0.1
         )
     )
