@@ -1736,6 +1736,7 @@ class SamplingPropertiesOfSystem:
 
 
 if __name__ == '__main__':
+
     system = 'WASP_89_b'
     p0_file_name = '%(system)s_p0_file_for_testinga.npy' % dict(system=system)
 
