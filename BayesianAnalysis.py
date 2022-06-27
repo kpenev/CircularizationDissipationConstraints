@@ -362,55 +362,10 @@ class System:
         print('Obliquity = ', self.obliquity.to(un.deg))
         print('Age = ', self.age, '=', self.age.to(un.s))
 
-
-############################################################
-class Structure:
-    """An empty class used only to hold user defined attributes."""
-
-    def __init__(self, **initial_attributes):
-        """Create a class with (optionally) initial attributes."""
-
-        for attribute_name, attribute_value in initial_attributes.items():
-            setattr(self, attribute_name, attribute_value)
-
-    def format(self, prefix=''):
-        """Generate a tree-like representation of self."""
-
-        result = ''
-        for attr_name in dir(self):
-            if attr_name[0] != '_':
-                attribute = getattr(self, attr_name)
-                if isinstance(attribute, Structure):
-                    result += (prefix
-                               +
-                               '|-'
-                               +
-                               attr_name
-                               +
-                               '\n'
-                               +
-                               attribute.format(prefix + '| '))
-                else:
-                    result += (prefix
-                               +
-                               '|-'
-                               +
-                               attr_name
-                               +
-                               ': '
-                               +
-                               str(attribute)
-                               +
-                               '\n')
-        return result
-
-
-########################################################
 class EnvelopeEccentricityDistribution:
 
     def __init__(self,
                  path='/home/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv',
-                 file_name=b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite",
                  maximum_number_of_data_points=math.inf,
                  threshold_value_of_envelope_eccentricity=0.001,
                  constraints=constraints_for_eccentricity_envelope(),
@@ -418,16 +373,169 @@ class EnvelopeEccentricityDistribution:
                  ):
 
         self.path = path
-        self.file_name = file_name
-        orbital_evolution_library.prepare_eccentricity_expansion(
-            file_name,
-            1e-4,
-            True,
-            True
-        )
-
 
         ##############################################################################
+        class Structure:
+            """An empty class used only to hold user defined attributes."""
+
+            def __init__(self, **initial_attributes):
+                """Create a class with (optionally) initial attributes."""
+
+                for attribute_name, attribute_value in initial_attributes.items():
+                    setattr(self, attribute_name, attribute_value)
+
+            def format(self, prefix=''):
+                """Generate a tree-like representation of self."""
+
+                result = ''
+                for attr_name in dir(self):
+                    if attr_name[0] != '_':
+                        attribute = getattr(self, attr_name)
+                        if isinstance(attribute, Structure):
+                            result += (prefix
+                                       +
+                                       '|-'
+                                       +
+                                       attr_name
+                                       +
+                                       '\n'
+                                       +
+                                       attribute.format(prefix + '| '))
+                        else:
+                            result += (prefix
+                                       +
+                                       '|-'
+                                       +
+                                       attr_name
+                                       +
+                                       ': '
+                                       +
+                                       str(attribute)
+                                       +
+                                       '\n')
+                return result
+        def convert_nasa_unit_to_astropy(unit_str):
+            """Return the astropy unit matching the one specified in input file."""
+
+            print('Unit str: ' + repr(unit_str))
+            if unit_str in ['days', 'hrs']:
+                unit_str = unit_str[:-1]
+            elif unit_str == 'decimal degrees':
+                unit_str = 'degree'
+            elif (
+                    unit_str in ['dex', 'Earth flux', 'sexagesimal']
+                    or
+                    unit_str.startswith('log10(')
+                    or
+                    unit_str.startswith('log(')
+            ):
+                return None
+            elif unit_str == 'Solar mass':
+                unit_str = 'solMass'
+            elif unit_str == 'Solar radii':
+                unit_str = 'solRad'
+            elif unit_str.endswith(' mass'):
+                unit_str = unit_str.split()[0].lower() + 'Mass'
+            elif unit_str.endswith(' radii'):
+                unit_str = unit_str.split()[0].lower() + 'Rad'
+            elif unit_str.startswith('percent'):
+                return 0.01
+
+            print('Converted to: ' + repr(unit_str))
+
+            return Unit(unit_str)
+
+        def read_ages(nasa_planets,
+                      age_file_standard='inputs/versioned/getages.txt',
+                      age_file_manual_density='inputs/versioned/getages_nodensity.txt',
+                      manual_densities='inputs/versioned/age_variables_nodensity.txt'):
+            """
+            Complete the NASA exoplanet archive planets with age information.
+
+            Args:
+                - nasa_planets: The planets read from a CSV file downloaded from the
+                                NASA exoplanet archive. On output, this gets updated
+                                with the information from the various input files.
+                - age_file_standard: The name of the file containing the derived
+                                     ages.
+                - age_file_manual_density: The name of the file with ages derived
+                                           from manually extracted densities.
+                - manual_densities: The name of the file containing the manually
+                                    extracted densities themselves.
+
+            Returns: None
+            """
+
+            def read_file(filename, columns):
+                """
+                Read one of the input files and update nasa_planets.
+
+                Args:
+                    - filename: The name of the file to read.
+                    - columns: a dictionary of the quantities to read from the file
+                               (keys) and the columns that contain them. The quantity
+                               pl_hostname must be among the columns.
+
+                Returns: None
+                """
+
+                hostname_list = list(nasa_planets.pl_hostname)
+                num_systems = len(hostname_list)
+                for quantity, column in columns.items():
+                    if not hasattr(nasa_planets, quantity):
+                        setattr(nasa_planets,
+                                quantity,
+                                numpy.full((num_systems,), numpy.nan))
+                with open(filename, 'r') as input_file:
+                    for line in input_file:
+                        entries = line.split()
+                        host = entries[columns['pl_hostname']]
+                        system_index = 0
+                        while (
+                                system_index < len(hostname_list)
+                                and
+                                (
+                                        not hostname_list[system_index].startswith(host)
+                                        or
+                                        (
+                                                len(hostname_list[system_index]) > len(host)
+                                                and
+                                                hostname_list[system_index][len(host)] != ' '
+                                        )
+                                )
+                        ):
+                            system_index += 1
+                        if system_index == len(hostname_list):
+                            continue
+                        for quantity, column in columns.items():
+                            if quantity != 'pl_hostname':
+                                try:
+                                    entry_val = int(entries[column])
+                                except ValueError:
+                                    entry_val = float(entries[column])
+                                getattr(nasa_planets, quantity)[system_index] = (
+                                    entry_val
+                                )
+
+            age_file_columns = dict(pl_hostname=0,
+                                    st_mass=2,
+                                    st_masserr1=3,
+                                    st_rad=6,
+                                    st_raderr1=7,
+                                    st_age=10,
+                                    st_ageerr1=11,
+                                    st_lum=14,
+                                    st_lumerr1=15)
+
+            density_file_columns = dict(pl_hostname=0,
+                                        st_dens=10,
+                                        st_denserr1=11,
+                                        st_denserr2=12)
+
+            read_file(age_file_standard, age_file_columns)
+            read_file(age_file_manual_density, age_file_columns)
+            read_file(manual_densities, density_file_columns)
+
         def read_nasa_planets(csv_filename,
                               eliminate=('SWEEPS-11',
                                          'HD 41004 B',
@@ -494,6 +602,9 @@ class EnvelopeEccentricityDistribution:
                             else:
                                 unit = 1
                             target_column[fill_index] = (value * unit)
+
+
+
 
             with open(csv_filename, 'r') as csv_file:
                 while csv_file.readline()[0] == '#':
@@ -606,7 +717,7 @@ class EnvelopeEccentricityDistribution:
                                        need_ages=False, )
         ###########################################################################################
 
-        # readPlanet = planetary_system_io.read_nasa_planets(self.path, eliminate=('SWEEPS-11','HD 41004 B','PSR J1719-1438','K2-22'), need_ages=False,)
+        #readPlanet = planetary_system_io.read_nasa_planets(self.path, eliminate=('SWEEPS-11','HD 41004 B','PSR J1719-1438','K2-22'), need_ages=False,)
 
         self.planet_name = readPlanet.pl_name
         self.orbital_period = readPlanet.pl_orbper  # days
@@ -1051,7 +1162,7 @@ class Element:
         self.max_discarded_feh_probability = 1e-08
         self.mean_density = mean_density
         self.lum = lum
-        self.num_parallel_processes = 4
+        self.num_parallel_processes = 1
         self.star_sampler_pickle_fname = 'star_sampler.pkl'
         self.stellar_evolution_interpolator_dir = '/home/mmmahmud/poet/stellar_evolution_interpolators'
         self.time_ode_atol = 1e-08
@@ -1063,9 +1174,7 @@ class PriorTransform:
     def __init__(self,
                  means,
                  standard_deviations,
-                 serialized_directory='/home/mmmahmud/poet/stellar_evolution_interpolators',
-                 eccentricity_expansion_fname=b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite",
-                 max_argument_of_phase_lag_function_for_planet=6,
+                 max_argument_of_phase_lag_function_for_planet=12,
                  min_argument_of_phase_lag_function_for_planet=5,
                  min_log_tidal_break_period=math.log(0.5,10),
                  max_log_tidal_break_period=1,
@@ -1085,12 +1194,7 @@ class PriorTransform:
         self.max_initial_stellar_spin = max_initial_stellar_spin
         self.min_initial_stellar_spin = min_initial_stellar_spin
 
-        logging.basicConfig(level=logging.DEBUG)
-
-        # mp.set_start_method('forkserver')
-        manager = StellarEvolutionManager(serialized_directory)
-        self.interpolator = manager.get_interpolator_by_name('default')
-        FeHConditionalLikelihoodBase.set_interpolator(self.interpolator)
+        #logging.basicConfig(level=logging.DEBUG)
 
         debug_plot = [('interpolation_performance', 'interp_performance.pdf')]
         teff = split_normal.freeze_error_bar(
@@ -1127,7 +1231,7 @@ class PriorTransform:
     def __call__(self, u):
         unit_cube = numpy.array([u[0], u[1], u[2]])
         stellar_metallicity, primary_mass, stellar_age = self.star_sampler.__call__(unit_cube)
-        primary_rad = self.interpolator('RADIUS', primary_mass, stellar_metallicity)
+        primary_rad = FeHConditionalLikelihoodBase.interpolator('RADIUS', primary_mass, stellar_metallicity)
         primary_radius = primary_rad(stellar_age)
         ratio_of_planet_to_stellar_radius = norm.ppf(u[3], loc=self.means['ratio of planet to stellar radius'], scale=(
                                                                                                                                   self.standard_deviations[
@@ -1169,7 +1273,8 @@ class LogLikelihood:
                  obliquity,
                  probability_density_of_eccentricity,
                  e_env,
-                 initial_eccentricity=0.5,
+                 system_name = 'Star-Exoplanet',
+                 initial_eccentricity=0.8,
                  constraints=constraints(),
                  spin_frequency_breaks_for_planet=None,
                  spin_frequency_powers_for_planet=np.array([0.0]),
@@ -1184,7 +1289,7 @@ class LogLikelihood:
         self.spin_frequency_breaks_for_planet = spin_frequency_breaks_for_planet
         self.spin_frequency_powers_for_planet = spin_frequency_powers_for_planet
         self.e_env = e_env
-        self.interpolator = prior_transform_instance.interpolator
+        self.system_name = system_name
         self.calculated_eccentricity_now = None
         self.Q0 = Q0
 
@@ -1281,7 +1386,7 @@ class LogLikelihood:
         yes = True
         if yes:
             evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
-                                                  interpolator=self.interpolator,
+                                                  interpolator=FeHConditionalLikelihoodBase.interpolator,
                                                   dissipation=dissipation,
                                                   max_age=stellar_age * un.Gyr,
                                                   initial_eccentricity=self.initial_eccentricity * un.dimensionless_unscaled,
@@ -1328,10 +1433,11 @@ class LogLikelihood:
                                     walkers,
                                     nwalkers,
                                     ndim,
-                                    p0_file_name
+                                    p0_file_name,
+                                    minprob = 0.0001
                                     ):
 
-        system = 'WASP-89b_p0_'
+        system = self.system_name + '_p0_'
         pid = os.getpid()
         date_time = datetime.now().strftime('%Y%m%d%H%M%S')
 
@@ -1357,7 +1463,7 @@ class LogLikelihood:
 
         p0_file_exists = os.path.exists(p0_file_name)
 
-        if not math.isinf(log_likelihood):
+        if (not math.isinf(log_likelihood)) and (log_likelihood > np.log(minprob)):
             print('number of discovered walkers = ', number_of_discovered_walkers.value)
             if p0_file_exists:
                 print(p0_file_name, ' file was previously created and now being updated.')
@@ -1562,19 +1668,34 @@ class ConfigObjectForLogging:
         self.logging_level = logging.WARNING
 
 
+class InitializationOfSamplingPropertiesOfSystem:
+    def __init__(self,
+                 serialized_directory = '/home/mmmahmud/poet/stellar_evolution_interpolators',
+                 eccentricity_expansion_fname=b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite"):
+
+        # mp.set_start_method('forkserver')
+        manager = StellarEvolutionManager(serialized_directory)
+        interpolator = manager.get_interpolator_by_name('default')
+        FeHConditionalLikelihoodBase.set_interpolator(interpolator)
+        orbital_evolution_library.prepare_eccentricity_expansion(
+            eccentricity_expansion_fname,
+            1e-4,
+            True,
+            True
+        )
+
+
 class SamplingPropertiesOfSystem:
     def __init__(self,
                  means,
                  standard_deviations,
-                 planet_name='Exo Planet',
-                 serialized_directory='/home/mmmahmud/poet/stellar_evolution_interpolators',
-                 eccentricity_expansion_fname=b"/home/mmmahmud/poet/scripts/eccentricity_expansion_coef.txt",
+                 system_name = 'Star-Exoplanet',
                  envelope_eccentricity_function=None,
-                 initial_eccentricity=0.5,
+                 initial_eccentricity=0.,
                  initial_stellar_spin=5,
-                 max_argument_of_phase_lag_function_for_planet=6,
+                 max_argument_of_phase_lag_function_for_planet=12,
                  min_argument_of_phase_lag_function_for_planet=5,
-                 min_tidal_break_period=0.5,
+                 min_tidal_break_period=0.8,
                  max_tidal_break_period=10,
                  min_power_law_argument=-5,
                  max_power_law_argument=5,
@@ -1584,6 +1705,13 @@ class SamplingPropertiesOfSystem:
                  spin_frequency_breaks_for_planet=None,
                  spin_frequency_powers_for_planet=np.array([0.0]),
                  find_argument_of_phase_lag_function_for_planet_range_auto=False):
+
+        logging_filename = 'logging/' + system_name + '_start.logging'
+
+        logging.basicConfig(
+            filename=logging_filename,
+            level=logging.DEBUG
+        )
 
         self.initial_eccentricity = initial_eccentricity
         self.initial_stellar_spin = initial_stellar_spin
@@ -1615,8 +1743,6 @@ class SamplingPropertiesOfSystem:
             self.standard_deviations = standard_deviations
             self.prior_transform_instance = PriorTransform(means,
                                                            standard_deviations,
-                                                           serialized_directory,
-                                                           eccentricity_expansion_fname,
                                                            max_argument_of_phase_lag_function_for_planet,
                                                            min_argument_of_phase_lag_function_for_planet,
                                                            min_tidal_break_period,
@@ -1642,6 +1768,7 @@ class SamplingPropertiesOfSystem:
                                                          0,  # obliquity
                                                          self.probability_density_of_eccentricity,
                                                          self.e_env,
+                                                         system_name,
                                                          initial_eccentricity,
                                                          constraints,
                                                          spin_frequency_powers_for_planet,
@@ -1810,16 +1937,6 @@ if __name__ == '__main__':
         print('still does not exist.')
 
 
-
-    system = 'WASP-89b_p0_'
-    filename = 'logging/' + system + 'start.logging'
-
-    logging.basicConfig(
-        filename=filename,
-        level=logging.DEBUG
-
-    )
-
     # analysis_on_Nasa_exoplanet_data()
     print('**********************************************************')
     test1 = EccentricityDistribution(mean_e_now=0.39,
@@ -1831,15 +1948,22 @@ if __name__ == '__main__':
     test2 = EnvelopeEccentricityDistribution()
     print('Binary systems whose probability density of eccentricity can be figured out:')
     index = test2.print_properties_of_binary_systems_satisfying_constraints()
-    means, standard_deviations, planet_name = test2.properties_of_ith_binary_system_if_satisfies_constraints(index[15])
+    means, standard_deviations, system_name = test2.properties_of_ith_binary_system_if_satisfies_constraints(index[15])
     means['ratio of planet to stellar radius'] = 0.0149
     standard_deviations['ratio_of_planet_to_stellar_radius_upper_uncertainty'] = 0.0002
     standard_deviations['ratio_of_planet_to_stellar_radius_lower_uncertainty'] = -0.0002
     print('Print properties of the chosen binary system: means = ', means, ' standard deviations = ',
-          standard_deviations, ' planet name = ', planet_name)
+          standard_deviations, ' Star-Exoplanet system name = ', system_name)
     print('*********************************************************')
+    InitializationOfSamplingPropertiesOfSystem()
+
+    if FeHConditionalLikelihoodBase.interpolator == None:
+        print('None')
+    else:
+        print('good')
+
     test3 = SamplingPropertiesOfSystem(means,
                                        standard_deviations,
-                                       planet_name=planet_name,
+                                       system_name=system_name,
                                        envelope_eccentricity_function=test2.envelope_eccentricity_function
                                        )
