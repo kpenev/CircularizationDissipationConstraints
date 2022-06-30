@@ -1162,7 +1162,7 @@ class Element:
         self.max_discarded_feh_probability = 1e-08
         self.mean_density = mean_density
         self.lum = lum
-        self.num_parallel_processes = 1
+        self.num_parallel_processes = 4
         self.star_sampler_pickle_fname = 'star_sampler.pkl'
         self.stellar_evolution_interpolator_dir = '/home/mmmahmud/poet/stellar_evolution_interpolators'
         self.time_ode_atol = 1e-08
@@ -1174,7 +1174,7 @@ class PriorTransform:
     def __init__(self,
                  means,
                  standard_deviations,
-                 max_argument_of_phase_lag_function_for_planet=12,
+                 max_argument_of_phase_lag_function_for_planet=6,
                  min_argument_of_phase_lag_function_for_planet=5,
                  min_log_tidal_break_period=math.log(0.5,10),
                  max_log_tidal_break_period=1,
@@ -1274,7 +1274,7 @@ class LogLikelihood:
                  probability_density_of_eccentricity,
                  e_env,
                  system_name = 'Star-Exoplanet',
-                 initial_eccentricity=0.8,
+                 initial_eccentricity=0.5,
                  constraints=constraints(),
                  spin_frequency_breaks_for_planet=None,
                  spin_frequency_powers_for_planet=np.array([0.0]),
@@ -1463,7 +1463,7 @@ class LogLikelihood:
 
         p0_file_exists = os.path.exists(p0_file_name)
 
-        if (not math.isinf(log_likelihood)) and (log_likelihood > np.log(minprob)):
+        if (not math.isinf(log_likelihood)): # and (log_likelihood > np.log(minprob)):
             print('number of discovered walkers = ', number_of_discovered_walkers.value)
             if p0_file_exists:
                 print(p0_file_name, ' file was previously created and now being updated.')
@@ -1674,15 +1674,19 @@ class InitializationOfSamplingPropertiesOfSystem:
                  eccentricity_expansion_fname=b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite"):
 
         # mp.set_start_method('forkserver')
+        print('creating interpolator ')
         manager = StellarEvolutionManager(serialized_directory)
         interpolator = manager.get_interpolator_by_name('default')
         FeHConditionalLikelihoodBase.set_interpolator(interpolator)
+        print('interpolator is created')
+        print('coefficients ')
         orbital_evolution_library.prepare_eccentricity_expansion(
             eccentricity_expansion_fname,
             1e-4,
             True,
             True
         )
+        print('coefficients are created')
 
 
 class SamplingPropertiesOfSystem:
@@ -1691,9 +1695,9 @@ class SamplingPropertiesOfSystem:
                  standard_deviations,
                  system_name = 'Star-Exoplanet',
                  envelope_eccentricity_function=None,
-                 initial_eccentricity=0.,
+                 initial_eccentricity=0.5,
                  initial_stellar_spin=5,
-                 max_argument_of_phase_lag_function_for_planet=12,
+                 max_argument_of_phase_lag_function_for_planet=6,
                  min_argument_of_phase_lag_function_for_planet=5,
                  min_tidal_break_period=0.8,
                  max_tidal_break_period=10,
