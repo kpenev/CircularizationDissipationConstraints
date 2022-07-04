@@ -68,6 +68,13 @@ from orbital_evolution.evolve_interface import library as \
 
 from reproduce_system import *
 
+def getPathOfExoplanetSystemsData():
+    return '/home/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv'
+def getStellarEvolutionInterpolatorsDirectory():
+    return '/home/mmmahmud/poet/stellar_evolution_interpolators'
+def getEccentricityExpansionCoefficientsFile():
+    return b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite"
+
 
 def phi(z):
     return 0.5 * (1 + erf(z / math.sqrt(2)))
@@ -365,7 +372,7 @@ class System:
 class EnvelopeEccentricityDistribution:
 
     def __init__(self,
-                 path='/home/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv',
+                 path = getPathOfExoplanetSystemsData(), #'/home/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv',
                  maximum_number_of_data_points=math.inf,
                  threshold_value_of_envelope_eccentricity=0.001,
                  constraints=constraints_for_eccentricity_envelope(),
@@ -1164,7 +1171,7 @@ class Element:
         self.lum = lum
         self.num_parallel_processes = 4
         self.star_sampler_pickle_fname = 'star_sampler.pkl'
-        self.stellar_evolution_interpolator_dir = '/home/mmmahmud/poet/stellar_evolution_interpolators'
+        self.stellar_evolution_interpolator_dir = getStellarEvolutionInterpolatorsDirectory()  #'/home/mmmahmud/poet/stellar_evolution_interpolators'
         self.time_ode_atol = 1e-08
         self.time_ode_max_step = 0.1
         self.time_ode_rtol = 1e-06
@@ -1558,14 +1565,13 @@ class LogLikelihood:
 
 
     def MCMC(self,
-             nwalkers=25,
+             nwalkers=28,
              ndim=9,
-             system = 'WASP_89_b',
-             reset_backend = True):
+             reset_backend = False):
 
         config = ConfigObjectForLogging(system=system)
-        mcmc_progress_file_name = '%(system)s_mcmc_progress.h5' % dict(system=system)
-        p0_file_name = '%(system)s_p0_file.npy' % dict(system=system)
+        mcmc_progress_file_name = '%(system)s_mcmc_progress.h5' % dict(system=self.system_name)
+        p0_file_name = '%(system)s_p0_file.npy' % dict(system=self.system_name)
 
         p0_file_exists = os.path.exists(p0_file_name)
         backend_file_exists = os.path.exists(mcmc_progress_file_name)
@@ -1629,7 +1635,7 @@ class LogLikelihood:
                                    quantiles=[0.16, 0.5, 0.84],
                                    show_titles=True, title_kwargs={"fontsize": 12})
             plt.show()
-            figfilename = "%(system)s_MCMC.pdf" % dict(system=system)
+            figfilename = "%(system)s_MCMC.pdf" % dict(system=self.system_name)
             figure.savefig(figfilename, bbox_inches='tight')
         return
 
@@ -1670,8 +1676,9 @@ class ConfigObjectForLogging:
 
 class InitializationOfSamplingPropertiesOfSystem:
     def __init__(self,
-                 serialized_directory = '/home/mmmahmud/poet/stellar_evolution_interpolators',
-                 eccentricity_expansion_fname=b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite"):
+                 serialized_directory = getStellarEvolutionInterpolatorsDirectory(), # '/home/mmmahmud/poet/stellar_evolution_interpolators',
+                 eccentricity_expansion_fname= getEccentricityExpansionCoefficientsFile(), # b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite"
+                 ):
 
         # mp.set_start_method('forkserver')
         print('creating interpolator ')
@@ -1767,20 +1774,21 @@ class SamplingPropertiesOfSystem:
             eccentricity_distribution_object.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
             self.probability_density_of_eccentricity = eccentricity_distribution_object.probability_density_of_eccentricity
 
-            self.log_likelihood_instance = LogLikelihood(self.prior_transform_instance,
-                                                         self.means['orbital period'],
-                                                         0,  # obliquity
-                                                         self.probability_density_of_eccentricity,
-                                                         self.e_env,
-                                                         system_name,
-                                                         initial_eccentricity,
-                                                         constraints,
-                                                         spin_frequency_powers_for_planet,
-                                                         spin_frequency_powers_for_planet
-                                                         )
+            #self.log_likelihood_instance = LogLikelihood(self.prior_transform_instance,
+                                                         #self.means['orbital period'],
+                                                         #0,  # obliquity
+                                                         #self.probability_density_of_eccentricity,
+                                                         #self.e_env,
+                                                         #system_name,
+                                                         #initial_eccentricity,
+                                                         #constraints,
+                                                         #spin_frequency_powers_for_planet,
+                                                         #spin_frequency_powers_for_planet
+                                                         #)
 
 
-            self.log_likelihood_instance.MCMC()
+            #self.log_likelihood_instance.MCMC()
+            print('All Done')
 
             if find_argument_of_phase_lag_function_for_planet_range_auto:
                 min_Qpl, max_Qpl = self.determine_a_suitable_range_of_argument_of_phase_lag_function_for_planet()
