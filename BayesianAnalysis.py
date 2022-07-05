@@ -47,6 +47,12 @@ from astropy.units import Unit, Quantity
 sys.path.append('/home/mmmahmud/CircularizationDissipationConstraints/source')
 sys.path.append('/home/mmmahmud/general_purpose_python_modules')
 sys.path.append('/home/mmmahmud/CircularizationDissipationConstraints/data')
+#sys.path.append('/home/mmm161430/CircularizationDissipationConstraints/source')
+#sys.path.append('/home/mmm161430/projects/git/general_purpose_python_modules')
+#sys.path.append('/home/mmm161430/projects/git/poet')
+#sys.path.append('/home/mmm161430/CircularizationDissipationConstraints/data')
+#sys.path.append('/home/mmm161430/emcee')
+#sys.path.append('/home/mmm161430/lib')
 
 if not sys.warnoptions:
     import warnings
@@ -69,11 +75,11 @@ from orbital_evolution.evolve_interface import library as \
 from reproduce_system import *
 
 def getPathOfExoplanetSystemsData():
-    return '/home/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv'
+    return '/home/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv' # '/home/mmm161430/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv'
 def getStellarEvolutionInterpolatorsDirectory():
-    return '/home/mmmahmud/poet/stellar_evolution_interpolators'
+    return '/home/mmmahmud/poet/stellar_evolution_interpolators' # '/home/mmm161430/projects/git/poet/stellar_evolution_interpolators'
 def getEccentricityExpansionCoefficientsFile():
-    return b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite"
+    return b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite" # b"/home/mmm161430/projects/git/poet/eccentricity_expansion_coef_O400.sqlite"
 
 
 def phi(z):
@@ -1681,11 +1687,9 @@ class InitializationOfSamplingPropertiesOfSystem:
                  ):
 
         # mp.set_start_method('forkserver')
-        print('creating interpolator ')
         manager = StellarEvolutionManager(serialized_directory)
         interpolator = manager.get_interpolator_by_name('default')
         FeHConditionalLikelihoodBase.set_interpolator(interpolator)
-        print('interpolator is created')
         print('coefficients ')
         orbital_evolution_library.prepare_eccentricity_expansion(
             eccentricity_expansion_fname,
@@ -1693,7 +1697,6 @@ class InitializationOfSamplingPropertiesOfSystem:
             True,
             True
         )
-        print('coefficients are created')
 
 
 class SamplingPropertiesOfSystem:
@@ -1774,21 +1777,20 @@ class SamplingPropertiesOfSystem:
             eccentricity_distribution_object.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
             self.probability_density_of_eccentricity = eccentricity_distribution_object.probability_density_of_eccentricity
 
-            #self.log_likelihood_instance = LogLikelihood(self.prior_transform_instance,
-                                                         #self.means['orbital period'],
-                                                         #0,  # obliquity
-                                                         #self.probability_density_of_eccentricity,
-                                                         #self.e_env,
-                                                         #system_name,
-                                                         #initial_eccentricity,
-                                                         #constraints,
-                                                         #spin_frequency_powers_for_planet,
-                                                         #spin_frequency_powers_for_planet
-                                                         #)
+            self.log_likelihood_instance = LogLikelihood(self.prior_transform_instance,
+                                                         self.means['orbital period'],
+                                                         0,  # obliquity
+                                                         self.probability_density_of_eccentricity,
+                                                         self.e_env,
+                                                         system_name,
+                                                         initial_eccentricity,
+                                                         constraints,
+                                                         spin_frequency_powers_for_planet,
+                                                         spin_frequency_powers_for_planet
+                                                         )
 
 
-            #self.log_likelihood_instance.MCMC()
-            print('All Done')
+            self.log_likelihood_instance.MCMC()
 
             if find_argument_of_phase_lag_function_for_planet_range_auto:
                 min_Qpl, max_Qpl = self.determine_a_suitable_range_of_argument_of_phase_lag_function_for_planet()
@@ -1875,79 +1877,6 @@ class SamplingPropertiesOfSystem:
 
 
 if __name__ == '__main__':
-
-    system = 'WASP_89_b'
-    p0_file_name = '%(system)s_p0_file_for_testinga.npy' % dict(system=system)
-
-    exists = os.path.exists(p0_file_name)
-    if exists:
-        print('exists')
-    else:
-        print('does not exist.')
-
-    reset = False
-
-    if exists:
-        p0_file = open(p0_file_name, 'rb')
-        u = np.load(p0_file)
-        print('u', u)
-        p0_file.close()
-
-
-
-    p0_file = open(p0_file_name, 'wb')
-    if exists:
-        u = np.vstack((u, np.random.rand(3)))
-    else:
-        u = np.random.rand(3)
-    print('u ', u)
-    np.save(p0_file, u)
-    p0_file.close()
-
-    p0_file = open(p0_file_name, 'rb')
-    u = np.load(p0_file)
-    print('u', u)
-    p0_file.close()
-
-    p0_file = open(p0_file_name, 'wb')
-    u = np.vstack((u, np.random.rand(3)))
-    print('u ', u)
-    np.save(p0_file, u)
-    p0_file.close()
-
-    p0_file = open(p0_file_name, 'rb')
-    u = np.load(p0_file)
-    print('u', u)
-    p0_file.close()
-
-    p0_file = open(p0_file_name, 'wb')
-    u = np.vstack((u, np.random.rand(3)))
-    print('u ', u)
-    np.save(p0_file, u)
-    p0_file.close()
-
-    p0_file = open(p0_file_name, 'rb')
-    u = np.load(p0_file)
-    print('u', u)
-    p0_file.close()
-
-    p0_file = open(p0_file_name, 'wb')
-    u = np.vstack((u, np.random.rand(3)))
-    print('u ', u)
-    np.save(p0_file, u)
-    p0_file.close()
-
-    p0_file = open(p0_file_name, 'rb')
-    u = np.load(p0_file)
-    print('u', u)
-    p0_file.close()
-
-    exists = os.path.exists(p0_file_name)
-    if exists:
-        print('now it exists')
-    else:
-        print('still does not exist.')
-
 
     # analysis_on_Nasa_exoplanet_data()
     print('**********************************************************')
