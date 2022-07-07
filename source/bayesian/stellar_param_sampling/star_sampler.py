@@ -949,8 +949,11 @@ class StarSampler:
             self._debug_plots = None
 
         if not self._check_for_pickled():
+            print('New sampler is going to be created')
             self._prepare_new_sampler()
             self._add_to_pickle_file()
+        else:
+            print('A sampler was already there.')
 
         self._update_feh_cdf()
 
