@@ -61,8 +61,9 @@ def log_probability(unit_cube_values,
             )
         )
 
-    parameters = prior_transform(unit_cube_values)
-    log_likelihood_value = log_likelihood(parameters)
+    transformed = prior_transform(unit_cube_values)
+    log_likelihood_value = log_likelihood(**transformed)
+    parameters = transformed['parameters']
     if exclude_from_blob:
         parameters = tuple(
             value

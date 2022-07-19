@@ -36,7 +36,7 @@ import hyadespraesepe_util
 from cluster_util import get_rv_likelihood
 #pylint: enable=import-error
 from bayesian.sampling import setup_process
-from bayesian.prior_transform_binary_stars import PriorTransformBinaryStars
+from bayesian.prior_transform_binary_stars import PriorTransformSB1
 from bayesian.sample_sb1_masses import SampleSB1Masses
 from bayesian.log_likelihood_sb1 import LogLikelihoodSB1
 from bayesian.parse_command_line import parse_command_line
@@ -224,7 +224,7 @@ def prepare_sampling(config):
                 scaled_period_guess=config.initial_period_scaled_guess,
                 prior_only=config.sampling=='prior'
             )
-            prior_transform = PriorTransformBinaryStars(
+            prior_transform = PriorTransformSB1(
                 sample_binary_masses=SampleSB1Masses(
                     rv_likelihood=rv_likelihood,
                     photometric_constraint=photometric_constraint,

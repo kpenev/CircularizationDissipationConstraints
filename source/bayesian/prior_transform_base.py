@@ -183,7 +183,7 @@ class PriorTransformBase(metaclass=ABCMeta):
             )
         )
 
-        return transformed_values
+        return dict(parameters=transformed_values)
 
     def count_sampled_parameters(self):
         """Count the random variates required by the defined transform."""

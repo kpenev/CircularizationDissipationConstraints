@@ -113,6 +113,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                  evolution_timeout,
                  period_search_factor,
                  scaled_period_guess,
+                 prior_only=False,
                  **kwargs):
         """
         Set-up the log-likelihood calculator.
@@ -135,6 +136,9 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             scaled_period_guess(float):    See same name argument to
                 :meth:`InitialConditionSolver.__init__`.
 
+            prior_only(bool):    If True, log-likelihood is always zero,
+                thus sampling is done only per the priors.
+
             kwargs:    Arguments in addition to `secondary_is_star` required by
                 the parent's :meth:`__init__()`.
 
@@ -145,6 +149,8 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         self.envelope_eccentricity = envelope_eccentricity
         self._evolution_timeout = evolution_timeout
         self.final_eccentricity = None
+
+        self._prior_only = prior_only
 
         self._find_evolution_kwargs = dict(
             interpolator=interpolator,
@@ -169,8 +175,6 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         Returns:
             float
         """
-
-        #TODO: fix when high-e evoluition is possible
 
         logger = logging.getLogger(__name__)
 
@@ -261,11 +265,29 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         self._stash = False
 
     @abstractmethod
-    def calculate_log_likelihood(self, parameters):
-        """Evaluate the log-likelihood at the given model parameters."""
+    def calculate_log_likelihood(self, parameters, **other_args):
+        """
+        Evaluate the log-likelihood at the given model parameters.
 
-    def __call__(self, parameters):
+        Args:
+            paramaters(array):    The parameters for which to evaluate the log
+                likelihood. Must uniquely define the likelihood.
+
+            other_args:    For some applications, terms the likelihood depends
+                on are calculated during the prior transform. This is a
+                mechanism to pass those pre-calculated values. These arguments
+                must be fully determined by the parameter values.
+
+        Returns:
+            float:    The natural logarithm of the posterior probability (not
+                normalized).
+        """
+
+    def __call__(self, parameters, **other_args):
         """Same as :meth:`calculate_log_likelihood` but handles stashing."""
+
+        if self._prior_only:
+            return 0.0
 
         param_hash = hex(hash(parameters.tostring()))[2:]
         if param_hash in self._stashed_results:
@@ -276,7 +298,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             )
             return result
 
-        result = self.calculate_log_likelihood(parameters)
+        result = self.calculate_log_likelihood(parameters, **other_args)
         logging.getLogger(__name__).info(
             'Calculated log_likelihood: %s',
             repr(result)

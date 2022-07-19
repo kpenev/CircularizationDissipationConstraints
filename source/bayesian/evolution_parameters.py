@@ -50,7 +50,8 @@ class EvolutionParameters:
 
     def __init__(self,
                  secondary_is_star,
-                 dissipation_parameters):
+                 dissipation_parameters,
+                 extra_parameters=None):
         """
         Prepare to manage the parameters for a given system.
 
@@ -105,6 +106,10 @@ class EvolutionParameters:
             +
             self.parameter_names_units['system']
         )
+        if extra_parameters is not None:
+            self.parameter_names_units['extra'] = extra_parameters
+            self.parameter_order += extra_parameters
+
         self.parameter_indices = dict(
             (name, index)
             for index, (name, units) in enumerate(self.parameter_order)

@@ -59,18 +59,18 @@ def get_samples(kic_id):
 
     return pandas.DataFrame(
         numpy.load(
-            path.join(data_dir, str(kic_id) + '.npz')
+            path.join(_data_dir, str(kic_id) + '.npz')
         )[
             'thinned_chain'
         ],
-        colmuns=['Mtot(Msun)',
+        columns=['Mtot',        #(Msun)
                  'Mratio',
                  'z',
-                 'tau(log10yr)',
-                 'dist(pc)',
+                 'tau',         #(log10yr)
+                 'dist',        #(pc)
                  'E(B-V)',
-                 'P(d)',
-                 'tpe(d)',
+                 'P',           #(d)
+                 'tpe',         #(d)
                  'esinw',
                  'ecosw',
                  'b',
@@ -78,8 +78,14 @@ def get_samples(kic_id):
                  'q12',
                  'q21',
                  'q22',
-                 'SysLCerror(ln)',
-                 'SysSEDerror(ln)',
-                 'E(B-V)unc(ln)',
-                 'distunc(lnpc)']
+                 'SysLCerror',  #(ln)
+                 'SysSEDerror', #(ln)
+                 'E(B-V)unc',   #(ln)
+                 'distunc']     #(lnpc)
     )
+
+
+if __name__ == '__main__':
+    samples = get_samples(5649206)
+    print('Samples:\n{!r}'.format(samples))
+    print('P stddev:' + repr(numpy.std(samples['P(d)'])))
