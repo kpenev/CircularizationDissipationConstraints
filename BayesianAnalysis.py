@@ -1575,7 +1575,7 @@ class LogLikelihood:
              ndim=9,
              reset_backend = False):
 
-        config = ConfigObjectForLogging(system=system)
+        config = ConfigObjectForLogging(system=self.system_name)
         mcmc_progress_file_name = '%(system)s_mcmc_progress.h5' % dict(system=self.system_name)
         p0_file_name = '%(system)s_p0_file.npy' % dict(system=self.system_name)
 
@@ -1584,30 +1584,58 @@ class LogLikelihood:
 
 
         if (not p0_file_exists):
-            print('Initially the file ', p0_file_name, ' did not exist.')
-            print('The walkers are going to be generated for the first time.')
-            print('The file ', p0_file_name, ' will be created and the walkers will be stored there.')
-
-            p0 = self.generate_successful_walkers(p0_file_name,
-                                              nwalkers,
-                                              ndim)
+            if backend_file_exists:
+                if reset_backend:
+                    p0 = self.generate_successful_walkers(p0_file_name,
+                                                          nwalkers,
+                                                          ndim)
+                else:
+                    backend_file_reader = emcee.backends.HDFBackend(mcmc_progress_file_name, read_only= True)
+                    ndim_prev = backend_file_reader.shape[1]
+                    if not (ndim == ndim_prev):
+                        reset_backend = True
+                        p0 = self.generate_successful_walkers(p0_file_name,
+                                                              nwalkers,
+                                                              ndim)
+                    else:
+                        if (not backend_file_reader.initialized) or backend_file_reader.iteration <= 0:
+                            reset_backend = True
+                            p0 = self.generate_successful_walkers(p0_file_name,
+                                                                  nwalkers,
+                                                                  ndim)
+            else:
+                print('Initially the file ', p0_file_name, ' did not exist.')
+                print('The walkers are going to be generated for the first time.')
+                print('The file ', p0_file_name, ' will be created and the walkers will be stored there.')
+                reset_backend = True
+                p0 = self.generate_successful_walkers(p0_file_name,
+                                                      nwalkers,
+                                                      ndim)
         else:
-            print('The file ', p0_file_name, ' existed previously.')
-            print('Previously worked out walkers will be loaded in the code for running MCMC.')
-            p0_file = open(p0_file_name, 'rb')
-            p0 = np.load(p0_file)
-            p0_file.close()
-            print('The already discovered walkers are: ', p0)
-            number_of_already_stored_walkers = p0.size/ndim
-            number_of_walkers_yet_to_be_found =(int) (nwalkers - number_of_already_stored_walkers)
-            if number_of_walkers_yet_to_be_found > 0:
-                print('New walkers are going to be discovered')
-                p0 = np.vstack((p0, self.generate_successful_walkers(p0_file_name,
-                                                                     number_of_walkers_yet_to_be_found,
-                                                                     ndim)))
-                print('All walkers are: ', p0)
-            if number_of_walkers_yet_to_be_found < 0:
-                p0 = p0[0:nwalkers]
+            if backend_file_exists and (not reset_backend):
+                backend_file_reader = emcee.backends.HDFBackend(mcmc_progress_file_name, read_only=True)
+                ndim_prev = backend_file_reader.shape[1]
+                if ndim != ndim_prev:
+                    reset_backend = True
+                if (not backend_file_reader.initialized) or backend_file_reader.iteration <= 0:
+                    reset_backend = True
+            if (not backend_file_exists) or reset_backend:
+                print('The file ', p0_file_name, ' existed previously.')
+                print('Previously worked out walkers will be loaded in the code for running MCMC.')
+                p0_file = open(p0_file_name, 'rb')
+                p0 = np.load(p0_file)
+                p0_file.close()
+                print('The already discovered walkers are: ', p0)
+                number_of_already_stored_walkers = p0.size / ndim
+                number_of_walkers_yet_to_be_found = (int)(nwalkers - number_of_already_stored_walkers)
+                if number_of_walkers_yet_to_be_found > 0:
+                    print('New walkers are going to be discovered')
+                    p0 = np.vstack((p0, self.generate_successful_walkers(p0_file_name,
+                                                                         number_of_walkers_yet_to_be_found,
+                                                                         ndim)))
+                    print('All walkers are: ', p0)
+                if number_of_walkers_yet_to_be_found < 0:
+                    p0 = p0[0:nwalkers]
 
         with Pool(config.num_parallel_processes,
                   initializer=setup_process,
@@ -1619,8 +1647,16 @@ class LogLikelihood:
             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool=pool, backend=backend)
 
             if backend_file_exists:
-                print('backend file exists.')
-                sampler.run_mcmc(None, 5, progress = True)
+                print('Backend file exists.')
+                chain_exists = backend.initialized and (backend.iteration > 0)
+                if reset_backend == False and chain_exists:
+                    print('Backend file is not subject to reset. The chain size is not zero.')
+                    print('Next samples will be drawn from the end of the previously worked out chain.')
+                    sampler.run_mcmc(None, 5, progress = True)
+                else:
+                    print('Either the backend file is subject to reset or previously calculated chain size is zero.')
+                    print('Samples will be drawn for the first time.')
+                    sampler.run_mcmc(p0, 5, progress = True)
             else:
                 sampler.run_mcmc(p0, 5, progress = True)
 
@@ -1877,7 +1913,6 @@ class SamplingPropertiesOfSystem:
 
 
 if __name__ == '__main__':
-
     # analysis_on_Nasa_exoplanet_data()
     print('**********************************************************')
     test1 = EccentricityDistribution(mean_e_now=0.39,
