@@ -2,7 +2,6 @@
 """I/O of Windemuth et. al. (2019) Kepler EB samples."""
 
 from os import path
-from glob import glob
 
 from matplotlib import pyplot
 import numpy
@@ -23,8 +22,9 @@ _data_dir = path.join(
     'windemuth_et_al_19_samples'
 )
 
-eccentricity_envelope = LinearEccentricityEnvelope(min_period=0.3,
-                                                   max_period=35.0,
+eccentricity_envelope = LinearEccentricityEnvelope(min_period=1.0,
+                                                   max_period=25.0,
+                                                   min_eccenticity=0.02,
                                                    max_eccentricity=0.8)
 
 
@@ -98,10 +98,13 @@ def get_samples(kic_id):
 def get_available_kic():
     """Return a list of the KIC identifiers for which samples are available."""
 
-    return [
-        int(path.splitext(path.basename(fname))[0])
-        for fname in glob(path.join(_data_dir, '*.npz'))
-    ]
+    ml_data = pandas.read_csv(
+        path.join(_data_dir, 'paper_maxlike_pars.dat'),
+        sep=r'\s+',
+        index_col='#KIC'
+    )
+
+    return ml_data.index[(ml_data['morph'] < 0.5)].to_numpy()
 
 
 if __name__ == '__main__':
@@ -116,24 +119,32 @@ if __name__ == '__main__':
                                                        ('e_max', float),
                                                        ('M1_median', float),
                                                        ('M1_min', float),
-                                                       ('M1_max', float)])
+                                                       ('M1_max', float),
+                                                       ('tau_median', float),
+                                                       ('tau_min', float),
+                                                       ('tau_max', float)])
     target_quantiles = scipy.stats.norm().cdf((-1.0, 0.0, 1.0))
     for i, kic in enumerate(available_kic):
         samples = get_samples(kic)
         plot_data['KIC'] = kic
-        (
-            plot_data['P_min'][i],
-            plot_data['P_median'][i],
-            plot_data['P_max'][i]
-        ) = numpy.percentile(samples['P'].array, target_quantiles)
+        for quantity in ['P', 'tau']:
+            (
+                plot_data[f'{quantity}_min'][i],
+                plot_data[f'{quantity}_median'][i],
+                plot_data[f'{quantity}_max'][i]
+            ) = numpy.percentile(samples[quantity].array, target_quantiles)
         (
             plot_data['e_min'][i],
             plot_data['e_median'][i],
             plot_data['e_max'][i]
-        ) = numpy.percentile(numpy.sqrt(samples['esinw'].array**2
-                                        +
-                                        samples['ecosw'].array**2),
-                             target_quantiles)
+        ) = numpy.percentile(
+            numpy.sqrt(
+                samples['esinw'].array**2
+                +
+                samples['ecosw'].array**2
+            ),
+            target_quantiles
+        )
         (
             plot_data['M1_min'][i],
             plot_data['M1_median'][i],
@@ -146,23 +157,28 @@ if __name__ == '__main__':
         )
 
     pyplot.xscale('log')
-    selected = plot_data['M1_max'] < 1.2
-    for label in ['M1<1.2', 'M1>=1.2']:
-        pyplot.errorbar(
-            plot_data['P_median'][selected],
-            plot_data['e_median'][selected],
-            numpy.stack((
-                plot_data['e_median'] - plot_data['e_min'],
-                plot_data['e_max'] - plot_data['e_median']
-            ))[:, selected],
-            numpy.stack((
-                plot_data['P_median'] - plot_data['P_min'],
-                plot_data['P_max'] - plot_data['P_median']
-            ))[:, selected],
-            fmt='o',
-            label=label
-        )
-        selected = numpy.logical_not(selected)
+    age_selected = plot_data['tau_min'] < 8.5
+    for label_pre in ['lg(t) < 8.5', 'lg(t) >= 8.5']:
+        mass_selected = plot_data['M1_max'] > 1.2
+        for label in ['M1>1.2', 'M1<=1.2']:
+            selected = numpy.logical_and(age_selected, mass_selected)
+            pyplot.errorbar(
+                plot_data['P_median'][selected],
+                plot_data['e_median'][selected],
+                numpy.stack((
+                    plot_data['e_median'] - plot_data['e_min'],
+                    plot_data['e_max'] - plot_data['e_median']
+                ))[:, selected],
+                numpy.stack((
+                    plot_data['P_median'] - plot_data['P_min'],
+                    plot_data['P_max'] - plot_data['P_median']
+                ))[:, selected],
+                fmt='o',
+                label=', '.join([label_pre, label])
+            )
+            mass_selected = numpy.logical_not(mass_selected)
+        age_selected = numpy.logical_not(age_selected)
+
     envelope_x = 10.0**numpy.linspace(-1.0, 3, 1000)
     pyplot.plot(envelope_x,
                 eccentricity_envelope(envelope_x),
