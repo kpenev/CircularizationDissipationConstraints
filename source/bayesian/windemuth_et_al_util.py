@@ -2,11 +2,13 @@
 """I/O of Windemuth et. al. (2019) Kepler EB samples."""
 
 from os import path
+import logging
 
 from matplotlib import pyplot
 import numpy
 import scipy.stats
 import pandas
+from astropy import units, constants
 
 from process_e_Q_grid import LinearEccentricityEnvelope
 
@@ -26,6 +28,8 @@ eccentricity_envelope = LinearEccentricityEnvelope(min_period=1.0,
                                                    max_period=25.0,
                                                    min_eccenticity=0.02,
                                                    max_eccentricity=0.8)
+
+_logger = logging.getLogger(__name__)
 
 
 def get_summary_stats():
@@ -95,19 +99,85 @@ def get_samples(kic_id):
     return pandas.DataFrame(raw_data, columns=columns)
 
 
-def get_available_kic():
-    """Return a list of the KIC identifiers for which samples are available."""
+def get_summary_data():
+    """Return the maximum likelihood and quantile posterior data."""
 
-    ml_data = pandas.read_csv(
+    maxlike_data = pandas.read_csv(
         path.join(_data_dir, 'paper_maxlike_pars.dat'),
         sep=r'\s+',
         index_col='#KIC'
     )
+    stellar_data = pandas.read_csv(
+        path.join(_data_dir, 'paper_stellar.posteriors'),
+        header=1,
+        sep=r'\s+',
+        index_col='#KIC'
+    )
+    orbital_data = pandas.read_csv(
+        path.join(_data_dir, 'paper_orbital.posteriors'),
+        header=1,
+        sep=r'\s+',
+        index_col='#KIC'
+    )
 
-    return ml_data.index[(ml_data['morph'] < 0.5)].to_numpy()
+    maxlike_data.columns = ['maxlike_' + col for col in maxlike_data.columns]
+    stellar_data.columns = ['posterior_' + col  for col in stellar_data.columns]
+    orbital_data.columns = ['posterior_' + col  for col in orbital_data.columns]
+
+    return maxlike_data.join([stellar_data, orbital_data])
+
+
+def get_available_kic():
+    """Return a list of the KIC identifiers for which samples are available."""
+
+    data = get_summary_data()
+
+    valid = data['maxlike_morph'] < 0.5
+    _logger.info('Morphology cut leaves {:d} binaries'.format(valid.sum()))
+
+    valid = numpy.logical_and(
+        valid,
+        data['posterior_tau(log10yr)'] + data['posterior_tau-sigma'] > 8.5
+    )
+    _logger.info('Age cut leaves {:d} binaries'.format(valid.sum()))
+
+    valid = numpy.logical_and(
+        valid,
+        data['posterior_m1(msun)'] + data['posterior_m1+sigma'] < 1.2
+    )
+    valid = numpy.logical_and(
+        valid,
+        data['posterior_m2(msun)'] + data['posterior_m2+sigma'] < 1.2
+    )
+    _logger.info('Mass cut leaves {:d} binaries'.format(valid.sum()))
+
+    logg = numpy.log10(
+        numpy.minimum(
+            (
+                constants.G
+                *
+                data['posterior_m1(msun)'].to_numpy() * units.M_sun
+                /
+                (data['posterior_r1(rsun)'].to_numpy() * units.R_sun)**2
+            ).to_value(units.cm / units.s**2),
+            (
+                constants.G
+                *
+                (data['posterior_m2(msun)'].to_numpy() * units.M_sun)
+                /
+                (data['posterior_r2(rsun)'].to_numpy() * units.R_sun)**2
+            ).to_value(units.cm / units.s**2)
+        )
+    )
+    valid = numpy.logical_and(valid, logg > 4.0)
+    _logger.info('Log10(g) cut leaves {:d} binaries'.format(valid.sum()))
+
+
+    return data.index[valid].to_numpy()
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     available_kic = get_available_kic()
 
     plot_data = numpy.empty(len(available_kic), dtype=[('KIC', int),
@@ -122,12 +192,15 @@ if __name__ == '__main__':
                                                        ('M1_max', float),
                                                        ('tau_median', float),
                                                        ('tau_min', float),
-                                                       ('tau_max', float)])
+                                                       ('tau_max', float),
+                                                       ('Mratio_median', float),
+                                                       ('Mratio_min', float),
+                                                       ('Mratio_max', float)])
     target_quantiles = scipy.stats.norm().cdf((-1.0, 0.0, 1.0))
     for i, kic in enumerate(available_kic):
         samples = get_samples(kic)
         plot_data['KIC'] = kic
-        for quantity in ['P', 'tau']:
+        for quantity in ['P', 'tau', 'Mratio']:
             (
                 plot_data[f'{quantity}_min'][i],
                 plot_data[f'{quantity}_median'][i],
@@ -156,28 +229,25 @@ if __name__ == '__main__':
             target_quantiles
         )
 
-    pyplot.xscale('log')
-    age_selected = plot_data['tau_min'] < 8.5
-    for label_pre in ['lg(t) < 8.5', 'lg(t) >= 8.5']:
-        mass_selected = plot_data['M1_max'] > 1.2
-        for label in ['M1>1.2', 'M1<=1.2']:
-            selected = numpy.logical_and(age_selected, mass_selected)
-            pyplot.errorbar(
-                plot_data['P_median'][selected],
-                plot_data['e_median'][selected],
-                numpy.stack((
-                    plot_data['e_median'] - plot_data['e_min'],
-                    plot_data['e_max'] - plot_data['e_median']
-                ))[:, selected],
-                numpy.stack((
-                    plot_data['P_median'] - plot_data['P_min'],
-                    plot_data['P_max'] - plot_data['P_median']
-                ))[:, selected],
-                fmt='o',
-                label=', '.join([label_pre, label])
-            )
-            mass_selected = numpy.logical_not(mass_selected)
-        age_selected = numpy.logical_not(age_selected)
+    selected = plot_data['Mratio_median'] > 0.5
+    for label in ['q > 0.5', 'q <= 0.5']:
+        pyplot.xscale('log')
+        pyplot.errorbar(
+            plot_data['P_median'][selected],
+            plot_data['e_median'][selected],
+            numpy.stack((
+                plot_data['e_median'] - plot_data['e_min'],
+                plot_data['e_max'] - plot_data['e_median']
+            ))[:, selected],
+            numpy.stack((
+                plot_data['P_median'] - plot_data['P_min'],
+                plot_data['P_max'] - plot_data['P_median']
+            ))[:, selected],
+            fmt='o',
+            markerfacecolor='none',
+            label=label
+        )
+        selected = numpy.logical_not(selected)
 
     envelope_x = 10.0**numpy.linspace(-1.0, 3, 1000)
     pyplot.plot(envelope_x,
