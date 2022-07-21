@@ -172,7 +172,6 @@ def get_available_kic():
     valid = numpy.logical_and(valid, logg > 4.0)
     _logger.info('Log10(g) cut leaves {:d} binaries'.format(valid.sum()))
 
-
     return data.index[valid].to_numpy()
 
 

@@ -17,6 +17,7 @@ from command_line_utilities import data_dir
 from bayesian import m35_util
 from bayesian import hyadespraesepe_util
 from bayesian.basic_util import default_logging_format
+from bayesian.windemuth_et_al_util import get_available_kic
 #pylint: enable=import-error
 
 RandomQuantity = namedtuple('RandomQuantity', ['distribution', 'units'])
@@ -221,7 +222,7 @@ def add_primary_args(parser, properties):
                       'possibly asymmetric.')
             )
 
-def get_binary_ids():
+def get_cluster_binary_ids():
     """Return dictionary indexed by cluster containing binary IDs."""
 
     binaries = dict()
@@ -271,20 +272,27 @@ def get_binary_ids():
     return binaries
 
 
-def add_binary_selection_args(parser):
-    """Add an argument to parses to choose a binary system to process."""
+def add_binary_selection_args(parser, collection):
+    """Add an argument to parser to choose a cluster system to process."""
 
-    binaries = get_binary_ids()
-
-    parser.add_argument(
-        'system',
-        choices=list(
+    if collection == 'cluster':
+        binaries = get_cluster_binary_ids()
+        choices = list(
             cluster_name + '_' + str(system)
             for cluster_name, cluster_systems in binaries.items()
             for system in cluster_systems
-        ),
+        )
+    else:
+        assert collection == 'w19'
+        choices = get_available_kic()
+
+    parser.add_argument(
+        'system',
+        choices=choices,
+        type=type(choices[0]),
         help='Select the system to analyze.'
     )
+
 
 def add_sampling_parameters(parser):
     """Add parameters configuring how to perform the sampling."""
@@ -482,7 +490,7 @@ def parse_command_line(description,
                        dissipation=False,
                        cluster=False,
                        primary_properties=(),
-                       choose_binary=False,
+                       choose_binary=None,
                        spindown=0):
     """
     Parse the command line for a Bayesian run.
@@ -503,8 +511,10 @@ def parse_command_line(description,
             properties supported.
             .
 
-        choose_binary(bool):    Whether to add argument for selecting a
-            particular binary by name.
+        choose_binary(str or None):    Whether to add argument for selecting a
+            particular binary by name. Should be one of 'cluster' or 'w19'
+            triggering the selection of a binary from an open cluster or from
+            the Windemuth et. al. (2019) collection.
 
         spindown(int):    For how many components should spindown parameters be
             added (0, 1, or 2).
@@ -560,5 +570,5 @@ def parse_command_line(description,
     if spindown:
         add_stellar_spindown_args(parser, spindown)
     if choose_binary:
-        add_binary_selection_args(parser)
+        add_binary_selection_args(parser, choose_binary)
     return parser.parse_args()

@@ -1,6 +1,8 @@
 """Define prior transformations based on Windemuth et. al. (2019) samples."""
 
 from astropy import units
+from scipy.stats import rdist
+import numpy
 
 from stellar_evolution.library_interface import \
     library as poet_stellar_evolution
@@ -20,7 +22,7 @@ class PriorTransformWindemuth(PriorTransformBase):
 
 
         sampled = dict()
-        weights = self.envelope_weights
+        weights = self.initial_sample_weights
         for quantity in self._quantities:
             self._distributions[quantity].set_weights(weights)
             sampled[quantity] = self._distributions[quantity].ppf(
@@ -54,31 +56,59 @@ class PriorTransformWindemuth(PriorTransformBase):
     def __init__(self,
                  samples,
                  envelope_eccentricity,
-                 kernels,
+                 initial_sample_weights,
+                 kernels=None,
                  **parent_kwargs):
         """
         Create a prior transform to sample from the given samples.
 
         Args:
-            samples(pandas.DataFrame):    The samples for a given Kepler ED from
+            samples(pandas.DataFrame):    The samples for a given Kepler EB from
                 Windemuth et. al. (2019).
+
+            envelope_eccentricity(float):    The value of the
+                period-eccentricity envelope evaluated at the orbital period of
+                the system being sampled.
+
+            initial_sample_weights(array):    Weight to apply to each of the
+                samples when combining to get the distribution to sample from.
 
             kernels(dict):    Kernel functions to convolve the samples with in
                 order to get a continuous distribution. Kernels should be
-                KDEDistribution instances (or provide equivalent functionality).
-                Each kernel is assumed to apply to only one variable (i.e. the
-                combined kernel has separation of variables) and should already
-                have the correct bandwidth set.
+                scipy.stats.rv_continuous instances (or provide equivalent
+                functionality). Each kernel is assumed to apply to only one
+                variable (i.e. the combined kernel has separation of variables)
+                and should already have the correct bandwidth set.
+
+            parent_kwargs:    Passed directly to parent`s ``__init__()``.
         """
 
         self._quantities = ['Mtot', 'Mratio', 'z', 'tau']
+        if kernels is None:
+            min_kernel_width = dict(
+                Mtot=0.05,
+                Mratio=0.05,
+                z=0.001,
+                tau=0.1
+            )
+            kernels = {
+                quantity: rdist(
+                    c=4,
+                    scale=max(
+                        (numpy.std(samples[quantity])
+                         *
+                         samples[quantity].size**(-0.2)),
+                        min_kernel_width[quantity]
+                    )
+                )
+                for quantity in self._quantities
+            }
         self._distributions = {
             quantity: KDEDistribution(samples[quantity], kernels[quantity])
             for quantity in self._quantities
         }
-        self.envelope_weights = self._distributions['e'].eval_sample_cdf(
-            envelope_eccentricity
-        )
+        self.initial_sample_weights = initial_sample_weights
+
         self._sample_weights_envelope = None
 
         super().__init__(**parent_kwargs)

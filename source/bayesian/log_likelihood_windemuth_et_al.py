@@ -1,7 +1,5 @@
 """Define a log-likelihood class for Windemuth et. al. (2019) EBs."""
 
-from astropy import units
-
 from bayesian.log_likelihood_binary_stars import LogLikelihoodBinaryStars
 
 class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
@@ -9,13 +7,23 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
     def __init__(self,
                  *parent_args,
-                 envelope_weights,
+                 envelope_eccentricity,
                  observed_eccentricity_distro,
                  **parent_kwargs):
-        """Prepare the log-likelihood function."""
+        """
+        Prepare the log-likelihood function.
 
-        super().__init__(*parent_args, **parent_kwargs)
-        self._envelope_weights = envelope_weights
+        Args:
+            parent_args:    Passed directly to parent`s ``__init__``.
+
+        """
+
+        super().__init__(*parent_args,
+                         envelope_eccentricity=envelope_eccentricity,
+                         **parent_kwargs)
+        self.envelope_weights = observed_eccentricity_distro.eval_sample_cdf(
+            envelope_eccentricity
+        )
         self._observed_eccentricity_distro = observed_eccentricity_distro
 
     def calculate_log_likelihood(self,
@@ -32,7 +40,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 final_eccentricity
             )
             /
-            self._envelope_weights
+            self.envelope_weights
             *
             other_args['sample_weights_envelope']
         ).sum()

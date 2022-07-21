@@ -4,19 +4,15 @@
 
 import logging
 import traceback
-from multiprocessing import Pool
 #from multiprocessing import set_start_method
 
-import numpy
 from astropy import units
 from scipy import stats
-import pandas
 import dynesty
 
 from stellar_evolution.manager import StellarEvolutionManager
 from orbital_evolution.evolve_interface import library as\
     orbital_evolution_library
-from visuals import make_corner_plot
 
 #Fixed module search paths, not intended to provide anything.
 #pylint: disable=unused-import
@@ -35,8 +31,11 @@ import hyadespraesepe_util
 #pylint: enable=unused-import
 from cluster_util import get_rv_likelihood
 #pylint: enable=import-error
+from bayesian.binary_utils import \
+    get_common_binary_star_priors,\
+    prepare_sampling_common
 from bayesian.sampling import setup_process
-from bayesian.prior_transform_binary_stars import PriorTransformSB1
+from bayesian.prior_transform_sb1 import PriorTransformSB1
 from bayesian.sample_sb1_masses import SampleSB1Masses
 from bayesian.log_likelihood_sb1 import LogLikelihoodSB1
 from bayesian.parse_command_line import parse_command_line
@@ -61,85 +60,10 @@ def get_independent_priors(config, observed_orbit, custom_util):
             The independent parameters that will be sampled for this binary.
     """
 
-    def get_distribution(parameter, distro_name='uniform'):
-        """
-        Return a uniform distribution with correct support for given parameter.
-
-        Args:
-            parameter(str):    The name of the parameter to get the entry for.
-
-            distribution(str):    The name of the distribution to set for the
-                given parameter from the scipy.stats module.
-
-        Returns:
-            tuple:
-                The entry in independent_parameter_distributions argument to
-                :meth:`PriorTransformClusterSB1.__init__()` that correctly
-                specifies the given model parameter's prior.
-        """
-
-        min_value, max_value = getattr(config, parameter)
-        return (
-            min_value if min_value == max_value
-            else getattr(stats, distro_name)(min_value, max_value - min_value)
-        )
-
-    def get_dissipation_parameters():
-        """Return list of parameters to add parametrizing tidal dissipation."""
-
-        result = [
-            (
-                param_name,
-                get_distribution(param_name),
-                units.dimensionless_unscaled
-            )
-            for param_name in ['lgQ_min', 'lgQ_inertial_boost']
-        ]
-        if (
-                config.lgQ_break_period is not None
-                and
-                config.lgQ_powerlaw is not None
-        ):
-            result.extend([
-                (
-                    'lgQ_break_period',
-                    get_distribution('lgQ_break_period', 'loguniform'),
-                    units.day
-                ),
-                (
-                    'lgQ_powerlaw',
-                    get_distribution('lgQ_powerlaw'),
-                    units.dimensionless_unscaled
-                )
-            ])
-
-        return result
-
-
     return (
-        get_dissipation_parameters()
+        get_common_binary_star_priors(config)
         +
         [
-            (
-                component + '_' + param_name,
-                get_distribution(component + '_' + param_name),
-                param_units
-            )
-            for component in ['primary', 'secondary']
-            for param_name, param_units in [
-                ('disk_lock_period', units.day),
-                ('wind_strength', units.dimensionless_unscaled),
-                ('wind_saturation', units.dimensionless_unscaled),
-                ('core_envelope_coupling_timescale', units.Myr)
-            ]
-        ]
-        +
-        [
-            (
-                'disk_dissipation_age',
-                get_distribution('disk_dissipation_age'),
-                units.Myr
-            ),
             (
                 'orbital_period',
                 stats.norm(float(observed_orbit['Per']),
@@ -155,11 +79,6 @@ def get_independent_priors(config, observed_orbit, custom_util):
                 'feh',
                 custom_util.cluster_feh_distribution,
                 units.dimensionless_unscaled
-            ),
-            (
-                'initial_eccentricity',
-                get_distribution('initial_eccentricity'),
-                units.dimensionless_unscaled
             )
         ]
     )
@@ -167,21 +86,10 @@ def get_independent_priors(config, observed_orbit, custom_util):
 def prepare_sampling(config):
     """Return log-likelihood & prior transform for sampling the selected SB1."""
 
-    interpolator = StellarEvolutionManager(
-        config.stellar_evolution_interpolator_dir
-    ).get_interpolator_by_name(
-        'default'
-    )
-    orbital_evolution_library.prepare_eccentricity_expansion(
-        config.eccentricity_expansion_coefficients.encode('ascii'),
-        1e-4,
-        True,
-        True
-    )
-
+    interpolator = prepare_sampling_common(config)
     pickle_substitutions = dict(system=config.system,
                                 sampling=config.sampling)
-    for cluster in ['NGC188', 'NGC6819', 'M35','HyadesPraesepe']:
+    for cluster in ['NGC188', 'NGC6819', 'M35', 'HyadesPraesepe']:
         if config.system.startswith(cluster + '_'):
             binary_id = int(config.system[len(cluster) + 1:])
             custom_util = globals()[cluster.lower() + '_util']
@@ -222,7 +130,7 @@ def prepare_sampling(config):
                 evolution_timeout=config.evolution_timeout,
                 period_search_factor=config.initial_period_search_factor,
                 scaled_period_guess=config.initial_period_scaled_guess,
-                prior_only=config.sampling=='prior'
+                prior_only=(config.sampling == 'prior')
             )
             prior_transform = PriorTransformSB1(
                 sample_binary_masses=SampleSB1Masses(
@@ -265,28 +173,6 @@ def main(config):
         num_params
     )
 
-#    if config.sampling.lower() == 'prior':
-#        inputs = numpy.random.rand(num_params * config.mcmc_nsteps).reshape((
-#            config.mcmc_nsteps,
-#            num_params
-#        ))
-#
-#        with Pool(config.num_parallel_processes,
-#                  initializer=setup_process,
-#                  initargs=[config],
-#                  maxtasksperchild=1) as workers:
-#            result = pandas.DataFrame(
-#                workers.map(prior_transform, inputs),
-#                columns=[p[0] for p in log_likelihood.parameter_order]
-#            )
-#
-#        make_corner_plot(
-#            pandas.DataFrame(
-#                result,
-#                columns=[p[0] for p in log_likelihood.parameter_order]
-#            )
-#        )
-#    el
     if config.sampling.lower() == 'nested':
         sampler = dynesty.NestedSampler(
             log_likelihood,
@@ -311,7 +197,7 @@ if __name__ == '__main__':
                 dissipation=True,
                 cluster=True,
                 primary_properties=('feh', 'logg', 'Teff', 'rho'),
-                choose_binary=True,
+                choose_binary='cluster',
                 spindown=2
             )
         )
