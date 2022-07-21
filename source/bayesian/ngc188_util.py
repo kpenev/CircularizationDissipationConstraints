@@ -6,7 +6,7 @@ import os.path
 import logging
 from multiprocessing import set_start_method
 
-from matplotlib import pyplot, rcParams
+from matplotlib import pyplot#, rcParams
 import pandas
 import numpy
 from scipy import stats

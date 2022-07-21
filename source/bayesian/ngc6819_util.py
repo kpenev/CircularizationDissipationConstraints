@@ -4,7 +4,7 @@
 import os.path
 import logging
 
-from matplotlib import pyplot, rcParams
+from matplotlib import pyplot#, rcParams
 import pandas
 from scipy import stats
 

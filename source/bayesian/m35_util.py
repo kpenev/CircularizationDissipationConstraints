@@ -25,10 +25,12 @@ from bayesian.photometric_constraint import\
 cluster_age_distribution = stats.norm(0.15, 0.03)
 cluster_feh_distribution = stats.norm(-0.18, 0.03)
 
-eccentricity_envelope = LinearEccentricityEnvelope(min_period=8.0,
-                                                   max_period=13.906390842036254,
-                                                   min_eccenticity=0.05,
-                                                   max_eccentricity=0.8)
+eccentricity_envelope = LinearEccentricityEnvelope(
+    min_period=8.0,
+    max_period=13.906390842036254,
+    min_eccenticity=0.05,
+    max_eccentricity=0.8
+)
 
 def get_photometry():
     """Return a pandas DataFrame containing M35 V and B-V photometry."""

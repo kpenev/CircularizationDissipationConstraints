@@ -15,13 +15,13 @@ from configargparse import ArgumentParser, DefaultsFormatter
 from scipy.stats import rdist, norm
 from scipy.interpolate import interp1d
 import numpy
-from kde import KDEDistribution
 from astropy.table import Table
 from cdspyreadme import CDSTablesMaker
 
+from kde import KDEDistribution
 from emcee_autocorrelation import\
-    max_likelihood_autocorr,\
-    average_autocorr
+    average_autocorr#,\
+#    max_likelihood_autocorr
 from mcmc_quantile_convergence import get_raftery_lewis_diagnostics
 from emcee_quantile_convergence import find_emcee_quantiles
 from combined_mcmc_constraint import CombinedMCMCConstraint
@@ -34,13 +34,12 @@ from bayesian.visualize_emcee import\
 #False positive, not sure why only m35 fails!
 #pylint: disable=unused-import
 from bayesian.m35_util import get_binary_data as get_m35_binary_data
-#pylint: enable=unused-import
 from bayesian.ngc6819_util import get_binary_data as get_ngc6819_binary_data
 from bayesian.ngc188_util import get_binary_data as get_ngc188_binary_data
 from bayesian.m35_util import get_photometry as get_m35_photometry
-#pylint: enable=unused-import
 from bayesian.ngc6819_util import get_photometry as get_ngc6819_photometry
 from bayesian.ngc188_util import get_photometry as get_ngc188_photometry
+#pylint: enable=unused-import
 
 from bayesian.cluster_util import select_binary_data
 
@@ -221,21 +220,21 @@ def add_preprocessed_data(samples_fname, preprocessed_data, result, config):
 
     if samples_fname in preprocessed_data:
         with open(
-            path.join(config.samples_dir, samples_fname),
-            'rb'
+                path.join(config.samples_dir, samples_fname),
+                'rb'
         ) as samples_f:
             if (
-                hashlib.md5(samples_f.read()).hexdigest()
-                ==
-                preprocessed_data[samples_fname]['checksum']
-                and
-                preprocessed_data[samples_fname]['ptide_grid']
-                ==
-                config.convergence_ptide_grid
-                and
-                preprocessed_data[samples_fname]['quantiles']
-                ==
-                config.convergence_quantiles
+                    hashlib.md5(samples_f.read()).hexdigest()
+                    ==
+                    preprocessed_data[samples_fname]['checksum']
+                    and
+                    preprocessed_data[samples_fname]['ptide_grid']
+                    ==
+                    config.convergence_ptide_grid
+                    and
+                    preprocessed_data[samples_fname]['quantiles']
+                    ==
+                    config.convergence_quantiles
             ):
                 result[preprocessed_data[samples_fname]['system']] = (
                     preprocessed_data[samples_fname]['system_data']
@@ -348,8 +347,8 @@ def get_sampling_data(config, add_quantiles=True):
             quantiles = get_quantiles(samples, config)
             result[system]['quantiles'] = quantiles
             with open(
-                path.join(config.samples_dir, samples_fname),
-                'rb'
+                    path.join(config.samples_dir, samples_fname),
+                    'rb'
             ) as samples_f:
                 preprocessed_data[samples_fname] = dict(
                     checksum=hashlib.md5(samples_f.read()).hexdigest(),
@@ -381,13 +380,13 @@ def plot_single_diagnostic_period(quantile_data,
     axis.set_xscale('log')
     axis.set_xlim(1, 50)
 
-    kwargs=dict()
+    kwargs = dict()
     if label is not None:
         kwargs['label'] = label
     if zorder is not None:
         kwargs['zorder'] = zorder
 
-    quantile_labels =[
+    quantile_labels = [
         'CDF={0:.3f}'.format(cdf) for cdf in config.convergence_quantiles
     ]
     description_quantity = dict(
@@ -448,7 +447,7 @@ def mark_valid_constraint_range(quantiles, axis, config):
         first_valid, last_valid = get_valid_ptide_indices(
             quantiles,
             config
-        )[[0,-1]]
+        )[[0, -1]]
         axis.axvline(x=config.convergence_ptide_grid[first_valid],
                      linewidth=1.5,
                      color='red',
@@ -537,7 +536,6 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
 
 #pylint: disable=too-many-locals
 def plot_single_convergence(*,
-                            binary,
                             system_data,
                             ptide,
                             ptide_ind,
@@ -560,7 +558,7 @@ def plot_single_convergence(*,
     plot_x = numpy.arange(combine_nsteps + 1,
                           len(lgq_values))
     plot_y = numpy.empty((plot_x.size, len(values)),
-                          dtype=float)
+                         dtype=float)
 
     for x_ind, lgq_values_end in enumerate(plot_x):
         lgq_values_start = (
@@ -602,7 +600,6 @@ def plot_single_lgq_quantiles(binary, system_data, ptide, axis, config):
 
     ptide_index = config.convergence_ptide_grid.index(ptide)
     plot_single_convergence(
-        binary=binary,
         system_data=system_data,
         ptide=ptide,
         ptide_ind=ptide_index,
@@ -625,7 +622,6 @@ def plot_single_quantiles_lgq(binary, system_data, ptide, axis, config):
 
     ptide_index = config.convergence_ptide_grid.index(ptide)
     plot_single_convergence(
-        binary=binary,
         system_data=system_data,
         ptide=ptide,
         ptide_ind=ptide_index,
@@ -768,7 +764,7 @@ def plot_single_raftery_lewis_diagnostics(_,
                 for line_x in numpy.atleast_1d(combined):
                     axis.axvline(x=line_x, color=color, zorder=20)
 
-            label=None
+            label = None
 
     axis_list[3].axvspan(xmin=axis_list[3].get_xlim()[0],
                          xmax=system_data['samples'].shape[0],
@@ -930,7 +926,7 @@ def get_subplots(num_systems, plot_type, config):
         sharex='col',
         sharey=('row' if plot_type == 'burnin_period' else 'row'),
         gridspec_kw=dict(wspace=0.05, hspace=0.25),
-        figsize=(8.5,11)
+        figsize=(8.5, 11)
     )
     axes = axes.flatten()
 
@@ -975,8 +971,8 @@ def plot_single_tightest_lgq_posterior(binary, system_data, _, axis, config):
                      'PDF',
                      config,
                      xlabel=r"$\log_{10}Q_\star'$",
-                     xticks=[4,6,8,10,12])
-    axis.set_xticks([5,7,9,11], minor=True)
+                     xticks=[4, 6, 8, 10, 12])
+    axis.set_xticks([5, 7, 9, 11], minor=True)
     axis.set_xticklabels(['']*4, minor=True)
     axis.grid(visible=True, which='both')
 
@@ -1026,6 +1022,8 @@ def save_individual_data_behind_figure(data, plot_type, binary, config):
     )
 
 
+#No clear way to simplify
+#pylint: disable=too-many-branches
 def plot_individual_constraints(plot_data, config):
     """Create plots showing the lgQ(Ptide) constraint for indivdiual systems."""
 
@@ -1132,6 +1130,7 @@ def plot_individual_constraints(plot_data, config):
                                    pad_inches=0)
                 else:
                     pdf.close()
+#pylint: enable=too-many-branches
 
 
 def save_combined_data_behind_figure(data,
@@ -1165,6 +1164,8 @@ def save_combined_data_behind_figure(data,
     tablemaker.toMRT()
 
 
+#TODO: simplify
+#pylint: disable=too-many-locals
 def plot_combined_constraints(plot_data, config):
     """Plot heat-map of joint constraint from all systems in a cluster."""
 
@@ -1206,7 +1207,7 @@ def plot_combined_constraints(plot_data, config):
                 period_range = (-numpy.inf, numpy.inf)
             else:
                 period_range = numpy.array(config.convergence_ptide_grid)[
-                    valid_ptide_indices[[0,-1]]
+                    valid_ptide_indices[[0, -1]]
                 ]
             min_lgq = 4 if samples['lgQ_min'].min() < 5 else 5
 
@@ -1289,10 +1290,12 @@ def plot_combined_constraints(plot_data, config):
                 all_combined_plotter.combined_pdf.ppf(cdf)
                 for cdf in config.convergence_quantiles
             ]
+    rcParams['font.size'] = orig_font_size
     return selected_quantiles
+#pylint: enable=too-many-locals
 
 
-def create_tightest_constraint_latex(data_behind, cluster, config):
+def create_tightest_constraint_latex(data_behind, cluster):
     """Save individual tightest vs global constraints as latex table."""
 
     latex_columns = []
@@ -1334,7 +1337,9 @@ def create_tightest_constraint_latex(data_behind, cluster, config):
                 'c'*(2 if cluster == 'M35' else 4)
             ),
             header_start=(
-                r'&&\multicolumn{4}{c@{\quad\quad\quad}}{\textbf{Individual CDF$^{-1}$}} & '
+                r'&&\multicolumn{4}{c@{\quad\quad\quad}}'
+                +
+                r'{\textbf{Individual CDF$^{-1}$}} & '
                 +
                 r'\multicolumn{'
                 +
@@ -1355,6 +1360,8 @@ def create_tightest_constraint_latex(data_behind, cluster, config):
     )
 
 
+#TODO: simplify
+#pylint: disable=too-many-locals
 def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
     """Plot tightest constraints as error bars vs tidal period."""
 
@@ -1491,7 +1498,8 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
             cluster + '_individual_vs_combined_constraints.mrt',
             config
         )
-        create_tightest_constraint_latex(data_behind, cluster, config)
+        create_tightest_constraint_latex(data_behind, cluster)
+#pylint: enable=too-many-locals
 
 
 def main(config):
@@ -1501,21 +1509,20 @@ def main(config):
         download_latest_samples(config.samples_dir)
 
     plot_data = get_sampling_data(config)
-    combined_quantiles = None
     plot_individual_constraints(plot_data, config)
-    exit(0)
-    combined_quantiles = plot_combined_constraints(plot_data, config)
-    if (
-            combined_quantiles is None
-            and
-            path.exists(config.combined_quantiles_pickle)
-    ):
-        with open(config.combined_quantiles_pickle, 'rb') as quanntile_pickle:
-            combined_quantiles = pickle.load(quanntile_pickle)
-    elif combined_quantiles is not None:
-        with open(config.combined_quantiles_pickle, 'wb') as quanntile_pickle:
-            pickle.dump(combined_quantiles, quanntile_pickle)
-    plot_tightest_constraints(plot_data, config, combined_quantiles)
+#    combined_quantiles = None
+#    combined_quantiles = plot_combined_constraints(plot_data, config)
+#    if (
+#            combined_quantiles is None
+#            and
+#            path.exists(config.combined_quantiles_pickle)
+#    ):
+#        with open(config.combined_quantiles_pickle, 'rb') as quanntile_pickle:
+#            combined_quantiles = pickle.load(quanntile_pickle)
+#    elif combined_quantiles is not None:
+#        with open(config.combined_quantiles_pickle, 'wb') as quanntile_pickle:
+#            pickle.dump(combined_quantiles, quanntile_pickle)
+#    plot_tightest_constraints(plot_data, config, combined_quantiles)
 
 
 if __name__ == '__main__':

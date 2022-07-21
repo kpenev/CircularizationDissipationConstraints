@@ -55,7 +55,6 @@ class PriorTransformWindemuth(PriorTransformBase):
 
     def __init__(self,
                  samples,
-                 envelope_eccentricity,
                  initial_sample_weights,
                  kernels=None,
                  **parent_kwargs):
@@ -65,10 +64,6 @@ class PriorTransformWindemuth(PriorTransformBase):
         Args:
             samples(pandas.DataFrame):    The samples for a given Kepler EB from
                 Windemuth et. al. (2019).
-
-            envelope_eccentricity(float):    The value of the
-                period-eccentricity envelope evaluated at the orbital period of
-                the system being sampled.
 
             initial_sample_weights(array):    Weight to apply to each of the
                 samples when combining to get the distribution to sample from.

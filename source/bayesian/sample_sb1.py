@@ -10,10 +10,6 @@ from astropy import units
 from scipy import stats
 import dynesty
 
-from stellar_evolution.manager import StellarEvolutionManager
-from orbital_evolution.evolve_interface import library as\
-    orbital_evolution_library
-
 #Fixed module search paths, not intended to provide anything.
 #pylint: disable=unused-import
 import update_search_paths

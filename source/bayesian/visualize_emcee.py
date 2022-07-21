@@ -652,7 +652,7 @@ class FrequencyDependencePlotter:
         plot_args = dict(shading='flat', cmap='viridis', zorder=10)
 
         if self.config.combined_constraint_heat_map == 'log':
-            with numpy.errstate(divide = 'ignore'):
+            with numpy.errstate(divide='ignore'):
                 plot_z = numpy.log10(plot_z)
             plot_args['vmin'] = numpy.log10(plot_z_min)
         else:

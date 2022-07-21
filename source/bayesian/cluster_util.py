@@ -13,7 +13,8 @@ from sample_sb1_masses import SampleSB1Masses
 
 _logger = logging.getLogger(__name__)
 
-def get_rv_likelihood(observed_orbit,
+def get_rv_likelihood(*,
+                      observed_orbit,
                       eccentricity_envelope,
                       num_parallel_processes,
                       interpolation_accuracy=1e-4,

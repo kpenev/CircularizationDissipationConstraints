@@ -52,7 +52,6 @@ def prepare_sampling(config):
     )
     prior_transform = PriorTransformWindemuth(
         samples,
-        envelope_eccentricity,
         initial_sample_weights=log_likelihood.envelope_weights,
         independent_parameter_distributions=get_common_binary_star_priors(
             config,

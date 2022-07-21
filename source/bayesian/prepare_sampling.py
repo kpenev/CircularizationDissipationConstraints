@@ -7,12 +7,14 @@ import traceback
 
 from bayesian.sample_sb1 import prepare_sampling
 from bayesian.sampling import setup_process
-from bayesian.parse_command_line import get_binary_ids, parse_command_line
+from bayesian.parse_command_line import \
+    get_cluster_binary_ids, \
+    parse_command_line
 
 def main(config):
     """Avoid polluting global namespace."""
 
-    for binary_id in get_binary_ids()[config.cluster]:
+    for binary_id in get_cluster_binary_ids()[config.cluster]:
         config.system = config.cluster + '_' + str(binary_id)
         setup_process(config)
         logging.info('Preparing sampling of %s', config.system)
