@@ -185,15 +185,9 @@ if __name__ == '__main__':
                         type=float)
     parser.add_argument('--system', help='Store the name of the star-exoplanet system')
     args = parser.parse_args()
-    if args.system:
-        e_dist = EccentricityDistribution(measured_eccentricity=args.eccentricity,
-                                          eccentricity_upper_uncertainty=args.eccentricity_upper_uncertainty,
-                                          eccentricity_lower_uncertainty=args.eccentricity_lower_uncertainty,
-                                          envelope_eccentricity=args.envelope_eccentricity,
-                                          system_name=args.system)
-    else:
-        e_dist = EccentricityDistribution(measured_eccentricity=args.eccentricity,
-                                          eccentricity_upper_uncertainty=args.eccentricity_upper_uncertainty,
-                                          eccentricity_lower_uncertainty=args.eccentricity_lower_uncertainty,
-                                          envelope_eccentricity=args.envelope_eccentricity)
+    e_dist = EccentricityDistribution(measured_eccentricity=args.eccentricity,
+                                      eccentricity_upper_uncertainty=args.eccentricity_upper_uncertainty,
+                                      eccentricity_lower_uncertainty=args.eccentricity_lower_uncertainty,
+                                      envelope_eccentricity=args.envelope_eccentricity,
+                                      system_name=args.system if args.system else "Star-Exoplanet")
     e_dist.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
