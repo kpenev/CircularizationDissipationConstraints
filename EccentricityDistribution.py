@@ -24,19 +24,20 @@ class SuperEccentricityDistribution(metaclass=ABCMeta):
 class EccentricityDistribution(SuperEccentricityDistribution):
 
     def __init__(self,
-                 args,
+                 measured_eccentricity,
+                 eccentricity_upper_uncertainty,
+                 eccentricity_lower_uncertainty,
+                 envelope_eccentricity,
+                 system_name = 'Star_exoplanet system',
                  percentile_for_e_now_upper_uncertainty=phi(1),  # or sometimes 1 - alpha(68.0)/2
                  percentile_for_e_now_lower_uncertainty=1 - phi(1),  # or sometimes alpha(68.0)/2
                  ):
 
-        self.measured_e_now = args.eccentricity
-        self.e_now_upper_uncertainty = args.eccentricity_upper_uncertainty
-        self.e_now_lower_uncertainty = args.eccentricity_lower_uncertainty
-        if args.system:
-            self.system_name = args.system
-        else:
-            self.system_name = 'Star-Exoplanet system'
-        self.e_env = args.envelope_eccentricity
+        self.measured_e_now = measured_eccentricity
+        self.e_now_upper_uncertainty = eccentricity_upper_uncertainty
+        self.e_now_lower_uncertainty = eccentricity_lower_uncertainty
+        self.e_env = envelope_eccentricity
+        self.system_name = system_name
 
         self.percentile_for_e_now_upper_uncertainty = percentile_for_e_now_upper_uncertainty
         self.percentile_for_e_now_lower_uncertainty = percentile_for_e_now_lower_uncertainty
@@ -184,5 +185,15 @@ if __name__ == '__main__':
                         type=float)
     parser.add_argument('--system', help='Store the name of the star-exoplanet system')
     args = parser.parse_args()
-    e_dist = EccentricityDistribution(args=args)
+    if args.system:
+        e_dist = EccentricityDistribution(measured_eccentricity=args.eccentricity,
+                                          eccentricity_upper_uncertainty=args.eccentricity_upper_uncertainty,
+                                          eccentricity_lower_uncertainty=args.eccentricity_lower_uncertainty,
+                                          envelope_eccentricity=args.envelope_eccentricity,
+                                          system_name=args.system)
+    else:
+        e_dist = EccentricityDistribution(measured_eccentricity=args.eccentricity,
+                                          eccentricity_upper_uncertainty=args.eccentricity_upper_uncertainty,
+                                          eccentricity_lower_uncertainty=args.eccentricity_lower_uncertainty,
+                                          envelope_eccentricity=args.envelope_eccentricity)
     e_dist.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
