@@ -1,5 +1,6 @@
 from astropy import units as un
 import argparse
+
 class System:
     def __init__(self,
                  primary_mass,
