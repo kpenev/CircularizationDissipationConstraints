@@ -28,7 +28,8 @@ class EccentricityDistribution(SuperEccentricityDistribution):
                  e_now_lower_uncertainty,
                  e_env,
                  percentile_for_e_now_upper_uncertainty=phi(1),  # or sometimes 1 - alpha(68.0)/2
-                 percentile_for_e_now_lower_uncertainty=1 - phi(1)  # or sometimes alpha(68.0)/2
+                 percentile_for_e_now_lower_uncertainty=1 - phi(1),  # or sometimes alpha(68.0)/2
+                 system = 'Star-Exoplanet'
                  ):
 
         self.mean_e_now = mean_e_now
@@ -36,6 +37,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         self.e_now_lower_uncertainty = e_now_lower_uncertainty
         self.percentile_for_e_now_upper_uncertainty = percentile_for_e_now_upper_uncertainty
         self.percentile_for_e_now_lower_uncertainty = percentile_for_e_now_lower_uncertainty
+        self.system_name = system
 
         self.rice_parameters_are_found = True
         self.e_env = e_env
@@ -134,30 +136,33 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         # naming the y axis
         plt.ylabel('probability density of eccentricity (f(e))')
         # giving a title to my graph
-        plt.title('Probability density of eccentricity vs. eccentricity')
+        plt.title('Probability density of eccentricity vs. eccentricity for %(system)s.pdf' % dict(system=self.system_name))
+
+        plt.savefig('Probability density of eccentricity vs. eccentricity for %(system)s.pdf' % dict(system=self.system_name))
         # function to show the plot
         plt.show()
-        plt.savefig('Probability density of eccentricity vs. eccentricity.pdf')
         plt.plot(eccentricity, M_cdf, label="cdf of M(e) vs. eccentricity (e)")
         # naming the x axis
         plt.xlabel('Eccentricity (e)')
         # naming the y axis
         plt.ylabel('M_cdf ')
         # giving a title to my graph
-        plt.title('CDF of M(e) vs. eccentricity, e')
+        plt.title('CDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(system=self.system_name))
         # function to show the plot
+        plt.savefig('CDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(system=self.system_name))
         plt.show()
-        plt.savefig('CDF of M(e) vs. eccentricity, e')
+
         plt.plot(eccentricity, M_pdf, label="pdf of M(e) vs. eccentricity (e)")
         # naming the x axis
         plt.xlabel('Eccentricity (e)')
         # naming the y axis
         plt.ylabel('M_pdf ')
         # giving a title to my graph
-        plt.title('M_pdf of eccentricity vs eccentricity')
+        plt.title('PDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(system=self.system_name))
+
+        plt.savefig('PDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(system=self.system_name))
         # function to show the plot
         plt.show()
-        plt.savefig('PDF of M(e) vs. eccentricity, e')
         return
 
 if __name__ == '__main__':
