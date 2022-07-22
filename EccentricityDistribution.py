@@ -8,6 +8,7 @@ import numpy as np
 from scipy.special import i0
 from scipy.integrate import nquad
 import matplotlib.pyplot as plt
+import argparse
 
 def phi(z):
     return 0.5 * (1 + erf(z / math.sqrt(2)))
@@ -23,33 +24,35 @@ class SuperEccentricityDistribution(metaclass=ABCMeta):
 class EccentricityDistribution(SuperEccentricityDistribution):
 
     def __init__(self,
-                 mean_e_now,
-                 e_now_upper_uncertainty,
-                 e_now_lower_uncertainty,
-                 e_env,
+                 args,
                  percentile_for_e_now_upper_uncertainty=phi(1),  # or sometimes 1 - alpha(68.0)/2
                  percentile_for_e_now_lower_uncertainty=1 - phi(1),  # or sometimes alpha(68.0)/2
-                 system = 'Star-Exoplanet'
                  ):
 
-        self.mean_e_now = mean_e_now
-        self.e_now_upper_uncertainty = e_now_upper_uncertainty
-        self.e_now_lower_uncertainty = e_now_lower_uncertainty
+        self.measured_e_now = args.eccentricity
+        self.e_now_upper_uncertainty = args.eccentricity_upper_uncertainty
+        self.e_now_lower_uncertainty = args.eccentricity_lower_uncertainty
+        if args.system:
+            self.system_name = args.system
+        else:
+            self.system_name = 'Star-Exoplanet system'
+        self.e_env = args.envelope_eccentricity
+
         self.percentile_for_e_now_upper_uncertainty = percentile_for_e_now_upper_uncertainty
         self.percentile_for_e_now_lower_uncertainty = percentile_for_e_now_lower_uncertainty
-        self.system_name = system
+
 
         self.rice_parameters_are_found = True
-        self.e_env = e_env
+
         self.b, self.s = self.roots_for_Rice_parameters()
         self.inv_norm = self.cdf(1.0)
 
     def equations_to_be_solved_for_Rice_distribution_parameters(self, x):
         b = x[0]
         s = x[1]
-        first = rice.cdf((self.mean_e_now + self.e_now_upper_uncertainty), b,
+        first = rice.cdf((self.measured_e_now + self.e_now_upper_uncertainty), b,
                          scale=s) - self.percentile_for_e_now_upper_uncertainty
-        second = rice.cdf((self.mean_e_now + self.e_now_lower_uncertainty), b,
+        second = rice.cdf((self.measured_e_now + self.e_now_lower_uncertainty), b,
                           scale=s) - self.percentile_for_e_now_lower_uncertainty
         if math.isnan(first) or math.isnan(second):
             logging.warning('Iteration does not converge')
@@ -58,7 +61,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
 
     def equation_to_be_solved_for_Rice_distribution_parameter_s_when_b_zero(self, x):
         s = x[0]
-        eqn = rice.cdf((self.mean_e_now + self.e_now_upper_uncertainty), 0,
+        eqn = rice.cdf((self.measured_e_now + self.e_now_upper_uncertainty), 0,
                        scale=s) - self.percentile_for_e_now_upper_uncertainty
         if math.isnan(eqn):
             logging.warning('Iteration does not converge')
@@ -67,7 +70,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
 
     def roots_for_Rice_parameters(self):
         estimated_s = self.e_now_upper_uncertainty
-        if self.mean_e_now == 0:
+        if self.measured_e_now == 0:
             try:
                 s = fsolve(self.equation_to_be_solved_for_Rice_distribution_parameter_s_when_b_zero,
                            np.asarray([estimated_s]))
@@ -78,7 +81,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
             else:
                 self.rice_parameters_are_found = True
                 return [0, s[0]]
-        estimated_b = self.mean_e_now / (self.e_now_upper_uncertainty)
+        estimated_b = self.measured_e_now / (self.e_now_upper_uncertainty)
         roots = [math.nan, math.nan]
         try:
             roots = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters,
@@ -166,8 +169,20 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         return
 
 if __name__ == '__main__':
-    test1 = EccentricityDistribution(mean_e_now=0.39,
-                                     e_now_upper_uncertainty=0.2,
-                                     e_now_lower_uncertainty=-0.2,
-                                     e_env=0.40)
-    test1.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('eccentricity',
+                        help='Store the present measured mean or mod eccentricity of the orbit',
+                        type=float)
+    parser.add_argument('eccentricity_upper_uncertainty',
+                        help='Store the upper uncertainty of the measured present eccentricity',
+                        type=float)
+    parser.add_argument('eccentricity_lower_uncertainty',
+                        help='Store the lower uncertainty of the measured present eccentricity',
+                        type=float)
+    parser.add_argument('envelope_eccentricity',
+                        help='Store the envelope eccentricity',
+                        type=float)
+    parser.add_argument('--system', help='Store the name of the star-exoplanet system')
+    args = parser.parse_args()
+    e_dist = EccentricityDistribution(args=args)
+    e_dist.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
