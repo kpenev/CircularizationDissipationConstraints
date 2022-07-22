@@ -139,7 +139,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         # naming the y axis
         plt.ylabel('probability density of eccentricity (f(e))')
         # giving a title to my graph
-        plt.title('Probability density of eccentricity vs. eccentricity for %(system)s.pdf' % dict(system=self.system_name))
+        plt.title('Probability density of eccentricity vs. eccentricity for %(system)s' % dict(system=self.system_name))
 
         plt.savefig('Probability density of eccentricity vs. eccentricity for %(system)s.pdf' % dict(system=self.system_name))
         # function to show the plot
@@ -150,7 +150,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         # naming the y axis
         plt.ylabel('M_cdf ')
         # giving a title to my graph
-        plt.title('CDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(system=self.system_name))
+        plt.title('CDF of M(e) vs. eccentricity, e for %(system)s' % dict(system=self.system_name))
         # function to show the plot
         plt.savefig('CDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(system=self.system_name))
         plt.show()
@@ -161,7 +161,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         # naming the y axis
         plt.ylabel('M_pdf ')
         # giving a title to my graph
-        plt.title('PDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(system=self.system_name))
+        plt.title('PDF of M(e) vs. eccentricity, e for %(system)s' % dict(system=self.system_name))
 
         plt.savefig('PDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(system=self.system_name))
         # function to show the plot
