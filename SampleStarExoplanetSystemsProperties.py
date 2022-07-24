@@ -736,3 +736,27 @@ class SamplingPropertiesOfSystem:
 
             self.log_likelihood_instance.MCMC()
 
+if __name__ == '__main__':
+
+    test2 = EnvelopeEccentricityDistribution.EnvelopeEccentricityDistribution()
+    print('Binary systems whose probability density of eccentricity can be figured out:')
+    index = test2.print_properties_of_binary_systems_satisfying_constraints()
+    means, standard_deviations, system_name = test2.properties_of_ith_binary_system_if_satisfies_constraints(index[15])
+    means['ratio of planet to stellar radius'] = 0.0149
+    standard_deviations['ratio_of_planet_to_stellar_radius_upper_uncertainty'] = 0.0002
+    standard_deviations['ratio_of_planet_to_stellar_radius_lower_uncertainty'] = -0.0002
+    print('Print properties of the chosen binary system: means = ', means, ' standard deviations = ',
+          standard_deviations, ' Star-Exoplanet system name = ', system_name)
+    print('*********************************************************')
+    InitializationOfSamplingPropertiesOfSystem()
+
+    if FeHConditionalLikelihoodBase.interpolator == None:
+        print('None')
+    else:
+        print('good')
+
+    test3 = SamplingPropertiesOfSystem(means,
+                                       standard_deviations,
+                                       system_name=system_name,
+                                       envelope_eccentricity_function=test2.envelope_eccentricity_function
+                                       )
