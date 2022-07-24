@@ -3,25 +3,66 @@ import numpy as np
 import Star_Exoplanet_system_io
 import Constraints_for_selecting_systems
 import matplotlib.pyplot as plt
+import logging
+import argparse
+
+
 
 def getPathOfExoplanetSystemsData():
     return '/home/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv'
 
 
+def envelope_eccentricity_function(x,
+                                   threshold_value_of_envelope_eccentricity = 0.01,
+                                   largest_acceptable_value_of_envelope_eccentricity = 0.5):
+
+    """
+        Workout the envelope eccentricity given the log(semi major axis / planetary radius)
+         from a scatter plot of eccentricity vs. log(semi major axis/planetary radius) graph
+
+        Args:
+            x:                                                            log(semi major axis/ secondary radius)
+            threshold_value_of_envelope_eccentricity:                     threshold value of envelope eccentricity
+            largest_acceptable_value_of_envelope_eccentricity:            largest acceptable value of envelope eccentricity
+
+        Returns:
+            envelope eccentricity
+    """
+
+    logx = math.log(x, 10)
+    crit1 = -2.7
+    crit2 = -2.32
+    if logx <= crit1:
+        return threshold_value_of_envelope_eccentricity
+    if logx > crit2:
+        logging.warning('Tidal effect on this system is negligible')
+        return largest_acceptable_value_of_envelope_eccentricity
+    if logx > crit1 and logx <= crit2:
+        return threshold_value_of_envelope_eccentricity + (logx - crit1) * (
+                largest_acceptable_value_of_envelope_eccentricity - threshold_value_of_envelope_eccentricity) / (
+                       crit2 - crit1)
+    return
+
 
 class EnvelopeEccentricityDistribution:
+    path_name_of_exoplanet_systems_database = getPathOfExoplanetSystemsData()
+
+    @classmethod
+    def get_path_name_of_exoplanet_systems_database(cls):
+        return cls.path_name_of_exoplanet_systems_database
+
+    @classmethod
+    def set_path_name_of_exoplanet_systems_database(cls, path_name):
+        cls.path_name_of_exoplanet_systems_database = path_name
 
     def __init__(self,
-                 path = getPathOfExoplanetSystemsData(),
                  maximum_number_of_data_points=math.inf,
                  threshold_value_of_envelope_eccentricity=0.001,
                  constraints=Constraints_for_selecting_systems.constraints_for_eccentricity_envelope(),
                  largest_acceptable_value_of_envelope_eccentricity=0.5
                  ):
 
-        self.path = path
-
-        readPlanet = Star_Exoplanet_system_io.read_nasa_planets(self.path,
+        readPlanet = Star_Exoplanet_system_io.read_nasa_planets(self.path_name_of_exoplanet_systems_database,
                                        eliminate=('SWEEPS-11', 'HD 41004 B', 'PSR J1719-1438', 'K2-22', 'HATS-67 b'),
                                        need_ages=False, )
 
@@ -101,6 +142,7 @@ class EnvelopeEccentricityDistribution:
                                                                                          threshold_value_of_envelope_eccentricity,
                                                                                          largest_acceptable_value_of_envelope_eccentricity,
                                                                                          constraints)
+
 
     def create_envelope_eccentricity_function(self,
                                               maximum_number_of_data_points,
@@ -323,6 +365,7 @@ class EnvelopeEccentricityDistribution:
         #string = 'Present Eccentricity vs. ' + x_attribute_
         #plt.title(string)
         plt.xscale("log")
+        plt.savefig("Envelope Eccentricity Distribution.pdf")
         plt.show()
         return
 
@@ -450,3 +493,13 @@ class EnvelopeEccentricityDistribution:
                 index_of_binary_system_with_constrained_properties = index_of_binary_system_with_constrained_properties + [
                     i]
         return index_of_binary_system_with_constrained_properties
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--path',
+                        help='Store the path of the file name where the database of star-exoplanet systems is saved'
+                        )
+    args = parser.parse_args()
+
+    if args.path:
+        EnvelopeEccentricityDistribution.set_path_name_of_exoplanet_systems_database(args.path)
