@@ -307,7 +307,7 @@ def add_sampling_parameters(parser):
         '--initial-eccentricity',
         type=float,
         nargs=2,
-        default=(0.5, 0.5),
+        default=(0.8, 0.8),
         help='The range to use for the uniform prior on initial eccentricity.'
     )
     parser.add_argument(
@@ -320,7 +320,7 @@ def add_sampling_parameters(parser):
     sampling.add_argument(
         '--mcmc-nwalkers',
         type=int,
-        default=12,
+        default=64,
         help='The number of walkers in the MCMC ensemble. Ignored if nested '
         'sampling is used.'
     )

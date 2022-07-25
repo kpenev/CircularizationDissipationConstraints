@@ -66,6 +66,19 @@ def main(config):
 
     setup_process(config)
 
+    log_likelihood_windemuth_et_al, prior_transform = prepare_sampling(config)
+
+    num_params = prior_transform.count_sampled_parameters()
+
+    logging.info(
+        'Starting %s sampling of binary %s with %d free parameters.',
+        config.sampling,
+        config.system,
+        num_params
+    )
+
+
+
 
 if __name__ == '__main__':
     try:
