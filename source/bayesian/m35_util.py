@@ -10,7 +10,8 @@ import pandas
 import numpy
 from scipy import stats
 
-from planetary_system_io import read_pipe_table_to_pandas
+from general_purpose_python_modules.planetary_system_io import \
+    read_pipe_table_to_pandas
 from command_line_utilities import data_dir
 from cmd_utils import CMDPhotometryInterpolator
 from process_e_Q_grid import LinearEccentricityEnvelope

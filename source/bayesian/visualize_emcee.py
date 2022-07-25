@@ -18,9 +18,9 @@ from scipy import stats
 from asteval import Interpreter
 from astropy.table import Table
 
-from combined_mcmc_constraint import CombinedMCMCConstraint
-
-from visuals import make_corner_plot
+from general_purpose_python_modules.combined_mcmc_constraint import \
+    CombinedMCMCConstraint
+from general_purpose_python_modules.visuals import make_corner_plot
 
 #Interface specified by argparse module.
 #pylint: disable=too-few-public-methods

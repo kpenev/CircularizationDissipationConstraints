@@ -8,7 +8,7 @@ import traceback
 import numpy
 from scipy.stats import rdist
 
-from kde import KDEDistribution
+from general_purpose_python_modules.kde import KDEDistribution
 
 from bayesian.parse_command_line import parse_command_line
 from bayesian.binary_utils import \

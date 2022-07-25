@@ -11,7 +11,8 @@ import pandas
 import numpy
 from scipy import stats
 
-from planetary_system_io import read_cds_pipe_table
+from general_purpose_python_modules.planetary_system_io import \
+    read_cds_pipe_table
 from command_line_utilities import data_dir
 from cmd_utils import\
     CMDPhotometryInterpolator,\

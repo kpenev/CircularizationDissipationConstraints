@@ -3,7 +3,7 @@
 import numpy
 from astropy import units
 
-from binary_utils import rv_semi_amplitude_scale
+from general_purpose_python_modules.binary_utils import rv_semi_amplitude_scale
 
 from bayesian.log_likelihood_binary_stars import LogLikelihoodBinaryStars
 

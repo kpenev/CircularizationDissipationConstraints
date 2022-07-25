@@ -6,7 +6,9 @@ import numpy
 from scipy import optimize
 from astropy import units, constants
 
-from binary_utils import rv_semi_amplitude_scale, calculate_secondary_mass
+from general_purpose_python_modules.binary_utils import \
+    rv_semi_amplitude_scale, \
+    calculate_secondary_mass
 from sample_binary_masses import SampleBinaryMasses
 
 class SampleSB1Masses(SampleBinaryMasses):

@@ -18,13 +18,16 @@ import numpy
 from astropy.table import Table
 from cdspyreadme import CDSTablesMaker
 
-from kde import KDEDistribution
-from emcee_autocorrelation import\
+from general_purpose_python_modules.kde import KDEDistribution
+from general_purpose_python_modules.emcee_autocorrelation import\
     average_autocorr#,\
 #    max_likelihood_autocorr
-from mcmc_quantile_convergence import get_raftery_lewis_diagnostics
-from emcee_quantile_convergence import find_emcee_quantiles
-from combined_mcmc_constraint import CombinedMCMCConstraint
+from general_purpose_python_modules.mcmc_quantile_convergence import \
+    get_raftery_lewis_diagnostics
+from general_purpose_python_modules.emcee_quantile_convergence import \
+    find_emcee_quantiles
+from general_purpose_python_modules.combined_mcmc_constraint import \
+    CombinedMCMCConstraint
 
 from bayesian.visualize_emcee import\
     add_frequency_dependence_plot_config,\

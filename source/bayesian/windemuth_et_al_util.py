@@ -175,8 +175,9 @@ def get_available_kic():
     return data.index[valid].to_numpy()
 
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+def plot_eccentricity_vs_period(plot_fname=None):
+    """Plot or show period-eccentricity envelope and data it is based on."""
+
     available_kic = get_available_kic()
 
     plot_data = numpy.empty(len(available_kic), dtype=[('KIC', int),
@@ -253,4 +254,12 @@ if __name__ == '__main__':
                 eccentricity_envelope(envelope_x),
                 '-k')
     pyplot.legend()
-    pyplot.show()
+    if plot_fname is None:
+        pyplot.show()
+    else:
+        pyplot.savefig(plot_fname)
+
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    plot_eccentricity_vs_period('w19_period_eccentricity.pdf')

@@ -6,7 +6,8 @@ import numpy
 
 from stellar_evolution.library_interface import \
     library as poet_stellar_evolution
-from kde import KDEDistribution
+from general_purpose_python_modules.kde import KDEDistribution
+
 from bayesian.prior_transform_base import PriorTransformBase
 
 class PriorTransformWindemuth(PriorTransformBase):

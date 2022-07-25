@@ -6,8 +6,10 @@ import os.path
 import numpy
 from configargparse import ArgumentParser, DefaultsFormatter
 
-from split_normal_distribution import split_normal
-from planetary_system_io import read_cds_pipe_table
+from general_purpose_python_modules.split_normal_distribution import \
+    split_normal
+from general_purpose_python_modules.planetary_system_io import \
+    read_cds_pipe_table
 
 #False positive (hanhdled in __init__.py).
 #pylint: disable=import-error
