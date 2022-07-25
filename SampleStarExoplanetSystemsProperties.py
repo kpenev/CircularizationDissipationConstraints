@@ -3,6 +3,11 @@ import os
 import logging
 from datetime import datetime
 import math
+
+sys.path.append('/home/mmmahmud/CircularizationDissipationConstraints/source')
+sys.path.append('/home/mmmahmud/general_purpose_python_modules')
+sys.path.append('/home/mmmahmud/CircularizationDissipationConstraints/data')
+
 from split_normal_distribution import split_normal
 from bayesian.stellar_param_sampling.poet_interp_likelihood import POETInterpLikelihood
 from bayesian.stellar_param_sampling.star_sampler import StarSampler
