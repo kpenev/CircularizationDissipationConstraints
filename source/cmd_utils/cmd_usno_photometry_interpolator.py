@@ -9,8 +9,10 @@ import os.path
 from matplotlib import pyplot
 import scipy
 
-from planetary_system_io import read_cds_pipe_table
-from magnitude_transformations import sdss_to_usno
+from general_purpose_python_modules.planetary_system_io import \
+    read_cds_pipe_table
+from general_purpose_python_modules.magnitude_transformations import \
+    sdss_to_usno
 
 from command_line_utilities import data_dir
 #False positive

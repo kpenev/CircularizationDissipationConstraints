@@ -11,7 +11,8 @@ from matplotlib import pyplot
 import numpy
 
 #pylint: disable=wrong-import-position
-from planetary_system_io import read_cds_pipe_table
+from general_purpose_python_modules.planetary_system_io import \
+    read_cds_pipe_table
 #pylint: disable=import-error
 from command_line_utilities import data_dir
 from cmd_isochrone_interpolator import CMDInterpolator

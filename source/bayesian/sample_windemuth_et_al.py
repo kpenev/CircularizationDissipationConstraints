@@ -25,15 +25,24 @@ def prepare_sampling(config):
     interpolator = prepare_sampling_common(config)
     samples = get_samples(config.system)
     envelope_eccentricity = eccentricity_envelope(numpy.median(samples['P']))
+    eccentricity_samples = numpy.sqrt(
+        samples['esinw']**2
+        +
+        samples['ecosw']**2
+    )
     eccentricity_kernel = rdist(
         c=4,
         scale=max(
-            (numpy.std(samples['e']) * samples['e'].size**(-0.2)),
+            (
+                numpy.std(eccentricity_samples)
+                *
+                eccentricity_samples.size**(-0.2)
+            ),
             0.001
         )
     )
 
-    observed_eccentricity_distro = KDEDistribution(samples['e'],
+    observed_eccentricity_distro = KDEDistribution(eccentricity_samples,
                                                    eccentricity_kernel)
 
     log_likelihood = LogLikelihoodWindemuth(

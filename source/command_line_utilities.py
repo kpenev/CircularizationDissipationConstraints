@@ -5,7 +5,8 @@ import os.path
 from astropy import units
 import numpy
 
-from planetary_system_io import QuantityWithErrors
+from general_purpose_python_modules.planetary_system_io import \
+    QuantityWithErrors
 
 data_dir = os.path.join(
     os.path.dirname(
