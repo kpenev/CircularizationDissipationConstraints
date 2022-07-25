@@ -3,6 +3,7 @@ import os
 import logging
 from datetime import datetime
 import math
+import json
 
 sys.path.append('/home/mmmahmud/CircularizationDissipationConstraints/source')
 sys.path.append('/home/mmmahmud/general_purpose_python_modules')
@@ -635,11 +636,28 @@ class ConfigObjectForLogging:
         self.logging_level = logging.WARNING
 
 class InitializationOfSamplingPropertiesOfSystem:
-    serialized_directory = getStellarEvolutionInterpolatorsDirectory(),
-    eccentricity_expansion_fname = getEccentricityExpansionCoefficientsFile(),
-    def __init__(self):
+    serialized_directory = getStellarEvolutionInterpolatorsDirectory()
+    eccentricity_expansion_fname = getEccentricityExpansionCoefficientsFile()
 
+    @classmethod
+    def set_serialized_directory(cls, name):
+        cls.serialized_directory = name
+
+    @classmethod
+    def get_serialized_directory(cls):
+        return cls.serialized_directory
+
+    @classmethod
+    def set_eccentricity_expansion_fname(cls, name):
+        cls.eccentricity_expansion_fname = name
+
+    @classmethod
+    def get_eccentricity_expansion_fname(cls):
+        return cls.eccentricity_expansion_fname
+
+    def __init__(self):
         # mp.set_start_method('forkserver')
+        print('serialized directory ', self.serialized_directory)
         manager = StellarEvolutionManager(self.serialized_directory)
         interpolator = manager.get_interpolator_by_name('default')
         FeHConditionalLikelihoodBase.set_interpolator(interpolator)
@@ -649,18 +667,7 @@ class InitializationOfSamplingPropertiesOfSystem:
             True,
             True
         )
-    @classmethod
-    def set_serialized_directory(cls, name):
-        cls.serialized_directory = name
-    @classmethod
-    def get_serialized_directory(cls):
-        return cls.serialized_directory
-    @classmethod
-    def set_eccentricity_expansion_fname(cls, name):
-        cls.eccentricity_expansion_fname = name
-    @classmethod
-    def get_eccentricity_expansion_fname(cls):
-        return cls.eccentricity_expansion_fname
+
 
 class SamplingPropertiesOfSystem:
     def __init__(self,
@@ -765,11 +772,11 @@ if __name__ == '__main__':
                              'secondary mass, primary radius, secondary radius, stellar metallicity, '
                              'orbital period, obliquity, stellar age, present eccentricity, semi-major axis,'
                              'stellar log g, stellar density, stellar effective temperature, ratio of planet to stellar radius',
-                        type=dict)
+                        type=json.loads)
     parser.add_argument('--standard_deviations',
                         help='stores a dictionary containing the standard deviations associated with the measured'
                              'values of the quantities',
-                        type=dict)
+                        type=json.loads)
     parser.add_argument('--system',
                         help = 'stores the name of the star-exoplanet system')
     args = parser.parse_args()
