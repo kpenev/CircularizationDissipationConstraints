@@ -861,7 +861,10 @@ def plot_single_burnin_period(binary, system_data, __, axis, config):
     mark_valid_constraint_range(system_data['quantiles'],
                                 axis,
                                 config)
-    axis.set_ylim(10, 2000)
+    if binary.startswith('M35'):
+        axis.set_ylim(10, 2500)
+    else:
+        axis.set_ylim(10, 2000)
     decorate_subplot(axis, binary, 'emcee steps', config)
     if config.individual_plot_mode == 'pages':
         axis.legend()
@@ -915,7 +918,9 @@ def get_plotting_order(plot_data, restrict_to_cluster=None):
                            'M35_41032',
                            'M35_49043',
                            'NGC188_4999']:
-            result[bad_binary.split('_')[0]].remove(bad_binary)
+            cluster_name = bad_binary.split('_')[0]
+            if not restrict_to_cluster or cluster_name == restrict_to_cluster:
+                result[cluster_name].remove(bad_binary)
 
     if restrict_to_cluster is None:
         return result
@@ -1503,7 +1508,6 @@ def main(config):
     plot_data = get_sampling_data(config)
     combined_quantiles = None
     plot_individual_constraints(plot_data, config)
-    exit(0)
     combined_quantiles = plot_combined_constraints(plot_data, config)
     if (
             combined_quantiles is None
