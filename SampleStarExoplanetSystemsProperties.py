@@ -24,6 +24,7 @@ from orbital_evolution.evolve_interface import library as \
     orbital_evolution_library
 import EnvelopeEccentricityDistribution
 import EccentricityDistribution
+import argparse
 
 if not sys.warnoptions:
     import warnings
@@ -629,22 +630,32 @@ class ConfigObjectForLogging:
         self.logging_level = logging.WARNING
 
 class InitializationOfSamplingPropertiesOfSystem:
-    def __init__(self,
-                 serialized_directory = getStellarEvolutionInterpolatorsDirectory(), # '/home/mmmahmud/poet/stellar_evolution_interpolators',
-                 eccentricity_expansion_fname= getEccentricityExpansionCoefficientsFile(), # b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite"
-                 ):
+    serialized_directory = getStellarEvolutionInterpolatorsDirectory(),
+    eccentricity_expansion_fname = getEccentricityExpansionCoefficientsFile(),
+    def __init__(self):
 
         # mp.set_start_method('forkserver')
-        manager = StellarEvolutionManager(serialized_directory)
+        manager = StellarEvolutionManager(self.serialized_directory)
         interpolator = manager.get_interpolator_by_name('default')
         FeHConditionalLikelihoodBase.set_interpolator(interpolator)
         orbital_evolution_library.prepare_eccentricity_expansion(
-            eccentricity_expansion_fname,
+            self.eccentricity_expansion_fname,
             1e-4,
             True,
             True
         )
-
+    @classmethod
+    def set_serialized_directory(cls, name):
+        cls.serialized_directory = name
+    @classmethod
+    def get_serialized_directory(cls):
+        return cls.serialized_directory
+    @classmethod
+    def set_eccentricity_expansion_fname(cls, name):
+        cls.eccentricity_expansion_fname = name
+    @classmethod
+    def get_eccentricity_expansion_fname(cls):
+        return cls.eccentricity_expansion_fname
 
 class SamplingPropertiesOfSystem:
     def __init__(self,
@@ -738,25 +749,35 @@ class SamplingPropertiesOfSystem:
 
 if __name__ == '__main__':
 
-    test2 = EnvelopeEccentricityDistribution.EnvelopeEccentricityDistribution()
-    print('Binary systems whose probability density of eccentricity can be figured out:')
-    index = test2.print_properties_of_binary_systems_satisfying_constraints()
-    means, standard_deviations, system_name = test2.properties_of_ith_binary_system_if_satisfies_constraints(index[15])
-    means['ratio of planet to stellar radius'] = 0.0149
-    standard_deviations['ratio_of_planet_to_stellar_radius_upper_uncertainty'] = 0.0002
-    standard_deviations['ratio_of_planet_to_stellar_radius_lower_uncertainty'] = -0.0002
-    print('Print properties of the chosen binary system: means = ', means, ' standard deviations = ',
-          standard_deviations, ' Star-Exoplanet system name = ', system_name)
-    print('*********************************************************')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--path_of_the_stellar_evolution_interpolators_directory',
+                        help='Store the path of the directory of the stellar evolution interpolators'
+                        )
+    parser.add_argument('--path_of_the_eccentricity_expansion_coefficients_file',
+                        help='Store the path of the eccentricity expansion coefficients file')
+    parser.add_argument('--measured_values',
+                        help='stores a dictionary containing the measured values of primary mass, '
+                             'secondary mass, primary radius, secondary radius, stellar metallicity, '
+                             'orbital period, obliquity, stellar age, present eccentricity, semi-major axis,'
+                             'stellar log g, stellar density, stellar effective temperature, ratio of planet to stellar radius',
+                        type=dict)
+    parser.add_argument('--standard_deviations',
+                        help='stores a dictionary containing the standard deviations associated with the measured'
+                             'values of the quantities',
+                        type=dict)
+    parser.add_argument('--system',
+                        help = 'stores the name of the star-exoplanet system')
+    args = parser.parse_args()
+
+    if args.path_of_the_stellar_evolution_interpolators_directory:
+        InitializationOfSamplingPropertiesOfSystem.set_serialized_directory(args.path_of_the_stellar_evolution_interpolators_directory)
+    if args.path_of_the_eccentricity_expansion_coefficients_file:
+        InitializationOfSamplingPropertiesOfSystem.set_eccentricity_expansion_fname(args.path_of_the_eccentricity_expansion_coefficients_file)
+
     InitializationOfSamplingPropertiesOfSystem()
 
-    if FeHConditionalLikelihoodBase.interpolator == None:
-        print('None')
-    else:
-        print('good')
-
-    test3 = SamplingPropertiesOfSystem(means,
-                                       standard_deviations,
-                                       system_name=system_name,
-                                       envelope_eccentricity_function=test2.envelope_eccentricity_function
+    test3 = SamplingPropertiesOfSystem(args.measured_values,
+                                       args.standard_deviations,
+                                       system_name=args.system,
+                                       envelope_eccentricity_function=EnvelopeEccentricityDistribution.envelope_eccentricity_function
                                        )
