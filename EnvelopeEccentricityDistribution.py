@@ -61,11 +61,9 @@ class EnvelopeEccentricityDistribution:
                  constraints=Constraints_for_selecting_systems.constraints_for_eccentricity_envelope(),
                  largest_acceptable_value_of_envelope_eccentricity=0.5
                  ):
-
         readPlanet = Star_Exoplanet_system_io.read_nasa_planets(self.path_name_of_exoplanet_systems_database,
                                        eliminate=('SWEEPS-11', 'HD 41004 B', 'PSR J1719-1438', 'K2-22', 'HATS-67 b'),
                                        need_ages=False, )
-
         self.planet_name = readPlanet.pl_name
         self.orbital_period = readPlanet.pl_orbper  # days
         self.orbital_period_upper_uncertainty = readPlanet.pl_orbpererr1
