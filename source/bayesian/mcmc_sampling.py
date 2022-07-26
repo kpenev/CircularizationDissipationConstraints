@@ -76,8 +76,9 @@ def log_probability(unit_cube_values,
                       repr(exclude_from_blob))
     else:
         parameters = tuple(parameters)
-        _logger.debug('Created blob containing all %d parameters.',
-                      len(parameters))
+        _logger.debug('Created blob containing all %d parameters: %s.',
+                      len(parameters),
+                      repr(parameters))
     if track_final_eccentricity:
         parameters += (log_likelihood.final_eccentricity,)
     return (

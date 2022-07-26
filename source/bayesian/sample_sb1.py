@@ -8,7 +8,6 @@ import traceback
 
 from astropy import units
 from scipy import stats
-import dynesty
 
 #Fixed module search paths, not intended to provide anything.
 #pylint: disable=unused-import
@@ -30,12 +29,11 @@ from cluster_util import get_rv_likelihood
 from bayesian.binary_utils import \
     get_common_binary_star_priors,\
     prepare_sampling_common
-from bayesian.sampling import setup_process
 from bayesian.prior_transform_sb1 import PriorTransformSB1
 from bayesian.sample_sb1_masses import SampleSB1Masses
 from bayesian.log_likelihood_sb1 import LogLikelihoodSB1
 from bayesian.parse_command_line import parse_command_line
-from bayesian import mcmc_sampling
+from bayesian.sample import sample
 #pylint: enable=wrong-import-order
 
 def get_independent_priors(config, observed_orbit, custom_util):
@@ -154,35 +152,9 @@ def prepare_sampling(config):
 def main(config):
     """Avoid polluting global namespace."""
 
-    setup_process(config)
-
-#    set_start_method('forkserver')
-
     log_likelihood, prior_transform = prepare_sampling(config)
+    sample(log_likelihood, prior_transform, config)
 
-    num_params = prior_transform.count_sampled_parameters()
-
-    logging.info(
-        'Starting %s sampling of binary %s with %d free parameters.',
-        config.sampling,
-        config.system,
-        num_params
-    )
-
-    if config.sampling.lower() == 'nested':
-        sampler = dynesty.NestedSampler(
-            log_likelihood,
-            prior_transform,
-            ndim=len(log_likelihood.parameter_order),
-            npdim=num_params,
-            nlive=1
-        )
-        sampler.run_nested()
-    else:
-        mcmc_sampling.run(config,
-                          log_likelihood,
-                          prior_transform,
-                          num_params)
 
 if __name__ == '__main__':
     try:

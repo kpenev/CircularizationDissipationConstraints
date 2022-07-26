@@ -190,6 +190,16 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 repr(k) + ':' + repr(v) for k, v in evolve_parameters.items()
             )
         )
+        if (
+                not evolve_parameters['secondary_is_star']
+                and
+                not numpy.isfinite(evolve_parameters['system'].secondary_radius)
+        ):
+            logger.error(
+                'Non-stellar secondary with radius=%s',
+                repr(evolve_parameters['system'].secondary_radius)
+            )
+            return None
 
         while failed and evolve_parameters['initial_eccentricity'] > 0.7:
             try:

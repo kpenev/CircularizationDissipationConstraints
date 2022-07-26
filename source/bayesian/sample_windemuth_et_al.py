@@ -14,10 +14,10 @@ from bayesian.parse_command_line import parse_command_line
 from bayesian.binary_utils import \
     get_common_binary_star_priors,\
     prepare_sampling_common
-from bayesian.sampling import setup_process
 from bayesian.windemuth_et_al_util import get_samples, eccentricity_envelope
 from bayesian.prior_transform_windemuth_et_al import PriorTransformWindemuth
 from bayesian.log_likelihood_windemuth_et_al import LogLikelihoodWindemuth
+from bayesian.sample import sample
 
 def prepare_sampling(config):
     """Return log-likelihood & prior transform for sampling selected binary."""
@@ -30,15 +30,19 @@ def prepare_sampling(config):
         +
         samples['ecosw']**2
     )
-    eccentricity_kernel = rdist(
-        c=4,
-        scale=max(
-            (
-                numpy.std(eccentricity_samples)
-                *
-                eccentricity_samples.size**(-0.2)
-            ),
-            0.001
+    eccentricity_kernel = (
+        'rdist',
+        (),
+        dict(
+            c=4,
+            scale=max(
+                (
+                    numpy.std(eccentricity_samples)
+                    *
+                    eccentricity_samples.size**(-0.2)
+                ),
+                0.001
+            )
         )
     )
 
@@ -73,20 +77,8 @@ def prepare_sampling(config):
 def main(config):
     """Avoid polluting global namespace."""
 
-    setup_process(config)
-
-    log_likelihood_windemuth_et_al, prior_transform = prepare_sampling(config)
-
-    num_params = prior_transform.count_sampled_parameters()
-
-    logging.info(
-        'Starting %s sampling of binary %s with %d free parameters.',
-        config.sampling,
-        config.system,
-        num_params
-    )
-
-
+    log_likelihood, prior_transform = prepare_sampling(config)
+    sample(log_likelihood, prior_transform, config)
 
 
 if __name__ == '__main__':
