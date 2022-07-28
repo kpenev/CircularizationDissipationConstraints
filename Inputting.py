@@ -37,6 +37,9 @@ if __name__ == '__main__':
                         help='Store the lower uncertainty associated with r',
                         type=float
                         )
+    parser.add_argument('--power_of_the_ratio_of_planetary_and_stellar_radius',
+                        help='Store the power of the ratio of planetary and stellar radius'
+                        )
     args = parser.parse_args()
     if args.i:
         measured_values, standard_deviations, system_name = inputting_instance.envelope_eccentricity_distribution_instance.properties_of_ith_binary_system_if_satisfies_constraints(
@@ -49,7 +52,12 @@ if __name__ == '__main__':
         string_standard_deviations = json.dumps(standard_deviations)
 
 
-        string = 'python3 SampleStarExoplanetSystemsProperties.py --measured_values \'' + string_measured_values + '\' --standard_deviations \'' + string_standard_deviations + '\' --system \'' + system_name +'\''
+        if args.power_of_the_ratio_of_planetary_and_stellar_radius:
+            string = 'python3 SampleStarExoplanetSystemsProperties.py --measured_values \'' + string_measured_values + '\' --standard_deviations \'' + string_standard_deviations + '\' --system \'' + system_name + '\' --power_of_the_ratio_of_planetary_and_stellar_radius ' + args.power_of_the_ratio_of_planetary_and_stellar_radius
+        else:
+            string = 'python3 SampleStarExoplanetSystemsProperties.py --measured_values \'' + string_measured_values + '\' --standard_deviations \'' + string_standard_deviations + '\' --system \'' + system_name + '\''
+
+
         print(string)
         os.system(string)
 
