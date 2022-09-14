@@ -80,7 +80,12 @@ def log_probability(unit_cube_values,
                       len(parameters),
                       repr(parameters))
     if track_final_eccentricity:
-        parameters += (log_likelihood.final_eccentricity,)
+        parameters += (
+            getattr(prior_transform,
+                    'eccentricity',
+                    log_likelihood.final_eccentricity)
+            ,
+        )
     return (
         (log_likelihood_value,)
         +
@@ -498,6 +503,7 @@ def recover_initial_positions(config, num_params):
 #pylint: disable=too-many-locals
 def get_initial_state(*,
                       num_params,
+                      lgq_min_param_index,
                       blobs_dtype,
                       log_prob_fn,
                       config,
@@ -543,6 +549,9 @@ def get_initial_state(*,
 
     while positions_found < config.mcmc_nwalkers:
         position, log_prob_result = result_queue.get()
+        _logger.debug('Log-likelihood(%s) = %s',
+                      repr(position),
+                      repr(log_prob_result))
         if log_prob_result[0] > config.mcmc_min_initial_log_probability:
             starting_positions[positions_found, :] = position
             starting_log_prob[positions_found] = log_prob_result[0]
@@ -556,7 +565,14 @@ def get_initial_state(*,
             _logger.debug('%d/%d starting positions found',
                           positions_found,
                           config.mcmc_nwalkers)
-        position_queue.put(numpy.random.rand(num_params))
+            position_queue.put(numpy.random.rand(num_params))
+        else:
+            orig_pos_repr = repr(position)
+            position[lgq_min_param_index] *= numpy.random.rand()
+            _logger.debug('Tweaking starting position to lower Q: %s -> %s',
+                          orig_pos_repr,
+                          repr(position))
+            position_queue.put(position)
 
     for process in workers:
         process.terminate()
@@ -611,12 +627,17 @@ def get_sampler_config_and_initial_state(config,
             log_probability,
             **log_prob_kwargs
         )
-        initial_state = get_initial_state(num_params=num_params,
-                                          blobs_dtype=blobs_dtype,
-                                          log_prob_fn=log_prob_function,
-                                          config=config,
-                                          samples_fname=samples_fname,
-                                          chain_name=chain_name)
+        initial_state = get_initial_state(
+            num_params=num_params,
+            blobs_dtype=blobs_dtype,
+            log_prob_fn=log_prob_function,
+            lgq_min_param_index=(
+                prior_transform.get_unit_cube_indices()['lgQ_min']
+            ),
+            config=config,
+            samples_fname=samples_fname,
+            chain_name=chain_name
+        )
 
     return (
         dict(

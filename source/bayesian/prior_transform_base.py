@@ -34,7 +34,8 @@ class PriorTransformBase(metaclass=ABCMeta):
 
     def _fill_independent_parameters(self,
                                      unit_cube_iter,
-                                     model_parameters):
+                                     model_parameters,
+                                     identify=False):
         """
         Consume unit-cube values to fill independently distributed parameters.
 
@@ -48,6 +49,11 @@ class PriorTransformBase(metaclass=ABCMeta):
                 calculations. The latter is used to count the number of free
                 parameters required.
 
+            identify(bool):    If True, model_parameters are filled with the
+                value in `unit_cube_iter` corresponding to each parameter rather
+                than applying the prior transform. Intended to allow identifying
+                which unit cube entry corresponds to which parameter.
+
         Returns:
             None
         """
@@ -59,7 +65,7 @@ class PriorTransformBase(metaclass=ABCMeta):
         ) in (
             self.independent_parameter_distributions
         ):
-            if distribution is None:
+            if distribution is None or identify:
                 if model_parameters is None:
                     next(unit_cube_iter)
                 else:
@@ -87,7 +93,8 @@ class PriorTransformBase(metaclass=ABCMeta):
     @abstractmethod
     def _fill_coupled_parameters(self,
                                  unit_cube_iter,
-                                 model_parameters):
+                                 model_parameters,
+                                 identify=False):
         """
         Update input with parameters not distributed independntly of all others.
 
@@ -99,6 +106,9 @@ class PriorTransformBase(metaclass=ABCMeta):
             model_parameters:    The independtly distributed parameters already
                 filled by :meth:`_fill_independent_parameters()`. Gets updated
                 with the dependent parameters.
+
+            identify(bool):    See same argument of
+                :meth:`_fill_independent_parameters()`
 
         Returns:
             None
@@ -185,6 +195,7 @@ class PriorTransformBase(metaclass=ABCMeta):
 
         return dict(parameters=transformed_values)
 
+
     def count_sampled_parameters(self):
         """Count the random variates required by the defined transform."""
 
@@ -193,4 +204,25 @@ class PriorTransformBase(metaclass=ABCMeta):
         self._fill_coupled_parameters(counter, None)
         return next(counter)
 
+
+    def get_unit_cube_indices(self):
+        """
+        Return index of unit cube that determines value of each parameter.
+
+        Args:
+            None
+
+        Returns:
+            dict:
+                Keys are the names of the parameters that are being sampled, and
+                the entry is the index within the unit cube that directly
+                determines the value of the corresponding parameter (given
+                values of all prior parameters).
+        """
+
+        result = dict()
+        counter = itertools.count()
+        self._fill_independent_parameters(counter, result, True)
+        self._fill_coupled_parameters(counter, result, True)
+        return result
 #pylint: enable=too-few-public-methods

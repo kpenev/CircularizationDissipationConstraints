@@ -11,7 +11,8 @@ class PriorTransformSB1(PriorTransformBase):
 
     def _fill_coupled_parameters(self,
                                  unit_cube_iter,
-                                 model_parameters):
+                                 model_parameters,
+                                 identify=False):
         """Fills primary and secondary mass."""
 
         if model_parameters is None:
@@ -19,28 +20,32 @@ class PriorTransformSB1(PriorTransformBase):
             next(unit_cube_iter)
             return
 
-        primary_mass, secondary_mass = self._sample_binary_masses(
-            next(unit_cube_iter),
-            next(unit_cube_iter)
-        )
+        if identify:
+            model_parameters['primary_mass'] = next(unit_cube_iter)
+            model_parameters['secondary_mass'] = next(unit_cube_iter)
+        else:
+            primary_mass, secondary_mass = self._sample_binary_masses(
+                next(unit_cube_iter),
+                next(unit_cube_iter)
+            )
 
-        model_parameters['primary_mass'] = primary_mass * units.M_sun
-        model_parameters['secondary_mass'] = secondary_mass * units.M_sun
+            model_parameters['primary_mass'] = primary_mass * units.M_sun
+            model_parameters['secondary_mass'] = secondary_mass * units.M_sun
 
-        for component in ['primary', 'secondary']:
-            model_parameters[
-                'cmd_%s_radius' % component
-            ] = (
-                self
-                .
-                _sample_binary_masses
-                .
-                photometric_constraint
-                .
-                get_component_radius
-            )(
-                model_parameters[component + '_mass'].to_value(units.M_sun)
-            )[0] * units.R_sun
+            for component in ['primary', 'secondary']:
+                model_parameters[
+                    'cmd_%s_radius' % component
+                ] = (
+                    self
+                    .
+                    _sample_binary_masses
+                    .
+                    photometric_constraint
+                    .
+                    get_component_radius
+                )(
+                    model_parameters[component + '_mass'].to_value(units.M_sun)
+                )[0] * units.R_sun
 
     def __init__(self,
                  sample_binary_masses,
