@@ -297,6 +297,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         """Same as :meth:`calculate_log_likelihood` but handles stashing."""
 
         if self._prior_only:
+            logging.getLogger(__name__).info('Prior only log-likelihood: 0.0')
             return 0.0
 
         param_hash = hex(hash(parameters.tostring()))[2:]

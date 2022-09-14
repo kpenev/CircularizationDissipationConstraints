@@ -20,6 +20,15 @@ class LogLikelihoodBinaryStars(LogLikelihoodBase, metaclass=ABCMeta):
             spin_frequency_powers=numpy.array([0.0]),
             reference_phase_lag=phase_lag(
                 self.get_parameter_value(parameters, 'lgQ_min')
+                +
+                self.get_parameter_value(parameters, 'lgQ_inertial_boost')
+            ),
+            inertial_mode_enhancement=10.0**(
+                self.get_parameter_value(parameters, 'lgQ_inertial_boost')
+            ),
+            inertial_mode_sharpness=self.get_parameter_value(
+                parameters,
+                'lgQ_inertial_sharpness'
             )
         )
         if 'lgQ_break_period' in self.parameter_indices:
@@ -88,6 +97,7 @@ class LogLikelihoodBinaryStars(LogLikelihoodBase, metaclass=ABCMeta):
         dissipation_parameters = [
             ('lgQ_min', units.dimensionless_unscaled),
             ('lgQ_inertial_boost', units.dimensionless_unscaled),
+            ('lgQ_inertial_sharpness', units.dimensionless_unscaled),
         ]
         if powerlaw_dissipation:
             dissipation_parameters.extend([

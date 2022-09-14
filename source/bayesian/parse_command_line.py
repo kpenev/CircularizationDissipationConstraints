@@ -89,6 +89,15 @@ def add_dissipation_args(parser):
         'dissipation is not enhanced in the inertial mode range (i.e. `boost` '
         'is always equal to 1).'
     )
+    dissipation.add_argument(
+        '--lgQ-inertial-sharpness',
+        nargs=2,
+        type=float,
+        default=(10.0, 10.0),
+        help='The sharpness parameter determining how quickly dissipation '
+        'switches between in vs out of inertial mode range.'
+    )
+
 
 
 def add_cluster_args(parser):
