@@ -83,7 +83,7 @@ def add_dissipation_args(parser):
         '--lgQ-inertial-boost',
         nargs=2,
         type=float,
-        default=(1.0, 1.0),
+        default=(0.0, 0.0),
         help='The range to assume for log10(`boost`) dissipation argument '
         '(boost of dissipation in inertial mode range). If not specified, '
         'dissipation is not enhanced in the inertial mode range (i.e. `boost` '
@@ -495,22 +495,29 @@ def add_output_parameters(parser):
         'documentation for details.'
     )
 
-def parse_command_line(description,
-                       config_fname,
-                       *,
-                       dissipation=False,
-                       cluster=False,
-                       primary_properties=(),
-                       choose_binary=None,
-                       spindown=0):
+def use_parser(parser,
+               *,
+               sampling=True,
+               output=True,
+               dissipation=False,
+               cluster=False,
+               primary_properties=(),
+               choose_binary=None,
+               spindown=0):
     """
-    Parse the command line for a Bayesian run.
+    Add the selected arguments to the given parser and parse the command line.
 
     Args:
-        description(str):    The description to display in command line help
-            message of the tool using the parsed command line.
+        parser(ArgumentParser):    The parser to add arguments to.
 
-        config_fname(str):    The name of the default config file.
+        sampling(bool):    Should parameters be added that configure how
+            sampling should be performed?
+
+        output(bool):    Should parameters be added that configure the output to
+            generate.
+
+        dissipation(bool):    Whether to include command line arguments to
+            define the dissipation.
 
         cluster(bool):    Whether to include command line arguments to select a
             an open cluster, and specify age and metallicity distributions to
@@ -530,19 +537,8 @@ def parse_command_line(description,
         spindown(int):    For how many components should spindown parameters be
             added (0, 1, or 2).
 
-    Returns:
-        argparse.Namespace:
-            The parsed command line options.
     """
 
-    parser = ArgumentParser(
-        description=description,
-        default_config_files=[config_fname],
-        args_for_writing_out_config_file=['--generate-config-file'],
-        args_for_setting_config_path=['--config-file', '-c'],
-        formatter_class=DefaultsFormatter,
-        ignore_unknown_config_file_keys=True
-    )
     parser.add_argument(
         '--stellar-evolution-interpolator-dir', '--interpolator-dir',
         default=(
@@ -570,8 +566,10 @@ def parse_command_line(description,
         'that we don\'t have time to fix.'
     )
 
-    add_sampling_parameters(parser)
-    add_output_parameters(parser)
+    if sampling:
+        add_sampling_parameters(parser)
+    if output:
+        add_output_parameters(parser)
     if dissipation:
         add_dissipation_args(parser)
     if cluster:
@@ -582,4 +580,35 @@ def parse_command_line(description,
         add_stellar_spindown_args(parser, spindown)
     if choose_binary:
         add_binary_selection_args(parser, choose_binary)
+
     return parser.parse_args()
+
+
+def parse_command_line(description,
+                       config_fname,
+                       **arg_selection):
+    """
+    Parse the command line for a Bayesian run.
+
+    Args:
+        description(str):    The description to display in command line help
+            message of the tool using the parsed command line.
+
+        config_fname(str):    The name of the default config file.
+
+        **arg_selection:    Flags indicating which arguments to include (see
+            add_parser_arguments().
+    Returns:
+        argparse.Namespace:
+            The parsed command line options.
+    """
+
+    parser = ArgumentParser(
+        description=description,
+        default_config_files=[config_fname],
+        args_for_writing_out_config_file=['--generate-config-file'],
+        args_for_setting_config_path=['--config-file', '-c'],
+        formatter_class=DefaultsFormatter,
+        ignore_unknown_config_file_keys=True
+    )
+    return use_parser(parser, **arg_selection)

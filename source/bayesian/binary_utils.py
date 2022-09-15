@@ -54,7 +54,9 @@ def get_common_binary_star_priors(config):
                 get_distribution(param_name),
                 units.dimensionless_unscaled
             )
-            for param_name in ['lgQ_min', 'lgQ_inertial_boost']
+            for param_name in ['lgQ_min',
+                               'lgQ_inertial_boost',
+                               'lgQ_inertial_sharpness']
         ]
         if (
                 config.lgQ_break_period is not None

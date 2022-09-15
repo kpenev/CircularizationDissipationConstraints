@@ -687,5 +687,9 @@ def run(config,
             sampler.run_mcmc(initial_state, config.mcmc_nsteps)
     else:
         sampler = emcee.EnsembleSampler(**sampler_config)
-
+        if config.reseed_random_number_generator:
+            #Bad indeed
+            #pylint: disable=protected-access
+            sampler._random.seed()
+            #pylint: enable=protected-access
         sampler.run_mcmc(initial_state, config.mcmc_nsteps)

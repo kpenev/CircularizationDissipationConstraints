@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+#pylint: disable=too-many-lines
+
 """Create grid of color map plots of the constraints ready for article."""
 
 from subprocess import call

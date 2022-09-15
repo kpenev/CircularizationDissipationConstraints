@@ -6,7 +6,6 @@ import logging
 import traceback
 
 import numpy
-from scipy.stats import rdist
 
 from general_purpose_python_modules.kde import KDEDistribution
 
@@ -25,10 +24,14 @@ def prepare_sampling(config):
     interpolator = prepare_sampling_common(config)
     samples = get_samples(config.system)
     envelope_eccentricity = eccentricity_envelope(numpy.median(samples['P']))
-    eccentricity_samples = numpy.sqrt(
-        samples['esinw']**2
-        +
-        samples['ecosw']**2
+    samples.insert(
+        loc=samples.shape[1],
+        column='e',
+        value=numpy.sqrt(
+            samples['esinw']**2
+            +
+            samples['ecosw']**2
+        )
     )
     eccentricity_kernel = (
         'rdist',
@@ -37,16 +40,16 @@ def prepare_sampling(config):
             c=4,
             scale=max(
                 (
-                    numpy.std(eccentricity_samples)
+                    numpy.std(samples['e'])
                     *
-                    eccentricity_samples.size**(-0.2)
+                    samples['e'].size**(-0.2)
                 ),
-                0.001
+                0.0001
             )
         )
     )
 
-    observed_eccentricity_distro = KDEDistribution(eccentricity_samples,
+    observed_eccentricity_distro = KDEDistribution(samples['e'],
                                                    eccentricity_kernel)
 
     log_likelihood = LogLikelihoodWindemuth(
@@ -65,7 +68,11 @@ def prepare_sampling(config):
     )
     prior_transform = PriorTransformWindemuth(
         samples,
-        initial_sample_weights=log_likelihood.envelope_weights,
+        initial_sample_weights=(
+            None
+            if config.sampling == 'prior' else
+            log_likelihood.envelope_weights
+        ),
         independent_parameter_distributions=get_common_binary_star_priors(
             config,
         ),

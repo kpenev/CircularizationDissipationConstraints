@@ -31,7 +31,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def _get_dissipation(self, parameters):
+    def get_dissipation(self, parameters):
         """Return the dissipation argument for `find_evolution`."""
 
     def _parse_parameters(self, parameters, logger):
@@ -55,7 +55,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             ): self.get_parameter_value(parameters, param_name)
             for param_name, _ in self.parameter_names_units['evolution']
         }
-        kwargs['dissipation'] = self._get_dissipation(parameters)
+        kwargs['dissipation'] = self.get_dissipation(parameters)
         kwargs['max_age'] = system.age
         kwargs['timeout'] = self._evolution_timeout
         kwargs['system'] = system

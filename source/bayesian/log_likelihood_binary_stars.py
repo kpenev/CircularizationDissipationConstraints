@@ -13,7 +13,7 @@ from bayesian.log_likelihood_base import LogLikelihoodBase
 class LogLikelihoodBinaryStars(LogLikelihoodBase, metaclass=ABCMeta):
     """Base class for log-likelihood functions for binary star analysis."""
 
-    def _get_dissipation(self, parameters):
+    def get_dissipation(self, parameters):
 
         star_dissipation = dict(
             spin_frequency_breaks=None,
@@ -21,7 +21,10 @@ class LogLikelihoodBinaryStars(LogLikelihoodBase, metaclass=ABCMeta):
             reference_phase_lag=phase_lag(
                 self.get_parameter_value(parameters, 'lgQ_min')
                 +
-                self.get_parameter_value(parameters, 'lgQ_inertial_boost')
+                max(
+                    self.get_parameter_value(parameters, 'lgQ_inertial_boost'),
+                    0.0
+                )
             ),
             inertial_mode_enhancement=10.0**(
                 self.get_parameter_value(parameters, 'lgQ_inertial_boost')
