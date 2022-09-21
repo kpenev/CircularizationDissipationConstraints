@@ -6,14 +6,21 @@ import logging
 import traceback
 
 import numpy
+from astropy import units
 
 from general_purpose_python_modules.kde import KDEDistribution
+from general_purpose_python_modules.split_normal_distribution import\
+    split_normal
 
+from bayesian.sampling import setup_process
 from bayesian.parse_command_line import parse_command_line
 from bayesian.binary_utils import \
     get_common_binary_star_priors,\
     prepare_sampling_common
-from bayesian.windemuth_et_al_util import get_samples, eccentricity_envelope
+from bayesian.windemuth_et_al_util import \
+    get_samples,\
+    eccentricity_envelope,\
+    get_summary_data
 from bayesian.prior_transform_windemuth_et_al import PriorTransformWindemuth
 from bayesian.log_likelihood_windemuth_et_al import LogLikelihoodWindemuth
 from bayesian.sample import sample
@@ -23,6 +30,7 @@ def prepare_sampling(config):
 
     interpolator = prepare_sampling_common(config)
     samples = get_samples(config.system)
+    summary_info = get_summary_data(config.system)
     envelope_eccentricity = eccentricity_envelope(numpy.median(samples['P']))
     samples.insert(
         loc=samples.shape[1],
@@ -66,6 +74,28 @@ def prepare_sampling(config):
         scaled_period_guess=config.initial_period_scaled_guess,
         prior_only=(config.sampling == 'prior')
     )
+    independent_parameter_distributions = get_common_binary_star_priors(
+        config,
+    )
+    for index, component in enumerate(['primary', 'secondary']):
+        independent_parameter_distributions.append(
+            (
+                'cmd_' + component + '_radius',
+                split_normal.freeze_error_bar(
+                    mode=summary_info.loc['posterior_r%d(rsun)' % (index + 1)],
+                    abs_plus_error=summary_info.loc['posterior_r%d+sigma'
+                                                    %
+                                                    (index + 1)],
+                    abs_minus_error=numpy.abs(
+                        summary_info.loc['posterior_r%d-sigma'
+                                         %
+                                         (index + 1)]
+                    )
+                ),
+                units.R_sun
+            )
+        )
+
     prior_transform = PriorTransformWindemuth(
         samples,
         initial_sample_weights=(
@@ -73,9 +103,7 @@ def prepare_sampling(config):
             if config.sampling == 'prior' else
             log_likelihood.envelope_weights
         ),
-        independent_parameter_distributions=get_common_binary_star_priors(
-            config,
-        ),
+        independent_parameter_distributions=independent_parameter_distributions,
         model_parameter_order=log_likelihood.parameter_order
     )
     return log_likelihood, prior_transform
@@ -84,6 +112,7 @@ def prepare_sampling(config):
 def main(config):
     """Avoid polluting global namespace."""
 
+    setup_process(config)
     log_likelihood, prior_transform = prepare_sampling(config)
     sample(log_likelihood, prior_transform, config)
 

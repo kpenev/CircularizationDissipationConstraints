@@ -209,7 +209,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                     **evolve_parameters
                 )
                 #pylint: enable=no-value-for-parameter
-            except AssertionError:
+            except RuntimeError:
                 evolve_parameters['initial_eccentricity'] -= 1e-2
                 logger.warning('Calculating evolution failed, trying e0 = %g.',
                                evolve_parameters['initial_eccentricity'])

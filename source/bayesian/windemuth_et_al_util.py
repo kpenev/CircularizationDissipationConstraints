@@ -10,7 +10,11 @@ import scipy.stats
 import pandas
 from astropy import units, constants
 
+from stellar_evolution.manager import StellarEvolutionManager
+from stellar_evolution.library_interface import library as stellar_evol_lib
+
 from process_e_Q_grid import LinearEccentricityEnvelope
+
 
 _data_dir = path.join(
     path.dirname(
@@ -28,6 +32,7 @@ eccentricity_envelope = LinearEccentricityEnvelope(min_period=1.0,
                                                    max_period=25.0,
                                                    min_eccenticity=0.02,
                                                    max_eccentricity=0.8)
+
 
 _logger = logging.getLogger(__name__)
 
@@ -99,7 +104,7 @@ def get_samples(kic_id):
     return pandas.DataFrame(raw_data, columns=columns)
 
 
-def get_summary_data():
+def get_summary_data(kic_id=None):
     """Return the maximum likelihood and quantile posterior data."""
 
     maxlike_data = pandas.read_csv(
@@ -124,11 +129,39 @@ def get_summary_data():
     stellar_data.columns = ['posterior_' + col  for col in stellar_data.columns]
     orbital_data.columns = ['posterior_' + col  for col in orbital_data.columns]
 
-    return maxlike_data.join([stellar_data, orbital_data])
+    summary = maxlike_data.join([stellar_data, orbital_data])
+
+    if kic_id is None:
+        return summary
+    return summary.loc[kic_id]
 
 
-def get_available_kic():
-    """Return a list of the KIC identifiers for which samples are available."""
+def get_available_kic(interpolator=None):
+    """
+    Return a list of the KIC which can be sampled.
+
+    Args:
+        interpolator(stellar evolution interpolator or None):    If not None, an
+            additional check is performed to verify age is within POET range and
+            that the convective moment of inertia is always positive.
+    """
+
+    def check_iconv(mass, feh, age):
+        """Check if given star has always positive Iconv up to max_age."""
+
+        print(
+            'Checking M = {!r}, [Fe/H] = {!r}, t = {!r}'.format(
+                mass, feh, age
+            )
+        )
+        iconv = interpolator('ICONV', mass, feh)
+        return (
+            iconv.max_age > age
+            and
+            iconv(numpy.linspace(10.0**(-0.5), age, 100)).min() > 0
+            and
+            iconv(numpy.logspace(-0.5, numpy.log10(age), 100)).min() > 0
+        )
 
     data = get_summary_data()
 
@@ -171,6 +204,34 @@ def get_available_kic():
     )
     valid = numpy.logical_and(valid, logg > 4.0)
     _logger.info('Log10(g) cut leaves {:d} binaries'.format(valid.sum()))
+
+    if interpolator is not None:
+        valid = numpy.logical_and(
+            valid,
+            numpy.vectorize(interpolator.feh_in_range)(
+                numpy.vectorize(stellar_evol_lib.feh_from_z)(
+                    data['posterior_z'].to_numpy()
+                )
+            )
+        )
+        _logger.info('[Fe/H] cut leaves {:d} binaries'.format(valid.sum()))
+        #False positive
+        #pylint: disable=no-member
+        data = data.iloc[valid.to_numpy()]
+        #pylint: enable=no-member
+        valid = numpy.ones(data.index.size, dtype=bool)
+        for i in range(valid.size):
+            info = data.iloc[[i]]
+            valid[i] = check_iconv(
+                float(info['posterior_m1(msun)']),
+                float(stellar_evol_lib.feh_from_z(info['posterior_z'])),
+                10.0**(float(info['posterior_tau(log10yr)'])
+                       +
+                       float(info['posterior_tau+sigma'])
+                       -
+                       9.0)
+            )
+        _logger.info('Iconv cut leaves {:d} binaries'.format(valid.sum()))
 
     return data.index[valid].to_numpy()
 
@@ -260,6 +321,21 @@ def plot_eccentricity_vs_period(plot_fname=None):
         pyplot.savefig(plot_fname)
 
 
-if __name__ == '__main__':
+def main():
+    """Avoid polluting global namespace."""
+
+    interpolator = StellarEvolutionManager(
+        path.expanduser('~/projects/git/poet/stellar_evolution_interpolators')
+    ).get_interpolator_by_name(
+        'default'
+    )
+
     logging.basicConfig(level=logging.INFO)
+
+    print(repr(get_available_kic(interpolator)))
+
     plot_eccentricity_vs_period('w19_period_eccentricity.pdf')
+
+
+if __name__ == '__main__':
+    main()

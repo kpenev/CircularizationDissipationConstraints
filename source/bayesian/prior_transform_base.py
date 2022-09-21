@@ -69,7 +69,7 @@ class PriorTransformBase(metaclass=ABCMeta):
                 if model_parameters is None:
                     next(unit_cube_iter)
                 else:
-                    model_parameters[name] = next(unit_cube_iter) * param_units
+                    model_parameters[name] = next(unit_cube_iter)
             elif hasattr(distribution, 'ppf'):
                 if model_parameters is None:
                     next(unit_cube_iter)

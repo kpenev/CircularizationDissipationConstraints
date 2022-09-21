@@ -568,10 +568,16 @@ def get_initial_state(*,
             position_queue.put(numpy.random.rand(num_params))
         else:
             orig_pos_repr = repr(position)
-            position[lgq_min_param_index] *= numpy.random.rand()
-            _logger.debug('Tweaking starting position to lower Q: %s -> %s',
-                          orig_pos_repr,
-                          repr(position))
+            if position[lgq_min_param_index] > 0.05:
+                position[lgq_min_param_index] *= numpy.random.rand()
+                _logger.debug('Tweaking starting position to lower Q: %s -> %s',
+                              orig_pos_repr,
+                              repr(position))
+            else:
+                position = numpy.random.rand(num_params)
+                _logger.debug('Declaring starting hopeless: %s -> %s',
+                              orig_pos_repr,
+                              repr(position))
             position_queue.put(position)
 
     for process in workers:

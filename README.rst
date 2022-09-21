@@ -1,5 +1,5 @@
 ================================================================
-System by system tidal dissipation constraints from eccentricity
+System by System Tidal Dissipation Constraints from Eccentricity
 ================================================================
 
 The idea is to derive tidal dissipation constraints on the full range of stars 

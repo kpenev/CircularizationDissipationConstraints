@@ -2,12 +2,10 @@
 
 """Create autocorrelation diagnostic plots."""
 
-from os import path
-
 from matplotlib import pyplot
 import numpy
 
-from emcee_autocorrelation import\
+from general_purpose_python_modules.emcee_autocorrelation import\
     autocorr_gw2010,\
     average_autocorr,\
     max_likelihood_autocorr

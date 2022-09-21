@@ -26,7 +26,7 @@ class PriorTransformWindemuth(PriorTransformBase):
 
 
         sampled = dict()
-        weights = self.initial_sample_weights
+        weights = numpy.copy(self.initial_sample_weights)
         for quantity in self._quantities:
             if identify:
                 sampled[quantity] = next(unit_cube_iter)
@@ -40,9 +40,6 @@ class PriorTransformWindemuth(PriorTransformBase):
                 )
 
         if not identify:
-            model_parameters['cmd_primary_radius'] = numpy.nan * units.R_sun
-            model_parameters['cmd_secondary_radius'] = numpy.nan * units.R_sun
-
             model_parameters['orbital_period'] = sampled['P'] * units.day
             model_parameters['primary_mass'] = (
                 sampled['Mtot']
@@ -109,6 +106,7 @@ class PriorTransformWindemuth(PriorTransformBase):
         self._quantities = ['P', 'Mtot', 'Mratio', 'z', 'tau']
         if initial_sample_weights is None:
             self._quantities.append('e')
+            self.eccentricity = numpy.nan
             self.initial_sample_weights = numpy.ones(samples['P'].size,
                                                      dtype=float)
         else:
