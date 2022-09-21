@@ -22,7 +22,7 @@ run_system() {
 
     while true; do
         python3 \
-            ${source_dir}/bayesian/sample_sb1.py @@CLUSTER@@_${sysid} \
+            ${source_dir}/bayesian/@@SAMPLER@@${sysid} \
             -c ${source_dir}/sampling_config/@@CONFIG_FNAME@@\
             --std-out-err-fname ${output_dir}/${sysid}'/%(system)s_%(now)s_%(pid)d.outerr'\
             --logging-fname ${output_dir}/${sysid}'/%(system)s_%(now)s_%(pid)d.log'\
