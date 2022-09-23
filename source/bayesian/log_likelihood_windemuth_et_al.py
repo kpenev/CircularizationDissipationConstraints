@@ -78,4 +78,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                      repr(numerator),
                      repr(denominator))
 
+        assert numerator >= 0
+        if numerator == 0:
+            return -numpy.inf
+
         return numpy.log(numerator) - numpy.log(denominator)

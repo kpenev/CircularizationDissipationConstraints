@@ -24,7 +24,7 @@ def get_code_version_str():
         return head_sha + ':dirty'
     return head_sha
 
-def setup_process(config):
+def setup_process(config, task='calculate'):
     """Logging and I/O setup for the current processes."""
 
     def ensure_directory(fname):
@@ -37,7 +37,8 @@ def setup_process(config):
     fname_substitutions = dict(
         now=datetime.now().strftime(config.fname_datetime_format),
         system=config.system,
-        pid=os.getpid()
+        pid=os.getpid(),
+        task=task
     )
 
     std_out_err_fname = config.std_out_err_fname % fname_substitutions

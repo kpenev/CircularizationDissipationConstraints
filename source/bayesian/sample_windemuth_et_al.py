@@ -112,7 +112,7 @@ def prepare_sampling(config):
 def main(config):
     """Avoid polluting global namespace."""
 
-    setup_process(config)
+    setup_process(config, 'init')
     log_likelihood, prior_transform = prepare_sampling(config)
     sample(log_likelihood, prior_transform, config)
 

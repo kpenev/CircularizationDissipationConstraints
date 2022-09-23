@@ -9,6 +9,7 @@ import numpy
 import scipy.stats
 import pandas
 from astropy import units, constants
+from configargparse import ArgumentParser, DefaultsFormatter
 
 from stellar_evolution.manager import StellarEvolutionManager
 from stellar_evolution.library_interface import library as stellar_evol_lib
@@ -35,29 +36,6 @@ eccentricity_envelope = LinearEccentricityEnvelope(min_period=1.0,
 
 
 _logger = logging.getLogger(__name__)
-
-
-def get_summary_stats():
-    """Return the posteriors median and 1-sigma quantiles."""
-
-    return pandas.merge(
-        pandas.read_csv(
-            path.join(_data_dir, 'paper_orbital.posteriors'),
-            header=1,
-            sep=' ',
-            index_col='KIC',
-            escapechar='#'
-        ),
-        pandas.read_csv(
-            path.join(_data_dir, 'paper_stellar.posteriors'),
-            header=1,
-            sep=' ',
-            index_col='KIC',
-            escapechar='#'
-        ),
-        left_index=True,
-        right_index=True
-    )
 
 
 def get_max_likelihood_params():
@@ -132,11 +110,11 @@ def get_summary_data(kic_id=None):
     summary = maxlike_data.join([stellar_data, orbital_data])
 
     if kic_id is None:
-        return summary
+        return summary.sort_values(by='maxlike_period')
     return summary.loc[kic_id]
 
 
-def get_available_kic(interpolator=None):
+def get_available_kic(interpolator=None, max_porb=numpy.inf, max_e=numpy.inf):
     """
     Return a list of the KIC which can be sampled.
 
@@ -149,11 +127,6 @@ def get_available_kic(interpolator=None):
     def check_iconv(mass, feh, age):
         """Check if given star has always positive Iconv up to max_age."""
 
-        print(
-            'Checking M = {!r}, [Fe/H] = {!r}, t = {!r}'.format(
-                mass, feh, age
-            )
-        )
         iconv = interpolator('ICONV', mass, feh)
         return (
             iconv.max_age > age
@@ -205,6 +178,15 @@ def get_available_kic(interpolator=None):
     valid = numpy.logical_and(valid, logg > 4.0)
     _logger.info('Log10(g) cut leaves {:d} binaries'.format(valid.sum()))
 
+    valid = numpy.logical_and(valid, data['maxlike_period'] <= max_porb)
+    _logger.info('Period cut leaves {:d} binaries'.format(valid.sum()))
+
+    valid = numpy.logical_and(
+        valid,
+        (data['maxlike_esinw']**2 + data['maxlike_ecosw']**2) <= max_e
+    )
+    _logger.info('Eccentricity cut leaves {:d} binaries'.format(valid.sum()))
+
     if interpolator is not None:
         valid = numpy.logical_and(
             valid,
@@ -236,10 +218,8 @@ def get_available_kic(interpolator=None):
     return data.index[valid].to_numpy()
 
 
-def plot_eccentricity_vs_period(plot_fname=None):
+def plot_eccentricity_vs_period(plot_fname, available_kic):
     """Plot or show period-eccentricity envelope and data it is based on."""
-
-    available_kic = get_available_kic()
 
     plot_data = numpy.empty(len(available_kic), dtype=[('KIC', int),
                                                        ('P_median', float),
@@ -315,27 +295,122 @@ def plot_eccentricity_vs_period(plot_fname=None):
                 eccentricity_envelope(envelope_x),
                 '-k')
     pyplot.legend()
-    if plot_fname is None:
+    if not plot_fname:
         pyplot.show()
     else:
         pyplot.savefig(plot_fname)
 
 
-def main():
+def generate_slurm_scripts(hpc, available_kic, slurm_dir):
+    """Create slurm scripts for a given HPC cluster to sample W19 systems."""
+
+    if hpc == 'ganymede':
+        sys_per_node = 1
+    elif hpc == 'stampede':
+        sys_per_node = 3
+    else:
+        assert hpc == 'ls6'
+        sys_per_node = 8
+    kic_by_node = numpy.zeros(
+        (int(numpy.ceil(available_kic.size / sys_per_node)), sys_per_node),
+        dtype=available_kic.dtype
+    )
+    kic_by_node.ravel()[:available_kic.size] = available_kic
+    slurm_generator = path.join(slurm_dir, hpc, 'generate_slurm.sh')
+    for node_kic in kic_by_node:
+        print()
+
+
+def parse_command_line():
+    """The command line arguments supplied when used as a script."""
+
+    parser = ArgumentParser(
+        description='Convenience tool for working with W19 binaries.',
+        default_config_files=['w19_util.cfg'],
+        args_for_writing_out_config_file=['--generate-config-file'],
+        args_for_setting_config_path=['--config-file', '-c'],
+        formatter_class=DefaultsFormatter,
+        ignore_unknown_config_file_keys=False
+    )
+    parser.add_argument(
+        '--stellar-evolution-interpolator-dir', '--interpolator-dir',
+        default=(
+            path.expanduser(
+                '~/projects/git/poet/stellar_evolution_interpolators'
+            )
+        ),
+        help='The directory to read stellar evolution interpolator from.'
+    )
+    parser.add_argument(
+        '--max-porb',
+        type=float,
+        default=numpy.inf,
+        help='Filter the W19 systems to only those with maximum likelihood '
+        'orbital period less than the specified value.'
+    )
+    parser.add_argument(
+        '--max-eccentricity', '--max-e',
+        type=float,
+        default=numpy.inf,
+        help='Filter the W19 systems to only those with maximum likelihood '
+        'present day eccentricity less than the specified value.'
+    )
+    parser.add_argument(
+        '--create-pe-plot',
+        default=None,
+        help='If specified, a period-eccentricity plot will be created and '
+        'saved with the given filename. Use empty string to show the plot '
+        'instead of saving.'
+    )
+    parser.add_argument(
+        '--list-valid-systems',
+        action='store_true',
+        help='If passed, output a list of systems for which circularization '
+        'analysis can be performed, possibly imposing orbital period and '
+        'eccentricity cuts (see --max-porb and --max-eccentricity arguments).'
+    )
+    parser.add_argument(
+        '--generate-slurm-scripts', '--slurms',
+        choices=['ganymede', 'stampede', 'ls6'],
+        default=None,
+        help='If passed, slurm scripts for circularization analysis of all '
+        'valid systems are generated for the specified HPC cluster.'
+    )
+    parser.add_argument(
+        '--slurm-dir',
+        default=path.join(
+            path.dirname(path.dirname(path.abspath(__file__))),
+            'slurm',
+        ),
+        help='The directory containing the slurm utilities for each HPC '
+        'cluster.'
+    )
+    return parser.parse_args()
+
+
+def main(config):
     """Avoid polluting global namespace."""
 
     interpolator = StellarEvolutionManager(
-        path.expanduser('~/projects/git/poet/stellar_evolution_interpolators')
+        config.stellar_evolution_interpolator_dir
     ).get_interpolator_by_name(
         'default'
     )
 
     logging.basicConfig(level=logging.INFO)
 
-    print(repr(get_available_kic(interpolator)))
+    available_kic = get_available_kic(interpolator,
+                                      config.max_porb,
+                                      config.max_eccentricity)
 
-    plot_eccentricity_vs_period('w19_period_eccentricity.pdf')
+    if config.list_valid_systems:
+        print('\n'.join(map(repr, available_kic)))
 
+    if config.create_pe_plot is not None:
+        plot_eccentricity_vs_period(config.create_pe_plot, available_kic)
+
+    if config.generate_slurm_scripts:
+        generate_slurm_scripts(config.generate_slurm_scripts, available_kic)
 
 if __name__ == '__main__':
-    main()
+    main(parse_command_line())

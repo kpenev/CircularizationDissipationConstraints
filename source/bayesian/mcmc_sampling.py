@@ -8,6 +8,7 @@ from glob import glob
 import re
 
 import numpy
+from scipy.stats import norm
 import emcee
 import h5py
 from astropy import units
@@ -37,19 +38,19 @@ _mutable_config_params = set(['mcmc_nsteps',
 
 _logger = logging.getLogger(__name__)
 
-def log_probability(unit_cube_values,
+def log_probability(independent_normal_values,
                     prior_transform,
                     log_likelihood,
                     track_final_eccentricity,
                     exclude_from_blob=()):
     """The posterior for MCMC, will track actual params & likelihood."""
 
-    if unit_cube_values.min() < 0 or unit_cube_values.max() > 1:
-        _logger.warning(
-            'At least one proposed unit cube value is outside the range(0, 1): '
-            '%s',
-            repr(unit_cube_values)
-        )
+    unit_cube_values = norm.cdf(independent_normal_values)
+    _logger.debug('Evaluating log-probability for i.n.v.(%s) -> U%d(%s)',
+                  repr(independent_normal_values),
+                  independent_normal_values.size,
+                  repr(unit_cube_values))
+    if unit_cube_values.max() == 1:
         return tuple(
             -numpy.inf if i == 0 else numpy.nan
             for i in range(
@@ -60,9 +61,9 @@ def log_probability(unit_cube_values,
                 (2 if track_final_eccentricity else 1)
             )
         )
-
+    log_likelihood_value = norm.logpdf(independent_normal_values).sum()
     transformed = prior_transform(unit_cube_values)
-    log_likelihood_value = log_likelihood(**transformed)
+    log_likelihood_value += log_likelihood(**transformed)
     parameters = transformed['parameters']
     if exclude_from_blob:
         parameters = tuple(
@@ -535,7 +536,7 @@ def get_initial_state(*,
     else:
         recovered_positions = numpy.array([])
     for _ in range(config.mcmc_nwalkers - recovered_positions.shape[0]):
-        position_queue.put(numpy.random.rand(num_params))
+        position_queue.put(norm.rvs(size=num_params))
 
     workers = [
         Process(
@@ -565,16 +566,20 @@ def get_initial_state(*,
             _logger.debug('%d/%d starting positions found',
                           positions_found,
                           config.mcmc_nwalkers)
-            position_queue.put(numpy.random.rand(num_params))
+            position_queue.put(norm.rvs(size=num_params))
         else:
             orig_pos_repr = repr(position)
-            if position[lgq_min_param_index] > 0.05:
-                position[lgq_min_param_index] *= numpy.random.rand()
+            if position[lgq_min_param_index] >- 2.0:
+                position[lgq_min_param_index] = norm.ppf(
+                    norm.cdf(position[lgq_min_param_index])
+                    *
+                    numpy.random.rand()
+                )
                 _logger.debug('Tweaking starting position to lower Q: %s -> %s',
                               orig_pos_repr,
                               repr(position))
             else:
-                position = numpy.random.rand(num_params)
+                position = norm.rvs(size=num_params)
                 _logger.debug('Declaring starting hopeless: %s -> %s',
                               orig_pos_repr,
                               repr(position))

@@ -1,5 +1,7 @@
 """Define prior transformations based on Windemuth et. al. (2019) samples."""
 
+import logging
+
 from astropy import units
 import numpy
 from KDEpy import NaiveKDE
@@ -24,6 +26,7 @@ class PriorTransformWindemuth(PriorTransformBase):
                 next(unit_cube_iter)
             return
 
+        logger = logging.getLogger(__name__)
 
         sampled = dict()
         weights = numpy.copy(self.initial_sample_weights)
@@ -31,13 +34,22 @@ class PriorTransformWindemuth(PriorTransformBase):
             if identify:
                 sampled[quantity] = next(unit_cube_iter)
             else:
+                assert (weights >= 0).all()
+                assert weights.sum() > 0
                 self._distributions[quantity].set_weights(weights)
                 sampled[quantity] = self._distributions[quantity].ppf(
                     next(unit_cube_iter)
                 )
-                weights *= self._distributions[quantity].eval_sample_pdf(
+                weight_scale = self._distributions[quantity].eval_sample_pdf(
                     sampled[quantity]
                 )
+                weights *= weight_scale
+                if weights.sum() == 0:
+                    logger.error(
+                        'All weights zero, should be impossible: x %s (sum=%s)',
+                        repr(weight_scale),
+                        repr(weight_scale.sum())
+                    )
 
         if not identify:
             model_parameters['orbital_period'] = sampled['P'] * units.day

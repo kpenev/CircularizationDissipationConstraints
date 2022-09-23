@@ -29,7 +29,7 @@ def sample(log_likelihood, prior_transform, config):
     """
 
     #set_start_method('forkserver')
-    setup_process(config)
+    setup_process(config, 'manage')
 
     num_params = prior_transform.count_sampled_parameters()
 

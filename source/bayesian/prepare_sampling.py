@@ -16,7 +16,7 @@ def main(config):
 
     for binary_id in get_cluster_binary_ids()[config.cluster]:
         config.system = config.cluster + '_' + str(binary_id)
-        setup_process(config)
+        setup_process(config, 'manage')
         logging.info('Preparing sampling of %s', config.system)
         try:
             prepare_sampling(config)
