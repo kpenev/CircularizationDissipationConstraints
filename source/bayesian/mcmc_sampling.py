@@ -348,9 +348,9 @@ def save_initial_position(position,
         destination = samples_file[chain_name]['starting_positions']
         if 'num_positions_found' not in destination.attrs:
             destination.attrs['num_positions_found'] = 0
-            assert 'unit_cube_values' not in destination
+            assert 'independent_normal_values' not in destination
             destination.create_dataset(
-                'unit_cube_values',
+                'independent_normal_values',
                 (nwalkers,) + position.shape,
                 maxshape=(None, len(position)),
                 dtype=numpy.float64
@@ -365,18 +365,30 @@ def save_initial_position(position,
 
         current_positions = destination.attrs['num_positions_found']
 
-        assert (destination['unit_cube_values'].shape[0]
+        assert (destination['independent_normal_values'].shape[0]
                 ==
                 destination['log_prob_results'].shape[0])
-        assert destination['unit_cube_values'].shape[1] == len(position)
+        assert destination['independent_normal_values'].shape[1] == (
+            len(position)
+        )
         assert destination['log_prob_results'].shape[1] == len(log_prob_result)
 
-        assert destination['unit_cube_values'].shape[0] >= current_positions
-        if destination['unit_cube_values'].shape[0] == current_positions:
-            for dset_name in ['unit_cube_values', 'log_prob_results']:
+        assert (
+            destination['independent_normal_values'].shape[0]
+            >=
+            current_positions
+        )
+        if (
+                destination['independent_normal_values'].shape[0]
+                ==
+                current_positions
+        ):
+            for dset_name in ['independent_normal_values', 'log_prob_results']:
                 destination[dset_name].resize(current_positions + nwalkers,
                                               axis=0)
-        destination['unit_cube_values'][current_positions, :] = position
+        destination['independent_normal_values'][current_positions, :] = (
+            position
+        )
         destination['log_prob_results'][current_positions, :] = log_prob_result
         destination.attrs['num_positions_found'] = current_positions + 1
 
