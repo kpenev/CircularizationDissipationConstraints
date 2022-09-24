@@ -21,3 +21,20 @@ if __name__ == '__main__':
     copyfile(in_fname, out_fname)
 
     with h5py.File(out_fname, 'r+') as outfile:
+        for chain in outfile:
+            niter = outfile[chain].attrs['iteration']
+            if niter > 0:
+                orig = outfile[chain]['chain'][:]
+                print('Orig chain shape %s' % repr(orig.shape))
+                print('Transforming first %d iterations' % niter)
+                outfile[chain]['unit_cube_chain'] = orig[:niter]
+                outfile[chain]['chain'][:niter] = norm.ppf(orig[:niter])
+            orig = outfile[chain]['starting_positions']['unit_cube_values'][:]
+            print('Transforming %dx%d starting positions' % orig.shape)
+            outfile[
+                chain
+            ][
+                'starting_positions'
+            ][
+                'independent_normal_values'
+            ] = norm.ppf(orig)
