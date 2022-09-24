@@ -3,6 +3,8 @@
 
 from os import path
 import logging
+from subprocess import run
+import platform
 
 from matplotlib import pyplot
 import numpy
@@ -301,7 +303,7 @@ def plot_eccentricity_vs_period(plot_fname, available_kic):
         pyplot.savefig(plot_fname)
 
 
-def generate_slurm_scripts(hpc, available_kic, slurm_dir):
+def generate_slurm_scripts(hpc, available_kic, slurm_dir, sampling_mode):
     """Create slurm scripts for a given HPC cluster to sample W19 systems."""
 
     if hpc == 'ganymede':
@@ -316,9 +318,14 @@ def generate_slurm_scripts(hpc, available_kic, slurm_dir):
         dtype=available_kic.dtype
     )
     kic_by_node.ravel()[:available_kic.size] = available_kic
-    slurm_generator = path.join(slurm_dir, hpc, 'generate_slurm.sh')
+    slurm_generator = path.join(slurm_dir, 'generate_slurm.sh')
     for node_kic in kic_by_node:
-        print()
+        run(
+            [slurm_generator, 'W19', sampling_mode, hpc]
+            +
+            [str(kic) for kic in node_kic],
+            check=True
+        )
 
 
 def parse_command_line():
@@ -371,10 +378,10 @@ def parse_command_line():
     )
     parser.add_argument(
         '--generate-slurm-scripts', '--slurms',
-        choices=['ganymede', 'stampede', 'ls6'],
         default=None,
         help='If passed, slurm scripts for circularization analysis of all '
-        'valid systems are generated for the specified HPC cluster.'
+        'valid systems are generated for the sampling mode specified and '
+        'for the HPC cluster specified by --hpc.'
     )
     parser.add_argument(
         '--slurm-dir',
@@ -385,7 +392,22 @@ def parse_command_line():
         help='The directory containing the slurm utilities for each HPC '
         'cluster.'
     )
-    return parser.parse_args()
+    parser.add_argument(
+        '--hpc',
+        choices=['ganymede', 'stampede', 'ls6'],
+        default=None,
+        help='The HPC cluster to generate slurm scripts for. By default it '
+        'is automatically determined from the host name (assuming you are '
+        'running this on the cluster you need slurm scripts for).'
+    )
+    config = parser.parse_args()
+    if config.hpc is None:
+        hostname = platform.node()
+        for hpc in ['ganymede', 'stampede', 'ls6']:
+            if hpc in hostname:
+                assert config.hpc is None
+                config.hpc = hpc
+    return config
 
 
 def main(config):
@@ -410,7 +432,10 @@ def main(config):
         plot_eccentricity_vs_period(config.create_pe_plot, available_kic)
 
     if config.generate_slurm_scripts:
-        generate_slurm_scripts(config.generate_slurm_scripts, available_kic)
+        generate_slurm_scripts(config.hpc,
+                               available_kic,
+                               config.slurm_dir,
+                               config.generate_slurm_scripts)
 
 if __name__ == '__main__':
     main(parse_command_line())
