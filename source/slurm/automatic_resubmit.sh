@@ -3,10 +3,11 @@
 CLUSTER=$1
 
 HOSTNAME=$(hostname)
+HOSTNAME=${HOSTNAME#login?.}
 
-if [ "$HOSTNAME" == "login1.ls6.tacc.utexas.edu" ]; then
+if [ "$HOSTNAME" == "ls6.tacc.utexas.edu" ]; then
 	HPC='ls6'
-elif [ "$HOSTNAME" == "login1.stampede2.tacc.utexas.edu" ]; then 
+elif [ "$HOSTNAME" == "stampede2.tacc.utexas.edu" ]; then 
 	HPC='stampede'
 elif [ "$HOSTNAME" == "ganymede.utdallas.edu" ]; then 
 	HPC='ganymede'
