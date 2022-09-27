@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -l
 
 CLUSTER=$1
 
@@ -8,7 +8,7 @@ HOSTNAME=${HOSTNAME#login?.}
 if [ "$HOSTNAME" == "ls6.tacc.utexas.edu" ]; then
 	HPC='ls6'
 elif [ "$HOSTNAME" == "stampede2.tacc.utexas.edu" ]; then 
-	HPC='stampede'
+	HPC='stampede2'
 elif [ "$HOSTNAME" == "ganymede.utdallas.edu" ]; then 
 	HPC='ganymede'
 else
