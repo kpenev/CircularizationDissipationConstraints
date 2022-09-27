@@ -414,7 +414,7 @@ def load_initial_positions(samples_fname,
                 :positions_found,
                 :
             ] = position_group[
-                'unit_cube_values'
+                'independent_normal_values'
             ][
                 :positions_found,
                 :
@@ -456,6 +456,9 @@ def load_initial_positions(samples_fname,
 def recover_initial_positions(config, num_params):
     """Return list of good unit-cube positions from logs of interrupted run."""
 
+    raise NotImplementedError(
+        'Recovering initial positions from logger is currently broken.'
+    )
     result = numpy.empty((config.mcmc_nwalkers, num_params), dtype=float)
     parse_line = dict(
         unit_cube_start=re.compile(
