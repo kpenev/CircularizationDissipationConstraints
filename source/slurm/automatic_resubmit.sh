@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -l
 
 CLUSTER=$1
 
