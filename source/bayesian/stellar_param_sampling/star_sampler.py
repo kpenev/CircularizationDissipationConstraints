@@ -792,12 +792,14 @@ class StarSampler:
         )
 
         self._plot_initial_feh_grid()
+        if FeHConditionalLikelihoodBase.interpolator is None:
+                FeHConditionalLikelihoodBase.set_interpolator(self.config.stellar_evolution_interpolator_dir)
 
 
         with Pool(
-                self.config.num_parallel_processes,
-                initializer=FeHConditionalLikelihoodBase.set_interpolator,
-                initargs=(self.config.stellar_evolution_interpolator_dir,)
+                self.config.num_parallel_processes #,
+                #initializer=FeHConditionalLikelihoodBase.set_interpolator,
+                #initargs=(self.config.stellar_evolution_interpolator_dir,)
         ) as workers:
             self._age_cdf_norms = self._calculate_age_cdf_norms(self._mass_grid,
                                                                 self._feh_grid,
@@ -950,10 +952,12 @@ class StarSampler:
 
         if not self._check_for_pickled():
             print('New sampler is going to be created')
+            logging.info('New sampler is going to be prepared.')
             self._prepare_new_sampler()
             self._add_to_pickle_file()
         else:
-            print('A sampler was already there.')
+            print('Pickled file is found.')
+            logging.info('Pickled file is found.')
 
         self._update_feh_cdf()
 

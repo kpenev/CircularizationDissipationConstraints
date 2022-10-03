@@ -9,12 +9,16 @@ from scipy.special import i0
 from scipy.integrate import nquad
 import matplotlib.pyplot as plt
 import argparse
+from scipy.stats import norm
+import os
+import sys
+
+sys.path.append('/home1/08529/mmmahmud/general_purpose_python_modules')
+from rice_distribution_utils import rice_from_error_bars
 
 def phi(z):
     return 0.5 * (1 + erf(z / math.sqrt(2)))
 
-def alpha(ci):
-    return 1 - ci / 100.0
 
 class SuperEccentricityDistribution(metaclass=ABCMeta):
     @abstractmethod
@@ -29,89 +33,113 @@ class EccentricityDistribution(SuperEccentricityDistribution):
                  eccentricity_lower_uncertainty,
                  envelope_eccentricity,
                  system_name = 'Star_exoplanet system',
-                 percentile_for_e_now_upper_uncertainty=phi(1),  # or sometimes 1 - alpha(68.0)/2
-                 percentile_for_e_now_lower_uncertainty=1 - phi(1),  # or sometimes alpha(68.0)/2
-                 ):
+                 output_directory = "/home1/08529/mmmahmud/scratch/circularization_exoplanet_system",
+                 #email="mmm161430@utdallas.edu",
+                 crit=35, logger = None):
 
         self.measured_e_now = measured_eccentricity
         self.e_now_upper_uncertainty = eccentricity_upper_uncertainty
         self.e_now_lower_uncertainty = eccentricity_lower_uncertainty
         self.e_env = envelope_eccentricity
         self.system_name = system_name
+        #self.email = email
+        self.logger = logger
 
-        self.percentile_for_e_now_upper_uncertainty = percentile_for_e_now_upper_uncertainty
-        self.percentile_for_e_now_lower_uncertainty = percentile_for_e_now_lower_uncertainty
+        self.output_directory = "%(output_directory)s/%(system)s_edist" % dict(output_directory=output_directory, system=system_name)
+        if os.path.exists(self.output_directory):
+            if self.logger is not None: self.logger.debug("output directory exists: %(directory)s " % dict(directory= self.output_directory))
+        if not os.path.exists(self.output_directory):
+            if self.logger is not None: self.logger.debug('output directory does not exist. we are going to create it.')
+            os.makedirs(self.output_directory)
+            if os.path.exists(self.output_directory):
+                 if self.logger is not None: self.logger.debug("Now it is created: %(directory)s " % dict(directory=self.output_directory))
+        self.rice_dist = False
+        if (eccentricity_upper_uncertainty != 0) and (eccentricity_lower_uncertainty != 0):
+            if measured_eccentricity/eccentricity_upper_uncertainty < crit or measured_eccentricity/math.fabs(eccentricity_lower_uncertainty) < crit:
+                 if self.logger is not None: self.logger.debug("Eccentricity distribution for this system is a Rice Distribution")
+                 self.rice_dist = True
+                 self.eccentricity_distribution = rice_from_error_bars(self.measured_e_now, self.e_now_upper_uncertainty, math.fabs(self.e_now_lower_uncertainty))
+            else:
+                 if self.logger is not None: self.logger.debug("Eccentricity distribution for this system is approximately a Normal distribution.")
+                 self.mu = self.measured_e_now
+                 self.sigma = (self.e_now_upper_uncertainty - self.e_now_lower_uncertainty)/2
+                 self.eccentricity_distribution = norm(loc = self.mu, scale = self.sigma)
+                 if self.logger is not None: self.logger.debug("mu = %(mu)f, sigma = %(sigma)f" % dict(mu=self.mu, sigma=self.sigma))
 
+        if (eccentricity_upper_uncertainty == 0) or (eccentricity_lower_uncertainty == 0):
+            if self.logger is not None: self.logger.debug("Either eccentricity upper uncertainty is zero or eccentricity lower uncertainty is zero.")
+            b, s = self.roots_for_Rice_parameters()
+            if self.logger is not None: self.logger.debug("b is %(b)f and s is %(s)f" % dict(b=b, s=s))
+            self.eccentricity_distribution = rice(b=b, scale=s)
 
-        self.rice_parameters_are_found = True
-
-        self.b, self.s = self.roots_for_Rice_parameters()
-        self.inv_norm = self.cdf(1.0)
-
+        self.inv_norm = self.eccentricity_distribution.cdf(1.0)
     def equations_to_be_solved_for_Rice_distribution_parameters(self, x):
         b = x[0]
         s = x[1]
         first = rice.cdf((self.measured_e_now + self.e_now_upper_uncertainty), b,
-                         scale=s) - self.percentile_for_e_now_upper_uncertainty
+                         scale=s) - phi(1)
         second = rice.cdf((self.measured_e_now + self.e_now_lower_uncertainty), b,
-                          scale=s) - self.percentile_for_e_now_lower_uncertainty
+                          scale=s) - (1-phi(1))
         if math.isnan(first) or math.isnan(second):
-            logging.warning('Iteration does not converge')
+            if self.logger is not None: self.logger.error('Iteration for working out Rice parameters does not converge')
             self.rice_parameters_are_found = False
         return [first, second]
 
     def equation_to_be_solved_for_Rice_distribution_parameter_s_when_b_zero(self, x):
         s = x[0]
         eqn = rice.cdf((self.measured_e_now + self.e_now_upper_uncertainty), 0,
-                       scale=s) - self.percentile_for_e_now_upper_uncertainty
+                       scale=s) - phi(1)
         if math.isnan(eqn):
-            logging.warning('Iteration does not converge')
+            if self.logger is not None: self.logger.error('Iteration for working out Rice parameters does not converge')
             self.rice_parameters_are_found = False
         return [eqn]
-
     def roots_for_Rice_parameters(self):
         estimated_s = self.e_now_upper_uncertainty
+        if self.logger is not None: self.logger.debug("estimated s = %(es)f" % dict(es=estimated_s))
         if self.measured_e_now == 0:
             try:
+                if self.logger is not None: self.logger.info("measured e_now is zero")
                 s = fsolve(self.equation_to_be_solved_for_Rice_distribution_parameter_s_when_b_zero,
                            np.asarray([estimated_s]))
             except:
-                logging.warning('Rice parameters cannot be worked out')
+                if self.logger is not None: self.logger.error('Rice parameters cannot be worked out')
                 self.rice_parameters_are_found = False
                 return [math.nan, math.nan]
             else:
                 self.rice_parameters_are_found = True
+                if self.logger is not None: self.logger.debug("Rice parameters are found.")
                 return [0, s[0]]
-        estimated_b = self.measured_e_now / (self.e_now_upper_uncertainty)
-        roots = [math.nan, math.nan]
-        try:
-            roots = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters,
-                           np.asarray([estimated_b, estimated_s]))
-        except:
-            logging.warning('Rice parameters cannot be worked out')
-            self.rice_parameters_are_found = False
-        else:
-            self.rice_parameters_are_found = True
-        return roots
-
-    def pdf(self, e):
-        val = i0((e / self.s) * self.b)
-        if val == math.inf:
-            return 0  # Then math.exp(-((e/s)**2+b**2)/2) = 0
-        return math.exp(-((e / self.s) ** 2 + self.b ** 2) / 2) * val
+        if self.e_now_upper_uncertainty !=0:
+            estimated_b = self.measured_e_now / (self.e_now_upper_uncertainty)
+            if self.logger is not None: self.logger.debug("Estimated b is %(eb)f" % dict(eb=estimated_b))
+            roots = [math.nan, math.nan]
+            try:
+                roots = fsolve(self.equations_to_be_solved_for_Rice_distribution_parameters,
+                               np.asarray([estimated_b, estimated_s]))
+            except:
+                if self.logger is not None: self.logger.error('Rice parameters cannot be worked out')
+                self.rice_parameters_are_found = False
+            else:
+                if self.logger is not None: self.logger.debug("Rice parameters are found.")
+                self.rice_parameters_are_found = True
+            return roots
+        return [math.nan, math.nan]
 
     def cdf(self, e_now):
-        value = nquad(self.pdf, [[0, e_now]])
-        return value[0]
+        value = self.eccentricity_distribution.cdf(e_now)
+        return value
+    def pdf(self, e_now):
+        value = self.eccentricity_distribution.pdf(e_now)
+        return value
 
     def cumulative_density_function_of_present_eccentricity(self, e_now):
-        if not (math.isnan(self.s) or math.isnan(self.b)):
-            if self.inv_norm == 0:
-                return math.inf
-            value = self.cdf(e_now) / self.inv_norm
+        if self.inv_norm == 0: return math.inf
+        value = self.eccentricity_distribution.cdf(e_now)/ self.inv_norm
+        if not math.isnan(value):
             return value
-        logging.warning(
-            'Cumulative density function of present eccentricity does not exist for the given e_now and its uncertainties')
+        if self.logger is not None:
+             self.logger.error(
+                'Cumulative density function of present eccentricity does not exist for the given e_now and its uncertainties')
         return math.nan
 
     def probability_density_of_eccentricity(self, e):
@@ -133,40 +161,41 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         M_pdf = []
         for i in range(0, len(eccentricity)):
             M_pdf = M_pdf + [self.pdf(eccentricity[i])]
-        plt.plot(eccentricity, probability_density_of_eccentricity,
-                 label="Probality density of eccentricity (f(e)) vs. eccentricity (e)")
-        # naming the x axis
-        plt.xlabel('Eccentricity (e)')
-        # naming the y axis
-        plt.ylabel('probability density of eccentricity (f(e))')
-        # giving a title to my graph
-        plt.title('Probability density of eccentricity vs. eccentricity for %(system)s' % dict(system=self.system_name))
 
-        plt.savefig('Probability density of eccentricity vs. eccentricity for %(system)s.pdf' % dict(system=self.system_name))
-        # function to show the plot
-        plt.show()
-        plt.plot(eccentricity, M_cdf, label="cdf of M(e) vs. eccentricity (e)")
-        # naming the x axis
+        if self.logger is not None: self.logger.info("We are going to save the probability distribution of eccentricity ")
+        plt.plot(eccentricity, probability_density_of_eccentricity, label="Probality density of eccentricity (f(e)) vs. eccentricity (e)")
         plt.xlabel('Eccentricity (e)')
-        # naming the y axis
+        plt.ylabel('probability density of eccentricity (f(e))')
+        plt.title('Probability density of eccentricity vs. eccentricity for %(system)s' % dict(system=self.system_name))
+        fname = '%(output_directory)s/Probability density of eccentricity vs. eccentricity for %(system)s.pdf' % dict(output_directory = self.output_directory, system=self.system_name)
+        msg = "\"Probability density of eccentricity vs. eccentricity for %(system)s\"" % dict(system=self.system_name)
+        plt.savefig(fname)
+        plt.clf()
+        #bash_command = "echo %(msg)s | mailx -s %(msg)s -a \"%(fname)s\" %(email)s" % dict(msg=msg, fname=fname, email=self.email)
+        #os.system(bash_command)
+        
+        plt.plot(eccentricity, M_cdf, label="cdf of M(e) vs. eccentricity (e)")
+        plt.xlabel('Eccentricity (e)')
         plt.ylabel('M_cdf ')
-        # giving a title to my graph
         plt.title('CDF of M(e) vs. eccentricity, e for %(system)s' % dict(system=self.system_name))
-        # function to show the plot
-        plt.savefig('CDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(system=self.system_name))
-        plt.show()
+        fname = '%(output_directory)s/CDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(output_directory = self.output_directory, system=self.system_name)
+        msg = "\"CDF of M(e) vs. eccentricity, e for %(system)s\"" % dict(system=self.system_name)
+        plt.savefig(fname)
+        plt.clf()
+        #bash_command = "echo %(msg)s | mailx -s %(msg)s -a \"%(fname)s\" %(email)s" % dict(msg=msg, fname=fname, email=self.email)
+        #os.system(bash_command)
 
         plt.plot(eccentricity, M_pdf, label="pdf of M(e) vs. eccentricity (e)")
-        # naming the x axis
         plt.xlabel('Eccentricity (e)')
-        # naming the y axis
         plt.ylabel('M_pdf ')
-        # giving a title to my graph
         plt.title('PDF of M(e) vs. eccentricity, e for %(system)s' % dict(system=self.system_name))
-
-        plt.savefig('PDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(system=self.system_name))
-        # function to show the plot
-        plt.show()
+        fname = '%(output_directory)s/PDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(output_directory = self.output_directory, system=self.system_name)
+        msg = "\"PDF of M(e) vs. eccentricity, e for %(system)s\"" % dict(system=self.system_name)
+        plt.savefig(fname)
+        plt.clf()
+        #bash_command = "echo %(msg)s | mailx -s %(msg)s -a \"%(fname)s\" %(email)s" % dict(msg=msg, fname=fname, email=self.email)
+        #os.system(bash_command)
+ 
         return
 
 if __name__ == '__main__':
@@ -184,10 +213,13 @@ if __name__ == '__main__':
                         help='Store the envelope eccentricity',
                         type=float)
     parser.add_argument('--system', help='Store the name of the star-exoplanet system')
+    parser.add_argument('--output_directory', help='Store the path of the output directory')
     args = parser.parse_args()
     e_dist = EccentricityDistribution(measured_eccentricity=args.eccentricity,
                                       eccentricity_upper_uncertainty=args.eccentricity_upper_uncertainty,
                                       eccentricity_lower_uncertainty=args.eccentricity_lower_uncertainty,
                                       envelope_eccentricity=args.envelope_eccentricity,
-                                      system_name=args.system if args.system else "Star-Exoplanet")
+                                      system_name=args.system if args.system else "Star-Exoplanet",
+                                      output_directory=args.output_directory if args.output_directory else "/home1/08529/mmmahmud/scratch/circularization_exoplanet_system" )
     e_dist.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
+

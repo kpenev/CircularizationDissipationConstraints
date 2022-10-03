@@ -44,13 +44,11 @@ from manual_exoplanet_data import data as manual_data
 from astropy.units import Unit, Quantity
 
 #######################
-sys.path.append('/home/mmmahmud/CircularizationDissipationConstraints/source')
-sys.path.append('/home/mmmahmud/general_purpose_python_modules')
-sys.path.append('/home/mmmahmud/CircularizationDissipationConstraints/data')
-#sys.path.append('/home/mmm161430/CircularizationDissipationConstraints/source')
-#sys.path.append('/home/mmm161430/projects/git/general_purpose_python_modules')
-#sys.path.append('/home/mmm161430/projects/git/poet')
-#sys.path.append('/home/mmm161430/CircularizationDissipationConstraints/data')
+
+sys.path.append('/home1/08529/mmmahmud/CircularizationDissipationConstraints/source')
+sys.path.append('/home1/08529/mmmahmud/general_purpose_python_modules')
+sys.path.append('/home1/08529/mmmahmud/poet')
+sys.path.append('/home1/08529/mmmahmud/CircularizationDissipationConstraints/data')
 #sys.path.append('/home/mmm161430/emcee')
 #sys.path.append('/home/mmm161430/lib')
 
@@ -66,7 +64,7 @@ if not sys.warnoptions:
                             "integers on this platform for lossless storage\.$",
                             SAWarning, r'^sqlalchemy\.sql\.type_api$')
 
-sys.path.append('/home/mmmahmud/poet/PythonPackage')
+sys.path.append('/home1/08529/mmmahmud/poet/PythonPackage')
 sys.path.append('../scripts')
 
 from orbital_evolution.evolve_interface import library as \
@@ -75,11 +73,11 @@ from orbital_evolution.evolve_interface import library as \
 from reproduce_system import *
 
 def getPathOfExoplanetSystemsData():
-    return '/home/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv' # '/home/mmm161430/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv'
+    return '/home1/08529/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv'
 def getStellarEvolutionInterpolatorsDirectory():
-    return '/home/mmmahmud/poet/stellar_evolution_interpolators' # '/home/mmm161430/projects/git/poet/stellar_evolution_interpolators'
+    return '/home1/08529/mmmahmud/poet/stellar_evolution_interpolators'
 def getEccentricityExpansionCoefficientsFile():
-    return b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite" # b"/home/mmm161430/projects/git/poet/eccentricity_expansion_coef_O400.sqlite"
+    return b"/home1/08529/mmmahmud/poet/eccentricity_expansion_coef_O400.sqlite"
 
 
 def phi(z):
@@ -378,7 +376,7 @@ class System:
 class EnvelopeEccentricityDistribution:
 
     def __init__(self,
-                 path = getPathOfExoplanetSystemsData(), #'/home/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv',
+                 path = getPathOfExoplanetSystemsData(), #'/home1/08529/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv',
                  maximum_number_of_data_points=math.inf,
                  threshold_value_of_envelope_eccentricity=0.001,
                  constraints=constraints_for_eccentricity_envelope(),
@@ -1718,8 +1716,8 @@ class ConfigObjectForLogging:
 
 class InitializationOfSamplingPropertiesOfSystem:
     def __init__(self,
-                 serialized_directory = getStellarEvolutionInterpolatorsDirectory(), # '/home/mmmahmud/poet/stellar_evolution_interpolators',
-                 eccentricity_expansion_fname= getEccentricityExpansionCoefficientsFile(), # b"/media/mmmahmud/USB/eccentricity_expansion_coef_O400.sqlite"
+                 serialized_directory = getStellarEvolutionInterpolatorsDirectory(), 
+                 eccentricity_expansion_fname= getEccentricityExpansionCoefficientsFile(), 
                  ):
 
         # mp.set_start_method('forkserver')

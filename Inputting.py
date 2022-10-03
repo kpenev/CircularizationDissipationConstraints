@@ -8,13 +8,18 @@ class Inputting:
     envelope_eccentricity_distribution_instance = None
     index = None
     @classmethod
-    def choosing_systems(cls):
+    def creating_envelope_eccentricity_distribution_instance(cls):
         cls.envelope_eccentricity_distribution_instance = EnvelopeEccentricityDistribution.EnvelopeEccentricityDistribution()
+        return
+    @classmethod
+    def choosing_systems(cls):
         print('Binary systems whose probability density of eccentricity can be figured out:')
         cls.index = cls.envelope_eccentricity_distribution_instance.print_properties_of_binary_systems_satisfying_constraints()
         return
 
     def __init__(self):
+        if self.envelope_eccentricity_distribution_instance is None:
+            self.creating_envelope_eccentricity_distribution_instance()
         if self.index is None:
             self.choosing_systems()
 
@@ -37,6 +42,9 @@ if __name__ == '__main__':
                         help='Store the lower uncertainty associated with r',
                         type=float
                         )
+    parser.add_argument('--power_of_the_ratio_of_planetary_and_stellar_radius',
+                        help='Store the power of the ratio of planetary and stellar radius'
+                        )
     args = parser.parse_args()
     if args.i:
         measured_values, standard_deviations, system_name = inputting_instance.envelope_eccentricity_distribution_instance.properties_of_ith_binary_system_if_satisfies_constraints(
@@ -49,10 +57,14 @@ if __name__ == '__main__':
         string_standard_deviations = json.dumps(standard_deviations)
 
 
-        string = 'python3 SampleStarExoplanetSystemsProperties.py --measured_values \'' + string_measured_values + '\' --standard_deviations \'' + string_standard_deviations + '\' --system \'' + system_name +'\''
+        if args.power_of_the_ratio_of_planetary_and_stellar_radius:
+            string = 'python3 SampleStarExoplanetSystemsProperties.py --measured_values \'' + string_measured_values + '\' --standard_deviations \'' + string_standard_deviations + '\' --system \'' + system_name + '\' --power_of_the_ratio_of_planetary_and_stellar_radius ' + args.power_of_the_ratio_of_planetary_and_stellar_radius
+        else:
+            string = 'python3 SampleStarExoplanetSystemsProperties.py --measured_values \'' + string_measured_values + '\' --standard_deviations \'' + string_standard_deviations + '\' --system \'' + system_name + '\''
+
         print(string)
         os.system(string)
-
+    
     #print('rp over rs', means['ratio of planet to stellar radius'])
     #means['ratio of planet to stellar radius'] = 0.0149
     #standard_deviations['ratio_of_planet_to_stellar_radius_upper_uncertainty'] = 0.0002

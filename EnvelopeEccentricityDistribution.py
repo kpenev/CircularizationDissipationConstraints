@@ -9,19 +9,20 @@ import argparse
 
 
 def getPathOfExoplanetSystemsData():
-    return '/home/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv'
+    return '/home1/08529/mmmahmud/CircularizationDissipationConstraints/data/PS_2021.07.13_00.12.38.csv'
 
 
 def envelope_eccentricity_function(x,
                                    threshold_value_of_envelope_eccentricity = 0.01,
-                                   largest_acceptable_value_of_envelope_eccentricity = 0.5):
+                                   largest_acceptable_value_of_envelope_eccentricity = 0.5,
+                                   logger = None):
 
     """
         Workout the envelope eccentricity given the log(semi major axis / planetary radius)
          from a scatter plot of eccentricity vs. log(semi major axis/planetary radius) graph
 
         Args:
-            x:                                                            log(semi major axis/ secondary radius)
+            x:                                                            semi major axis/ secondary radius
             threshold_value_of_envelope_eccentricity:                     threshold value of envelope eccentricity
             largest_acceptable_value_of_envelope_eccentricity:            largest acceptable value of envelope eccentricity
 
@@ -35,7 +36,8 @@ def envelope_eccentricity_function(x,
     if logx <= crit1:
         return threshold_value_of_envelope_eccentricity
     if logx > crit2:
-        logging.warning('Tidal effect on this system is negligible')
+        if logger is not None:
+                 logging.warning('Tidal effect on this system is negligible')
         return largest_acceptable_value_of_envelope_eccentricity
     if logx > crit1 and logx <= crit2:
         return threshold_value_of_envelope_eccentricity + (logx - crit1) * (
