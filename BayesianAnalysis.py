@@ -1192,7 +1192,8 @@ class PriorTransform:
                  min_power_law_argument=-5,
                  max_power_law_argument=5,
                  max_initial_stellar_spin=15,
-                 min_initial_stellar_spin=5
+                 min_initial_stellar_spin=5,
+                 power_of_the_ratio_of_planetary_and_stellar_radius = 2
                  ):
         self.means = means
         self.standard_deviations = standard_deviations
@@ -1204,7 +1205,7 @@ class PriorTransform:
         self.max_power_law_argument = max_power_law_argument
         self.max_initial_stellar_spin = max_initial_stellar_spin
         self.min_initial_stellar_spin = min_initial_stellar_spin
-
+        self.power_of_the_ratio_of_planetary_and_stellar_radius = power_of_the_ratio_of_planetary_and_stellar_radius
         #logging.basicConfig(level=logging.DEBUG)
 
         debug_plot = [('interpolation_performance', 'interp_performance.pdf')]
@@ -1249,8 +1250,10 @@ class PriorTransform:
                                                                                                                                       'ratio_of_planet_to_stellar_radius_upper_uncertainty'] -
                                                                                                                                   self.standard_deviations[
                                                                                                                                       'ratio_of_planet_to_stellar_radius_lower_uncertainty']) / 2)
+        n = 1.0/self.power_of_the_ratio_of_planetary_and_stellar_radius
         secondary_radius = (
-                                       ratio_of_planet_to_stellar_radius ** 0.5) * primary_radius * const.R_sun.value / const.R_earth.value
+                                       ratio_of_planet_to_stellar_radius ** n) * primary_radius * const.R_sun.value / const.R_earth.value
+
         secondary_mass = norm.ppf(u[4], loc=self.means['secondary mass'], scale=(self.standard_deviations[
                                                                                      'secondary_mass_upper_uncertainty'] -
                                                                                  self.standard_deviations[
@@ -1752,6 +1755,7 @@ class SamplingPropertiesOfSystem:
                  constraints=constraints(),
                  spin_frequency_breaks_for_planet=None,
                  spin_frequency_powers_for_planet=np.array([0.0]),
+                 power_of_the_ratio_of_planetary_and_stellar_radius = 2,
                  find_argument_of_phase_lag_function_for_planet_range_auto=False):
 
         logging_filename = 'logging/' + system_name + '_start.logging'
@@ -1773,6 +1777,7 @@ class SamplingPropertiesOfSystem:
         self.min_initial_stellar_spin = min_initial_stellar_spin
         self.spin_frequency_breaks_for_planet = spin_frequency_breaks_for_planet
         self.spin_frequency_powers_for_planet = spin_frequency_powers_for_planet
+        self.power_of_the_ratio_of_planetary_and_stellar_radius = power_of_the_ratio_of_planetary_and_stellar_radius
 
         if envelope_eccentricity_function == None:
             envelope_eccentricity_distribution_object = EnvelopeEccentricityDistribution()
@@ -1796,7 +1801,8 @@ class SamplingPropertiesOfSystem:
                                                            min_tidal_break_period,
                                                            max_tidal_break_period,
                                                            min_power_law_argument, max_power_law_argument,
-                                                           max_initial_stellar_spin, min_initial_stellar_spin)
+                                                           max_initial_stellar_spin, min_initial_stellar_spin,
+                                                           power_of_the_ratio_of_planetary_and_stellar_radius)
 
             self.e_env = self.envelope_eccentricity_function(
                 x=self.means['semi major axis'] / self.means['secondary radius'])
@@ -1926,6 +1932,7 @@ if __name__ == '__main__':
     means['ratio of planet to stellar radius'] = 0.0149
     standard_deviations['ratio_of_planet_to_stellar_radius_upper_uncertainty'] = 0.0002
     standard_deviations['ratio_of_planet_to_stellar_radius_lower_uncertainty'] = -0.0002
+    power_of_the_ratio_of_planetary_and_stellar_radius = 2
     print('Print properties of the chosen binary system: means = ', means, ' standard deviations = ',
           standard_deviations, ' Star-Exoplanet system name = ', system_name)
     print('*********************************************************')
@@ -1939,5 +1946,6 @@ if __name__ == '__main__':
     test3 = SamplingPropertiesOfSystem(means,
                                        standard_deviations,
                                        system_name=system_name,
-                                       envelope_eccentricity_function=test2.envelope_eccentricity_function
+                                       envelope_eccentricity_function=test2.envelope_eccentricity_function,
+                                       power_of_the_ratio_of_planetary_and_stellar_radius=power_of_the_ratio_of_planetary_and_stellar_radius
                                        )

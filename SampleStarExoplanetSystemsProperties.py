@@ -141,6 +141,7 @@ class PriorTransform:
         self.min_initial_stellar_spin = min_initial_stellar_spin
         self.power_of_the_ratio_of_planetary_and_stellar_radius = power_of_the_ratio_of_planetary_and_stellar_radius
 
+
         debug_plot = [('interpolation_performance', 'interp_performance.pdf')]
         teff = split_normal.freeze_error_bar(
             mode=self.means['stellar effective temperature'],
@@ -871,6 +872,7 @@ class SamplingPropertiesOfSystem:
                  output_dirname="/home1/08529/mmmahmud/scratch/circularization_exoplanet_system/sampling_output",
                  logging_level=logging.DEBUG):
 
+
         logging_fname = "%(dirname)s/%(system)s/logger_for_%(system)s.log" % dict(dirname=output_dirname, system=system_name)
         logger_name = "%(dirname)s/%(system)s/logger_for_%(system)s" % dict(dirname=output_dirname, system=system_name)
         logger = setup_logger(logger_name, logging_fname, level=logging_level)
@@ -924,6 +926,7 @@ class SamplingPropertiesOfSystem:
                                                            min_power_law_argument, max_power_law_argument,
                                                            max_initial_stellar_spin, min_initial_stellar_spin,
                                                            power_of_the_ratio_of_planetary_and_stellar_radius, logger)
+
 
             self.e_env = self.envelope_eccentricity_function(
                 x=self.means['semi major axis'] / self.means['secondary radius'], logger=logger)
@@ -994,6 +997,6 @@ if __name__ == '__main__':
                                        args.standard_deviations,
                                        system_name=args.system,
                                        envelope_eccentricity_function=EnvelopeEccentricityDistribution.envelope_eccentricity_function,
-                                       power_of_the_ratio_of_planetary_and_stellar_radius = args.power_of_the_ratio_of_planetary_and_stellar_radius if args.power_of_the_ratio_of_planetary_and_stellar_radius else 2
+                                       power_of_the_ratio_of_planetary_and_stellar_radius = args.power_of_the_ratio_of_planetary_and_stellar_radius if args.power_of_the_ratio_of_planetary_and_stellar_radius else 2                                      
                                        )
 
