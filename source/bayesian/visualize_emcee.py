@@ -3,6 +3,7 @@
 """Create plots of emcee sampling results."""
 
 import logging
+from os import path
 
 import matplotlib
 from matplotlib import pyplot
@@ -11,12 +12,15 @@ from configargparse import\
     DefaultsFormatter,\
     Action as ArgparseAction
 import numpy
+from numpy.lib import recfunctions
 import emcee
 import h5py
 import pandas
 from scipy import stats
 from asteval import Interpreter
 from astropy.table import Table
+
+from orbital_evolution.transformations import lgQ
 
 from general_purpose_python_modules.combined_mcmc_constraint import \
     CombinedMCMCConstraint
@@ -205,6 +209,7 @@ def parse_command_line():
 def get_chain_name(samples_fname, chain_conditions):
     """Return the name of the chain satisfying the given conditions."""
 
+    system_name = None
     with h5py.File(samples_fname, 'r') as chain_file:
         chain_name = None
         for try_chain_name in chain_file.keys():
@@ -235,9 +240,16 @@ def get_chain_name(samples_fname, chain_conditions):
                         )
                     )
                 chain_name = try_chain_name
-                system_name = chain_file[chain_name].attrs['system']
+                if 'system' in chain_file[chain_name].attrs:
+                    system_name = chain_file[chain_name].attrs['system']
         if chain_name is None:
             return None, None
+        if system_name is None:
+            fname, ext = path.splitext(path.basename(samples_fname))
+            assert ext in ['.h5', '.hdf5']
+            fname_start, system_name = fname.split('_')
+            assert fname_start == 'system'
+            system_name = int(system_name)
         return chain_name, system_name
 
 
@@ -749,15 +761,103 @@ def add_errorbar(samples, config):
         line_width += 2
 #pylint: enable=too-many-locals
 
-def get_plot_data(samples_fname, burn_in, chain_condition):
+
+def ensure_uniform_blob_columns(blobs):
+    """Ensure output blobs have correct columns for analysis."""
+
+    blob_columns = list(blobs.dtype.names)
+    if 'lgQ_min' not in blob_columns:
+        blobs['break_period'] = 2.0 * numpy.pi / blobs['break_period']
+        phase_lag_max = blobs['phase_lag_max']
+        two_breaks = blobs['alpha'] > 0
+        phase_lag_max[two_breaks] *= numpy.power(
+            50.0 / blobs['break_period'][two_breaks],
+            blobs['alpha'][two_breaks]
+        )
+        blobs['phase_lag_max'] = lgQ(phase_lag_max)
+
+        rename_columns = [('phase_lag_max', 'lgQ_min'),
+                          ('alpha', 'lgQ_powerlaw'),
+                          ('break_period', 'lgQ_break_period')]
+        if 'm_sum' in blob_columns and 'mass_ratio' in blob_columns:
+            rename_columns.extend([('m_sum', 'primary_mass'),
+                                   ('mass_ratio', 'secondary_mass')])
+            primary_mass = blobs['m_sum'] / (1.0 + blobs['mass_ratio'])
+            blobs['m_sum'] = primary_mass
+            blobs['mass_ratio'] *= primary_mass
+        if 'metallicity' in blob_columns:
+            rename_columns.append(('metallicity', 'feh'))
+
+        for from_col, to_col in rename_columns:
+            blob_columns[blob_columns.index(from_col)] = to_col
+
+        blobs.dtype.names = tuple(blob_columns)
+#        if 'Wdisk' not in blob_columns:
+#            return recfunctions.append_fields(
+#                blobs.flatten(),
+#                'Wdisk',
+#                numpy.full(blobs['lgQ_min'].size, numpy.nan),
+#                float
+#            ).reshape(blobs.shape)
+#    return blobs
+
+
+def get_plot_data(samples_fname_list, burn_in, chain_condition):
     """Return the samples to use for plotting for a single system."""
 
-    backend, system_name = get_backend(samples_fname, chain_condition)
-    assert backend is not None
+    combined_blobs = None
+    combined_logprob = None
+    for samples_fname in samples_fname_list:
+        backend, system_name = get_backend(samples_fname, chain_condition)
+        assert backend is not None
+        blobs = backend.get_blobs()
+        ensure_uniform_blob_columns(blobs)
+        logprob = backend.get_log_prob()
+
+        if combined_blobs is None:
+            print('First batch tail: ' + repr(blobs[-1]))
+            assert combined_logprob is None
+            combined_blobs = blobs
+            combined_logprob = logprob
+        else:
+            print('Adding %s steps to %s old ones' % (blobs.shape,
+                                                      combined_blobs.shape))
+            final_shape = (combined_blobs.shape[0] + blobs.shape[0],
+                           combined_blobs.shape[1])
+            combined_blobs = recfunctions.stack_arrays(
+                (combined_blobs, blobs)
+            ).reshape(final_shape)
+            combined_logprob = numpy.concatenate((combined_logprob, logprob))
+            print('Ended up with %s steps' % (combined_blobs.shape,))
+
+    nan_indices = numpy.nonzero(
+        numpy.logical_not(numpy.isfinite(combined_logprob))
+    )[0]
+    if nan_indices.size:
+        last_nan = nan_indices.max()
+    else:
+        last_nan = -1
+    for colname in combined_blobs.dtype.names:
+        if colname == 'Wdisk':
+            continue
+        nan_indices = numpy.nonzero(
+            numpy.logical_not(numpy.isfinite(combined_blobs[colname]))
+        )[0]
+        if nan_indices.size:
+            last_nan = max(
+                last_nan,
+                nan_indices.max()
+            )
+            print('Last nan for %s: %d' % (colname, nan_indices.max()))
+
+    print('Discarding %d leading nan steps' % (last_nan + 1))
+    combined_blobs = combined_blobs[last_nan + burn_in + 1:]
+    combined_logprob = combined_logprob[last_nan + burn_in + 1:]
+
     return (
         system_name,
-        backend.get_blobs(discard=burn_in),
-        backend.get_log_prob(discard=burn_in)
+        combined_blobs,
+        combined_logprob
     )
 
 def main(config):
@@ -778,7 +878,7 @@ def main(config):
 
         try:
             system_name, samples, log_probability = get_plot_data(
-                samples_fname,
+                [samples_fname],
                 burn_in,
                 config.chain_condition
             )

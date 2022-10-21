@@ -45,6 +45,8 @@ from bayesian.m35_util import get_photometry as get_m35_photometry
 from bayesian.ngc6819_util import get_photometry as get_ngc6819_photometry
 from bayesian.ngc188_util import get_photometry as get_ngc188_photometry
 #pylint: enable=unused-import
+from bayesian.windemuth_et_al_util import \
+    get_summary_data as get_w19_summary_data
 
 from bayesian.cluster_util import select_binary_data
 
@@ -68,32 +70,54 @@ def parse_command_line(quantiles_only=False):
                 )
             )
         ),
-        'samples'
+        'samples',
+        '{method:s}',
+        '{collection:s}'
+    )
+
+    parser.add_argument(
+        '--collection',
+        default='w19',
+        choices=['w19', 'sb1'],
+        help='The collection of binary systems to plot constraints for.'
+    )
+    parser.add_argument(
+        '--method',
+        default='circularization',
+        choices=['circularization', 'spin'],
+        help='The method of constraining Q* used.'
     )
 
     parser.add_argument(
         '--samples-dir',
         default=default_samples_dir,
-        help='The directory holding the HDF5 files with MCMC samples.'
+        help='The directory holding the HDF5 files with MCMC samples. May '
+        'contain ``{collection}`` and ``{method}`` format string specifications'
+        ' which will be substituted with the chosen collection of binaries and '
+        'method of constraining Q.'
     )
     parser.add_argument(
         '--data-pickle',
         default=path.join(
             default_samples_dir,
             'processed_sampling_data.pkl'
-        )
+        ),
+        help='Filename to pickle processed sampling data to for faster plotting'
+        ' in the future.'
     )
     parser.add_argument(
         '--combined-quantiles-pickle',
         default=path.join(
             default_samples_dir,
             'combined_quantiles.pkl'
-        )
+        ),
+        help='Filename to pickle the quantiles of the combined constraint to.'
     )
     parser.add_argument(
-        '--skip-download',
-        default=False,
-        action='store_true',
+        '--download-from',
+        default=['ls6'],
+        choices=['ls6', 'stampede2', 'ganymede'],
+        nargs='*',
         help='If passed, does not download the latest samples from stampede2 '
         'and ganymede.'
     )
@@ -114,7 +138,7 @@ def parse_command_line(quantiles_only=False):
     )
     parser.add_argument(
         '--constraint-validity-threshold',
-        default=0.7,
+        default=0.5,
         type=float,
         help='Constraints are considered valid if the highest quantile does '
         'not exceed this value + its minimum over tidal period.'
@@ -155,13 +179,14 @@ def parse_command_line(quantiles_only=False):
         '--combined-constraint-period-range', '--combined-prange',
         nargs=2,
         type=float,
-        default=(2.0, 10.0),
+        default=(1.0, 30.0),
         help='The range of tidal periods to show in the combined constraint '
         'plot.'
     )
     parser.add_argument(
         '--nthreads',
         default=16,
+        type=int,
         help='The maximum number of parallel threads to use for calculating '
         'quantile diagnostics (the only slow part of preparing plotting data).'
     )
@@ -171,25 +196,85 @@ def parse_command_line(quantiles_only=False):
         help='The author to specify for the generated data behind the figures '
         'tables.'
     )
+    parser.add_argument(
+        '--mrt-fname',
+        default=path.join(
+            default_samples_dir,
+            'kic{binary:d}_{plot_type:s}.mrt'
+        ),
+        help='The filename to save data behind the figures tables. May include '
+        'substitutions of ``{collection}``, ``{method}``, ``{binary}``, '
+        '``{plot_type}``. Filename clashes will cause an error.'
+    )
+    parser.add_argument(
+        '--reprocess',
+        nargs='+',
+        default=[],
+        help='If passed, filenames in this list do not use pickled results '
+        'from processing their samples even if it seems there are no updates.'
+        'Can be specified by basename only.'
+    )
+
     if not quantiles_only:
         add_frequency_dependence_plot_config(parser)
 
-    return parser.parse_args()
+    result = parser.parse_args()
+    substitutions = dict(collection=result.collection,
+                         method=result.method)
+    result.samples_dir = result.samples_dir.format_map(substitutions)
+    result.data_pickle = result.data_pickle.format_map(substitutions)
+    result.combined_quantiles_pickle = (
+        result.combined_quantiles_pickle.format_map(substitutions)
+    )
+    return result
 
 
-def download_latest_samples(destination):
+def download_latest_samples(download_from, destination, collection, method):
     """Download the latest samples files from stampede2 and ganymede."""
 
-    for source in [
-            'kxp174430@ganymede:~/M35*_powerlaw_alllock_*mcmc_samples.h5',
-            'kpenev@stampede2.tacc.utexas.edu:~/'
-            'NGC*_mcmc_powerlawlgQ_samples.h5'
-    ]:
+    for hpc in download_from:
+        if hpc in ['ls6', 'stampede2']:
+            host = 'kpenev@{0:s}.tacc.utexas.edu:'.format(hpc)
+        else:
+            assert host == 'ganymede'
+            host = 'kxp174430@ganymede:'
+        if method == 'circularization':
+            if collection == 'w19':
+                assert hpc in ['ls6', 'stampede2']
+                source = (
+                    host
+                    +
+                    '/work/05392/kpenev/{0:s}/circularization/W19/samples/*.h5'
+                ).format(hpc)
+            else:
+                assert collection == 'sb1'
+                if hpc == 'ganymede':
+                    source = (
+                        host
+                        +
+                        '~/M35*_powerlaw_alllock_*mcmc_samples.h5'
+                    )
+                elif hpc == 'stampede2':
+                    source = (
+                        host
+                        +
+                        '~/NGC*_mcmc_powerlawlgQ_samples.h5'
+                    )
+                else:
+                    assert False
+        else:
+            assert method == 'spin'
+            assert hpc == 'ls6'
+            source = (
+                host
+                +
+                '/work/06850/rpatel23/ls6/scratch/sampling_output/h5_files/*.h5'
+            )
         call(['rsync', '-avz', '--progress', source, destination])
 
 
 def hack_preprocessed_data(preprocessed_data, config):
-    """Ensure plots look OK."""
+    """Ensure plots are generated even for non-converged systems."""
 
     for samples_fname in preprocessed_data:
         for ptide_ind in range(len(config.convergence_ptide_grid)):
@@ -220,6 +305,7 @@ def hack_preprocessed_data(preprocessed_data, config):
                     )
                 )
 
+
 def add_preprocessed_data(samples_fname, preprocessed_data, result, config):
     """Add system data from loaded pickle to result."""
 
@@ -248,7 +334,7 @@ def add_preprocessed_data(samples_fname, preprocessed_data, result, config):
     return False
 
 
-def add_orbit_and_photometry(sampling_data):
+def add_sb1_orbit_and_photometry(sampling_data):
     """Add orbit data to `sampling_data`."""
 
     sb1_orbits = dict()
@@ -277,6 +363,14 @@ def add_orbit_and_photometry(sampling_data):
         sampling_data[binary]['photometry'] = photometry[cluster][
             photometry[cluster][id_column] == binary_id
         ]
+
+
+def add_w19_summary_data(sampling_data):
+    """Add W19 maximum likelihood and posterior quantiles to `sampling_data`."""
+
+    summary_data = get_w19_summary_data()
+    for kic_id in sampling_data.keys():
+        sampling_data[kic_id]['summary'] = summary_data.loc[kic_id]
 
 
 def get_single_quantile(cdf_value, ptide, samples, config):
@@ -330,16 +424,24 @@ def get_sampling_data(config, add_quantiles=True):
         if not path.splitext(samples_fname)[1] == '.h5':
             print('Skipping ' + repr(samples_fname))
             continue
-        if add_preprocessed_data(samples_fname,
-                                 preprocessed_data,
-                                 result,
-                                 config):
+        if (
+                samples_fname not in config.reprocess
+                and
+                add_preprocessed_data(samples_fname,
+                                      preprocessed_data,
+                                      result,
+                                      config)
+        ):
             print('Reusing pickled data for: ' + repr(samples_fname))
             continue
         try:
-            print('Reading: ' + repr(samples_fname))
+            to_read = [path.join(config.samples_dir, 'pre_run', samples_fname),
+                       path.join(config.samples_dir, samples_fname)]
+            if not path.exists(to_read[0]):
+                to_read = to_read[1:]
+            print('Reading: ' + repr(to_read))
             system, samples, log_probability = get_plot_data(
-                path.join(config.samples_dir, samples_fname),
+                to_read,
                 0,
                 config.chain_condition
             )
@@ -365,7 +467,11 @@ def get_sampling_data(config, add_quantiles=True):
                 with open(config.data_pickle, 'wb') as pickle_file:
                     pickle.dump(preprocessed_data, pickle_file)
 
-    add_orbit_and_photometry(result)
+    if config.collection == 'sb1':
+        add_sb1_orbit_and_photometry(result)
+    else:
+        assert config.collection == 'w19'
+        add_w19_summary_data(result)
     return result
 
 
@@ -502,7 +608,10 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
     axis.set_xscale('log')
     orig_axis = pyplot.gca()
     pyplot.sca(axis)
-    lgq_range = (4.0 if binary.startswith('M35_') else 5.0, 12)
+    lgq_range = (
+        4.0 if isinstance(binary, str) and binary.startswith('M35_') else 5.0,
+        12
+    )
     config.combined_constraint_lgQ_grid = numpy.linspace(*lgq_range, 50)
     frequency_dependence_plotter = FrequencyDependencePlotter(1, config)
     frequency_dependence_plotter.add_chain(
@@ -521,7 +630,12 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
                                                 fmt='-k',
                                                 label=None,
                                                 zorder=20)
-    pyplot.axvline(x=min(system_data['orbit']['Per']),
+    if 'orbit' in system_data:
+        porb = min(system_data['orbit']['Per'])
+    else:
+        assert 'summary' in system_data
+        porb = system_data['summary']['maxlike_period']
+    pyplot.axvline(x=porb,
                    color='black',
                    linewidth=3,
                    zorder=20)
@@ -533,7 +647,11 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
         binary,
         r"$\log_{10}Q_\star'$",
         config,
-        yticks=[4, 6, 8, 10, 12] if binary.startswith('M35') else [5, 7, 9, 11]
+        yticks=(
+            [4, 6, 8, 10, 12]
+            if isinstance(binary, str) and binary.startswith('M35') else
+            [5, 7, 9, 11]
+        )
     )
     pyplot.sca(orig_axis)
     return data_behind
@@ -830,16 +948,23 @@ def decorate_subplot(axis,
         if yticks is not None:
             axis.set_yticks(yticks)
 
-    cluster, binary_id = binary.split('_')
-    axis.set_title(
-        ('PKM ' if cluster == 'NGC188' else 'WOCS ') + binary_id,
-        pad=3
-    )
+    if isinstance(binary, int):
+        axis.set_title('TIC %d' % binary, pad=3)
+    else:
+        cluster, binary_id = binary.split('_')
+        axis.set_title(
+            ('PKM ' if cluster == 'NGC188' else 'WOCS ') + binary_id,
+            pad=3
+        )
 
 
 def plot_single_burnin_period(binary, system_data, __, axis, config):
     """Plot the required burnin for each quantile of lgQ(Ptide) vs Ptide."""
 
+    if isinstance(binary, int):
+        cluster = 'W19'
+    else:
+        cluster = binary.split('_')[0]
     axis.set_yscale('log')
     data_behind = plot_single_diagnostic_period(
         system_data['quantiles'],
@@ -849,7 +974,7 @@ def plot_single_burnin_period(binary, system_data, __, axis, config):
         label=(
             None if getattr(plot_single_burnin_period,
                             'labeled_cluster',
-                            None) == binary.split('_')[0]
+                            None) == cluster
             else True
         )
     )
@@ -857,7 +982,7 @@ def plot_single_burnin_period(binary, system_data, __, axis, config):
     axis.axhspan(ymax=system_data['samples'].shape[0], ymin=0, color='black')
 
     if config.individual_plot_mode == 'subplots':
-        plot_single_burnin_period.labeled_cluster = binary.split('_')[0]
+        plot_single_burnin_period.labeled_cluster = cluster
 
     mark_valid_constraint_range(system_data['quantiles'],
                                 axis,
@@ -872,6 +997,11 @@ def plot_single_burnin_period(binary, system_data, __, axis, config):
 def plot_single_cdfstd_period(binary, system_data, __, axis, config):
     """Plot the required burnin for each quantile of lgQ(Ptide) vs Ptide."""
 
+    if isinstance(binary, int):
+        cluster = 'W19'
+    else:
+        cluster = binary.split('_')[0]
+
     axis.set_yscale('log')
     data_behind = plot_single_diagnostic_period(
         system_data['quantiles'],
@@ -881,12 +1011,12 @@ def plot_single_cdfstd_period(binary, system_data, __, axis, config):
         label=(
             None if getattr(plot_single_cdfstd_period,
                             'labeled_cluster',
-                            None) == binary.split('_')[0]
+                            None) == cluster
             else True
         )
     )
     if config.individual_plot_mode == 'subplots':
-        plot_single_cdfstd_period.labeled_cluster = binary.split('_')[0]
+        plot_single_cdfstd_period.labeled_cluster = cluster
     mark_valid_constraint_range(system_data['quantiles'],
                                 axis,
                                 config)
@@ -897,30 +1027,44 @@ def plot_single_cdfstd_period(binary, system_data, __, axis, config):
     return data_behind
 
 
-def get_plotting_order(plot_data, restrict_to_cluster=None):
+def get_plotting_order(plot_data, collection, restrict_to_cluster=None):
     """Split the given systems by cluster and order them  by orbital period."""
 
-    result = dict()
-    cluster_list = (['M35', 'NGC6819', 'NGC188'] if restrict_to_cluster is None
-                    else [restrict_to_cluster])
-    for cluster in cluster_list:
-        period_binary = [
-            (min(data['orbit']['Per']), binary)
-            for binary, data in plot_data.items()
-            if binary.startswith(cluster) and min(data['orbit']['Per']) < 50.0
-        ]
-        result[cluster] = [entry[1] for entry in sorted(period_binary)]
+    if collection == 'sb1':
+        result = dict()
+        cluster_list = (
+            ['M35', 'NGC6819', 'NGC188'] if restrict_to_cluster is None
+            else [restrict_to_cluster]
+        )
+        for cluster in cluster_list:
+            period_binary = [
+                (min(data['orbit']['Per']), binary)
+                for binary, data in plot_data.items()
+                if (
+                    binary.startswith(cluster)
+                    and
+                    min(data['orbit']['Per']) < 50.0
+                )
+            ]
+            result[cluster] = [entry[1] for entry in sorted(period_binary)]
 
-    if restrict_to_cluster is None or restrict_to_cluster == 'M35':
-        for bad_binary in ['M35_15012',
-                           'M35_41032',
-                           'M35_49043',
-                           'NGC188_4999']:
-            result[bad_binary.split('_')[0]].remove(bad_binary)
+        if restrict_to_cluster is None or restrict_to_cluster == 'M35':
+            for bad_binary in ['M35_15012',
+                               'M35_41032',
+                               'M35_49043',
+                               'NGC188_4999']:
+                result[bad_binary.split('_')[0]].remove(bad_binary)
 
-    if restrict_to_cluster is None:
-        return result
-    return result[cluster]
+        if restrict_to_cluster is None:
+            return result
+        return result[cluster]
+
+    assert collection == 'w19'
+    period_binary = [
+        (data['summary']['maxlike_period'], binary)
+        for binary, data in plot_data.items()
+    ]
+    return dict(W19=[entry[1] for entry in sorted(period_binary)])
 
 
 def get_subplots(num_systems, plot_type, config):
@@ -1003,28 +1147,36 @@ def save_data_behind_figure(data, title, filename, config):
 def save_individual_data_behind_figure(data, plot_type, binary, config):
     """Return a ready-to-use table maker that can save to AAS MRT format."""
 
-    cluster, binary_id = binary.split('_')
     quantity = dict(
         lgQ_period="Quantiles of log10(Q*') vs tidal period",
         burnin_period="Burn-in period for each quantile vs tidal period",
         cdfstd_period=("Standard deviation of the CDF at each quantile vs "
                        "tidal period")
     )
-    title_info = dict(
-        cluster=('NGC ' + cluster[3:] if cluster.startswith('NGC')
-                 else 'M ' + cluster[1:]),
-        id_type=('PKM' if cluster == 'NGC188' else 'WOCS'),
-        binary_id=binary_id,
-        quantity=quantity[plot_type]
+
+    if isinstance(binary, str):
+        cluster, binary_id = binary.split('_')
+        title = '{quantity} for {cluster} binary {id_type} {binary_id}'.format(
+            cluster=('NGC ' + cluster[3:] if cluster.startswith('NGC')
+                     else 'M ' + cluster[1:]),
+            id_type=('PKM' if cluster == 'NGC188' else 'WOCS'),
+            binary_id=binary_id,
+            quantity=quantity[plot_type]
+        )
+    else:
+        assert config.collection == 'w19'
+        title = '{quantity} for Kepler eclipsing binary KIC {binary:d}'.format(
+            quantity=quantity[plot_type],
+            binary=binary
+        )
+    mrt_filename = config.mrt_fname.format(
+        collection=config.collection,
+        method=config.method,
+        binary=binary,
+        plot_type=plot_type
     )
-    save_data_behind_figure(
-        data,
-        '{quantity} for {cluster} binary {id_type} {binary_id}'.format_map(
-            title_info
-        ),
-        binary + '_' + plot_type + '.mrt',
-        config
-    )
+    assert not path.exists(mrt_filename)
+    save_data_behind_figure(data, title, mrt_filename, config)
 
 
 #No clear way to simplify
@@ -1032,7 +1184,7 @@ def save_individual_data_behind_figure(data, plot_type, binary, config):
 def plot_individual_constraints(plot_data, config):
     """Create plots showing the lgQ(Ptide) constraint for indivdiual systems."""
 
-    plotting_order = get_plotting_order(plot_data)
+    plotting_order = get_plotting_order(plot_data, config.collection)
 
     config.combined_constraint_heat_map = 'log'
 
@@ -1049,9 +1201,9 @@ def plot_individual_constraints(plot_data, config):
     )
 
     for plot_type in [
-            #'lgQ_period',
+            'lgQ_period',
             #'lgQ_quantiles',
-            'quantiles_lgQ',
+#            'quantiles_lgQ',
             #'autocorrelation',
             #'autocorrelation_time',
             #'raftery_lewis_diagnostics',
@@ -1060,7 +1212,7 @@ def plot_individual_constraints(plot_data, config):
             #'tightest_lgQ_posterior'
     ]:
         print('Plot type: ' + plot_type)
-        for cluster in ['M35', 'NGC6819', 'NGC188']:
+        for cluster, cluster_binaries in plotting_order.items():
             print('\tCluster: ' + cluster)
             for plot_split in plot_type_split[plot_type]:
                 print('\t\tSplit: ' + repr(plot_split))
@@ -1069,12 +1221,12 @@ def plot_individual_constraints(plot_data, config):
                     output_fname += '_' + str(plot_split)
                 output_fname += '.pdf'
                 if config.individual_plot_mode == 'subplots':
-                    axes = get_subplots(len(plotting_order[cluster]),
+                    axes = get_subplots(len(cluster_binaries),
                                         plot_type,
                                         config)
                 else:
                     pdf = PdfPages(output_fname)
-                for binary_index, binary in enumerate(plotting_order[cluster]):
+                for binary_index, binary in enumerate(cluster_binaries):
                     config.left = (
                         config.individual_plot_mode == 'pages'
                         or
@@ -1083,7 +1235,7 @@ def plot_individual_constraints(plot_data, config):
                     config.bottom = (
                         config.individual_plot_mode == 'pages'
                         or
-                        binary_index >= len(plotting_order[cluster]) - 3
+                        binary_index >= len(cluster_binaries) - 3
                     )
                     print('\t\t\tBinary: ' + repr(binary))
                     if plot_type == 'raftery_lewis_diagnostics':
@@ -1112,7 +1264,7 @@ def plot_individual_constraints(plot_data, config):
                             config
                         )
                     if config.individual_plot_mode == 'pages':
-                        pyplot.suptitle(binary
+                        pyplot.suptitle(str(binary)
                                         +
                                         ': %d steps'
                                         %
@@ -1177,7 +1329,7 @@ def plot_combined_constraints(plot_data, config):
     orig_font_size = rcParams['font.size']
     rcParams['font.size'] = '24'
     config.combined_constraint_heat_map = 'log'
-    include_binaries = get_plotting_order(plot_data)
+    include_binaries = get_plotting_order(plot_data, config.collection)
 
     numpy.set_printoptions(precision=16, floatmode='fixed', linewidth=100)
     config.combined_constraint_lgQ_grid = numpy.linspace(4, 7, 100)
@@ -1194,14 +1346,14 @@ def plot_combined_constraints(plot_data, config):
     selected_quantiles = dict(ptide_grid=config.ptide_grid)
 
     combined_clusters = []
-    for cluster in ['NGC6819', 'NGC188', 'M35']:
+    for cluster, cluster_binaries in include_binaries.items():
         print(cluster + ':')
         combined_clusters.append(cluster)
         cluster_plotter = FrequencyDependencePlotter(
-            len(include_binaries[cluster]),
+            len(cluster_binaries),
             config
         )
-        for nadded, binary in enumerate(include_binaries[cluster]):
+        for nadded, binary in enumerate(cluster_binaries):
             burnin = get_burnin(plot_data[binary], config, binary)
             samples = plot_data[binary]['samples']
             valid_ptide_indices = get_valid_ptide_indices(
@@ -1370,23 +1522,19 @@ def create_tightest_constraint_latex(data_behind, cluster):
 def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
     """Plot tightest constraints as error bars vs tidal period."""
 
-    include_binaries = get_plotting_order(plot_data)
-    offsets = numpy.zeros(len(config.convergence_ptide_grid), dtype=int)
-    for cluster in ['M35', 'NGC6819', 'NGC188']:
-        pyplot.xscale('log')
-        lgq_range = ((4, 8) if cluster == 'M35' else (5, 9))
-        cluster_quantiles = numpy.empty((len(config.convergence_quantiles),
-                                         len(include_binaries[cluster])))
-        plot_ptide = numpy.empty(len(include_binaries[cluster]))
-        data_behind = Table(
+
+    def init_data_behind_table(binary_list, id_name):
+        """Create the table to store the data behind figure information."""
+
+        return Table(
             [
-                [b.split('_')[1] for b in include_binaries[cluster]],
-                numpy.empty(len(include_binaries[cluster]))
+                [
+                    b.split('_')[1] if config.collection == 'sb1' else str(b)
+                    for b in binary_list
+                ],
+                numpy.empty(len(binary_list))
             ],
-            names=[
-                ('PKM' if cluster == 'NGC188' else 'WOCS'),
-                'Ptide'
-            ],
+            names=[id_name, 'Ptide'],
             descriptions=[
                 "Binary identifier",
                 (
@@ -1395,7 +1543,25 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
                 ).format(100.0 * max(config.convergence_quantiles))
             ]
         )
-        for binary_ind, binary in enumerate(include_binaries[cluster]):
+
+
+    binary_id_name = dict(
+        NGC188='PKM',
+        M35='WOCS',
+        NGC6819='WOCS',
+        W19='KIC'
+    )
+    include_binaries = get_plotting_order(plot_data, config.collection)
+    offsets = numpy.zeros(len(config.convergence_ptide_grid), dtype=int)
+    for cluster, cluster_binaries in include_binaries.items():
+        pyplot.xscale('log')
+        lgq_range = ((4, 8) if cluster == 'M35' else (5, 9))
+        cluster_quantiles = numpy.empty((len(config.convergence_quantiles),
+                                         len(cluster_binaries)))
+        plot_ptide = numpy.empty(len(include_binaries[cluster]))
+        data_behind = init_data_behind_table(cluster_binaries,
+                                             binary_id_name[cluster])
+        for binary_ind, binary in enumerate(cluster_binaries):
             upper_quantile_ind = numpy.argmax(config.convergence_quantiles)
             ptide_ind = numpy.array([
                 entry[upper_quantile_ind][0]
@@ -1510,10 +1676,13 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
 def main(config):
     """Avoid polluting global namespace."""
 
-    if not config.skip_download:
-        download_latest_samples(config.samples_dir)
+    download_latest_samples(config.download_from,
+                            config.samples_dir,
+                            config.collection,
+                            config.method)
 
     plot_data = get_sampling_data(config)
+    print('Plot data: ' + repr(plot_data))
     plot_individual_constraints(plot_data, config)
 #    combined_quantiles = None
 #    combined_quantiles = plot_combined_constraints(plot_data, config)
