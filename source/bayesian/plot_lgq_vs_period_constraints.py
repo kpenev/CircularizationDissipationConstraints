@@ -9,6 +9,7 @@ from os import path, listdir
 import hashlib
 import pickle
 from multiprocessing import Pool
+from traceback import print_exc
 
 import matplotlib
 from matplotlib import pyplot, cm, colors, rcParams
@@ -138,10 +139,13 @@ def parse_command_line(quantiles_only=False):
     )
     parser.add_argument(
         '--constraint-validity-threshold',
-        default=0.5,
+        default=[0.5],
         type=float,
-        help='Constraints are considered valid if the highest quantile does '
-        'not exceed this value + its minimum over tidal period.'
+        nargs='+',
+        help='The upper(lower) half of the distribution is considered valid if '
+        'all quantiles above(below) the median are within this value of their '
+        'minimum(maximum) over the tidal period range. Should specify either a '
+        'single value or one value per convergence quantile.'
     )
     parser.add_argument(
         '--convergence-combine-nsteps',
@@ -216,7 +220,10 @@ def parse_command_line(quantiles_only=False):
     )
 
     if not quantiles_only:
-        add_frequency_dependence_plot_config(parser)
+        add_frequency_dependence_plot_config(
+            parser,
+            ['hatch', 'bounds', 'lines', 'confidence']
+        )
 
     result = parser.parse_args()
     substitutions = dict(collection=result.collection,
@@ -226,6 +233,27 @@ def parse_command_line(quantiles_only=False):
     result.combined_quantiles_pickle = (
         result.combined_quantiles_pickle.format_map(substitutions)
     )
+    if len(result.constraint_validity_threshold) == 1:
+        result.constraint_validity_threshold = [
+            result.constraint_validity_threshold[0]
+            for q in result.convergence_quantiles if q != 0.5
+        ]
+    else:
+        assert (
+            len(result.constraint_validity_threshold)
+            ==
+            (
+                len(result.convergence_quantiles)
+                -
+                (1 if 0.5 in result.convergence_quantiles else 0)
+            )
+        )
+
+    if 0.5 not in result.convergence_quantiles:
+        result.convergence_quantiles = sorted(result.convergence_quantiles
+                                              +
+                                              [0.5])
+    result.frequency_dependence_plot_no_lines = True
     return result
 
 
@@ -512,6 +540,12 @@ def plot_single_diagnostic_period(quantile_data,
         descriptions=["The tidal period at which Q' was evaluated"],
     )
     for quantile_ind, quant_label in enumerate(quantile_labels):
+        if config.convergence_quantiles[quantile_ind] == 0.5:
+            if diagnostic == 'quantile':
+                kwargs['color'] = 'red'
+                kwargs['linewidth'] = 0.5
+            else:
+                continue
         if label is True:
             kwargs['label'] = quant_label
 
@@ -533,72 +567,99 @@ def plot_single_diagnostic_period(quantile_data,
             fmt,
             **kwargs
         )
+        if config.convergence_quantiles[quantile_ind] == 0.5:
+            del kwargs['color']
+            del kwargs['linewidth']
     return data_behind
 
 
 def get_valid_ptide_indices(quantiles, config):
-    """Indicate well constrained entries of convergence Ptide grid."""
+    """Find Ptide grid indices with well constrained upper/lower distro."""
 
-    upper_quantile_ind = numpy.argmax(config.convergence_quantiles)
-    upper_quantile = numpy.array([entry[upper_quantile_ind][0]
-                                  for entry in quantiles])
-    if upper_quantile.min() > 9:
-        return None
-    return numpy.nonzero(
-        upper_quantile
-        <
-        upper_quantile.min() + config.constraint_validity_threshold
-    )[0]
+    valid_upper = numpy.ones(len(config.convergence_ptide_grid), dtype=bool)
+    valid_lower = numpy.ones(len(config.convergence_ptide_grid), dtype=bool)
+    for quantile_ind, cdf_value in enumerate(config.convergence_quantiles):
+        quantile = numpy.array([entry[quantile_ind][0] for entry in quantiles])
+
+        if cdf_value > 0.5 and quantile.min() < 9:
+            valid_upper = numpy.logical_and(
+                valid_upper,
+                (
+                    quantile < quantile.min()
+                    +
+                    config.constraint_validity_threshold[quantile_ind - 1]
+                )
+            )
+        elif cdf_value < 0.5:
+            valid_lower = numpy.logical_and(
+                valid_lower,
+                (
+                    quantile > quantile.max()
+                    -
+                    config.constraint_validity_threshold[quantile_ind]
+
+                )
+            )
+
+    return numpy.nonzero(valid_upper)[0], numpy.nonzero(valid_lower)[0]
 
 
 def mark_valid_constraint_range(quantiles, axis, config):
     """Add two vertical lines showing Ptide range where constraint is valid."""
 
     try:
-        first_valid, last_valid = get_valid_ptide_indices(
+        med_index = config.convergence_quantiles.index(0.5)
+        median = numpy.array([q[med_index][0] for q in quantiles])
+        valid_indices = get_valid_ptide_indices(
             quantiles,
             config
-        )[[0, -1]]
-        axis.axvline(x=config.convergence_ptide_grid[first_valid],
-                     linewidth=1.5,
-                     color='red',
-                     zorder=30)
-        axis.axvline(x=config.convergence_ptide_grid[last_valid],
-                     linewidth=1.5,
-                     color='red',
-                     zorder=30)
+        )
+        plot_ylimits = axis.get_ylim()
+        upper = True
+        for index_range in (ind[[0, -1]] for ind in valid_indices):
+            axis.vlines(
+                x=numpy.array(config.convergence_ptide_grid)[index_range],
+                ymin=(median[index_range] if upper else 2 * [plot_ylimits[0]]),
+                ymax=(2 * [plot_ylimits[1]] if upper else median[index_range]),
+                linewidth=1.5,
+                color='red',
+                zorder=30
+            )
+            upper = False
     except TypeError:
-        pass
+        print_exc()
 
 
 def get_burnin(system_data, config, binary=''):
     """Return the burnin to use for this system."""
 
     burnin = 0
-    valid_ptide_indices = get_valid_ptide_indices(system_data['quantiles'],
-                                                  config)
-    if valid_ptide_indices is None:
-        valid_ptide_indices = numpy.arange(
-            len(config.convergence_ptide_grid)
-        )
+    valid_ptide_indices = get_valid_ptide_indices(
+        system_data['quantiles'],
+        config
+    )
 
-    for ptide_ind in valid_ptide_indices:
-        ptide_burnin = max(
-            quantiles[4]
-            for quantiles in system_data['quantiles'][ptide_ind]
-        )
-        burnin = max(burnin, ptide_burnin)
-        if burnin > system_data['samples'].shape[0] - 100:
-            print(
-                'Burn-in period for %(binary)s leaves < %(minsteps)d steps,'
-                'using last %(minsteps)d steps!'
-                %
-                dict(binary=binary, minsteps=100)
+    for quantile_ind, cdf_value in enumerate(config.convergence_quantiles):
+        for ptide_ind in valid_ptide_indices[0 if cdf_value > 0.5 else 1]:
+            burnin = max(
+                burnin,
+                system_data['quantiles'][ptide_ind][quantile_ind][4]
             )
-            return system_data['samples'].shape[0] - 100
-    print('%(binary)s burn-in: %(burnin)d'
-          %
-          dict(binary=binary, burnin=burnin))
+            if burnin > system_data['samples'].shape[0] - 100:
+                print(
+                    'Burn-in period for %(binary)s leaves < %(minsteps)d steps,'
+                    'using last %(minsteps)d steps!'
+                    %
+                    dict(binary=binary, minsteps=100)
+                )
+                return system_data['samples'].shape[0] - 100
+    print(
+        '%(binary)s burn-in: %(burnin)d (out of %(nsteps)d steps)'
+        %
+        dict(binary=binary,
+             burnin=burnin,
+             nsteps=system_data['samples'].shape[0])
+    )
     return burnin
 
 
@@ -818,9 +879,6 @@ def get_raftery_lewis_plot_data(binary_chain,
     ]
 
     plot_data[0][:-1] = binary_chain.mean(axis=0) - quantile_cdf
-    print('Mean binary chain (q=%.5f): %s'
-          %
-          (quantile_cdf, repr(binary_chain.mean())))
     for walker in range(num_walkers):
         (
             plot_data[1][walker],
@@ -1179,14 +1237,13 @@ def save_individual_data_behind_figure(data, plot_type, binary, config):
     save_data_behind_figure(data, title, mrt_filename, config)
 
 
-#No clear way to simplify
+#No clear way to simplify, but try
 #pylint: disable=too-many-branches
+#pylint: disable=too-many-locals
 def plot_individual_constraints(plot_data, config):
     """Create plots showing the lgQ(Ptide) constraint for indivdiual systems."""
 
     plotting_order = get_plotting_order(plot_data, config.collection)
-
-    config.combined_constraint_heat_map = 'log'
 
     plot_type_split = dict(
         lgQ_period=[None],
@@ -1199,6 +1256,8 @@ def plot_individual_constraints(plot_data, config):
         cdfstd_period=[None],
         tightest_lgQ_posterior=[None],
     )
+
+    max_plots_per_page = 18
 
     for plot_type in [
             'lgQ_period',
@@ -1219,25 +1278,46 @@ def plot_individual_constraints(plot_data, config):
                 output_fname = cluster + '_' + plot_type
                 if plot_split is not None:
                     output_fname += '_' + str(plot_split)
-                output_fname += '.pdf'
-                if config.individual_plot_mode == 'subplots':
-                    axes = get_subplots(len(cluster_binaries),
-                                        plot_type,
-                                        config)
-                else:
+                if config.individual_plot_mode == 'pages':
                     pdf = PdfPages(output_fname)
+                else:
+                    output_fname += '_fig{fignum:d}'
+
+                output_fname += '.pdf'
                 for binary_index, binary in enumerate(cluster_binaries):
+
+                    plot_index = binary_index % max_plots_per_page
+                    if (
+                            config.individual_plot_mode == 'subplots'
+                            and
+                            plot_index == 0
+                    ):
+                        pyplot.clf()
+                        num_page_plots = min(
+                            max_plots_per_page,
+                            len(cluster_binaries) - binary_index
+                        )
+                        axes = get_subplots(num_page_plots,
+                                            plot_type,
+                                            config)
+
                     config.left = (
                         config.individual_plot_mode == 'pages'
                         or
-                        binary_index % 3 == 0
+                        plot_index % 3 == 0
                     )
                     config.bottom = (
                         config.individual_plot_mode == 'pages'
                         or
-                        binary_index >= len(cluster_binaries) - 3
+                        plot_index >= num_page_plots - 3
                     )
-                    print('\t\t\tBinary: ' + repr(binary))
+                    print('\t\t\tBinary: '
+                          +
+                          repr(binary)
+                          +
+                          ' -> plot '
+                          +
+                          str(plot_index))
                     if plot_type == 'raftery_lewis_diagnostics':
                         assert config.individual_plot_mode == 'pages'
                         data_behind = None
@@ -1257,7 +1337,7 @@ def plot_individual_constraints(plot_data, config):
                             plot_data[binary],
                             plot_split,
                             (
-                                axes[binary_index]
+                                axes[plot_index]
                                 if config.individual_plot_mode == 'subplots'
                                 else pyplot.gca()
                             ),
@@ -1281,13 +1361,26 @@ def plot_individual_constraints(plot_data, config):
                                                            binary,
                                                            config)
 
-                if config.individual_plot_mode == 'subplots':
-                    pyplot.savefig(output_fname,
-                                   bbox_inches='tight',
-                                   pad_inches=0)
-                else:
+                    if (
+                            config.individual_plot_mode == 'subplots'
+                            and
+                            (
+                                plot_index == max_plots_per_page - 1
+                                or
+                                binary_index == len(cluster_binaries) - 1
+                            )
+                    ):
+                        pyplot.savefig(
+                            output_fname.format(
+                                fignum=(binary_index // max_plots_per_page) + 1
+                            ),
+                            bbox_inches='tight',
+                            pad_inches=0
+                        )
+                if config.individual_plot_mode == 'pages':
                     pdf.close()
 #pylint: enable=too-many-branches
+#pylint: enable=too-many-locals
 
 
 def save_combined_data_behind_figure(data,
@@ -1323,25 +1416,39 @@ def save_combined_data_behind_figure(data,
 
 #TODO: simplify
 #pylint: disable=too-many-locals
+#pylint: disable=too-many-statements
 def plot_combined_constraints(plot_data, config):
     """Plot heat-map of joint constraint from all systems in a cluster."""
 
     orig_font_size = rcParams['font.size']
     rcParams['font.size'] = '24'
-    config.combined_constraint_heat_map = 'log'
     include_binaries = get_plotting_order(plot_data, config.collection)
 
     numpy.set_printoptions(precision=16, floatmode='fixed', linewidth=100)
-    config.combined_constraint_lgQ_grid = numpy.linspace(4, 7, 100)
+    #config.combined_constraint_lgQ_grid = numpy.linspace(4, 7, 100)
     config.ptide_grid = numpy.linspace(*config.combined_constraint_period_range,
                                        100)
     all_combined_plotter = FrequencyDependencePlotter(0, config)
 
     fully_combined_n = 1
 
-    assert include_binaries['NGC188'][6] == 'NGC188_4904'
-    include_binaries['NGC188'][6] = include_binaries['NGC188'][-1]
-    include_binaries['NGC188'][-1] = 'NGC188_4904'
+    if config.collection == 'sb1':
+        assert include_binaries['NGC188'][6] == 'NGC188_4904'
+        include_binaries['NGC188'][6] = include_binaries['NGC188'][-1]
+        include_binaries['NGC188'][-1] = 'NGC188_4904'
+
+    plot_max_lgq = dict(
+        M35=6,
+        NGC6819=7,
+        NGC188=7,
+        W19=10
+    )
+    plot_min_lgq = dict(
+        M35=4,
+        NGC6819=5,
+        NGC188=5,
+        W19=5
+    )
 
     selected_quantiles = dict(ptide_grid=config.ptide_grid)
 
@@ -1360,13 +1467,10 @@ def plot_combined_constraints(plot_data, config):
                 plot_data[binary]['quantiles'],
                 config
             )
-            if valid_ptide_indices is None:
-                period_range = (-numpy.inf, numpy.inf)
-            else:
-                period_range = numpy.array(config.convergence_ptide_grid)[
-                    valid_ptide_indices[[0, -1]]
-                ]
-            min_lgq = 4 if samples['lgQ_min'].min() < 5 else 5
+            period_range = [
+                numpy.array(config.convergence_ptide_grid)[valid_i[[0, -1]]]
+                for valid_i in valid_ptide_indices
+            ]
 
             cluster_plotter.add_chain(
                 samples[burnin:],
@@ -1377,7 +1481,7 @@ def plot_combined_constraints(plot_data, config):
             all_combined_plotter.add_chain(
                 samples[burnin:],
                 None,
-                (min_lgq, numpy.inf),
+                (plot_min_lgq[cluster], numpy.inf),
                 period_range
             )
 
@@ -1398,7 +1502,7 @@ def plot_combined_constraints(plot_data, config):
                 pyplot.figure(figsize=(11, 8.5), dpi=300, tight_layout=True)
                 pyplot.xscale('log')
                 print('    Adding ' + repr(binary))
-                pyplot.ylim(min_lgq, 6.0 if cluster == 'M35' else 7.0)
+                pyplot.ylim(plot_min_lgq[cluster], plot_max_lgq[cluster])
                 pyplot.xlim(*config.combined_constraint_period_range)
                 plotter.plot_combined_pdf_heat_map()
                 data_behind = plotter.plot_combined_quantiles(
@@ -1450,6 +1554,8 @@ def plot_combined_constraints(plot_data, config):
     rcParams['font.size'] = orig_font_size
     return selected_quantiles
 #pylint: enable=too-many-locals
+#pylint: enable=too-many-statements
+
 
 
 def create_tightest_constraint_latex(data_behind, cluster):
@@ -1682,21 +1788,27 @@ def main(config):
                             config.method)
 
     plot_data = get_sampling_data(config)
-    print('Plot data: ' + repr(plot_data))
-    plot_individual_constraints(plot_data, config)
-#    combined_quantiles = None
-#    combined_quantiles = plot_combined_constraints(plot_data, config)
-#    if (
-#            combined_quantiles is None
-#            and
-#            path.exists(config.combined_quantiles_pickle)
-#    ):
-#        with open(config.combined_quantiles_pickle, 'rb') as quanntile_pickle:
-#            combined_quantiles = pickle.load(quanntile_pickle)
-#    elif combined_quantiles is not None:
-#        with open(config.combined_quantiles_pickle, 'wb') as quanntile_pickle:
-#            pickle.dump(combined_quantiles, quanntile_pickle)
-#    plot_tightest_constraints(plot_data, config, combined_quantiles)
+#    plot_individual_constraints(plot_data, config)
+    if config.combined_constraint_kernel_width is not None:
+        combined_quantiles = None
+        combined_quantiles = plot_combined_constraints(plot_data, config)
+        if (
+            combined_quantiles is None
+            and
+                path.exists(config.combined_quantiles_pickle)
+        ):
+            with open(
+                    config.combined_quantiles_pickle,
+                    'rb'
+            ) as quanntile_pickle:
+                combined_quantiles = pickle.load(quanntile_pickle)
+        elif combined_quantiles is not None:
+            with open(
+                    config.combined_quantiles_pickle,
+                    'wb'
+            ) as quanntile_pickle:
+                pickle.dump(combined_quantiles, quanntile_pickle)
+        plot_tightest_constraints(plot_data, config, combined_quantiles)
 
 
 if __name__ == '__main__':

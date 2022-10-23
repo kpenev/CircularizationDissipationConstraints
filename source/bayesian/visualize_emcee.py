@@ -41,8 +41,18 @@ class ParseGrid(ArgparseAction):
                                int(values[2])))
 #pylint: enable=too-few-public-methods
 
-def add_frequency_dependence_plot_config(parser):
+def add_frequency_dependence_plot_config(parser, disable=()):
     """Add command line arguments configuring the frequence dependence plots."""
+
+    for entry in disable:
+        assert entry in ['hatch',
+                         'bounds',
+                         'lgQ_grid',
+                         'ptide_grid',
+                         'heat_map',
+                         'kernel',
+                         'confidence',
+                         'lines']
 
     parser.add_argument(
         '--chain-condition',
@@ -58,75 +68,84 @@ def add_frequency_dependence_plot_config(parser):
         'exactly in the order specified. By default, plots the first chain in '
         'the input file.'
     )
-    parser.add_argument(
-        '--frequency-dependence-hatch',
-        default=False,
-        help='If specified frequency dependent plots use hatching as well as '
-        'color to distinguish between constraints from different systems.'
-    )
-    parser.add_argument(
-        '--frequency-dependence-bounds',
-        default=False,
-        action='store_true',
-        help='If specified frequency dependent plots draw lines to indicate the'
-        ' bounds of the specified confidence intervals.'
-    )
-    parser.add_argument(
-        '--combined-constraint-lgQ-grid',
-        default=numpy.linspace(4, 12, 100),
-        action=ParseGrid,
-        nargs=3,
-        metavar=('MIN_LGQ', 'MAX_LGQ', 'RES'),
-        help='Set the range and resolution in log10(Q) on which to calculate '
-        'cobined constraints.'
-    )
-    parser.add_argument(
-        '--combined-constraint-heat-map',
-        default=None,
-        choices=('log', 'lin'),
-        help='Plot a heat map of the combined (log-)likelihood in the frequnecy'
-        ' dependence plot. If enabled, the confidence interval is shown using '
-        'lines only (not filled).'
-    )
-    parser.add_argument(
-        '--heat-map-contrast',
-        default=1e-3,
-        type=float,
-        help='The smallest value to plot on the heat map is this factor times '
-        'the maximum value.'
-    )
-
-    parser.add_argument(
-        '--combined-constraint-kernel-width',
-        default=0.2,
-        type=float,
-        help='The width of the kernel that gets convolved with the samples for '
-        'calculating combined constraints.'
-    )
-    parser.add_argument(
-        '--plot-confidence',
-        type=float,
-        nargs='*',
-        default=[stats.norm.cdf(2.0) - stats.norm.cdf(-2.0)],
-        help='Specify the confidence to display in the dissipation vs tidal '
-        'frequency plot (see --frequency-dependence-plot-fname argument).'
-    )
-    parser.add_argument(
-        '--ptide-grid',
-        nargs=3,
-        default=numpy.logspace(0.0, numpy.log10(50.0), 100),
-        action=ParseGrid,
-        metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES'),
-        help='Set the range and resolution of the tidal period to include in '
-        'the frequency dependence plot (see --frequency-dependence-plot-fname '
-        'argument).'
-    )
-    parser.add_argument(
-        '--frequency-dependence-plot-no-lines',
-        action='store_true',
-        help='If passed, the frequency dependence plot will not include '
-        'individual lines.'
-    )
+    if 'hatch' not in disable:
+        parser.add_argument(
+            '--frequency-dependence-hatch',
+            default=False,
+            help='If specified frequency dependent plots use hatching as well '
+            'as color to distinguish between constraints from different '
+            'systems.'
+        )
+    if 'bounds' not in disable:
+        parser.add_argument(
+            '--frequency-dependence-bounds',
+            default=False,
+            action='store_true',
+            help='If specified frequency dependent plots draw lines to indicate'
+            ' the bounds of the specified confidence intervals.'
+        )
+    if 'lgQ_grid' not in disable:
+        parser.add_argument(
+            '--combined-constraint-lgQ-grid',
+            default=numpy.linspace(4, 12, 100),
+            action=ParseGrid,
+            nargs=3,
+            metavar=('MIN_LGQ', 'MAX_LGQ', 'RES'),
+            help='Set the range and resolution in log10(Q) on which to '
+            'calculate cobined constraints.'
+        )
+    if 'heat_map' not in disable:
+        parser.add_argument(
+            '--combined-constraint-heat-map',
+            default='log',
+            choices=('log', 'lin'),
+            help='Plot a heat map of the combined (log-)likelihood in the '
+            'frequnecy dependence plot. If enabled, the confidence interval is '
+            'shown using lines only (not filled).'
+        )
+        parser.add_argument(
+            '--heat-map-contrast',
+            default=1e-3,
+            type=float,
+            help='The smallest value to plot on the heat map is this factor '
+            'times the maximum value.'
+        )
+    if 'kernel' not in disable:
+        parser.add_argument(
+            '--combined-constraint-kernel-width',
+            default=None,
+            type=float,
+            help='The width of the kernel that gets convolved with the samples '
+            'for calculating combined constraints. If not specified, a combined'
+            ' cosntraint is not generated.'
+        )
+    if 'confidence' not in disable:
+        parser.add_argument(
+            '--plot-confidence',
+            type=float,
+            nargs='*',
+            default=[stats.norm.cdf(2.0) - stats.norm.cdf(-2.0)],
+            help='Specify the confidence to display in the dissipation vs tidal'
+            ' frequency plot (see --frequency-dependence-plot-fname argument).'
+        )
+    if 'ptide_grid' not in disable:
+        parser.add_argument(
+            '--ptide-grid',
+            nargs=3,
+            default=numpy.logspace(0.0, numpy.log10(50.0), 100),
+            action=ParseGrid,
+            metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES'),
+            help='Set the range and resolution of the tidal period to include '
+            'in the frequency dependence plot (see '
+            '--frequency-dependence-plot-fname argument).'
+        )
+    if 'lines' not in disable:
+        parser.add_argument(
+            '--frequency-dependence-plot-no-lines',
+            action='store_true',
+            help='If passed, the frequency dependence plot will not include '
+            'individual lines.'
+        )
 
 def parse_command_line():
     """Parse the command line for what and how to plot."""
@@ -431,7 +450,7 @@ class FrequencyDependencePlotter:
             1.0 / (len(config.plot_confidence)
                    *
                    num_chains)
-            if config.plot_confidence else None
+            if getattr(config, 'plot_confidence', None) else None
         )
         self._constraint_index = 0
         self._hatch_list = ['\\\\',
@@ -454,9 +473,10 @@ class FrequencyDependencePlotter:
                             'tab:gray',
                             'tab:olive',
                             'tab:cyan']
-        self.combined_pdf = CombinedMCMCConstraint(
-            config.combined_constraint_lgQ_grid,
-            config.combined_constraint_kernel_width
+        self.combined_pdf = (
+            None if config.combined_constraint_kernel_width is None
+            else CombinedMCMCConstraint(config.combined_constraint_lgQ_grid,
+                                        config.combined_constraint_kernel_width)
         )
 
 
@@ -464,20 +484,48 @@ class FrequencyDependencePlotter:
                   samples,
                   label,
                   prior_range=(-numpy.inf, numpy.inf),
-                  period_range=(-numpy.inf, numpy.inf)):
-        """Overplot another chain of samples."""
+                  period_range=None):
+        """
+        Overplot another chain of samples and update combined constraint.
+
+        Args:
+            samples(array):    The samples of tidal dissipation parameters to
+                add.
+
+            label(str):    How to label the area per the new samples added to
+                the plot.
+
+            prior_range(2-tuple):    Upper and lower limit on the evaluated
+                lg(Q) values beyond which the PDF distribution is replaced by
+                the value at those boundaries.
+
+            period_range(None or 2x2 iterable):    If not None, specifies a
+                range of periods for which the distribution above and below the
+                50-th percentile is considered valid. The invalid part of the
+                bistribution is not folded into the combined constraint.
+        """
 
         evaluated_lgq = evaluate_lgq(samples, self.config.ptide_grid)
 
         assert numpy.isfinite(evaluated_lgq).all()
-        self.combined_pdf.add_samples(
-            evaluated_lgq,
-            prior_range,
-            numpy.logical_and(
-                self.config.ptide_grid >= period_range[0],
-                self.config.ptide_grid <= period_range[1],
-            )
-        )
+        if self.combined_pdf is not None:
+            if period_range is None:
+                self.combined_pdf.add_samples(
+                    evaluated_lgq,
+                    prior_range,
+                )
+            else:
+                for (min_period, max_period), ignore_side in zip(period_range,
+                                                                 [-1, 1]):
+                    self.combined_pdf.add_samples(
+                        samples=evaluated_lgq,
+                        prior_range=prior_range,
+                        include_samples=numpy.logical_and(
+                            self.config.ptide_grid >= min_period,
+                            self.config.ptide_grid <= max_period,
+                        ),
+                        ignore_past_quantile=(0.5, ignore_side)
+                    )
 
 
         if not self.config.frequency_dependence_plot_no_lines:
@@ -491,7 +539,7 @@ class FrequencyDependencePlotter:
             )
 
         for conf_index, confidence in enumerate(
-                self.config.plot_confidence
+                getattr(self.config, 'plot_confidence', [])
         ):
             min_lgq, max_lgq = get_confidence_interval(evaluated_lgq,
                                                        confidence)
@@ -564,6 +612,7 @@ class FrequencyDependencePlotter:
             ]
             return lower_bound, upper_bound
 
+        assert self.combined_pdf is not None
         pdf = self.combined_pdf()
         cdf = numpy.cumsum(pdf, 0) - 0.5 * pdf
 
@@ -642,6 +691,8 @@ class FrequencyDependencePlotter:
             None
         """
 
+        assert self.combined_pdf is not None
+
         period_boundaries = numpy.empty(self.config.ptide_grid.size + 1)
         lgq_boundaries = numpy.empty(
             self.config.combined_constraint_lgQ_grid.size
@@ -689,6 +740,8 @@ class FrequencyDependencePlotter:
                                 fmt='-',
                                 label_fmt='CDF={0:.3f}'):
         """Plot the specified percentiles."""
+
+        assert self.combined_pdf is not None
 
         data_behind = Table(
             [self.config.ptide_grid],
