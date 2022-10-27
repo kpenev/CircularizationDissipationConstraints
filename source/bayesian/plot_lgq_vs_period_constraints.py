@@ -440,15 +440,14 @@ def get_quantiles(samples, config):
 def add_discard_flags(sampling_data, config):
     """Add flags whether any side of the distribution should be ignored."""
 
-    if config.method == 'spin':
-        assert config.collection == 'w19'
+    if config.collection == 'w19':
         with open(
                 path.join(config.samples_dir, 'manual_info.json'),
                 'r'
         ) as manual_f:
             manual_data = json.load(manual_f)
     for kic in sampling_data:
-        if config.method == 'spin':
+        if config.collection == 'w19' and str(kic) in manual_data:
             discard = manual_data[str(kic)]['discard']
             if discard.lower() == 'none':
                 discard = None
@@ -633,10 +632,10 @@ def get_valid_ptide_indices(quantiles,
     """Find Ptide grid indices with well constrained upper/lower distro."""
 
     valid_upper = numpy.full(len(config.convergence_ptide_grid),
-                             discard != 'upper',
+                             discard not in ['upper', 'all'],
                              dtype=bool)
     valid_lower = numpy.full(len(config.convergence_ptide_grid),
-                             discard != 'lower',
+                             discard not in ['lower', 'all'],
                              dtype=bool)
     for quantile_ind, cdf_value in enumerate(config.convergence_quantiles):
         quantile = numpy.array([entry[quantile_ind][0] for entry in quantiles])
@@ -753,6 +752,7 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
         4.0 if isinstance(binary, str) and binary.startswith('M35_') else 5.0,
         12
     )
+    orig_lgQ_grid = config.lgQ_grid
     config.lgQ_grid = numpy.linspace(*lgq_range, 50)
     frequency_dependence_plotter = FrequencyDependencePlotter(1, config)
     frequency_dependence_plotter.add_chain(
@@ -804,6 +804,8 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
         )
     )
     pyplot.sca(orig_axis)
+
+    config.lgQ_grid = orig_lgQ_grid
     return data_behind
 
 
