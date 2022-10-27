@@ -86,7 +86,7 @@ def add_frequency_dependence_plot_config(parser, disable=()):
         )
     if 'lgQ_grid' not in disable:
         parser.add_argument(
-            '--combined-constraint-lgQ-grid',
+            '--lgQ-grid',
             default=numpy.linspace(4, 12, 100),
             action=ParseGrid,
             nargs=3,
@@ -112,8 +112,8 @@ def add_frequency_dependence_plot_config(parser, disable=()):
         )
     if 'kernel' not in disable:
         parser.add_argument(
-            '--combined-constraint-kernel-width',
-            default=None,
+            '--kernel-width',
+            default=0.2,
             type=float,
             help='The width of the kernel that gets convolved with the samples '
             'for calculating combined constraints. If not specified, a combined'
@@ -474,9 +474,9 @@ class FrequencyDependencePlotter:
                             'tab:olive',
                             'tab:cyan']
         self.combined_pdf = (
-            None if config.combined_constraint_kernel_width is None
-            else CombinedMCMCConstraint(config.combined_constraint_lgQ_grid,
-                                        config.combined_constraint_kernel_width)
+            None if config.kernel_width is None
+            else CombinedMCMCConstraint(config.lgQ_grid,
+                                        config.kernel_width)
         )
 
 
@@ -607,7 +607,7 @@ class FrequencyDependencePlotter:
                 cdf_slice[:lower_indices[-1] + 1]+ confidence
             )
             selected = numpy.argmin(upper_indices - lower_indices)
-            lower_bound, upper_bound = self.config.combined_constraint_lgQ_grid[
+            lower_bound, upper_bound = self.config.lgQ_grid[
                 [lower_indices[selected], upper_indices[selected]]
             ]
             return lower_bound, upper_bound
@@ -695,13 +695,13 @@ class FrequencyDependencePlotter:
 
         period_boundaries = numpy.empty(self.config.ptide_grid.size + 1)
         lgq_boundaries = numpy.empty(
-            self.config.combined_constraint_lgQ_grid.size
+            self.config.lgQ_grid.size
             +
             1
         )
         for boundaries, grid in [
                 (period_boundaries, self.config.ptide_grid),
-                (lgq_boundaries, self.config.combined_constraint_lgQ_grid)
+                (lgq_boundaries, self.config.lgQ_grid)
         ]:
             boundaries[1:-1] = 0.5 * (grid[1:] + grid[:-1])
             boundaries[0] = 1.5 * grid[0] - 0.5 * grid[1]
@@ -868,7 +868,6 @@ def get_plot_data(samples_fname_list, burn_in, chain_condition):
         logprob = backend.get_log_prob()
 
         if combined_blobs is None:
-            print('First batch tail: ' + repr(blobs[-1]))
             assert combined_logprob is None
             combined_blobs = blobs
             combined_logprob = logprob

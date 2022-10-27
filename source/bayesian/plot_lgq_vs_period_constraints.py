@@ -10,6 +10,7 @@ import hashlib
 import pickle
 from multiprocessing import Pool
 from traceback import print_exc
+import json
 
 import matplotlib
 from matplotlib import pyplot, cm, colors, rcParams
@@ -183,9 +184,9 @@ def parse_command_line(quantiles_only=False):
         '--combined-constraint-period-range', '--combined-prange',
         nargs=2,
         type=float,
-        default=(1.0, 30.0),
+        default=None,
         help='The range of tidal periods to show in the combined constraint '
-        'plot.'
+        'plot. If not specified, no combined constraint plot is generated.'
     )
     parser.add_argument(
         '--nthreads',
@@ -436,6 +437,26 @@ def get_quantiles(samples, config):
     ]
 
 
+def add_discard_flags(sampling_data, config):
+    """Add flags whether any side of the distribution should be ignored."""
+
+    if config.method == 'spin':
+        assert config.collection == 'w19'
+        with open(
+                path.join(config.samples_dir, 'manual_info.json'),
+                'r'
+        ) as manual_f:
+            manual_data = json.load(manual_f)
+    for kic in sampling_data:
+        if config.method == 'spin':
+            discard = manual_data[str(kic)]['discard']
+            if discard.lower() == 'none':
+                discard = None
+        else:
+            discard = None
+        sampling_data[kic]['discard'] = discard
+
+
 def get_sampling_data(config, add_quantiles=True):
     """Return dictionary index by system of samples, likelihood, & quantile."""
 
@@ -500,15 +521,20 @@ def get_sampling_data(config, add_quantiles=True):
     else:
         assert config.collection == 'w19'
         add_w19_summary_data(result)
+    add_discard_flags(result, config)
     return result
 
 
+#TODO: split
+#pylint: disable=too-many-locals
+#pylint: disable=too-many-branches
 def plot_single_diagnostic_period(quantile_data,
                                   diagnostic,
                                   axis,
                                   config,
+                                  first_last_valid,
                                   *,
-                                  fmt='-',
+                                  fmt=('-', ':'),
                                   label=True,
                                   zorder=None):
     """Plot some diagnostic of the quantiles of lgQ(Ptide) vs Ptide."""
@@ -541,11 +567,20 @@ def plot_single_diagnostic_period(quantile_data,
     )
     for quantile_ind, quant_label in enumerate(quantile_labels):
         if config.convergence_quantiles[quantile_ind] == 0.5:
+            quantile_valid = (0, len(config.convergence_ptide_grid) - 1)
             if diagnostic == 'quantile':
                 kwargs['color'] = 'red'
                 kwargs['linewidth'] = 0.5
             else:
                 continue
+        elif config.convergence_quantiles[quantile_ind] > 0.5:
+            quantile_valid = first_last_valid[0]
+        else:
+            quantile_valid = first_last_valid[1]
+        if quantile_valid is None:
+            quantile_valid = (0, 0)
+        else:
+            quantile_valid = (quantile_valid[0], quantile_valid[1] + 1)
         if label is True:
             kwargs['label'] = quant_label
 
@@ -561,23 +596,48 @@ def plot_single_diagnostic_period(quantile_data,
                 label=quant_label
             )
         )
+        kwargs['color'] = axis.plot(
+            config.convergence_ptide_grid[quantile_valid[0]:quantile_valid[1]],
+            plot_y[quantile_valid[0]:quantile_valid[1]],
+            fmt[0],
+            **kwargs
+        )[0].get_color()
+
+        if label is True:
+            del kwargs['label']
         axis.plot(
-            config.convergence_ptide_grid,
-            plot_y,
-            fmt,
+            config.convergence_ptide_grid[:quantile_valid[0]],
+            plot_y[:quantile_valid[0]],
+            fmt[1],
             **kwargs
         )
+        axis.plot(
+            config.convergence_ptide_grid[quantile_valid[1]:],
+            plot_y[quantile_valid[1]:],
+            fmt[1],
+            **kwargs
+        )
+
         if config.convergence_quantiles[quantile_ind] == 0.5:
-            del kwargs['color']
             del kwargs['linewidth']
+        del kwargs['color']
     return data_behind
+#pylint: enable=too-many-locals
+#pylint: enable=too-many-branches
 
 
-def get_valid_ptide_indices(quantiles, config):
+def get_valid_ptide_indices(quantiles,
+                            config,
+                            discard=None,
+                            first_last_only=False):
     """Find Ptide grid indices with well constrained upper/lower distro."""
 
-    valid_upper = numpy.ones(len(config.convergence_ptide_grid), dtype=bool)
-    valid_lower = numpy.ones(len(config.convergence_ptide_grid), dtype=bool)
+    valid_upper = numpy.full(len(config.convergence_ptide_grid),
+                             discard != 'upper',
+                             dtype=bool)
+    valid_lower = numpy.full(len(config.convergence_ptide_grid),
+                             discard != 'lower',
+                             dtype=bool)
     for quantile_ind, cdf_value in enumerate(config.convergence_quantiles):
         quantile = numpy.array([entry[quantile_ind][0] for entry in quantiles])
 
@@ -601,30 +661,43 @@ def get_valid_ptide_indices(quantiles, config):
                 )
             )
 
+    if first_last_only:
+        return (
+            (
+                numpy.nonzero(valid_upper)[0][[0,-1]] if valid_upper.any()
+                else None
+            ),
+            (
+                numpy.nonzero(valid_lower)[0][[0,-1]] if valid_lower.any()
+                else None
+            )
+        )
     return numpy.nonzero(valid_upper)[0], numpy.nonzero(valid_lower)[0]
 
 
-def mark_valid_constraint_range(quantiles, axis, config):
+def mark_valid_constraint_range(quantiles,
+                                first_last_valid,
+                                axis,
+                                config):
     """Add two vertical lines showing Ptide range where constraint is valid."""
 
     try:
         med_index = config.convergence_quantiles.index(0.5)
         median = numpy.array([q[med_index][0] for q in quantiles])
-        valid_indices = get_valid_ptide_indices(
-            quantiles,
-            config
-        )
         plot_ylimits = axis.get_ylim()
         upper = True
-        for index_range in (ind[[0, -1]] for ind in valid_indices):
-            axis.vlines(
-                x=numpy.array(config.convergence_ptide_grid)[index_range],
-                ymin=(median[index_range] if upper else 2 * [plot_ylimits[0]]),
-                ymax=(2 * [plot_ylimits[1]] if upper else median[index_range]),
-                linewidth=1.5,
-                color='red',
-                zorder=30
-            )
+        for index_range in first_last_valid:
+            if index_range is not None:
+                axis.vlines(
+                    x=numpy.array(config.convergence_ptide_grid)[index_range],
+                    ymin=(median[index_range] if upper
+                          else 2 * [plot_ylimits[0]]),
+                    ymax=(2 * [plot_ylimits[1]] if upper
+                          else median[index_range]),
+                    linewidth=1.5,
+                    color='red',
+                    zorder=30
+                )
             upper = False
     except TypeError:
         print_exc()
@@ -636,7 +709,8 @@ def get_burnin(system_data, config, binary=''):
     burnin = 0
     valid_ptide_indices = get_valid_ptide_indices(
         system_data['quantiles'],
-        config
+        config,
+        system_data['discard']
     )
 
     for quantile_ind, cdf_value in enumerate(config.convergence_quantiles):
@@ -647,10 +721,16 @@ def get_burnin(system_data, config, binary=''):
             )
             if burnin > system_data['samples'].shape[0] - 100:
                 print(
-                    'Burn-in period for %(binary)s leaves < %(minsteps)d steps,'
-                    'using last %(minsteps)d steps!'
-                    %
-                    dict(binary=binary, minsteps=100)
+                    (
+                        'Burn-in period ({burnin:d} out of {nsteps:d}) for '
+                        '{binary!r} leaves < {minsteps:d} steps,'
+                        'using last {minsteps:d} steps!'
+                    ).format(
+                        binary=binary,
+                        minsteps=100,
+                        burnin=burnin,
+                        nsteps=system_data['samples'].shape[0]
+                    )
                 )
                 return system_data['samples'].shape[0] - 100
     print(
@@ -673,7 +753,7 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
         4.0 if isinstance(binary, str) and binary.startswith('M35_') else 5.0,
         12
     )
-    config.combined_constraint_lgQ_grid = numpy.linspace(*lgq_range, 50)
+    config.lgQ_grid = numpy.linspace(*lgq_range, 50)
     frequency_dependence_plotter = FrequencyDependencePlotter(1, config)
     frequency_dependence_plotter.add_chain(
         system_data['samples'][get_burnin(system_data, config, binary):],
@@ -684,11 +764,19 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
         xlabel=config.bottom,
         ylabel=config.left
     )
+    first_last_valid = get_valid_ptide_indices(
+        system_data['quantiles'],
+        config,
+        system_data['discard'],
+        first_last_only=True
+    )
+
     data_behind = plot_single_diagnostic_period(system_data['quantiles'],
                                                 'quantile',
                                                 axis,
                                                 config,
-                                                fmt='-k',
+                                                first_last_valid,
+                                                fmt=('-k', ':k'),
                                                 label=None,
                                                 zorder=20)
     if 'orbit' in system_data:
@@ -701,6 +789,7 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
                    linewidth=3,
                    zorder=20)
     mark_valid_constraint_range(system_data['quantiles'],
+                                first_last_valid,
                                 axis,
                                 config)
     decorate_subplot(
@@ -1006,7 +1095,7 @@ def decorate_subplot(axis,
         if yticks is not None:
             axis.set_yticks(yticks)
 
-    if isinstance(binary, int):
+    if isinstance(binary, (int, numpy.int32, numpy.int64)):
         axis.set_title('TIC %d' % binary, pad=3)
     else:
         cluster, binary_id = binary.split('_')
@@ -1016,19 +1105,29 @@ def decorate_subplot(axis,
         )
 
 
+#TODO: Show valid constraint range for each quantile by line style
 def plot_single_burnin_period(binary, system_data, __, axis, config):
     """Plot the required burnin for each quantile of lgQ(Ptide) vs Ptide."""
 
-    if isinstance(binary, int):
+    if isinstance(binary, (int, numpy.int32, numpy.int64)):
         cluster = 'W19'
     else:
         cluster = binary.split('_')[0]
+
+    first_last_valid = get_valid_ptide_indices(
+        system_data['quantiles'],
+        config,
+        system_data['discard'],
+        first_last_only=True
+    )
+
     axis.set_yscale('log')
     data_behind = plot_single_diagnostic_period(
         system_data['quantiles'],
         'burnin',
         axis,
         config,
+        first_last_valid,
         label=(
             None if getattr(plot_single_burnin_period,
                             'labeled_cluster',
@@ -1042,9 +1141,6 @@ def plot_single_burnin_period(binary, system_data, __, axis, config):
     if config.individual_plot_mode == 'subplots':
         plot_single_burnin_period.labeled_cluster = cluster
 
-    mark_valid_constraint_range(system_data['quantiles'],
-                                axis,
-                                config)
     axis.set_ylim(10, 2000)
     decorate_subplot(axis, binary, 'emcee steps', config)
     if config.individual_plot_mode == 'pages':
@@ -1052,13 +1148,21 @@ def plot_single_burnin_period(binary, system_data, __, axis, config):
     return data_behind
 
 
+#TODO: Show valid constraint range for each quantile by line style
 def plot_single_cdfstd_period(binary, system_data, __, axis, config):
     """Plot the required burnin for each quantile of lgQ(Ptide) vs Ptide."""
 
-    if isinstance(binary, int):
+    if isinstance(binary, (int, numpy.int32, numpy.int64)):
         cluster = 'W19'
     else:
         cluster = binary.split('_')[0]
+
+    first_last_valid = get_valid_ptide_indices(
+        system_data['quantiles'],
+        config,
+        system_data['discard'],
+        first_last_only=True
+    )
 
     axis.set_yscale('log')
     data_behind = plot_single_diagnostic_period(
@@ -1066,6 +1170,7 @@ def plot_single_cdfstd_period(binary, system_data, __, axis, config):
         'std',
         axis,
         config,
+        first_last_valid,
         label=(
             None if getattr(plot_single_cdfstd_period,
                             'labeled_cluster',
@@ -1075,9 +1180,6 @@ def plot_single_cdfstd_period(binary, system_data, __, axis, config):
     )
     if config.individual_plot_mode == 'subplots':
         plot_single_cdfstd_period.labeled_cluster = cluster
-    mark_valid_constraint_range(system_data['quantiles'],
-                                axis,
-                                config)
     axis.set_ylim(1e-3, 0.03)
     decorate_subplot(axis, binary, r'$\sigma_{CDF}$', config)
     if config.individual_plot_mode == 'pages':
@@ -1169,7 +1271,7 @@ def plot_single_tightest_lgq_posterior(binary, system_data, _, axis, config):
     plot_lgq = numpy.linspace(4.0, 12.0, 1000)
     pdf = CombinedMCMCConstraint(
         plot_lgq,
-        config.combined_constraint_kernel_width
+        config.kernel_width
     )
     pdf.add_samples(evaluated_lgq)
     axis.plot(plot_lgq, pdf() / (pdf().sum() * (plot_lgq[1] - plot_lgq[0])))
@@ -1425,9 +1527,12 @@ def plot_combined_constraints(plot_data, config):
     include_binaries = get_plotting_order(plot_data, config.collection)
 
     numpy.set_printoptions(precision=16, floatmode='fixed', linewidth=100)
-    #config.combined_constraint_lgQ_grid = numpy.linspace(4, 7, 100)
-    config.ptide_grid = numpy.linspace(*config.combined_constraint_period_range,
-                                       100)
+    #config.lgQ_grid = numpy.linspace(4, 7, 100)
+    config.ptide_grid = numpy.logspace(
+        numpy.log10(config.combined_constraint_period_range[0]),
+        numpy.log10(config.combined_constraint_period_range[1]),
+        100
+    )
     all_combined_plotter = FrequencyDependencePlotter(0, config)
 
     fully_combined_n = 1
@@ -1465,10 +1570,15 @@ def plot_combined_constraints(plot_data, config):
             samples = plot_data[binary]['samples']
             valid_ptide_indices = get_valid_ptide_indices(
                 plot_data[binary]['quantiles'],
-                config
+                config,
+                plot_data[binary]['discard'],
+                first_last_only=True
             )
             period_range = [
-                numpy.array(config.convergence_ptide_grid)[valid_i[[0, -1]]]
+                (
+                    numpy.array([numpy.nan, numpy.nan]) if valid_i is None
+                    else numpy.array(config.convergence_ptide_grid)[valid_i]
+                )
                 for valid_i in valid_ptide_indices
             ]
 
@@ -1541,7 +1651,7 @@ def plot_combined_constraints(plot_data, config):
                 pyplot.clf()
 
             fully_combined_n += 1
-        if cluster == 'M35':
+        if cluster in ['M35', 'W19']:
             selected_quantiles[cluster] = [
                 cluster_plotter.combined_pdf.ppf(cdf)
                 for cdf in config.convergence_quantiles
@@ -1614,7 +1724,9 @@ def create_tightest_constraint_latex(data_behind, cluster):
         ),
         formats={
             colname: (
-                '%6s' if ('{PKM}' in colname or '{WOCS}' in colname)
+                '%6s' if ('{PKM}' in colname
+                          or '{WOCS}' in colname
+                          or '{KIC}' in colname)
                 else '%5.2f'
             )
             for colname in data_behind.colnames
@@ -1661,7 +1773,12 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
     offsets = numpy.zeros(len(config.convergence_ptide_grid), dtype=int)
     for cluster, cluster_binaries in include_binaries.items():
         pyplot.xscale('log')
-        lgq_range = ((4, 8) if cluster == 'M35' else (5, 9))
+        if cluster == 'M35':
+            lgq_range = (4, 8)
+        elif cluster == 'W19':
+            lgq_range = (5, 10)
+        else:
+            lgq_range = (5, 9)
         cluster_quantiles = numpy.empty((len(config.convergence_quantiles),
                                          len(cluster_binaries)))
         plot_ptide = numpy.empty(len(include_binaries[cluster]))
@@ -1669,9 +1786,13 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
                                              binary_id_name[cluster])
         for binary_ind, binary in enumerate(cluster_binaries):
             upper_quantile_ind = numpy.argmax(config.convergence_quantiles)
+            lower_quantile_ind = numpy.argmin(config.convergence_quantiles)
             ptide_ind = numpy.array([
-                entry[upper_quantile_ind][0]
-                for entry in plot_data[binary]['quantiles']
+                (
+                    entry[upper_quantile_ind][0]
+                    -
+                    entry[lower_quantile_ind][0]
+                ) for entry in plot_data[binary]['quantiles']
             ]).argmin()
             data_behind['Ptide'][binary_ind] = (
                 config.convergence_ptide_grid[ptide_ind]
@@ -1788,8 +1909,8 @@ def main(config):
                             config.method)
 
     plot_data = get_sampling_data(config)
-#    plot_individual_constraints(plot_data, config)
-    if config.combined_constraint_kernel_width is not None:
+    plot_individual_constraints(plot_data, config)
+    if config.combined_constraint_period_range is not None:
         combined_quantiles = None
         combined_quantiles = plot_combined_constraints(plot_data, config)
         if (
