@@ -637,28 +637,52 @@ def get_valid_ptide_indices(quantiles,
     valid_lower = numpy.full(len(config.convergence_ptide_grid),
                              discard not in ['lower', 'all'],
                              dtype=bool)
+    match_upper = True
+    match_lower = True
     for quantile_ind, cdf_value in enumerate(config.convergence_quantiles):
         quantile = numpy.array([entry[quantile_ind][0] for entry in quantiles])
 
-        if cdf_value > 0.5 and quantile.min() < 9:
-            valid_upper = numpy.logical_and(
-                valid_upper,
-                (
-                    quantile < quantile.min()
-                    +
+        if cdf_value > 0.5 :
+            if (
                     config.constraint_validity_threshold[quantile_ind - 1]
-                )
-            )
+                    is not
+                    None
+            ):
+                if quantile.min() < 9:
+                    valid_upper = numpy.logical_and(
+                        valid_upper,
+                        (
+                            quantile < quantile.min()
+                            +
+                            config.constraint_validity_threshold[quantile_ind - 1]
+                        )
+                    )
+                match_lower = False
         elif cdf_value < 0.5:
-            valid_lower = numpy.logical_and(
-                valid_lower,
-                (
-                    quantile > quantile.max()
-                    -
+            if (
                     config.constraint_validity_threshold[quantile_ind]
+                    is not
+                    None
+            ):
+                valid_lower = numpy.logical_and(
+                    valid_lower,
+                    (
+                        quantile > quantile.max()
+                        -
+                        config.constraint_validity_threshold[quantile_ind]
 
+                    )
                 )
-            )
+                match_upper = False
+
+    assert not (match_lower and match_upper)
+
+    if match_lower:
+        print('Using lower constraint everywhere')
+        valid_upper = valid_lower
+    if match_upper:
+        valid_lower = valid_upper
+        print('Using upper constraint everywhere')
 
     if first_last_only:
         return (
@@ -752,7 +776,7 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
         4.0 if isinstance(binary, str) and binary.startswith('M35_') else 5.0,
         12
     )
-    orig_lgQ_grid = config.lgQ_grid
+    orig_lgq_grid = config.lgQ_grid
     config.lgQ_grid = numpy.linspace(*lgq_range, 50)
     frequency_dependence_plotter = FrequencyDependencePlotter(1, config)
     frequency_dependence_plotter.add_chain(
@@ -805,7 +829,7 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
     )
     pyplot.sca(orig_axis)
 
-    config.lgQ_grid = orig_lgQ_grid
+    config.lgQ_grid = orig_lgq_grid
     return data_behind
 
 
@@ -1215,7 +1239,10 @@ def get_plotting_order(plot_data, collection, restrict_to_cluster=None):
                                'M35_41032',
                                'M35_49043',
                                'NGC188_4999']:
-                result[bad_binary.split('_')[0]].remove(bad_binary)
+                try:
+                    result[bad_binary.split('_')[0]].remove(bad_binary)
+                except ValueError:
+                    pass
 
         if restrict_to_cluster is None:
             return result
@@ -1544,6 +1571,8 @@ def plot_combined_constraints(plot_data, config):
         include_binaries['NGC188'][6] = include_binaries['NGC188'][-1]
         include_binaries['NGC188'][-1] = 'NGC188_4904'
 
+    cluster_order = ['NGC6819', 'NGC188', 'M35', 'W19']
+
     plot_max_lgq = dict(
         M35=6,
         NGC6819=7,
@@ -1560,7 +1589,10 @@ def plot_combined_constraints(plot_data, config):
     selected_quantiles = dict(ptide_grid=config.ptide_grid)
 
     combined_clusters = []
-    for cluster, cluster_binaries in include_binaries.items():
+    for cluster in cluster_order:
+        if cluster not in include_binaries:
+            continue
+        cluster_binaries = include_binaries[cluster]
         print(cluster + ':')
         combined_clusters.append(cluster)
         cluster_plotter = FrequencyDependencePlotter(
@@ -1611,6 +1643,8 @@ def plot_combined_constraints(plot_data, config):
                         fully_combined_n
                     )
             ]:
+                if config.combined_constraint_heat_map is None:
+                    continue
                 pyplot.figure(figsize=(11, 8.5), dpi=300, tight_layout=True)
                 pyplot.xscale('log')
                 print('    Adding ' + repr(binary))
@@ -1915,23 +1949,23 @@ def main(config):
     if config.combined_constraint_period_range is not None:
         combined_quantiles = None
         combined_quantiles = plot_combined_constraints(plot_data, config)
-        if (
+    if (
             combined_quantiles is None
             and
-                path.exists(config.combined_quantiles_pickle)
-        ):
-            with open(
-                    config.combined_quantiles_pickle,
-                    'rb'
-            ) as quanntile_pickle:
-                combined_quantiles = pickle.load(quanntile_pickle)
-        elif combined_quantiles is not None:
-            with open(
-                    config.combined_quantiles_pickle,
-                    'wb'
-            ) as quanntile_pickle:
-                pickle.dump(combined_quantiles, quanntile_pickle)
-        plot_tightest_constraints(plot_data, config, combined_quantiles)
+            path.exists(config.combined_quantiles_pickle)
+    ):
+        with open(
+                config.combined_quantiles_pickle,
+                'rb'
+        ) as quanntile_pickle:
+            combined_quantiles = pickle.load(quanntile_pickle)
+    elif combined_quantiles is not None:
+        with open(
+                config.combined_quantiles_pickle,
+                'wb'
+        ) as quanntile_pickle:
+            pickle.dump(combined_quantiles, quanntile_pickle)
+    plot_tightest_constraints(plot_data, config, combined_quantiles)
 
 
 if __name__ == '__main__':
