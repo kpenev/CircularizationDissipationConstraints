@@ -706,11 +706,12 @@ def run(config,
             sampler = emcee.EnsembleSampler(**sampler_config,
                                             pool=UnchunkedPool(workers))
             if config.reseed_random_number_generator:
-                #Bad indeed
-                #pylint: disable=protected-access
-                sampler._random.seed()
-                #pylint: enable=protected-access
-            sampler.run_mcmc(initial_state, config.mcmc_nsteps)
+                _logger.warning('Re-seeding emcee random number generator.')
+                sampler.run_mcmc(initial_state,
+                                 config.mcmc_nsteps,
+                                 rstate0=numpy.random.get_state())
+            else:
+                sampler.run_mcmc(initial_state, config.mcmc_nsteps)
     else:
         sampler = emcee.EnsembleSampler(**sampler_config)
         if config.reseed_random_number_generator:
