@@ -683,6 +683,10 @@ def run(config,
         num_params):
     """Sample the selected system using MCMC."""
 
+    _logger.info('Starting sampling with configuration:\n\t'
+                 +
+                 '\n\t'.join([str(key) + ': ' + repr(value)
+                              for key, value in vars(config).items()]))
     sampler_config, initial_state = get_sampler_config_and_initial_state(
         config,
         log_likelihood,
