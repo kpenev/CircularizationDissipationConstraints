@@ -126,8 +126,7 @@ class PriorTransform:
                  max_power_law_argument=5,
                  max_initial_stellar_spin=15,
                  min_initial_stellar_spin=5,
-                 logger=None,
-                 probability_density_of_eccentricity = None
+                 logger=None
                  ):
         self.means = means
         self.standard_deviations = standard_deviations
@@ -139,8 +138,6 @@ class PriorTransform:
         self.max_power_law_argument = max_power_law_argument
         self.max_initial_stellar_spin = max_initial_stellar_spin
         self.min_initial_stellar_spin = min_initial_stellar_spin
-        self.logger = logger
-        self.probability_density_of_eccentricity = probability_density_of_eccentricity
 
         debug_plot = [('interpolation_performance', 'interp_performance.pdf')]
         teff = None
@@ -192,30 +189,51 @@ class PriorTransform:
         if logger is not None:
             logger.debug("StarSampler instance is created.")
 
+    def determine_min_argument_of_phase_lag_function_for_planet(self):
+        loglikelihood_instance = LogLikelihood(prior_transform_instance = self,
+                                               orbital_period = means['orbital period'],
+                                               obliquity=0,
+                                               )
+        initial_stellar_spin = self.min_initial_stellar_spin + numpy.random.rand() * (
+                    self.max_initial_stellar_spin - self.min_initial_stellar_spin)
+        argument_of_phase_lag_function_for_planet = self.min_argument_of_phase_lag_function_for_planet
+        tidal_break_period = 10**(self.min_log_tidal_break_period + numpy.random.rand() * (
+                    self.max_log_tidal_break_period - self.min_log_tidal_break_period))
+        power_law_argument = self.min_power_law_argument + numpy.random.rand() * (
+                    self.max_power_law_argument - self.min_power_law_argument)
+
+        parameters_for_evolution = {'primary mass': self.means['primary mass'],
+                                    'stellar age': self.means['stellar age'],
+                                    'secondary radius': self.means['secondary radius'],
+                                    'stellar metallicity': self.means['stellar metallicity'],
+                                    'secondary mass': self.means['secondary mass'],
+                                    'initial stellar spin': initial_stellar_spin,
+                                    'argument of phase lag function for planet': argument_of_phase_lag_function_for_planet,
+                                    'tidal break period': tidal_break_period,
+                                    'power law argument': power_law_argument}
+        return 0
+
     def __call__(self, u):
         unit_cube = numpy.array([u[0], u[1], u[2]])
         stellar_metallicity, primary_mass, stellar_age = self.star_sampler.__call__(unit_cube)
         primary_rad = FeHConditionalLikelihoodBase.interpolator('RADIUS', primary_mass, stellar_metallicity)
         primary_radius = primary_rad(stellar_age)
-        secondary_radius = None
         if 'transit depth' in self.means:
-            if self.standard_deviations['transit_depth_upper_uncertainty'] is not None and self.standard_deviations['transit_depth_lower_uncertainty'] is None:
-                square_of_the_ratio_of_planet_to_stellar_radius = norm.ppf(u[3], loc=self.means['transit depth'],
-                                                                           scale=(self.standard_deviations['transit_depth_upper_uncertainty']
-                                                                                 - self.standard_deviations['transit_depth_lower_uncertainty'])/2)/100.0
-                secondary_radius = (square_of_the_ratio_of_planet_to_stellar_radius ** 0.5) * primary_radius * const.R_sun.value / const.R_earth.value
-        if 'ratio of planet to stellar radius' in self.means:
-            if self.standard_deviations['ratio_of_planet_to_stellar_radius_upper_uncertainty'] is not None and self.standard_deviations['ratio_of_planet_to_stellar_radius_lower_uncertainty'] is not None and secondary_radius is None:
-                ratio_of_planet_to_stellar_radius = norm.ppf(u[3], loc=self.means['ratio of planet to stellar radius'],
-                                                             scale=(self.standard_deviations['ratio_of_planet_to_stellar_radius_upper_uncertainty']
-                                                                   - self.standard_deviations['ratio_of_planet_to_stellar_radius_lower_uncertainty'])/2)
-                secondary_radius = ratio_of_planet_to_stellar_radius * primary_radius * const.R_sun.value / const.R_earth.value
-        if 'secondary radius' in self.means:
-            if self.standard_deviations['secondary_radius_upper_uncertainty'] is not None and self.standard_deviations['secondary_radius_lower_uncertainty'] is not None and secondary_radius is None:
-                secondary_radius = norm.ppf(u[3], loc=self.means['secondary radius'],
-                                            scale=(self.standard_deviations['secondary_radius_upper_uncertainty']
-                                                  - self.standard_deviations['secondary_radius_lower_uncertainty'])/2)
-
+            square_of_the_ratio_of_planet_to_stellar_radius = norm.ppf(u[3], loc=self.means['transit depth'],
+                                                                       scale=(self.standard_deviations['transit_depth_upper_uncertainty']
+                                                                             - self.standard_deviations['transit_depth_lower_uncertainty'])/2)/100.0
+            secondary_radius = (square_of_the_ratio_of_planet_to_stellar_radius ** 0.5) * primary_radius * const.R_sun.value / const.R_earth.value
+        elif 'ratio of planet to stellar radius' in self.means:
+            ratio_of_planet_to_stellar_radius = norm.ppf(u[3], loc=self.means['ratio of planet to stellar radius'],
+                                                         scale=(self.standard_deviations['ratio_of_planet_to_stellar_radius_upper_uncertainty']
+                                                               - self.standard_deviations['ratio_of_planet_to_stellar_radius_lower_uncertainty'])/2)
+            secondary_radius = ratio_of_planet_to_stellar_radius * primary_radius * const.R_sun.value / const.R_earth.value
+        elif 'secondary radius' in self.means:
+            secondary_radius = norm.ppf(u[3], loc=self.means['secondary radius'],
+                                        scale=(self.standard_deviations['secondary_radius_upper_uncertainty']
+                                              - self.standard_deviations['secondary_radius_lower_uncertainty'])/2)
+        else:
+            secondary_radius = None
         secondary_mass = norm.ppf(u[4], loc=self.means['secondary mass'], scale=(self.standard_deviations[
                                                                                      'secondary_mass_upper_uncertainty'] -
                                                                                  self.standard_deviations[
@@ -253,23 +271,9 @@ class LogLikelihood:
                  constraints = Constraints_for_selecting_systems.constraints(),
                  spin_frequency_breaks_for_planet=None,
                  spin_frequency_powers_for_planet=numpy.array([0.0]),
-                 logger = None, number_of_parallel_processes = 16
+                 Q0 = 1, logger = None, number_of_parallel_processes = 16
                  ):
         self.prior_transform_instance = prior_transform_instance
-        self.means = self.prior_transform_instance.means
-        self.standard_deviations = self.prior_transform_instance.standard_deviations
-        self.max_argument_of_phase_lag_function_for_planet = self.prior_transform_instance.max_argument_of_phase_lag_function_for_planet
-        self.min_argument_of_phase_lag_function_for_planet = self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet
-        self.min_log_tidal_break_period = self.prior_transform_instance.min_log_tidal_break_period
-        self.max_log_tidal_break_period = self.prior_transform_instance.max_log_tidal_break_period
-        self.min_power_law_argument = self.prior_transform_instance.min_power_law_argument
-        self.max_power_law_argument =self.prior_transform_instance.max_power_law_argument
-        self.max_initial_stellar_spin = self.prior_transform_instance.max_initial_stellar_spin
-        self.min_initial_stellar_spin = self.prior_transform_instance.min_initial_stellar_spin
-
-        self.number_of_times_evolution_is_calculated = 0
-        self.number_of_times_crash_due_to_evolution_is_not_calculated_up_to_the_stellar_age_happens = 0
-
         self.orbital_period = orbital_period
         self.obliquity = obliquity
         self.probability_density_of_eccentricity = probability_density_of_eccentricity
@@ -281,127 +285,9 @@ class LogLikelihood:
         self.system_name = system_name
         self.directory_name = directory_name
         self.calculated_eccentricity_now = None
+        self.Q0 = Q0
         self.logger = logger
         self.number_of_parallel_processes = number_of_parallel_processes
-
-        lgQplmin_file_name  = '%(dir)s/%(system)s/%(system)s_lgQplmin.npy' % dict(dir=directory_name, system=self.system_name)
-        lgQplmin_file_exists = os.path.exists(lgQplmin_file_name)
-        if lgQplmin_file_exists:
-            if self.logger is not None: self.logger.debug("File containing lgQpl_min exists")
-            lgQplmin_file = open(lgQplmin_file_name, 'rb')
-            lgQplmin_a = numpy.load(lgQplmin_file)
-            lgQplmin_file.close()
-            if self.logger is not None: self.logger.debug("lg Qpl_min found in the previously existing file is : %(x)f" % dict(x=lgQplmin_a[0]))
-            self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet = lgQplmin_a[0]
-            self.min_argument_of_phase_lag_function_for_planet = lgQplmin_a[0]
-
-        if (not lgQplmin_file_exists) and (not (self.probability_density_of_eccentricity is None)) and (not (self.e_env is None)):
-            ensure_directory(lgQplmin_file_name)
-            if not self.logger is None: self.logger.debug("A suitable value of the minimum argument of phase lag function for planet is going to be created.")
-            if 'secondary radius' in self.means:
-                rad = self.means['secondary radius']
-                if not self.logger is None: self.logger.debug("secondary radius is directly found in the list of parameters that is %(x)f" % dict(x=rad))
-            elif ('ratio of planet and stellar radius' in self.means) and ('primary radius' in self.means):
-                rad = self.means['ratio of planet and stellar radius'] * self.means['primary radius'] * const.R_sun.value / const.R_earth.value
-                if not self.logger is None: self.logger.debug("secondary radius is calculated from Rp/Rs and Rs that is %(x)f" % dict(x=rad))
-            elif ('transit depth' in self.means) and ('primary radius' in self.means):
-                rad = ((self.means['transit depth']/100)**0.5) *  self.means['primary radius'] * const.R_sun.value / const.R_earth.value
-                if not self.logger is None: self.logger.debug("secondary radius is calculated from transit depth and primary radius that is %(x)f" % dict(x=rad))
-            else:
-                rad = None
-            if not(rad is None):
-                rad_j = rad * const.R_earth.value / const.R_jup.value
-                if not self.logger is None: self.logger.debug("secondary radius in Jupiter mass is %(x)f" % dict(x=rad_j))
-                if rad_j > 0.6:
-                    self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet = self.determine_min_argument_of_phase_lag_function_for_planet(rad=rad, starting=3)
-                    self.min_argument_of_phase_lag_function_for_planet = self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet
-                    if self.logger is not None: self.logger.debug("min argument of phase lag function for planet %(x)f" % dict(x=self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet))
-                else:
-                    self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet = self.determine_min_argument_of_phase_lag_function_for_planet(rad=rad, starting=1)
-                    self.min_argument_of_phase_lag_function_for_planet = self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet
-                    if self.logger is not None: self.logger.debug("min argument of phase lag function for planet %(x)f" % dict(x=self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet))
-                lgQplmin_file = open(lgQplmin_file_name, 'wb')
-                numpy.save(lgQplmin_file, numpy.array([self.min_argument_of_phase_lag_function_for_planet]))
-                lgQplmin_file.close()
-
-
-    def determine_min_argument_of_phase_lag_function_for_planet(self,rad, starting=3, crit = 5, test_n=16, tol=0.5, tolc = 0.1):
-        flag = False
-        k = self.logger is not None
-        min_argument_of_phase_lag_function_for_planet = starting-1
-        while (not flag) and (min_argument_of_phase_lag_function_for_planet < crit):
-            if k: self.logger.debug("Inside the loop of working out Qmin")
-            count = 0
-            crash = 0
-            n_evolution = 0
-            min_argument_of_phase_lag_function_for_planet = min_argument_of_phase_lag_function_for_planet + 1
-            i = 1
-            if k:
-                self.logger.debug("We are trying with Qpl = %(x)f" % dict(x=min_argument_of_phase_lag_function_for_planet))
-                self.logger.debug("iteration number = %(x)f" % dict(x=i))
-            while i<=test_n:
-                if k: self.logger.debug("We are in the loop where i is less than test_n")
-                initial_stellar_spin = self.min_initial_stellar_spin + numpy.random.rand() * (
-                            self.max_initial_stellar_spin - self.min_initial_stellar_spin)
-                argument_of_phase_lag_function_for_planet = min_argument_of_phase_lag_function_for_planet
-                tidal_break_period = 10**(self.min_log_tidal_break_period + numpy.random.rand() * (
-                            self.max_log_tidal_break_period - self.min_log_tidal_break_period))
-                #power_law_argument = self.min_power_law_argument + numpy.random.rand() * (
-                            #self.max_power_law_argument - self.min_power_law_argument)
-                power_law_argument = 0
-                if k:
-                    self.logger.debug("i = %(i)f"% dict(i = i))
-                    self.logger.debug("initial stellar spin = %(s)f" % dict(s=initial_stellar_spin))
-                    self.logger.debug("argument of phase lag function for planet =  %(x)f" % dict(x=argument_of_phase_lag_function_for_planet))
-                    self.logger.debug("tidal break period =  %(p)f" % dict(p = tidal_break_period))
-                    self.logger.debug("power law argument = %(a)f" % dict(a=power_law_argument))
-
-                parameters_for_evolution = {'primary mass': self.means['primary mass'],
-                                            'stellar age': self.means['stellar age'],
-                                            'secondary radius': rad,
-                                            'stellar metallicity': self.means['stellar metallicity'],
-                                            'secondary mass': self.means['secondary mass'],
-                                            'initial stellar spin': initial_stellar_spin,
-                                            'argument of phase lag function for planet': argument_of_phase_lag_function_for_planet,
-                                            'tidal break period': tidal_break_period,
-                                            'power law argument': power_law_argument}
-                if k: self.logger.debug("parameters to try this Qmin = %(x)f are %(p)s" % dict(x = argument_of_phase_lag_function_for_planet, p = json.dumps(parameters_for_evolution)))
-                try:
-                    if k: self.logger.debug("trial for min Q = %(q)f and iteration %(i)f" % dict(q=min_argument_of_phase_lag_function_for_planet, i = i))
-                    log_likelihood, fl = self.log_prob(parameters_for_evolution)
-                    if k: self.logger.debug("log_likelihood is %(x)f" % dict(x=log_likelihood))
-                except:
-                    if k: self.logger.debug("Exception occurs and caught in qmin determination method. log_likelihood is %(a)f" % dict(a=log_likelihood))
-                    if k: self.logger.debug('log likelihood of e cannot be calculated for this value of minimum Q: %(x)f. in method qmin determination'
-                                                        % dict(x=min_argument_of_phase_lag_funtion_for_planet))
-                else:
-                    if fl == 8 or fl == 4 or fl == 5 or fl == 6:
-                        n_evolution = n_evolution + 1
-                        if k: self.logger.debug("number of successful evolutions = %(x)f" % dict(x=n_evolution))
-                    if not numpy.isinf(log_likelihood) and fl==8:
-                        count = count + 1
-                        if k: self.logger.debug("in method qmin determination. log likelihood for Qmin = %(q)f is finite: %(z)f, present count= %(c)f" % dict(q=min_argument_of_phase_lag_function_for_planet, z=log_likelihood, c=count))
-                    if numpy.isinf(log_likelihood) and fl==5:
-                        crash = crash + 1
-                        if k:
-                            self.logger.debug("A crash occurs due to the reason that eccentricity is not calculated up to the present stellar age.")
-                            self.logger.debug("in method qmin determination. log likelihood for Qmin = %(q)f is infinite: %(z)f" % dict(q=min_argument_of_phase_lag_function_for_planet, z=log_likelihood))
-                            r = crash/n_evolution
-                            self.logger.debug("Rate of crashes = %(x)f" % dict(x=r))
-                if k: self.logger.debug("i = %(i)f" % dict(i = i))
-                i = i + 1
-            if k:
-                self.logger.debug("count of finite log likelihood for Qmin = %(a)f is %(c)f" % dict(a=min_argument_of_phase_lag_function_for_planet, c=count))
-                self.logger.debug("Number of crashes due to the reason that the evolution is not computed up to the present stellar age for Qmin = %(a)f is %(c)f" % dict(a=min_argument_of_phase_lag_function_for_planet, c =crash))
-                r = 0
-                if n_evolution >0: r = crash/n_evolution
-                self.logger.debug("Rate of crashes = %(a)f" % dict(a=r))
-            if count > tol * test_n and crash < test_n * tolc:
-                flag = True
-        if k: self.logger.debug("The suitable Qmin is determined to be %(x)f" % dict(x=min_argument_of_phase_lag_function_for_planet))
-        return min_argument_of_phase_lag_function_for_planet
-
-
 
     def priors(self,
                parameters_for_evolution):
@@ -431,18 +317,17 @@ class LogLikelihood:
         tidal_break_period = parameters_for_evolution['tidal break period']
         power_law_argument = parameters_for_evolution['power law argument']
 
-        if not self.logger is None:
-            self.logger.info("log prob of eccetricity will be calculated for the following parameters.")
-            self.logger.info('The parameters for evolution are: ')
-            self.logger.info('primary mass = %(m)f '% dict(m= primary_mass))
-            self.logger.info('stellar age = %(age)f'% dict(age= stellar_age))
-            self.logger.info('secondary radius = %(r)f' % dict(r= secondary_radius))
-            self.logger.info('stellar metallicity = %(feh)f '% dict(feh= stellar_metallicity))
-            self.logger.info('secondary mass = %(m)f'% dict(m= secondary_mass))
-            self.logger.info('initial stellar spin = %(spin)f '% dict(spin=initial_stellar_spin))
-            self.logger.info('argument of phase lag function for planet = %(ar)f '% dict(ar= argument_of_phase_lag_function_for_planet))
-            self.logger.info('tidal break period = %(bp)f '% dict(bp= tidal_break_period))
-            self.logger.info('power law argument = %(alpha)f' % dict(alpha= power_law_argument))
+        logging.info("log prob of eccetricity will be calculated for the following parameters.")
+        logging.info('The parameters for evolution are: ')
+        logging.info('primary mass = %(m)f '% dict(m= primary_mass))
+        logging.info('stellar age = %(age)f'% dict(age= stellar_age))
+        logging.info('secondary radius = %(r)f' % dict(r= secondary_radius))
+        logging.info('stellar metallicity = %(feh)f '% dict(feh= stellar_metallicity))
+        logging.info('secondary mass = %(m)f'% dict(m= secondary_mass))
+        logging.info('initial stellar spin = %(spin)f '% dict(spin=initial_stellar_spin))
+        logging.info('argument of phase lag function for planet = %(ar)f '% dict(ar= argument_of_phase_lag_function_for_planet))
+        logging.info('tidal break period = %(bp)f '% dict(bp= tidal_break_period))
+        logging.info('power law argument = %(alpha)f' % dict(alpha= power_law_argument))
 
         priors = self.priors({'primary mass': primary_mass,
                               'secondary mass': secondary_mass,
@@ -450,7 +335,7 @@ class LogLikelihood:
                               'stellar age': stellar_age})
 
         if not priors:
-            return -numpy.inf, 0
+            return -numpy.inf
 
         star_exoplanet_binary_system = StarExoplanetSystem.System(primary_mass=primary_mass * un.solMass,
                                               secondary_mass=secondary_mass * un.earthMass,
@@ -497,10 +382,6 @@ class LogLikelihood:
         if self.logger is not None: self.logger.debug("Evolution is being worked out")
         evolution_complete = False
         e_in = self.initial_eccentricity
-        e_in_of_previous_iteration = e_in + 0.01
-        if self.logger is not None: self.logger.debug("****************************** the initial eccentricity is %(e)f" % dict(e=e_in))
-        linear_to_exponential_decrement_of_e_in = False
-        t = 0
         while (not evolution_complete):
             try:
                  if self.logger is not None: self.logger.debug("find_evolution method is being called.")
@@ -522,70 +403,32 @@ class LogLikelihood:
                                                        solve=True,
                                                        secondary_is_star=False)
             except AssertionError:
-                 if not linear_to_exponential_decrement_of_e_in:
-                     e_in_of_previous_iteration = e_in
-                     e_in = e_in - 0.01
-                 if e_in < self.e_env or linear_to_exponential_decrement_of_e_in:
-                     linear_to_exponential_decrement_of_e_in = True
-                 if linear_to_exponential_decrement_of_e_in:
-                     e_in_of_previous_iteration = self.e_env + 0.01 * math.exp(-10*(t-0.01)/(-self.e_env+self.initial_eccentricity))
-                     e_in = self.e_env + 0.01 * math.exp(-10*t/(-self.e_env+self.initial_eccentricity))
-                     t = t + 0.01
+                 e_in = e_in - 0.01
                  logging.warning('Calculating evolution failed, trying initial eccentricity = %(e)f' % dict(e=e_in))
                  if self.logger is not None: self.logger.warning('Calculating evolution failed, trying initial eccentricity = %(e)f' % dict(e=e_in))
                  #print('Calculating evolution failed, trying initial eccentricity = %(e)f' % dict(e=e_in))
                  #if self.logger is not None: self.logger.warning('Calculating evolution failed, trying initial eccentricity = %(e)f' % dict(e=e_in))
                  evolution_complete = False
-                 if math.fabs(e_in - e_in_of_previous_iteration)<0.000001:
-                     if self.logger is not None: self.logger.debug("This lgQ_pl for the chosen parameters does not suit")
-                     return -numpy.inf, 1
-            except ValueError as verror:
-                 logging.error('Invalid parameter values encountered: %(error)s' % dict(error= str(verror)))
-                 if self.logger is not None: self.logger.error('Invalid parameter values encountered: %(error)s' % dict(error= str(verror)))
+            except ValueError as error:
+                 logging.error('Invalid parameter values encountered: %(error)s' % dict(error= str(error)))
+                 if self.logger is not None: self.logger.error('Invalid parameter values encountered: %(error)s' % dict(error= str(error)))
                  #print('Invalid parameter values encountered: %(error)s' % dict(error= str(error)))
-                 return  -numpy.inf, 2
+                 return  -numpy.inf
             except:
-                 logging.error("General Error occurs while calculating evolution")
-                 if self.logger is not None: self.logger.error("Error occurs while calculating evolution")
-                 return -numpy.inf, 3
+                 logging.error("Error occurs")
+                 if self.logger is not None: self.logger.error("Error occurs")
+                 return -numpy.inf
             else:
-                 evolution_complete = True
-                 if self.logger is not None:
-                      self.logger.debug("Evolution is calculated.")
-                 self.number_of_times_evolution_is_calculated = self.number_of_times_evolution_is_calculated + 1
                  calculated_eccentricity_now = evolutionary_history.eccentricity[- 1]
                  age_upto_which_evolution_is_calculated = evolutionary_history.age[-1]
-
-                 if self.logger is not None: self.logger.debug("Calculated eccentricity now in the log_prob method is %(e)f" % dict(e=calculated_eccentricity_now))
-                 logging.debug("Calculated eccentricity now in the log_prob method is %(e)f" % dict(e=calculated_eccentricity_now))
-                 if self.logger is not None:
-                      if math.fabs(stellar_age - age_upto_which_evolution_is_calculated) <0.00001:
-                          self.logger.debug("Evolution is calculated up to the stellar age.")
-                      else:
-                          self.logger.debug("Evolution is NOT calculated up to the stellar age.")
-                 if not math.fabs(stellar_age - age_upto_which_evolution_is_calculated) <0.00001:
-                      self.number_of_times_crash_due_to_evolution_is_not_calculated_up_to_the_stellar_age_happens = self.number_of_times_crash_due_to_evolution_is_not_calculated_up_to_the_stellar_age_happens +1
-
+                 if self.logger is not None: self.logger.debug("Calculated eccentricity now is %(e)f" % dict(e=calculated_eccentricity_now))
+                 logging.debug("Calculated eccentricity now is %(e)f" % dict(e=calculated_eccentricity_now))
                  #print("Calculated eccentricity now is %(e)f" % dict(e=calculated_eccentricity_now))
-                 if calculated_eccentricity_now < self.e_env and math.fabs(stellar_age - age_upto_which_evolution_is_calculated) <0.00001:
-                      if self.logger is not None:
-                          self.logger.debug("calculated e = %(a)f, e_env = %(b)f, stellar age = %(c)f, calculated stellar age = %(d)f" % dict(a=calculated_eccentricity_now,
-                                                                                                                                              b=self.e_env,
-                                                                                                                                              c=stellar_age,
-                                                                                                                                              d=age_upto_which_evolution_is_calculated))
-                          self.logger.debug("calculated e is less than the envelope e and stellar age is almost same to the age upto which the evolution is calculated.")
+                 if calculated_eccentricity_now < self.e_env and (stellar_age - age_upto_which_evolution_is_calculated) <0.00001:
+                      evolution_complete = True
                  else:
-                      if self.logger is not None:
-                          self.logger.debug("calculated e = %(a)f, e_env = %(b)f, stellar age = %(c)f, calculated stellar age = %(d)f" % dict(a=calculated_eccentricity_now,
-                                                                                                                                              b=self.e_env,
-                                                                                                                                              c=stellar_age,
-                                                                                                                                              d=age_upto_which_evolution_is_calculated))
-                          self.logger.debug("either calculated e is more than the envelope e, or stellar age is not equal to the age upto which the evolution is calculated.")
-                      if not calculated_eccentricity_now < self.e_env:
-                          return -numpy.inf, 4
-                      if not math.fabs(stellar_age - age_upto_which_evolution_is_calculated)<0.00001:
-                          return -numpy.inf, 5
-
+                      return -numpy.inf
+ 
         self.calculated_eccentricity_now = calculated_eccentricity_now
 
         if calculated_eccentricity_now >= 0 and calculated_eccentricity_now <= 1:
@@ -596,17 +439,15 @@ class LogLikelihood:
             if probability_density == 0:
                 logging.debug("log of probability density of e is %(x)f " % dict(x=-numpy.inf))
                 if self.logger is not None: self.logger.debug("log of probability density of e is %(x)f " % dict(x=-numpy.inf))
-                return -numpy.inf, 6
+                return -numpy.inf
             if probability_density < 0:
                 logging.warning('Probability density cannot be less than zero.')
-                if self.logger is not None: self.logger.warning('Probability density cannot be less than zero.')
-                return -numpy.inf, 7
+                return -numpy.inf
             logging.debug("log of probability density of e is %(x)f " % dict(x=numpy.log(probability_density)))
-            if not self.logger is None: self.logger.debug("log of probability density of e is %(x)f " % dict(x=numpy.log(probability_density)))
-            return numpy.log(probability_density), 8
+            if self.logger is not None: self.logger.debug("log of probability density of e is %(x)f " % dict(x=numpy.log(probability_density)))
+            return numpy.log(probability_density)
         logging.warning('Calculated present eccentricity can neither be less than zero nor greater than one')
-        if not self.logger is None: self.logger.warning('Calculated present eccentricity can neither be less than zero nor greater than one')
-        return -numpy.inf, 9
+        return -numpy.inf
 
 
     def generate_successful_walkers_aux(self,
@@ -621,26 +462,16 @@ class LogLikelihood:
                                     output_dirname = "/work/08529/mmmahmud/scratch/circularization_exoplanet_system/sampling_output"
                                     ):
         numpy.random.seed()
-        #pid = os.getpid()
-        #date_time = datetime.now().strftime('%Y%m%d%H%M%S')
-        #logging_file_name = '%(outdir)s/%(system)s/P0_processor_logging/p0_%(now)s_%(pid)d.logging' % dict(outdir=output_dirname, system=self.system_name, now=date_time, pid=pid)
-        #msg_file_name = '%(outdir)s/%(system)s/P0_processor_message/p0_%(now)s_%(pid)d.txt' % dict(outdir=output_dirname, system=self.system_name, now=date_time, pid=pid)
         pid = os.getpid()
-        logging_folder_name = '%(outdir)s/%(system)s/P0_processor_logging/p0_%(pid)d/' % dict(outdir=output_dirname, system=self.system_name, pid=pid)
-        msg_folder_name = '%(outdir)s/%(system)s/P0_processor_message/p0_%(pid)d/' % dict(outdir=output_dirname, system=self.system_name, pid=pid)
-        ensure_directory(logging_folder_name)
-        ensure_directory(msg_folder_name)
-        def setup_logging_messaging_file(i):
-            date_time = datetime.now().strftime('%Y%m%d%H%M%S')
-            logging_file_name = '%(folder)sp0_%(now)s_%(pid)d_i_%(i)d.logging' % dict(folder=logging_folder_name, now=date_time, pid=pid, i = i)
-            msg_file_name = '%(folder)sp0_%(now)s_%(pid)d_i_%(i)d.txt' % dict(folder=msg_folder_name, now=date_time, pid=pid, i = i)
-            setup_basic_logging(logging_file_name, msg_file_name)
+        date_time = datetime.now().strftime('%Y%m%d%H%M%S')
+        logging_file_name = '%(outdir)s/%(system)s/P0_processor_logging/p0_%(now)s_%(pid)d.logging' % dict(outdir=output_dirname, system=self.system_name, now=date_time, pid=pid)
+        msg_file_name = '%(outdir)s/%(system)s/P0_processor_message/p0_%(now)s_%(pid)d.txt' % dict(outdir=output_dirname, system=self.system_name, now=date_time, pid=pid)
+        ensure_directory(logging_file_name)
+        ensure_directory(msg_file_name)
 
-
-        #setup_basic_logging(logging_file_name, msg_file_name)
-        if self.logger is not None:
-            self.logger.debug("generate_successsful_walkers_aux method is called. ")
-            self.logger.debug("u = %(u)s " % dict(u=numpy.array2string(u)))
+        setup_basic_logging(logging_file_name, msg_file_name)
+        if self.logger is not None: self.logger.debug("generate_successsful_walkers_aux method is called. ")
+        logging.debug("u = %(u)s " % dict(u=numpy.array2string(u)))
 
         lgQpl_max = self.prior_transform_instance.max_argument_of_phase_lag_function_for_planet
         lgQpl_min = self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet
@@ -676,7 +507,6 @@ class LogLikelihood:
         loop_x_complete = False
         loop_y_complete = False
         walker_found = False
-        i = 0
 
         w = w_start
         alpha_u = w * del_alpha_u + numpy.random.rand() * del_alpha_u
@@ -687,33 +517,25 @@ class LogLikelihood:
                 y = y_start
                 spin_u = (y + numpy.random.rand()) * del_spin_u
                 while not (loop_y_complete or walker_found):
-                    self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet = lgQpl_min
                     u[5] = spin_u % 1 if spin_u > 1 else spin_u
                     temp = numpy.random.rand() * del_lgQpl_u
                     u[6] = temp % 1 if temp > 1 else temp
                     u[7] = lgPbr_u % 1 if lgPbr_u > 1 else lgPbr_u
                     u[8] = alpha_u % 1 if alpha_u > 1 else alpha_u
-                    i = i+1
-                    setup_logging_messaging_file(i)
                     logging.debug("Modified u is %(u)s" % dict(u=numpy.array2string(u)))
-                    if self.logger is not None: self.logger.debug("Modified u is %(u)s" % dict(u=numpy.array2string(u)))
+
                     log_likelihood, parameters_for_evolution = self(u)
+
                     logging.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood, p=numpy.array2string(parameters_for_evolution)))
-                    if self.logger is not None: self.logger.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood, p=numpy.array2string(parameters_for_evolution)))
                     if (not math.isinf(log_likelihood)) and (log_likelihood < min_log_likelihood):
                         logging.debug("Start: log likelihood is not negative infinity for this u")
-                        if self.logger is not None: self.logger.debug("Start: log likelihood is not negative infinity for this u")
                         a = u[6]
                         b = 1.0
                         c = (a+b)/2.0
                         c = c % 1 if c > 1 else c
                         u[6] = c
-                        i = i+1
-                        setup_logging_messaging_file(i)
                         log_likelihood, parameters_for_evolution = self(u)
                         logging.debug("u = %(u)s log likelihood = %(n)f for parameters: %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood, p=numpy.array2string(parameters_for_evolution)))
-                        if self.logger is not None: self.logger.debug("u = %(u)s log likelihood = %(n)f for parameters: %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood,
-                                                                                                                                      p=numpy.array2string(parameters_for_evolution)))
                         while log_likelihood < min_log_likelihood:
                             while math.isinf(log_likelihood):
                                 b = c
@@ -722,8 +544,6 @@ class LogLikelihood:
                                 u[6] = c
                                 logging.debug("c = %(s)f  " % dict(s = c))
                                 if self.logger is not None: self.logger.debug("c =  %(s)f " % dict(s = c))
-                                i = i+1
-                                setup_logging_messaging_file(i)
                                 log_likelihood, parameters_for_evolution = self(u)
                                 logging.debug("log likelihood = %(s)f  " % dict(s = log_likelihood))
                                 if self.logger is not None: self.logger.debug("log likelihood =  %(s)f " % dict(s = log_likelihood))
@@ -734,23 +554,16 @@ class LogLikelihood:
                             u[6] = c
                             logging.debug("c = %(s)f  " % dict(s = c))
                             if self.logger is not None: self.logger.debug("c =  %(s)f " % dict(s = c))
-                            i = i+1
-                            setup_logging_messaging_file(i)
                             log_likelihood, parameters_for_evolution = self(u)
                             logging.debug("log likelihood = %(s)f  " % dict(s = log_likelihood))
                             if self.logger is not None: self.logger.debug("log likelihood =  %(s)f " % dict(s = log_likelihood))
                     if (not math.isinf(log_likelihood)) and (log_likelihood > min_log_likelihood):
                         logging.debug("we got a range of u[6] for the acceptable walkers. The extreme u = %(u)s with log likelihood %(n)f" % dict(u=numpy.array2string(u), n=log_likelihood))
-                        if self.logger is not None: self.logger.debug(logging.debug("we got a range of u[6] for the acceptable walkers. The extreme u = %(u)s with log likelihood %(n)f"
-                                                                                    % dict(u=numpy.array2string(u), n=log_likelihood)))
                         logging.debug("corresponding extreme parameters are: %(p)s" % dict(p=numpy.array2string(parameters_for_evolution)))
-                        if self.logger is not None: self.logger.debug("corresponding extreme parameters are: %(p)s" % dict(p=numpy.array2string(parameters_for_evolution)))
+
                         x = numpy.random.uniform(0.0, u[6], 1)
                         u[6] = x[0]
                         logging.debug("a value of u[6] picked up randomly from 0 and the extremum u[6]. That is %(x)f" % dict(x= u[6]))
-                        if self.logger is not None: self.logger.debug("a value of u[6] picked up randomly from 0 and the extremum u[6]. That is %(x)f" % dict(x= u[6]))
-                        i = i+1
-                        setup_logging_messaging_file(i)
                         log_likelihood, parameters_for_evolution = self(u)
                         if not math.isinf(log_likelihood):
                             logging.debug('The discovered walker is u  = %(u)s' % dict(u=numpy.array2string(u)))
@@ -763,7 +576,6 @@ class LogLikelihood:
 
                             p0_file_exists = os.path.exists(p0_file_name)
                             logging.debug('number of discovered walkers = %(x)f' % dict(x=number_of_discovered_walkers.value))
-                            if self.logger is not None: self.logger.debug('number of discovered walkers = %(x)f' % dict(x=number_of_discovered_walkers.value))
                             if p0_file_exists:
                                 while True:
                                      if ((p0_file_is_being_updated.value == 0) and (number_of_discovered_walkers.value < nwalkers)):
@@ -952,8 +764,6 @@ class LogLikelihood:
             ensure_directory(msg_file_name)
             setup_basic_logging(logging_file_name, msg_file_name)
 
-        self.number_of_times_evolution_is_calculated = 0
-        self.number_of_times_crash_due_to_evolution_is_not_calculated_up_to_the_stellar_age_happens = 0
         with Pool(self.number_of_parallel_processes,
                   initializer=setup_basic_logging_for_mcmc,
                   #initargs=[config],
@@ -1030,15 +840,7 @@ class LogLikelihood:
                            parameters_for_evolution['argument of phase lag function for planet'],
                            parameters_for_evolution['tidal break period'],
                            parameters_for_evolution['power law argument']])
-        log_prob_parameters_for_evolution, flag = self.log_prob(parameters_for_evolution)
-        r = 0
-        if self.number_of_times_evolution_is_calculated != 0:
-            r = self.number_of_times_crash_due_to_evolution_is_not_calculated_up_to_the_stellar_age_happens/self.number_of_times_evolution_is_calculated
-        logging.debug("The rate of crashes = %(r)f" % dict(r=r))
-        if self.logger is not None:
-            self.logger.debug("number of evolutions = %(x)f" % dict(x=self.number_of_times_evolution_is_calculated))
-            self.logger.debug("number of times crashes happen = %(x)f" % dict(x=self.number_of_times_crash_due_to_evolution_is_not_calculated_up_to_the_stellar_age_happens))
-            self.logger.debug("The rate of crashes = %(r)f" % dict(r=r))
+        log_prob_parameters_for_evolution = self.log_prob(parameters_for_evolution)
         if numpy.isinf(-log_prob_parameters_for_evolution):
             logging.debug("Actual params are: %(x)s " % dict(x=json.dumps(parameters_for_evolution)))
             return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None])
@@ -1159,6 +961,17 @@ class SamplingPropertiesOfSystem:
             logger.info("Standard deviations in the measured values are %(stdev)s " % dict(stdev = standard_deviations))
             self.means = means
             self.standard_deviations = standard_deviations
+            logger.info("PriorTransform instance is going to be created for the %(system)s" % dict(system=system_name))
+            self.prior_transform_instance = PriorTransform(means,
+                                                           standard_deviations,
+                                                           max_argument_of_phase_lag_function_for_planet,
+                                                           min_argument_of_phase_lag_function_for_planet,
+                                                           min_log_of_tidal_break_period,
+                                                           max_log_of_tidal_break_period,
+                                                           min_power_law_argument, max_power_law_argument,
+                                                           max_initial_stellar_spin, min_initial_stellar_spin,
+                                                           logger)
+
 
             self.e_env = self.envelope_eccentricity_function(
                 x=self.means['semi major axis'] / self.means['secondary radius'], logger=logger)
@@ -1178,17 +991,6 @@ class SamplingPropertiesOfSystem:
                 eccentricity_distribution_object.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
                 logger.debug("The graph is plotted")
                 self.probability_density_of_eccentricity = eccentricity_distribution_object.probability_density_of_eccentricity
-                logger.info("PriorTransform instance is going to be created for the %(system)s" % dict(system=system_name))
-                self.prior_transform_instance = PriorTransform(means,
-                                                               standard_deviations,
-                                                               max_argument_of_phase_lag_function_for_planet,
-                                                               min_argument_of_phase_lag_function_for_planet,
-                                                               min_log_of_tidal_break_period,
-                                                               max_log_of_tidal_break_period,
-                                                               min_power_law_argument, max_power_law_argument,
-                                                               max_initial_stellar_spin, min_initial_stellar_spin,
-                                                               logger, self.probability_density_of_eccentricity)
-
                 logger.debug("LogLikelihood instance is going to be created")
                 self.log_likelihood_instance = LogLikelihood(prior_transform_instance = self.prior_transform_instance,
                                                              orbital_period = self.means['orbital period'],
@@ -1201,7 +1003,7 @@ class SamplingPropertiesOfSystem:
                                                              constraints = constraints,
                                                              spin_frequency_breaks_for_planet = spin_frequency_breaks_for_planet,
                                                              spin_frequency_powers_for_planet = spin_frequency_powers_for_planet,
-                                                             logger=logger, number_of_parallel_processes = 16
+                                                             Q0 = 1, logger=logger, number_of_parallel_processes = 16
                                                              )
 
                 logger.debug("LogeLikelihod instance is created. Now MCMC is going to run")
@@ -1245,4 +1047,17 @@ if __name__ == '__main__':
                                            envelope_eccentricity_function=EnvelopeEccentricityDistribution.envelope_eccentricity_function
                                            )
 
+
+
+
+#while not good_minimum_of_Q_is_found:
+ #                       try:
+  #                          log_likelihood, parameters_for_evolution = self(u)
+   #                     except:
+    #                        logging.debug('log likelihood of e cannot be calculated for this value of minimum Q')
+     #                       self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet += 0.5
+      #                  else:
+       #                     good_minimum_of_Q_is_found = True
+        #                finally:
+         #                   logging.debug('minimum value of the argument of phase lag function for planet is %(x)f'% dict(x= self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet))
 

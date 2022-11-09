@@ -34,7 +34,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
                  envelope_eccentricity,
                  eccentricity_flag_limit = 0,
                  system_name = 'Star_exoplanet system',
-                 output_directory = "/work/08529/mmmahmud/p0andmcmc",
+                 output_directory = "/home1/08529/mmmahmud/scratch/circularization_exoplanet_system",
                  #email="mmm161430@utdallas.edu",
                  crit=35, logger = None):
 
@@ -44,11 +44,9 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         self.e_env = envelope_eccentricity
         if eccentricity_flag_limit == 1:
             self.confidence_interval_for_eccentricity = phi(1)
-        if eccentricity_flag_limit == 2:
-            self.confidence_interval_for_eccentricity = 0.95
-        if eccentricity_flag_limit == 3:
-            self.confidence_interval_for_eccentricity = 0.99
-        if eccentricity_flag_limit == 0:
+        elif eccentricity_flag_limit > 1:
+            self.confidence_interval_for_eccentricity = 2*phi(eccentricity_flag_limit) - 1
+        else:
             self.confidence_interval_for_eccentricity = 2*phi(1) - 1
 
         self.system_name = system_name
@@ -56,7 +54,7 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         self.logger = logger
         self.eccentricity_distribution_is_delta = False
 
-        self.output_directory = "%(output_directory)s/%(system)s/%(system)s_edist" % dict(output_directory=output_directory, system=system_name)
+        self.output_directory = "%(output_directory)s/%(system)s_edist" % dict(output_directory=output_directory, system=system_name)
         if os.path.exists(self.output_directory):
             if self.logger is not None: self.logger.debug("output directory exists: %(directory)s " % dict(directory= self.output_directory))
         if not os.path.exists(self.output_directory):
@@ -200,18 +198,18 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         plt.ylabel('probability density of eccentricity (f(e))')
         plt.title('Probability density of eccentricity vs. eccentricity for %(system)s' % dict(system=self.system_name))
         fname = '%(output_directory)s/Probability density of eccentricity vs. eccentricity for %(system)s.pdf' % dict(output_directory = self.output_directory, system=self.system_name)
-        #msg = "\"Probability density of eccentricity vs. eccentricity for %(system)s\"" % dict(system=self.system_name)
+        msg = "\"Probability density of eccentricity vs. eccentricity for %(system)s\"" % dict(system=self.system_name)
         plt.savefig(fname)
         plt.clf()
         #bash_command = "echo %(msg)s | mailx -s %(msg)s -a \"%(fname)s\" %(email)s" % dict(msg=msg, fname=fname, email=self.email)
         #os.system(bash_command)
-
+        
         plt.plot(eccentricity, M_cdf, label="cdf of M(e) vs. eccentricity (e)")
         plt.xlabel('Eccentricity (e)')
         plt.ylabel('M_cdf ')
         plt.title('CDF of M(e) vs. eccentricity, e for %(system)s' % dict(system=self.system_name))
         fname = '%(output_directory)s/CDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(output_directory = self.output_directory, system=self.system_name)
-        #msg = "\"CDF of M(e) vs. eccentricity, e for %(system)s\"" % dict(system=self.system_name)
+        msg = "\"CDF of M(e) vs. eccentricity, e for %(system)s\"" % dict(system=self.system_name)
         plt.savefig(fname)
         plt.clf()
         #bash_command = "echo %(msg)s | mailx -s %(msg)s -a \"%(fname)s\" %(email)s" % dict(msg=msg, fname=fname, email=self.email)
@@ -222,12 +220,12 @@ class EccentricityDistribution(SuperEccentricityDistribution):
         plt.ylabel('M_pdf ')
         plt.title('PDF of M(e) vs. eccentricity, e for %(system)s' % dict(system=self.system_name))
         fname = '%(output_directory)s/PDF of M(e) vs. eccentricity, e for %(system)s.pdf' % dict(output_directory = self.output_directory, system=self.system_name)
-        #msg = "\"PDF of M(e) vs. eccentricity, e for %(system)s\"" % dict(system=self.system_name)
+        msg = "\"PDF of M(e) vs. eccentricity, e for %(system)s\"" % dict(system=self.system_name)
         plt.savefig(fname)
         plt.clf()
         #bash_command = "echo %(msg)s | mailx -s %(msg)s -a \"%(fname)s\" %(email)s" % dict(msg=msg, fname=fname, email=self.email)
         #os.system(bash_command)
-
+ 
         return
 
 if __name__ == '__main__':
@@ -256,6 +254,6 @@ if __name__ == '__main__':
                                       envelope_eccentricity=args.envelope_eccentricity,
                                       eccentricity_flag_limit=args.eccentricity_flag_limit if args.eccentricity_flag_limit else 0.0,
                                       system_name=args.system if args.system else "Star-Exoplanet",
-                                      output_directory=args.output_directory if args.output_directory else "/work/08529/mmmahmud/p0andmcmc")
+                                      output_directory=args.output_directory if args.output_directory else "/home1/08529/mmmahmud/scratch/circularization_exoplanet_system" )
     e_dist.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
 

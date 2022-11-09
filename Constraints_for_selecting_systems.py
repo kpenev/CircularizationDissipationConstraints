@@ -11,7 +11,7 @@ def constraints(smallest_acceptable_value_of_orbital_period=0,
                 smallest_acceptable_value_of_stellar_age=0,
                 largest_acceptable_value_of_stellar_age=10,
                 smallest_acceptable_value_of_eccentricity_now=0,
-                largest_acceptable_value_of_eccentricity_now=0.45):
+                largest_acceptable_value_of_eccentricity_now=0.5):
     smallest = {'orbital period': smallest_acceptable_value_of_orbital_period,
                 'primary mass': smallest_acceptable_value_of_primary_mass,
                 'secondary mass': smallest_acceptable_value_of_secondary_mass,
@@ -26,14 +26,14 @@ def constraints(smallest_acceptable_value_of_orbital_period=0,
                'present eccentricity': largest_acceptable_value_of_eccentricity_now}
     return smallest, largest
 
-def constraints_for_eccentricity_envelope(smallest_acceptable_value_of_secondary_radius=8,
+def constraints_for_eccentricity_envelope(smallest_acceptable_value_of_secondary_radius=0,
                                           largest_acceptable_value_of_secondary_radius=math.inf,
-                                          smallest_acceptable_value_of_planet_mass_sin_i=50,
-                                          largest_acceptable_value_of_planet_mass_sin_i=math.inf):
+                                          smallest_acceptable_value_of_planet_mass=0,
+                                          largest_acceptable_value_of_planet_mass=25000):
     smallest = {'secondary radius': smallest_acceptable_value_of_secondary_radius,
-                'planet mass times sin i': smallest_acceptable_value_of_planet_mass_sin_i}
+                'planet mass': smallest_acceptable_value_of_planet_mass}
     largest = {'secondary radius': largest_acceptable_value_of_secondary_radius,
-               'planet mass times sin i': largest_acceptable_value_of_planet_mass_sin_i}
+               'planet mass': largest_acceptable_value_of_planet_mass}
     return smallest, largest
 def constraints_are_satisfied(orbital_period,
                               primary_mass,
@@ -56,15 +56,15 @@ def constraints_are_satisfied(orbital_period,
     return False
 
 
-def constraints_for_eccentricity_envelope_are_satisfied(secondary_radius,
-                                                        planet_mass_sin_i,
+def constraints_for_eccentricity_envelope_are_satisfied(secondary_radius=0,
+                                                        planet_mass=0,
                                                         constraints=constraints_for_eccentricity_envelope()):
     smallest = constraints[0]
     largest = constraints[1]
     if secondary_radius <= largest['secondary radius'] and secondary_radius > smallest['secondary radius']:
         return True
-    if planet_mass_sin_i <= largest['planet mass times sin i'] and planet_mass_sin_i > smallest[
-        'planet mass times sin i']:
+    if planet_mass <= largest['planet mass'] and planet_mass > smallest[
+        'planet mass']:
         return True
 
     return False

@@ -32,7 +32,6 @@ class System:
         print('Age = ', self.age, '=', self.age.to(un.s))
 
 if __name__ == '__main__':
-    os.system('python3 EccentricityDistribution.py 0.39 0.2 -0.2 .40 --system WASP')
     parser = argparse.ArgumentParser()
     parser.add_argument('-Mp', '--Primary_mass',
                         help = 'Store the mass of the primary body in the unit of solar mass',
