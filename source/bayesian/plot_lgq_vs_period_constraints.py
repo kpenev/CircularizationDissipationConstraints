@@ -1406,7 +1406,7 @@ def plot_individual_constraints(plot_data, config):
             print('\tCluster: ' + cluster)
             for plot_split in plot_type_split[plot_type]:
                 print('\t\tSplit: ' + repr(plot_split))
-                output_fname = cluster + '_' + plot_type
+                output_fname = '_'.join([cluster, config.method, plot_type])
                 if plot_split is not None:
                     output_fname += '_' + str(plot_split)
                 if config.individual_plot_mode == 'pages':
@@ -1631,7 +1631,11 @@ def plot_combined_constraints(plot_data, config):
 
             for output_fname, plotter, included_clusters, ncombined in [
                     (
-                        cluster + '_combined_lgQ_period_%d.pdf' % (nadded + 1),
+                        '_'.join([
+                            cluster,
+                            config.method,
+                            'combined_lgQ_period_%d.pdf' % (nadded + 1)
+                        ]),
                         cluster_plotter,
                         [cluster],
                         (nadded + 1)
@@ -1918,9 +1922,11 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
         pyplot.gca().set_xticks(range(2, 11))
         pyplot.gca().set_xticklabels([str(i) for i in range(2, 11)])
 
-        pyplot.savefig(cluster + '_tightest_constraints.pdf',
-                       bbox_inches='tight',
-                       pad_inches=0)
+        pyplot.savefig(
+            cluster + '_' + config.method + '_tightest_constraints.pdf',
+            bbox_inches='tight',
+            pad_inches=0
+        )
         pyplot.clf()
         if cluster == 'M35':
             data_behind.remove_columns(['Comb. CDF-1(2.3%)',
