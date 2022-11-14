@@ -1050,21 +1050,10 @@ class SamplingPropertiesOfSystem:
             self.means = means
             self.standard_deviations = standard_deviations
 
-            if 'secondary radius' in self.means:
-                rad = self.means_['secondary radius']
-            elif ('ratio of planet and stellar radius' in self.means) and ('primary radius' in self.means):
-                rad = self.means['ratio of planet and stellar radius'] * self.means['primary radius'] * const.R_sun.value / const.R_earth.value
-            elif ('transit depth' in self.means) and ('primary radius' in self.means):
-                rad = ((self.means['transit depth']/100)**0.5) *  self.means['primary radius'] * const.R_sun.value / const.R_earth.value
-            else:
-                rad = None
-
-            if rad is not None:
-                self.e_env = self.envelope_eccentricity_function(x=self.means['semi major axis'] / rad, logger=logger)
-            else:
-                self.e_env = 0.5
+            self.e_env = self.envelope_eccentricity_function(
+                x=self.means['semi major axis'] / self.means['secondary radius'], logger=logger)
             logger.info("The envelope eccentricity for the system %(system)s is %(eenv)f" % dict(system=system_name, eenv=self.e_env))
-            if rad is not None and self.e_env > self.means['present eccentricity']:
+            if self.e_env > self.means['present eccentricity']:
                 logger.debug("EnccentricityDistribution instance is going to be created.")
                 eccentricity_distribution_object = EccentricityDistribution.EccentricityDistribution(self.means['present eccentricity'],
                                                                             self.standard_deviations[

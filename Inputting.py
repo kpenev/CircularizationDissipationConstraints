@@ -4,7 +4,7 @@ import argparse
 import os
 import json
 from SampleStarExoplanetSystemsProperties import *
-import EnvelopeEccentricityDistribution
+
 
 class Inputting:
     envelope_eccentricity_distribution_instance = None

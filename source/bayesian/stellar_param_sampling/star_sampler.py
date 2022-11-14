@@ -951,12 +951,12 @@ class StarSampler:
             self._debug_plots = None
 
         if not self._check_for_pickled():
-            print('New sampler is going to be created')
+            #print('New sampler is going to be created')
             logging.info('New sampler is going to be prepared.')
             self._prepare_new_sampler()
             self._add_to_pickle_file()
         else:
-            print('Pickled file is found.')
+            #print('Pickled file is found.')
             logging.info('Pickled file is found.')
 
         self._update_feh_cdf()
