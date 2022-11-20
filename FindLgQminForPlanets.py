@@ -5,7 +5,8 @@ from datetime import datetime
 import math
 import json
 import h5py
-
+import pickle
+from functools import partial
 
 sys.path.append('/home1/08529/mmmahmud/CircularizationDissipationConstraints/source')
 sys.path.append('/home1/08529/mmmahmud/general_purpose_python_modules')
@@ -68,7 +69,6 @@ def ensure_directory(fname):
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-
 class Initialization:
     serialized_directory = getStellarEvolutionInterpolatorsDirectory()
     eccentricity_expansion_fname = getEccentricityExpansionCoefficientsFile()
@@ -90,8 +90,6 @@ class Initialization:
         return cls.eccentricity_expansion_fname
 
     def __init__(self):
-        # mp.set_start_method('forkserver')
-        #print('serialized directory ', self.serialized_directory)
         manager = StellarEvolutionManager(self.serialized_directory)
         interpolator = manager.get_interpolator_by_name('default')
         FeHConditionalLikelihoodBase.set_interpolator(interpolator)
@@ -153,7 +151,15 @@ class PriorTransform:
         self.spin_frequency_breaks_for_planet=spin_frequency_breaks_for_planet
         self.spin_frequency_powers_for_planet=spin_frequency_powers_for_planet
         self.logger = logger
+        self.logging_fname = None
+        if self.logger is not None:
+            handler = logger.handlers[0]
+            self.logging_fname = handler.baseFilename
+        if self.logger is not None:
+            self.logger.debug("The name of the log file for the system %(s)s is %(f)s " % dict(s=system, f=self.logging_fname))
         if self.logger is not None: self.logger.debug("We are forming prior transform instance for %(s)s" % dict(s=system))
+        if self.logging_fname is not None: logging.basicConfig(filename = self.logging_fname, level=logging.DEBUG, force = True)
+        logging.debug("Basic Config for the log file is done for the system %(s)s" % dict(s=system))
         debug_plot = [('interpolation_performance', 'interp_performance.pdf')]
         teff = None
         feh = None
@@ -214,6 +220,7 @@ class PriorTransform:
             self.logger.debug("StarSampler instance for %(system)s is created." % dict(system=self.system))
 
     def evolution_is_calculated_up_to_stellar_age(self, lgQmin):
+        if self.logging_fname is not None: logging.basicConfig(filename = self.logging_fname, level=logging.DEBUG, force = True)
         if self.logger is not None: self.logger.debug("evolution_is_calculated_up_to_stellar_age method is called for %(s)s" % dict(s=self.system))
 
         u = numpy.random.rand(7)
@@ -258,66 +265,66 @@ class PriorTransform:
         t = 0
         while (not evolution_complete):
             try:
-                 if self.logger is not None: self.logger.debug("find_evolution method for %(system)s is being called." % dict(system=self.system))
-                 evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
-                                                       interpolator=FeHConditionalLikelihoodBase.interpolator,
-                                                       dissipation=dissipation,
-                                                       max_age=parameters_for_evolution['stellar age'] * un.Gyr,
-                                                       initial_eccentricity=e_in * un.dimensionless_unscaled,
-                                                       initial_obliquity=0.0,
-                                                       disk_period=parameters_for_evolution['initial stellar spin'] * un.d,
-                                                       disk_dissipation_age=2e-2 * un.Gyr,
-                                                       primary_wind_strength=0.17,
-                                                       primary_wind_saturation=2.78,
-                                                       primary_core_envelope_coupling_timescale=0.05 * un.Gyr,
-                                                       secondary_wind_strength=0.0,
-                                                       secondary_wind_saturation=100.0,
-                                                       secondary_core_envelope_coupling_timescale=0.05 * un.Gyr,
-                                                       orbital_period_tolerance=1e-6,
-                                                       solve=True,
-                                                       secondary_is_star=False)
+                if self.logger is not None: self.logger.debug("find_evolution method for %(system)s is being called." % dict(system=self.system))
+                evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
+                                                      interpolator=FeHConditionalLikelihoodBase.interpolator,
+                                                      dissipation=dissipation,
+                                                      max_age=parameters_for_evolution['stellar age'] * un.Gyr,
+                                                      initial_eccentricity=e_in * un.dimensionless_unscaled,
+                                                      initial_obliquity=0.0,
+                                                      disk_period=parameters_for_evolution['initial stellar spin'] * un.d,
+                                                      disk_dissipation_age=2e-2 * un.Gyr,
+                                                      primary_wind_strength=0.17,
+                                                      primary_wind_saturation=2.78,
+                                                      primary_core_envelope_coupling_timescale=0.05 * un.Gyr,
+                                                      secondary_wind_strength=0.0,
+                                                      secondary_wind_saturation=100.0,
+                                                      secondary_core_envelope_coupling_timescale=0.05 * un.Gyr,
+                                                      orbital_period_tolerance=1e-6,
+                                                      solve=True,
+                                                      secondary_is_star=False)
             except AssertionError:
-                 if not linear_to_exponential_decrement_of_e_in:
-                     e_in_of_previous_iteration = e_in
-                     e_in = e_in - 0.01
-                 if e_in < self.e_env or linear_to_exponential_decrement_of_e_in:
-                     linear_to_exponential_decrement_of_e_in = True
-                 if linear_to_exponential_decrement_of_e_in:
-                     e_in_of_previous_iteration = self.e_env + 0.01 * math.exp(-10*(t-0.01)/(-self.e_env+self.initial_eccentricity))
-                     e_in = self.e_env + 0.01 * math.exp(-10*t/(-self.e_env+self.initial_eccentricity))
-                     t = t + 0.01
-                 logging.warning('Calculating evolution for %(s)s with initial eccentricity %(ep)f failed, now trying initial eccentricity = %(e)f'
-                                 % dict(e=e_in, s=self.system, ep=e_in_previous_iteration ))
-                 if self.logger is not None: self.logger.warning('Calculating evolution failed, trying initial eccentricity = %(e)f' % dict(e=e_in))
-                 evolution_complete = False
-                 if math.fabs(e_in - e_in_of_previous_iteration)<0.000001:
-                     if self.logger is not None: self.logger.debug("This lgQ_pl for %(s)s and for the chosen parameters does not suit" % dict(s=self.system))
-                     return 0
+                if not linear_to_exponential_decrement_of_e_in:
+                    e_in_of_previous_iteration = e_in
+                    e_in = e_in - 0.01
+                if e_in < self.e_env or linear_to_exponential_decrement_of_e_in:
+                    linear_to_exponential_decrement_of_e_in = True
+                if linear_to_exponential_decrement_of_e_in:
+                    e_in_of_previous_iteration = self.e_env + 0.01 * math.exp(-10*(t-0.01)/(-self.e_env+self.initial_eccentricity))
+                    e_in = self.e_env + 0.01 * math.exp(-10*t/(-self.e_env+self.initial_eccentricity))
+                    t = t + 0.01
+                logging.warning('Calculating evolution for %(s)s with initial eccentricity %(ep)f failed, now trying initial eccentricity = %(e)f'
+                                 % dict(e=e_in, s=self.system, ep=e_in_of_previous_iteration ))
+                if self.logger is not None: self.logger.warning('Calculating evolution failed, trying initial eccentricity = %(e)f' % dict(e=e_in))
+                evolution_complete = False
+                if math.fabs(e_in - e_in_of_previous_iteration)<0.000001:
+                    if self.logger is not None: self.logger.debug("This lgQ_pl for %(s)s and for the chosen parameters does not suit" % dict(s=self.system))
+                    return 0
             except ValueError as verror:
-                 logging.error('Invalid parameter values encountered for %(s)s: %(error)s' % dict(s=self.system, error= str(verror)))
-                 if self.logger is not None: self.logger.error('Invalid parameter values encountered for %(s)s: %(error)s' % dict(error= str(verror), s=self.system))
-                 return 0
+                logging.error('Invalid parameter values encountered for %(s)s: %(error)s' % dict(s=self.system, error= str(verror)))
+                if self.logger is not None: self.logger.error('Invalid parameter values encountered for %(s)s: %(error)s' % dict(error= str(verror), s=self.system))
+                return 0
             except:
-                 logging.error("General Error occurs while calculating evolution for %(s)s" % dict(s=self.system))
-                 if self.logger is not None: self.logger.error("Error occurs while calculating evolution" % dict(s=self.system))
-                 return 0
+                logging.error("General Error occurs while calculating evolution for %(s)s" % dict(s=self.system))
+                if self.logger is not None: self.logger.error("Error occurs while calculating evolution for $(s)s" % dict(s=self.system))
+                return 0
             else:
-                 evolution_complete = True
-                 calculated_eccentricity_now = evolutionary_history.eccentricity[-1]
-                 age_upto_which_evolution_is_calculated = evolutionary_history.age[-1]
-                 if self.logger is not None:
-                      self.logger.debug("Evolution is calculated for %(s)s." % dict(s=self.system))
-                      self.logger.debug("%(s)s : calculated e = %(a)f, e_env = %(b)f, stellar age = %(c)f, calculated stellar age = %(d)f" % dict(a=calculated_eccentricity_now,
-                                                                                                                                                  b=self.e_env,
-                                                                                                                                                  c=parameters_for_evolution['stellar age'],
-                                                                                                                                                  d=age_upto_which_evolution_is_calculated,
-                                                                                                                                                  s=self.system))
-                 if math.fabs(stellar_age - age_upto_which_evolution_is_calculated) <0.00001:
-                      self.logger.debug("Evolution of %(s)s is calculated up to the stellar age." % dict(s=self.system))
-                      return 1
-                 else:
-                      self.logger.debug("Evolution of %(s)s is NOT calculated up to the stellar age." % dict(s=self.system))
-                      return 0
+                evolution_complete = True
+                calculated_eccentricity_now = evolutionary_history.eccentricity[-1]
+                age_upto_which_evolution_is_calculated = evolutionary_history.age[-1]
+                if self.logger is not None:
+                    self.logger.debug("Evolution is calculated for %(s)s." % dict(s=self.system))
+                    self.logger.debug("%(s)s : calculated e = %(a)f, e_env = %(b)f, stellar age = %(c)f, calculated stellar age = %(d)f" % dict(a=calculated_eccentricity_now,
+                                                                                                                                                b=self.e_env,
+                                                                                                                                                c=parameters_for_evolution['stellar age'],
+                                                                                                                                                d=age_upto_which_evolution_is_calculated,
+                                                                                                                                                s=self.system))
+                if math.fabs(stellar_age - age_upto_which_evolution_is_calculated) <0.00001:
+                     self.logger.debug("Evolution of %(s)s is calculated up to the stellar age." % dict(s=self.system))
+                     return 1
+                else:
+                     self.logger.debug("Evolution of %(s)s is NOT calculated up to the stellar age." % dict(s=self.system))
+                     return 0
 
 
     def __call__(self, u):
@@ -378,6 +385,53 @@ def setup_logger(name,
     logger.addHandler(handler)
     return logger
 
+def save_object(obj, filename):
+    with open(filename, 'wb') as outp:  # Overwrites any existing file.
+        pickle.dump(obj, outp, pickle.HIGHEST_PROTOCOL)
+
+
+class FindLgQmin:
+    def __init__(self, array_of_prior_transform_instances, starting=5, ending=7, n=5, tol=0.3):
+        self.array_of_prior_transform_instances = array_of_prior_transform_instances
+        self.starting = starting
+        self.ending = ending
+        self.n = n
+        self.tol = tol
+        self.lgQmin = self.determine_lgQmin()
+    def number_of_successes_of_calculating_evolution(self, prior_transform_instance, lgQmin):
+        success = 0
+        f = False
+        if prior_transform_instance.logger is not None: f = True
+        if f: prior_transform_instance.logger.debug("We are now calculating the number of successes of calculating evolution of the system %(s)s for lgQmin %(q)f"
+                                                    % dict(s=prior_transform_instance.system, q=lgQmin))
+        for i in range(0, self.n):
+            success = success + prior_transform_instance.evolution_is_calculated_up_to_stellar_age(lgQmin)
+
+        if f: prior_transform_instance.logger.debug("number of successful evolutions for %(s)s with lgQmin= %(q)f is = %(d)d" % dict(s=prior_transform_instance.system, q=lgQmin, d=success))
+        return success
+
+    def rate_of_successful_evolution_calculations_for_all_systems(self, lgQmin):
+        func = partial(self.number_of_successes_of_calculating_evolution, lgQmin=lgQmin)
+        with Pool(processes=3) as pool:
+            checks = pool.map(func, self.array_of_prior_transform_instances)
+        nSystems = len(self.array_of_prior_transform_instances)
+        logging.debug("nSystems = %(s)s" % dict(s=nSystems))
+        nTrials = nSystems * self.n
+        nSuccess = numpy.sum(list(checks))
+        logging.debug("nSuccess = %(s)f" % dict(s=nSuccess))
+        rSuccess = (nSuccess * 1.00)/nTrials
+        return rSuccess
+
+    def determine_lgQmin(self):
+        logging.debug("We are now determining lgQmin")
+        lgQmin = self.starting
+        while lgQmin < self.ending:
+            r = self.rate_of_successful_evolution_calculations_for_all_systems(lgQmin)
+            logging.debug("Rate of success for lgQmin = %(x)f is %(r)f" % dict(x=lgQmin, r=r))
+            if r >= self.tol:
+                return lgQmin
+            lgQmin = lgQmin + 1
+        return lgQmin
 
 if __name__ == '__main__':
     Initialization()
@@ -390,7 +444,7 @@ if __name__ == '__main__':
 
     envelope_eccentricity_distribution_instance = EnvelopeEccentricityDistribution.EnvelopeEccentricityDistribution()
     index = envelope_eccentricity_distribution_instance.print_properties_of_binary_systems_satisfying_constraints()
-    logger.debug("index of the selected systems = %(i)s" % dict(i = ' '.join(map(str,index))))
+    logger.debug("^^^^index of the selected systems = %(i)s" % dict(i = ' '.join(map(str,index))))
     logger.debug("length of index is = %(z)f" % dict(z=len(index)))
     measured_values = []
     standard_deviations = []
@@ -437,23 +491,27 @@ if __name__ == '__main__':
         logger = setup_logger(logger_name, logging_fname, level=logging_level)
         x = PriorTransform(measured_values[i], standard_deviations[i], e_env[i], system=system_name[i], logger=logger)
         return x
-    for i in range(5, j+1):
-        #if (i != 5) and (i != 6) and (i != 7) and (i != 8):
-        a = get_prior_transform_instance(i)
-        prior_transform_instance.append(a)
-    logger.debug("DONE")
+    directory = "/work/08529/mmmahmud/prior_transform_instances"
+    for i in range(0, j+1):
+        file_name = "%(d)s/prior_transform_instance_for_%(s)s.pkl" % dict(d=directory, s=system_name[i])
+        ensure_directory(file_name)
+        file_exists = os.path.exists(file_name)
+        a = None
+        if not file_exists:
+            logger.debug("pickled file did not exists. Prior transform instance is created for the first time for this system %(s)s" % dict(s=system_name[i]))
+            a = get_prior_transform_instance(i)
+            save_object(a, file_name)
+        if file_exists:
+            a = pickle.load(open( file_name, "rb" ) )
+            logger.debug("pickled file containing the prior transform instance for this system %(s)s exists" % dict(s=system_name[i]))
+            if a is None:
+                a = get_prior_transform_instance(i)
+                save_object(a, file_name)
+        if a is not None: prior_transform_instance.append(a)
 
+    k = prior_transform_instance[0:3]
 
-
-    #r = []
-    #j = 4
-    #for p in range(0, j+1):
-        #for q in range(0, 4):
-            #r.append(p)
-    #logger.debug("r = %(r)s" % dict(r=numpy.array2string(r)))
-    #with Pool(processes=16) as pool:
-        #checks = pool.map(lambda s: prior_transform_instance[s].evolution_is_calculated_up_to_stellar_age(3), r)
-    #logger.debug("checks = %(f)s" % dict(f=numpy.array2string(checks)))
-    #prior_transform_instance = PriorTransform(measured_values[0], standard_deviations[0], e_env[0], logger=logger)
-    #a = prior_transform_instance.evolution_is_calculated_up_to_stellar_age(3)
-    #logger.debug("Done. a = %(a)f" % dict(a=a))
+    p = FindLgQmin(k)
+    g = p.lgQmin
+    logging.debug("The value of g is %(x)f" % dict(x=g))
+    logging.debug("DONE")
