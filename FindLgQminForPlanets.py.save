@@ -289,11 +289,11 @@ class PriorTransform:
                 if not linear_to_exponential_decrement_of_e_in:
                     e_in_of_previous_iteration = e_in
                     e_in = e_in - 0.01
-                if (e_in < self.e_env + 0.2) or linear_to_exponential_decrement_of_e_in:
+                if e_in < self.e_env or linear_to_exponential_decrement_of_e_in:
                     linear_to_exponential_decrement_of_e_in = True
                 if linear_to_exponential_decrement_of_e_in:
-                    e_in_of_previous_iteration = self.e_env + 0.2 + 0.01 * math.exp(-10*(t-0.01)/(-self.e_env - 0.2 + self.initial_eccentricity))
-                    e_in = self.e_env + 0.2 + 0.01 * math.exp(-10*t/(-self.e_env - 0.2 + self.initial_eccentricity))
+                    e_in_of_previous_iteration = self.e_env + 0.01 * math.exp(-10*(t-0.01)/(-self.e_env+self.initial_eccentricity))
+                    e_in = self.e_env + 0.01 * math.exp(-10*t/(-self.e_env+self.initial_eccentricity))
                     t = t + 0.01
                 logging.warning('Calculating evolution for %(s)s with initial eccentricity %(ep)f failed, now trying initial eccentricity = %(e)f'
                                  % dict(e=e_in, s=self.system, ep=e_in_of_previous_iteration ))
