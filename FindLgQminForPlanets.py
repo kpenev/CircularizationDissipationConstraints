@@ -260,10 +260,10 @@ class PriorTransform:
         e_in = self.initial_eccentricity
         e_in_of_previous_iteration = e_in + 0.01
 
-        if self.logger is not None: self.logger.debug("xxxxxxxxxxxxxxxxxxxxxxx the initial eccentricity is %(e)f for %(system)s" % dict(e=e_in, system=self.system))
+        if self.logger is not None: self.logger.debug("SSSSSSSSSSSSSSSSSSSSS  the initial eccentricity is %(e)f for %(system)s" % dict(e=e_in, system=self.system))
 
-        linear_to_exponential_decrement_of_e_in = False
-        t = 0
+        #linear_to_exponential_decrement_of_e_in = False
+        #t = 0
         while (not evolution_complete):
             try:
                 if self.logger is not None: self.logger.debug("find_evolution method for %(system)s is being called." % dict(system=self.system))
@@ -286,22 +286,27 @@ class PriorTransform:
                                                       secondary_is_star=False)
             except AssertionError as asserror:
                 if self.logger is not None: self.logger.warning(traceback.format_exc())
-                if not linear_to_exponential_decrement_of_e_in:
-                    e_in_of_previous_iteration = e_in
-                    e_in = e_in - 0.01
-                if (e_in < self.e_env + 0.2) or linear_to_exponential_decrement_of_e_in:
-                    linear_to_exponential_decrement_of_e_in = True
-                if linear_to_exponential_decrement_of_e_in:
-                    e_in_of_previous_iteration = self.e_env + 0.2 + 0.01 * math.exp(-10*(t-0.01)/(-self.e_env - 0.2 + self.initial_eccentricity))
-                    e_in = self.e_env + 0.2 + 0.01 * math.exp(-10*t/(-self.e_env - 0.2 + self.initial_eccentricity))
-                    t = t + 0.01
+                e_in_of_previous_iteration = e_in
+                e_in = e_in - 0.01
+                if (e_in < self.e_env + 0.2):
+                    if self.logger is not None: self.logger.debug("e_in becomes less than e_env + 0.2, so loglikelihood is -inf")
+                    return 0
+                #if not linear_to_exponential_decrement_of_e_in:
+                    #e_in_of_previous_iteration = e_in
+                    #e_in = e_in - 0.01
+                #if (e_in < self.e_env + 0.2) or linear_to_exponential_decrement_of_e_in:
+                    #linear_to_exponential_decrement_of_e_in = True
+                #if linear_to_exponential_decrement_of_e_in:
+                    #e_in_of_previous_iteration = self.e_env + 0.2 + 0.01 * math.exp(-10*(t-0.01)/(-self.e_env - 0.2 + self.initial_eccentricity))
+                    #e_in = self.e_env + 0.2 + 0.01 * math.exp(-10*t/(-self.e_env - 0.2 + self.initial_eccentricity))
+                    #t = t + 0.01
                 logging.warning('Calculating evolution for %(s)s with initial eccentricity %(ep)f failed, now trying initial eccentricity = %(e)f'
                                  % dict(e=e_in, s=self.system, ep=e_in_of_previous_iteration ))
                 if self.logger is not None: self.logger.warning('Calculating evolution failed, trying initial eccentricity = %(e)f' % dict(e=e_in))
                 evolution_complete = False
-                if math.fabs(e_in - e_in_of_previous_iteration)<0.000001:
-                    if self.logger is not None: self.logger.debug("This lgQ_pl for %(s)s and for the chosen parameters does not suit" % dict(s=self.system))
-                    return 0
+                #if math.fabs(e_in - e_in_of_previous_iteration)<0.000001:
+                    #if self.logger is not None: self.logger.debug("This lgQ_pl for %(s)s and for the chosen parameters does not suit" % dict(s=self.system))
+                    #return 0
             except ValueError as verror:
                 if self.logger is not None: self.logger.warning(traceback.format_exc())
                 logging.error('Invalid parameter values encountered for %(s)s: %(error)s' % dict(s=self.system, error= str(verror)))
@@ -310,7 +315,7 @@ class PriorTransform:
             except Exception as exc:
                 if self.logger is not None: self.logger.warning(traceback.format_exc())
                 logging.error("General Error occurs while calculating evolution for %(s)s" % dict(s=self.system))
-                if self.logger is not None: self.logger.error("Error occurs while calculating evolution for $(s)s" % dict(s=self.system))
+                if self.logger is not None: self.logger.error("Error occurs while calculating evolution for %(s)s" % dict(s=self.system))
                 return 0
             else:
                 evolution_complete = True
@@ -395,28 +400,65 @@ def save_object(obj, filename):
 
 
 class FindLgQmin:
-    def __init__(self, array_of_prior_transform_instances, starting=5, ending=7, n=5, tol=0.3):
+    def __init__(self, array_of_prior_transform_instances, starting=3, ending=7, n=10, tol=0.8, directory="/work/08529/mmmahmud/directory_n_successes_and_iterations", reset=False):
         self.array_of_prior_transform_instances = array_of_prior_transform_instances
         self.starting = starting
         self.ending = ending
         self.n = n
         self.tol = tol
+        self.directory = directory
+        self.reset = reset
         self.lgQmin = self.determine_lgQmin()
     def number_of_successes_of_calculating_evolution(self, prior_transform_instance, lgQmin):
         success = 0
+        iteration = 0
+        system_name = prior_transform_instance.system
+        success_file_name = "%(d)s/%(lgQmin)s/n_success_of_%(s)s.pkl" % dict(d=self.directory, lgQmin=lgQmin, s=system_name)
+        iteration_file_name = "%(d)s/%(lgQmin)s/i_of_%(s)s.pkl" % dict(d=self.directory, lgQmin=lgQmin, s=system_name)
+        ensure_directory(success_file_name)
+        ensure_directory(iteration_file_name)
+        if not self.reset:
+            success_file_exists = os.path.exists(success_file_name)
+            iteration_file_exists = os.path.exists(iteration_file_name)
+            if success_file_exists and iteration_file_exists:
+                success = pickle.load(open(success_file_name,"rb"))
+                iteration = pickle.load(open(iteration_file_name, "rb"))
+            else:
+                save_object(success, success_file_name)
+                save_object(iteration, iteration_file_name)
+
         f = False
         if prior_transform_instance.logger is not None: f = True
         if f: prior_transform_instance.logger.debug("We are now calculating the number of successes of calculating evolution of the system %(s)s for lgQmin %(q)f"
                                                     % dict(s=prior_transform_instance.system, q=lgQmin))
-        for i in range(0, self.n):
+        if (not self.reset) and (iteration > self.n) and (iteration !=0):
+            return int(success/iteration * self.n)
+        if not self.reset:
+            i = iteration
+        else:
+            i = 0
+        while i < self.n:
+            prev_success = success
             success = success + prior_transform_instance.evolution_is_calculated_up_to_stellar_age(lgQmin)
+            if success > prev_success: save_object(success, success_file_name)
+            i = i+1
+            save_object(i, iteration_file_name)
 
         if f: prior_transform_instance.logger.debug("number of successful evolutions for %(s)s with lgQmin= %(q)f is = %(d)d" % dict(s=prior_transform_instance.system, q=lgQmin, d=success))
         return success
 
     def rate_of_successful_evolution_calculations_for_all_systems(self, lgQmin):
+
+        success_rate_file_name = "%(d)s/%(lgQmin)s/r_success_%(lgQmin)s.pkl" % dict(d=self.directory, lgQmin=lgQmin)
+        ensure_directory(success_rate_file_name)
+        if not self.reset:
+            success_rate_file_exists = os.path.exists(success_rate_file_name)
+            if success_rate_file_exists:
+                rSuccess = pickle.load(open(success_rate_file_name,"rb"))
+                return rSuccess
+
         func = partial(self.number_of_successes_of_calculating_evolution, lgQmin=lgQmin)
-        with Pool(processes=3) as pool:
+        with Pool(processes=len(self.array_of_prior_transform_instances)) as pool:
             checks = pool.map(func, self.array_of_prior_transform_instances)
         nSystems = len(self.array_of_prior_transform_instances)
         logging.debug("nSystems = %(s)s" % dict(s=nSystems))
@@ -424,6 +466,8 @@ class FindLgQmin:
         nSuccess = numpy.sum(list(checks))
         logging.debug("nSuccess = %(s)f" % dict(s=nSuccess))
         rSuccess = (nSuccess * 1.00)/nTrials
+        logging.debug("rSuccess = %(s)f" % dict(s=rSuccess))
+        save_object(rSuccess, success_rate_file_name)
         return rSuccess
 
     def determine_lgQmin(self):
@@ -513,7 +557,7 @@ if __name__ == '__main__':
                 save_object(a, file_name)
         if a is not None: prior_transform_instance.append(a)
 
-    k = prior_transform_instance[0:3]
+    k = prior_transform_instance[0:6]
 
     p = FindLgQmin(k)
     g = p.lgQmin
