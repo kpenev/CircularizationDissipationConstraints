@@ -7,6 +7,7 @@ import math
 import json
 import h5py
 import pickle
+from types import SimpleNamespace
 from functools import partial
 
 sys.path.append('/home1/08529/mmmahmud/CircularizationDissipationConstraints/source')
@@ -159,7 +160,7 @@ class PriorTransform:
         if self.logger is not None:
             self.logger.debug("The name of the log file for the system %(s)s is %(f)s " % dict(s=system, f=self.logging_fname))
         if self.logger is not None: self.logger.debug("We are forming prior transform instance for %(s)s" % dict(s=system))
-        if self.logging_fname is not None: logging.basicConfig(filename = self.logging_fname, level=logging.DEBUG, force = True)
+        if self.logging_fname is not None: logging.basicConfig(filename = self.logging_fname, level=logging.DEBUG, force = True, format='%(asctime)s %(message)s')
         logging.debug("Basic Config for the log file is done for the system %(s)s" % dict(s=system))
         debug_plot = [('interpolation_performance', 'interp_performance.pdf')]
         teff = None
@@ -219,32 +220,54 @@ class PriorTransform:
             if self.logger is not None: self.logger.debug("star sampler is successfully created for %(s)s" % dict(s=self.system))
         if (self.logger is not None) and (self.star_sampler is not None):
             self.logger.debug("StarSampler instance for %(system)s is created." % dict(system=self.system))
+            u = numpy.random.rand(7)
+            unit_cube = numpy.array([u[0], u[1], u[2]])
+            try:
+                stellar_metallicity, primary_mass, stellar_age = self.star_sampler.__call__(unit_cube)
+            except ValueError as verror:
+                if self.logger is not None:
+                    self.logger.warning(traceback.format_exc())
+                    self.logger.error("Value Error occurs while sampling metallicity, primary mass and age for  %(s)s" % dict(s=self.system))
+                    self.logger.error('error occurs for %(s)s: %(error)s' % dict(s=self.system, error= str(verror)))
+            except RuntimeError as rerror:
+                if self.logger is not None:
+                    self.logger.warning(traceback.format_exc())
+                    self.logger.error("Runtime Error occurs while sampling metallicity, primary mass and age for  %(s)s" % dict(s=self.system))
+                    self.logger.error('Runtime error occurs for %(s)s: %(error)s' % dict(s=self.system, error= str(rerror)))
+            except Exception as expt:
+                if self.logger is not None:
+                    self.logger.warning(traceback.format_exc())
+                    self.logger.error("General error occurs")
+            else:
+                if self.logger is not None: self.logger.debug("stellar metallicity = %(x)f, primary mass = %(y)f, stellar age = %(z)f" % dict(x=stellar_metallicity, y=primary_mass, z=stellar_age))
+
 
     def evolution_is_calculated_up_to_stellar_age(self, lgQmin):
-        if self.logging_fname is not None: logging.basicConfig(filename = self.logging_fname, level=logging.DEBUG, force = True)
+        if self.logging_fname is not None: logging.basicConfig(filename = self.logging_fname, level=logging.DEBUG, force = True, format='%(asctime)s %(message)s')
         if self.logger is not None: self.logger.debug("evolution_is_calculated_up_to_stellar_age method is called for %(s)s" % dict(s=self.system))
 
         u = numpy.random.rand(7)
         parameters_for_evolution = self.__call__(u)
+
         parameters_for_evolution['argument of phase lag function for planet'] = lgQmin
         parameters_for_evolution['power law argument'] = 0
         stellar_age = parameters_for_evolution['stellar age']
-
-        star_exoplanet_binary_system = StarExoplanetSystem.System(primary_mass=parameters_for_evolution['primary mass'] * un.solMass,
+        if self.logger is not None: self.logger.debug("parameters for evolution: %(x)s" % dict(x="Khalum"))
+        star_exoplanet_binary_system = SimpleNamespace(primary_mass=parameters_for_evolution['primary mass'] * un.solMass,
                                               secondary_mass=parameters_for_evolution['secondary mass'] * un.earthMass,
                                               secondary_radius=parameters_for_evolution['secondary radius'] * un.earthRad,
                                               feh=parameters_for_evolution['stellar metallicity'] * un.dimensionless_unscaled,
                                               orbital_period=self.means['orbital period'] * un.d,
                                               obliquity=self.obliquity * un.deg,
                                               age=parameters_for_evolution['stellar age'] * un.Gyr)
+
         break_frequency = 2 * math.pi / parameters_for_evolution['tidal break period']
-        tidal_frequency_breaks_for_planet = None
-        tidal_frequency_powers_for_planet = None
         reference_argument_of_phase_lag_function_for_planet = parameters_for_evolution['argument of phase lag function for planet']
 
         tidal_frequency_breaks_for_planet = numpy.array([2 * math.pi / 20, break_frequency])
         tidal_frequency_powers_for_planet = numpy.array([0.0, 0.0, 0.0])
-        reference_argument_of_phase_lag_function_for_planet += - math.log(tidal_frequency_breaks_for_planet[1], 10)
+        reference_phase_lag=phase_lag(reference_argument_of_phase_lag_function_for_planet)
+
         dissipation = dict(
             primary=None,
             secondary=dict(
@@ -252,21 +275,32 @@ class PriorTransform:
                 spin_frequency_breaks=self.spin_frequency_breaks_for_planet,
                 tidal_frequency_powers=tidal_frequency_powers_for_planet,
                 spin_frequency_powers=self.spin_frequency_powers_for_planet,
-                reference_phase_lag=phase_lag(reference_argument_of_phase_lag_function_for_planet)
+                reference_phase_lag=reference_phase_lag
                 )
 	        )
+        dissipation_string = dict(
+            primary = None,
+            secondary = dict(
+                tidal_frequency_breaks=numpy.array2string(tidal_frequency_breaks_for_planet) if tidal_frequency_breaks_for_planet is not None else None,
+                spin_frequency_breaks=numpy.array2string(self.spin_frequency_breaks_for_planet) if self.spin_frequency_breaks_for_planet is not None else None,
+                tidal_frequency_powers=numpy.array2string(tidal_frequency_powers_for_planet) if tidal_frequency_powers_for_planet is not None else None,
+                spin_frequency_powers=numpy.array2string(self.spin_frequency_powers_for_planet) if self.spin_frequency_powers_for_planet is not None else None,
+                reference_phase_lag=str(reference_phase_lag)
+                )
+                )
+        if self.logger is not None: self.logger.debug("dissipation again: %(x)s" % dict(x=str(dissipation_string)))
         if self.logger is not None: self.logger.debug("Evolution of %(system)s is being worked out" % dict(system = self.system))
         evolution_complete = False
         e_in = self.initial_eccentricity
         e_in_of_previous_iteration = e_in + 0.01
 
-        if self.logger is not None: self.logger.debug("SSSSSSSSSSSSSSSSSSSSS  the initial eccentricity is %(e)f for %(system)s" % dict(e=e_in, system=self.system))
+        if self.logger is not None: self.logger.debug("VVVVVVVVVVVVVVVVV  the initial eccentricity is %(e)f for %(system)s" % dict(e=e_in, system=self.system))
 
-        #linear_to_exponential_decrement_of_e_in = False
-        #t = 0
         while (not evolution_complete):
             try:
-                if self.logger is not None: self.logger.debug("find_evolution method for %(system)s is being called." % dict(system=self.system))
+                if self.logger is not None:
+                    self.logger.debug("find_evolution method for %(system)s is being called." % dict(system=self.system))
+                    self.logger.debug("dissipation: %(dissipation)s" % dict(dissipation = json.dumps(dissipation_string)))
                 evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
                                                       interpolator=FeHConditionalLikelihoodBase.interpolator,
                                                       dissipation=dissipation,
@@ -284,29 +318,20 @@ class PriorTransform:
                                                       orbital_period_tolerance=1e-6,
                                                       solve=True,
                                                       secondary_is_star=False)
-            except AssertionError as asserror:
+            except RuntimeError as runerror:
+                logging.error('Runtime error occurs for %(s)s: %(error)s' % dict(s=self.system, error= str(runerror)))
                 if self.logger is not None: self.logger.warning(traceback.format_exc())
                 e_in_of_previous_iteration = e_in
                 e_in = e_in - 0.01
                 if (e_in < self.e_env + 0.2):
                     if self.logger is not None: self.logger.debug("e_in becomes less than e_env + 0.2, so loglikelihood is -inf")
                     return 0
-                #if not linear_to_exponential_decrement_of_e_in:
-                    #e_in_of_previous_iteration = e_in
-                    #e_in = e_in - 0.01
-                #if (e_in < self.e_env + 0.2) or linear_to_exponential_decrement_of_e_in:
-                    #linear_to_exponential_decrement_of_e_in = True
-                #if linear_to_exponential_decrement_of_e_in:
-                    #e_in_of_previous_iteration = self.e_env + 0.2 + 0.01 * math.exp(-10*(t-0.01)/(-self.e_env - 0.2 + self.initial_eccentricity))
-                    #e_in = self.e_env + 0.2 + 0.01 * math.exp(-10*t/(-self.e_env - 0.2 + self.initial_eccentricity))
-                    #t = t + 0.01
+
                 logging.warning('Calculating evolution for %(s)s with initial eccentricity %(ep)f failed, now trying initial eccentricity = %(e)f'
                                  % dict(e=e_in, s=self.system, ep=e_in_of_previous_iteration ))
                 if self.logger is not None: self.logger.warning('Calculating evolution failed, trying initial eccentricity = %(e)f' % dict(e=e_in))
                 evolution_complete = False
-                #if math.fabs(e_in - e_in_of_previous_iteration)<0.000001:
-                    #if self.logger is not None: self.logger.debug("This lgQ_pl for %(s)s and for the chosen parameters does not suit" % dict(s=self.system))
-                    #return 0
+
             except ValueError as verror:
                 if self.logger is not None: self.logger.warning(traceback.format_exc())
                 logging.error('Invalid parameter values encountered for %(s)s: %(error)s' % dict(s=self.system, error= str(verror)))
@@ -338,7 +363,9 @@ class PriorTransform:
 
     def __call__(self, u):
         unit_cube = numpy.array([u[0], u[1], u[2]])
+        if self.logger is not None: self.logger.debug("Checkpoint 1")
         stellar_metallicity, primary_mass, stellar_age = self.star_sampler.__call__(unit_cube)
+        if self.logger is not None: self.logger.debug("Checkpoint 2: Fe/H: %(x)f, M*: %(y)f, age: %(z)f" % dict(x=stellar_metallicity, y=primary_mass, z=stellar_age))
         primary_rad = FeHConditionalLikelihoodBase.interpolator('RADIUS', primary_mass, stellar_metallicity)
         primary_radius = primary_rad(stellar_age)
         secondary_radius = None
@@ -418,31 +445,67 @@ class FindLgQmin:
         ensure_directory(success_file_name)
         ensure_directory(iteration_file_name)
         if not self.reset:
+            if prior_transform_instance.logger is not None:
+                prior_transform_instance.logger.debug("We are not resetting previous calculations. Let's see whether any iteration and success number previously calculated can be retrieved.")
             success_file_exists = os.path.exists(success_file_name)
+            if prior_transform_instance.logger is not None and success_file_exists:
+                prior_transform_instance.logger.debug("File storing the number of successful calculations of evolution previously calculated exists")
             iteration_file_exists = os.path.exists(iteration_file_name)
+            if prior_transform_instance.logger is not None and iteration_file_exists:
+                prior_transform_instance.logger.debug("File storing the number of iterations previously done, exists")
             if success_file_exists and iteration_file_exists:
                 success = pickle.load(open(success_file_name,"rb"))
                 iteration = pickle.load(open(iteration_file_name, "rb"))
+                if prior_transform_instance.logger is not None:
+                    prior_transform_instance.logger.debug("Number of successful calculations of evolution, previously calculated is %(x)d" % dict(x=success))
+                    prior_transform_instance.logger.debug("Number of iterations, previously done is %(x)d" % dict(x=iteration))
             else:
+                if prior_transform_instance.logger is not None:
+                    prior_transform_instance.logger.debug("No calculations were done previously. New files are created to store default values of success and iterations")
                 save_object(success, success_file_name)
                 save_object(iteration, iteration_file_name)
+                success_file_exists = os.path.exists(success_file_name)
+                iteration_file_exists = os.path.exists(iteration_file_name)
+                if (prior_transform_instance.logger is not None) and success_file_exists and iteration_file_exists:
+                    success_temp = pickle.load(open(success_file_name,"rb"))
+                    iteration_temp = pickle.load(open(iteration_file_name, "rb"))
+                    prior_transform_instance.logger.debug("default value of success = %(x)d" % dict(x=success_temp))
+                    prior_transform_instance.logger.debug("default value of iteration = %(x)d" % dict(x=iteration_temp))
 
         f = False
         if prior_transform_instance.logger is not None: f = True
         if f: prior_transform_instance.logger.debug("We are now calculating the number of successes of calculating evolution of the system %(s)s for lgQmin %(q)f"
                                                     % dict(s=prior_transform_instance.system, q=lgQmin))
         if (not self.reset) and (iteration > self.n) and (iteration !=0):
-            return int(success/iteration * self.n)
+            r_success = int(success/iteration * self.n)
+            if prior_transform_instance.logger is not None:
+                prior_transform_instance.logger.debug("Number of previously done iterations is greater than the expectation. Expected n is %(x)d, where previously done %(y)d"
+                                                      % dict(x=self.n,y=iteration))
+                prior_transform_instance.logger.debug("success rate on the basis of previous results = %(x)f" % dict(x=r_success))
+            return r_success
         if not self.reset:
             i = iteration
         else:
             i = 0
+        if prior_transform_instance.logger is not None:
+            prior_transform_instance.logger.debug("iteration = %(i)d" % dict(i=i))
+            prior_transform_instance.logger.debug("self.n = %(n)d" % dict(n=self.n))
         while i < self.n:
             prev_success = success
             success = success + prior_transform_instance.evolution_is_calculated_up_to_stellar_age(lgQmin)
-            if success > prev_success: save_object(success, success_file_name)
+            if success > prev_success:
+                save_object(success, success_file_name)
+                if prior_transform_instance.logger is not None:
+                    prior_transform_instance.logger.debug("New successful calculation of evolution  is found and the success_file is updated. Previous number of success = %(x)d" % dict(x=prev_success))
+                    temp = pickle.load(open(success_file_name,"rb"))
+                    prior_transform_instance.logger.debug("Number of successes retrieved from the updated success_file is %(x)d" % dict(x=temp))
             i = i+1
+            if prior_transform_instance.logger is not None:
+                    prior_transform_instance.logger.debug("Number of iteration is going to be updated in the iteration_file")
             save_object(i, iteration_file_name)
+            temp = pickle.load(open(iteration_file_name, "rb"))
+            if prior_transform_instance.logger is not None:
+                    prior_transform_instance.logger.debug("Recently updated number of iteration retrieved from the iteration_file is %(x)d" % dict(x=temp))
 
         if f: prior_transform_instance.logger.debug("number of successful evolutions for %(s)s with lgQmin= %(q)f is = %(d)d" % dict(s=prior_transform_instance.system, q=lgQmin, d=success))
         return success
@@ -454,9 +517,11 @@ class FindLgQmin:
         if not self.reset:
             success_rate_file_exists = os.path.exists(success_rate_file_name)
             if success_rate_file_exists:
+                logging.debug("success_rate_file exists for lgQmin = %(x)f" % dict(x=lgQmin))
                 rSuccess = pickle.load(open(success_rate_file_name,"rb"))
+                logging.debug("previously calculated rate of success for lgQmin %(a)f is = %(x)f" % dict(a=lgQmin, x=rSuccess))
                 return rSuccess
-
+        logging.debug("success_rate_file still does not exists")
         func = partial(self.number_of_successes_of_calculating_evolution, lgQmin=lgQmin)
         with Pool(processes=len(self.array_of_prior_transform_instances)) as pool:
             checks = pool.map(func, self.array_of_prior_transform_instances)
@@ -464,10 +529,12 @@ class FindLgQmin:
         logging.debug("nSystems = %(s)s" % dict(s=nSystems))
         nTrials = nSystems * self.n
         nSuccess = numpy.sum(list(checks))
-        logging.debug("nSuccess = %(s)f" % dict(s=nSuccess))
+        logging.debug("nSuccess = %(s)f for lgQmin = %(x)f" % dict(s=nSuccess, x=lgQmin))
         rSuccess = (nSuccess * 1.00)/nTrials
-        logging.debug("rSuccess = %(s)f" % dict(s=rSuccess))
+        logging.debug("rSuccess = %(s)f for lgQmin = %(x)f" % dict(s=rSuccess, x = lgQmin))
         save_object(rSuccess, success_rate_file_name)
+        temp = pickle.load(open(success_rate_file_name,"rb"))
+        logging.debug("success_rate_file is created and rSuccess is stored in it. The retrieved value of rSuccess for lgQmin %(y)f from this file is %(x)f" % dict(y=lgQmin, x=temp))
         return rSuccess
 
     def determine_lgQmin(self):
@@ -557,9 +624,12 @@ if __name__ == '__main__':
                 save_object(a, file_name)
         if a is not None: prior_transform_instance.append(a)
 
-    k = prior_transform_instance[0:6]
+    k = prior_transform_instance[54:55]
+    g = k[0].system
+    logging.debug("The value of present g is %(s)s" % dict(s=g))
 
     p = FindLgQmin(k)
     g = p.lgQmin
     logging.debug("The value of g is %(x)f" % dict(x=g))
     logging.debug("DONE")
+

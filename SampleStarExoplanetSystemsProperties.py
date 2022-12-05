@@ -376,22 +376,10 @@ class LogLikelihood:
         if power_law_argument < 0:
             tidal_frequency_breaks_for_planet = numpy.array([break_frequency])
             tidal_frequency_powers_for_planet = numpy.array([0.0, power_law_argument])
-
-            # tidal_frequency_breaks_for_planet = np.array([2 * math.pi / 20, break_frequency])
-            # tidal_frequency_powers_for_planet = np.array([1.0, 0.0, power_law_argument])
-
         if power_law_argument > 0 or power_law_argument == 0:
             tidal_frequency_breaks_for_planet = numpy.array([2 * math.pi / 20, break_frequency])
             tidal_frequency_powers_for_planet = numpy.array([0.0, power_law_argument, 0.0])
-            reference_argument_of_phase_lag_function_for_planet += power_law_argument * (math.log(tidal_frequency_breaks_for_planet[0], 10) - math.log(tidal_frequency_breaks_for_planet[1], 10))
-
-            # tidal_frequency_powers_for_planet = np.array([1.0, power_law_argument, 0.0])
-            # reference_argument_of_phase_lag_function_for_planet = argument_of_phase_lag_function_for_planet + power_law_argument * (
-            # math.log(20.0, 10) - math.log(tidal_break_period, 10))
-
-        #if power_law_argument == 0:
-            #reference_argument_of_phase_lag_function_for_planet = argument_of_phase_lag_function_for_planet
-            #tidal_frequency_powers_for_planet = np.array([1.0, 0.0])
+            reference_argument_of_phase_lag_function_for_planet += power_law_argument * math.log10(tidal_frequency_breaks_for_planet[1]/tidal_frequency_breaks_for_planet[0])
 
         dissipation = dict(
             primary=None,
