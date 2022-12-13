@@ -6,6 +6,8 @@ import logging
 from multiprocessing import Pool, cpu_count
 from functools import partial
 from types import SimpleNamespace
+import pickle
+from os import path
 
 from configargparse import\
     ArgumentParser,\
@@ -67,7 +69,7 @@ def parse_command_line():
     parser.add_argument(
         '--max-efinal-grid',
         nargs=3,
-        default=numpy.linspace(0.1, 0.6, 7),
+        default=numpy.linspace(0.1, 0.6, 6),
         action=ParseGrid,
         metavar=('MIN_E', 'MAX_E', 'NUM_E'),
         help='The initial orbital period is tuned to reproduce each of the '
@@ -108,7 +110,7 @@ def parse_command_line():
     parser.add_argument(
         '--num-parallel-processes', '--num-parallel',
         type=int,
-        default=cpu_count()/2,
+        default=cpu_count()//2,
         help='The maximum number of parallel processes to use.'
     )
     parser.add_argument(
@@ -119,7 +121,7 @@ def parse_command_line():
     )
     parser.add_argument(
         '--std-out-err-fname',
-        default='sampling_output/%(system)s_%(now)s_%(pid)d.outerr',
+        default='sampling_output/%(system)s/%(task)s_%(now)s_%(pid)d.outerr',
         help='Filename to redirect worker process stdout and stderr to during '
         'multiprocessing. Should include at least `%%(pid)d` (worker process '
         'id) substitution to avoid mangling, but may also include `%%(system)s`'
@@ -128,7 +130,7 @@ def parse_command_line():
     )
     parser.add_argument(
         '--logging-fname',
-        default='sampling_output/%(system)s_%(now)s_%(pid)d.log',
+        default='sampling_output/%(system)s/%(task)s_%(now)s_%(pid)d.log',
         help='Filename for log mesasges from sampling. Should include at least '
         '`%%(pid)d` (worker process id) substitution to avoid mangling during '
         'multiprocessing, but may also include `%%(system)s`'
@@ -153,8 +155,23 @@ def parse_command_line():
         help='How to format logging messages. See python logging module '
         'documentation for details.'
     )
+    parser.add_argument(
+        '--pickle-fname',
+        default='final_initial_eccentricity_dependence.pkl',
+        help='Filename to save temporary progress in.'
+    )
 
     return parser.parse_args()
+
+
+class FoundSolution(Exception):
+    """Allow immediate termination of a solver when good enough sol is found."""
+
+    def __init__(self, solution):
+        """Store the solution found."""
+
+        super().__init__()
+        self.solution = solution
 
 
 def get_final_eccentricity_difference(initial_porb,
@@ -170,9 +187,14 @@ def get_final_eccentricity_difference(initial_porb,
                                 interpolator=interpolator,
                                 final_state_only=True)
     _logger.info('Final state: %s', repr(final_state))
-    assert final_state.age == config.final_age
     if numpy.isfinite(final_state.eccentricity):
-        return  final_state.eccentricity - max_final_eccentricity
+        if (
+            numpy.abs(final_state.eccentricity - max_final_eccentricity)
+            <=
+            config.max_final_e_tolerance
+        ):
+            raise FoundSolution(initial_porb)
+        return final_state.eccentricity - max_final_eccentricity
 
     return -max_final_eccentricity
 
@@ -180,7 +202,6 @@ def get_final_eccentricity_difference(initial_porb,
 def get_final_period(max_final_eccentricity, config, interpolator):
     """Return the final Porb for which max efinal has the given value."""
 
-    <++> FIND INITIAL SECONDARY ANGMOM <++>
     porb_min, porb_max = -numpy.inf, numpy.inf
     porb_guess = 15.0
     while not (numpy.isfinite(porb_min) and numpy.isfinite(porb_max)):
@@ -203,30 +224,115 @@ def get_final_period(max_final_eccentricity, config, interpolator):
     _logger.debug('Searching for initial Porb in range [%s, %s]',
                   repr(porb_min),
                   repr(porb_max))
-    solution = root_scalar(
-        get_final_eccentricity_difference,
-        args=(max_final_eccentricity, config, interpolator),
-        bracket=(porb_min, porb_max),
-        xtol=config.max_final_e_tolerance
-    )
-    _logger.debug('Scalar root solution: %s', repr(solution))
-    assert solution.converged
-    return solution.root
+    try:
+        root_scalar(
+            get_final_eccentricity_difference,
+            args=(max_final_eccentricity, config, interpolator),
+            bracket=(porb_min, porb_max),
+            xtol=1e-16,
+            rtol=1e-12
+        )
+        raise RuntimeError(
+            'Failed to find initial period that reproduces max final e=%s'
+            %
+            repr(max_final_eccentricity)
+        )
+    except FoundSolution as porb_found:
+        _logger.debug('Initial Porb = %s reproduces max final e = %s',
+                      repr(porb_found.solution),
+                      repr(max_final_eccentricity))
+        config.initial_orbital_period = porb_found.solution
+        config.initial_eccentricity = config.initial_eccentricity_grid.max()
+        final_state = run_evolution(config,
+                                    interpolator=interpolator,
+                                    final_state_only=True)
+        _logger.debug('Porb final state: %s', repr(final_state))
+        assert final_state.age == config.final_age
+        assert (
+            numpy.abs(final_state.eccentricity - max_final_eccentricity)
+            <=
+            config.max_final_e_tolerance
+        )
+        return final_state.orbital_period
 
 
 def get_final_eccentricity(final_porb_initial_e,
                            find_evolution_kwargs):
     """Return the final eccentricity for given final Porb and initial e."""
 
-    find_evolution_kwargs['system']['orbital_period'] = (
+    find_evolution_kwargs['system'].orbital_period = (
         final_porb_initial_e[0] * units.day
     )
     evolution = find_evolution(
         initial_eccentricity=final_porb_initial_e[1],
         **find_evolution_kwargs,
     )
-    assert evolution.age[-1] == find_evolution_kwargs['max_age']
-    return evolution.eccentricity[-1]
+    _logger.debug('Evolution for final Porb = %s, initial e = %s: %s',
+                  repr(final_porb_initial_e[0]),
+                  repr(final_porb_initial_e[1]),
+                  repr(evolution))
+
+    if (
+        evolution.age[-1] * units.Gyr / find_evolution_kwargs['max_age']
+        >=
+        (1.0 - 1e-4)
+    ):
+        _logger.debug(
+            'Max evolution age (%s) for final Porb = %s, initial e = %s '
+            '(matches expected)',
+            repr(evolution.age[-1]),
+            repr(final_porb_initial_e[0]),
+            repr(final_porb_initial_e[1])
+        )
+
+        return evolution.eccentricity[-1]
+
+    _logger.warning(
+        'Max evolution age (%s) for final Porb = %s, initial e = %s did not'
+        ' reach %s!',
+        repr(evolution.age[-1]),
+        repr(final_porb_initial_e[0]),
+        repr(final_porb_initial_e[1]),
+        repr(find_evolution_kwargs['max_age'])
+    )
+    return numpy.nan
+
+
+def get_porb_final(config, process_config, interpolator):
+    """Return the list of final orbital periods that reproduce max final e."""
+
+    porb_final_list = None
+    if path.exists(config.pickle_fname):
+        with open(config.pickle_fname, 'rb') as pickle_f:
+            max_efinal_grid=pickle.load(pickle_f)
+            if (
+                    numpy.array(max_efinal_grid)
+                    ==
+                    numpy.array(config.max_efinal_grid)
+            ).all():
+                _logger.info('Re-using pickled final Porb')
+                porb_final_list = pickle.load(pickle_f)
+            else:
+                _logger.info('Pickled max final e grid: %s != target grid: %s',
+                             repr(max_efinal_grid),
+                             repr(config.max_efinal_grid))
+    if porb_final_list is None:
+        with Pool(
+            config.num_parallel_processes,
+            initializer=setup_process,
+            initargs=(process_config, 'porb_final'),
+            maxtasksperchild=1
+        ) as workers:
+            porb_final_list = workers.map(
+                partial(get_final_period,
+                        config=config,
+                        interpolator=interpolator),
+                config.max_efinal_grid
+            )
+        with open(config.pickle_fname, 'wb') as pickle_f:
+            pickle.dump(config.max_efinal_grid, pickle_f)
+            pickle.dump(porb_final_list, pickle_f)
+    return porb_final_list
 
 
 def main(config):
@@ -248,16 +354,7 @@ def main(config):
 
     logging.basicConfig(level=logging.DEBUG)
     interpolator = set_up_library(config)
-    with Pool(
-        config.num_parallel_processes,
-        initializer=setup_process,
-        initargs=(process_config, 'porb_final'),
-        maxtasksperchild=1
-    ) as workers:
-        porb_final_list = workers.map(
-            partial(get_final_period, config=config, intepolator=interpolator),
-            config.max_efinal_grid
-        )
+    porb_final_list = get_porb_final(config, process_config, interpolator)
 
     find_evolution_kwargs = dict(
         system=SimpleNamespace(
