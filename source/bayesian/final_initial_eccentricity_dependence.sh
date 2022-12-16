@@ -9,7 +9,6 @@ nohup ./final_initial_eccentricity_dependence.py \
     --final-age 5.0 \
     --precision 1e-5 \
     --logging-verbosity debug \
-    --pickle-fname final_initial_eccentricity_dependence_pwr-3_break_20d.pkl \
     > \
     final_initial_eccentricity_dependence_pwr-3_break_20d.out \
     2>&1 \
