@@ -13,8 +13,6 @@ import pandas as pd
 from scipy.optimize import fsolve
 from rice_distribution_utils import rice_from_error_bars
 from scipy import integrate
-from scipy.misc import derivative
-from scipy.special import i0
 
 sys.path.append('/home1/08529/mmmahmud/CircularizationDissipationConstraints/source')
 sys.path.append('/home1/08529/mmmahmud/general_purpose_python_modules')
@@ -354,9 +352,9 @@ class FinalVsInitialEccentricity:
                 return None
 
 class EfinalVsPorb:
-    def __init__(self, checks, arg):
-        self.checks = checks
-        self.arg = arg
+            def __init__(self, checks, arg):
+                self.checks = checks
+                self.arg = arg
 
 class argument:
     def __init__(self, e_i, Porb):
@@ -369,12 +367,6 @@ class e_final_vs_e_initial:
     def __init__(self, e_i_array, e_f_array):
         self.e_i_array = e_i_array
         self.e_f_array = e_f_array
-        self.raw_e_f_as_a_smooth_function_of_e_i = self.build_lagrangian_function(self.e_i_array, self.e_f_array)
-        e_f_array_for_smooth_inverse_function, e_i_array_for_smooth_inverse_function = self.build_x_array_and_y_array_for_smooth_inverse_function()
-        self.raw_e_i_as_a_smooth_function_of_e_f = self.build_lagrangian_function(e_f_array_for_smooth_inverse_function, e_i_array_for_smooth_inverse_function)
-        e_i_array_for_derivative_of_e_f_wrt_e_i_smooth, d_e_f_wrt_e_i_array_for_derivative_of_e_f_wrt_e_i_smooth = self.build_x_array_and_y_array_for_derivative_of_e_f_wrt_e_i_smooth()
-        self.derivative_of_e_f_wrt_e_i_smooth = self.build_lagrangian_function(e_i_array_for_derivative_of_e_f_wrt_e_i_smooth, d_e_f_wrt_e_i_array_for_derivative_of_e_f_wrt_e_i_smooth)
-
     def piecewise_linear_function(self, e_i):
         a = 0
         length = len(self.e_i_array)
@@ -421,7 +413,6 @@ class e_final_vs_e_initial:
         if e_i<0: e_i=0
         if e_i>1: e_i=1
         return e_i
-
     def linear_inverse_function(self, e_f):
         m = (self.e_i_array[-1]-self.e_i_array[0])/(self.e_f_array[-1]-self.e_f_array[0])
         e_i = self.e_i_array[0] + (e_f - self.e_f_array[0])*m
@@ -429,49 +420,60 @@ class e_final_vs_e_initial:
         if e_i>1: e_i=1
         return e_i
 
-    def build_lagrangian_function(self, x_array, y_array):
-        def lagrangian_function(x):
-            y = 0
-            i = 0
-            while i<len(x_array):
-                A = y_array[i]
-                B = 1
-                C = 1
-                j = 0
-                while j<len(x_array):
-                    if j != i:
-                        B = B * (x - x_array[j])
-                        C = C * (x_array[i] - x_array[j])
-                    j = j + 1
-                y = y + A * B / C
-                i = i + 1
-            return y
-        return lagrangian_function
-
     def smooth_function(self, e_i):
-        e_f = self.raw_e_f_as_a_smooth_function_of_e_i(e_i)
-        if e_f <0: return 0
-        if e_f>1: return 1
+        x = self.e_i_array
+        y = self.e_f_array
+        e_f = 0
+        i = 0
+        while i<len(x):
+            A = y[i]
+            B = 1
+            C = 1
+            j = 0
+            while j<len(x):
+                if j != i:
+                    B = B * (e_i - x[j])
+                    C = C * (x[i] - x[j])
+                j = j + 1
+            e_f = e_f + A * B / C
+            i = i + 1
+        if e_f < 0: e_f = 0
+        if e_f > 1 : e_f = 1
+
         return e_f
 
-    def smooth_inverse_function_aux(self, e_f):
+    def smooth_inverse_function(self, e_f):
+        #a = 0
+        #length = len(self.e_f_array)
+        #b = length -1
+        #while b-a>1:
+            #mid_index = int((a+b)/2)
+            #mid = self.e_f_array[mid_index]
+            #if e_f == mid:
+                #return self.e_i_array[mid_index]
+            #if e_f < mid:
+                #b = mid_index
+            #if e_f > mid:
+                #a = mid_index
+        #if self.e_f_array[a]==e_f: return self.e_i_array[a]
+        #if self.e_f_array[b]==e_f: return self.e_i_array[b]
+        #e_f_a = self.e_f_array[a]
+        #e_f_b = self.e_f_array[b]
+        #e_i_a = self.e_i_array[a]
+        #e_i_b = self.e_i_array[b]
+        #if e_f>e_f_b:
+           # e_f_a = e_f_b
+            #e_f_b = 1.0
+        #if e_f<e_f_a:
+            #e_f_b = e_f_a
+            #e_f_a = 0.0
         delta = (self.e_f_array[-1] - self.e_f_array[0])/1000.0
-        e_i_a = self.e_i_array[0]
-        e_i_b = self.e_i_array[-1]
+        e_i_a = 0
+        e_i_b = 0.9
         e_f_a = self.smooth_function(e_i_a)
         e_f_b = self.smooth_function(e_i_b)
-        if math.fabs(e_f-e_f_a) < delta: return e_i_a
-        if math.fabs(e_f-e_f_b) < delta: return e_i_b
-        if e_f>e_f_b and math.fabs(e_f-e_f_b)>delta:
-            e_i_a = e_i_b
-            e_i_b = 1.0
-            e_f_a = e_f_b
-            e_f_b = self.smooth_function(e_i_b)
-        if e_f<e_f_a and math.fabs(e_f-e_f_a)>delta:
-            e_i_b = e_i_a
-            e_i_a = 0.0
-            e_f_b = e_f_a
-            e_f_a = self.smooth_function(e_i_a)
+        if e_f==e_f_a or e_f<e_f_a: return 0.0
+        if e_f==e_f_b or e_f>e_f_b: return 0.9
         while (e_f>e_f_a and e_f<e_f_b):
             e_i_c = (e_i_a + e_i_b)/2.0
             e_f_c = self.smooth_function(e_i_c)
@@ -486,73 +488,36 @@ class e_final_vs_e_initial:
             if e_f_c > e_f:
                 e_i_b = e_i_c
                 e_f_b = self.smooth_function(e_i_b)
-            if math.fabs(e_f-e_f_a) < delta: return e_i_a
-            if math.fabs(e_f-e_f_b) < delta: return e_i_b
+        if e_f==e_f_a or e_f<e_f_a: return 0.0
+        if e_f==e_f_b or e_f>e_f_b: return 0.9
 
-    def build_x_array_and_y_array_for_smooth_inverse_function(self):
-        e_i_array = self.e_i_array
-        e_f_array = self.e_f_array
-        k =(e_i_array[-1]-e_i_array[0])/(e_i_array[1]-e_i_array[0])
-        del_e_f = (e_f_array[-1] - e_f_array[0])/(k)
-
-        x_array = []
-        y_array = []
-
-        e_f = e_f_array[0]
-        while e_f < (e_f_array[-1]+del_e_f):
-            e_i = self.smooth_inverse_function_aux(e_f)
-            if e_i is not None:
-                x_array.append(e_f)
-                y_array.append(e_i)
-            e_f = e_f + del_e_f
-        return x_array, y_array
-
-    def smooth_inverse_function(self, e_f):
-        e_i = self.raw_e_i_as_a_smooth_function_of_e_f(e_f)
-        if e_i < 0: return 0
-        if e_i > 1: return 1
-        return e_i
-
-    def build_x_array_and_y_array_for_derivative_of_e_f_wrt_e_i_smooth(self):
-        e_i_array = self.e_i_array
-        e_f_array = self.e_f_array
-        x_array = []
-        y_array = []
-
-        k = (e_i_array[-1] - e_i_array[0])/(e_i_array[1] - e_i_array[0])
-        del_e_i = (e_i_array[-1] - e_i_array[0])/(k*4)
-
-        e_i = e_i_array[0]
-        while e_i < e_i_array[-1]:
-            d_e_f_wrt_e_i = (self.smooth_function(e_i + del_e_i) - self.smooth_function(e_i))/del_e_i
-            if d_e_f_wrt_e_i is not None:
-                x_array.append(e_i)
-                y_array.append(d_e_f_wrt_e_i)
-            e_i = e_i + del_e_i
-
-        return x_array, y_array
+        #def func(x):
+            #return (self.smooth_function(x) - e_f)
+        #e_i = fsolve(func, 0.5)
+        #return e_i
 
     def derivative_of_e_final_wrt_e_initial(self, e_i, function):
         delta = 0.05
-        d = derivative(function, e_i, dx=delta)
+        a = function(e_i + delta)
+        b = function(e_i)
+        d = (a-b)/delta
         return d
 
+def pi_e(e_i):
+    if e_i <= 0.8 and e_i >= 0:
+        return 1.0/0.8
+    else:
+        return 0
 
-class eccentricity_distribution_class:
-    def __init__(self, sigma_square, nu_square):
-        self.sigma_square = sigma_square
-        self.nu_square = nu_square
-        self.nu = math.sqrt(self.nu_square)
+def eccentricity_distribution(e, rice_distribution):
+    return rice_distribution.pdf(e)/(2 * math.pi * e)
 
-    def eccentricity_distribution(self, e):
-        return (1/2/math.pi/self.sigma_square)*math.exp(-(e**2 + self.nu_square)/2/self.sigma_square)* i0(e * self.nu/self.sigma_square)
+def prior_distribution_of_e_i(e_i):
+    e_i_max = 0.8
+    if e_i > e_i_max: return 0
+    return 1/e_i_max
 
-    def prior_distribution_of_e_i(self, e_i):
-        if e_i > 1: return 0
-        if e_i < 0: return 0
-        return 1
-
-if __name__ == '__main__':
+if __name__ == '__main__': 
     Initialization()
     dirname = "/work/08529/mmmahmud/finalVsInitialEccentricity"
     arg = []
@@ -631,18 +596,13 @@ if __name__ == '__main__':
            a.tidal_break_period = Pbr
            a.argument_of_phase_lag_function_for_planet = lgQpl
            arg = []
-
            for e_init in numpy.arange(0.1, 0.9, 0.1):
                x = argument(e_init, Porb)
                arg.append(x)
-
            with Pool(processes=len(arg)) as pool:
                checks = pool.map(func, arg)
            e_i = []
            e_f = []
-           e_i.append(0)
-           e_f.append(0)
-           e_init = 0.01
            for e_init in numpy.arange(0.1, 0.9, 0.1):
                filename = "%(dirname)s/arguments/Porb_%(Porb)f/alpha_%(alpha)f/lgQpl_%(lgQpl)f/Porb_%(Porb)f_e_i_%(e_i)f_when_Pbr_%(Pbr)f_alpha_%(alpha)f_lgQpl_%(lgQpl)f.pkl" % dict(dirname = dirname,
                                                                                                                                                                                       Porb=Porb,
@@ -656,7 +616,6 @@ if __name__ == '__main__':
                    if element.e_f is not None:
                        e_i.append(e_init)
                        e_f.append(element.e_f)
-
            plt.plot(e_i, e_f)
            plt.xlabel("Initial Eccentricity")
            plt.ylabel('Final Eccentricity')
@@ -681,7 +640,7 @@ if __name__ == '__main__':
        plt.plot(e_i, e_f)
        plt.xlabel("Initial Eccentricity")
        plt.ylabel('Final Eccentricity')
-       fig_file_name = "%(dirname)s/plots/test59_e_f_vs_e_in_for_Porb_%(Porb)f_when_alpha_%(alpha)f_Pbr_%(Pbr)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
+       fig_file_name = "%(dirname)s/plots/test55_e_f_vs_e_in_for_Porb_%(Porb)f_when_alpha_%(alpha)f_Pbr_%(Pbr)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
                                                	                                                                                            Porb=Porb_2,
                                                     	                                                                                    alpha=3,
                                                                                                                                             Pbr=1.0,
@@ -700,7 +659,7 @@ if __name__ == '__main__':
        plt.plot(e_i, e_f)
        plt.xlabel("Initial Eccentricity")
        plt.ylabel('Final Eccentricity')
-       fig_file_name = "%(dirname)s/plots/test669_e_f_vs_e_in_for_Porb_%(Porb)f_when_alpha_%(alpha)f_Pbr_%(Pbr)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
+       fig_file_name = "%(dirname)s/plots/test666_e_f_vs_e_in_for_Porb_%(Porb)f_when_alpha_%(alpha)f_Pbr_%(Pbr)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
                                                                                                                                              Porb=Porb_2,
                                                                                                                                              alpha=3,
                                                                                                                                              Pbr=1.0,
@@ -711,24 +670,17 @@ if __name__ == '__main__':
        plt.clf()
 
        d_e_i = []
-       e_i = []
        e_f = []
-       delta = (e_i_array[-1] - e_i_array[0])/100.0
-       for e_initial in numpy.arange(e_i_array[0], e_i_array[-1]+0.05 , 0.05):
-           e_i.append(e_initial)
-           e_final = e_final_vs_e_initial_instance.smooth_function(e_initial)
-           a.logger.debug("e_final is YYYYYYYYYYYYY %(e)f" % dict(e=e_final))
-           #e_f.append(e_final)
-           r = e_final_vs_e_initial_instance.derivative_of_e_f_wrt_e_i_smooth(e_initial)
-           #r = (e_final_vs_e_initial_instance.smooth_function(e_initial+0.05)-e_final_vs_e_initial_instance.smooth_function(e_initial))/0.05
-           #if not (math.fabs(r)<0.0001):
+       delta = (e_f_array[-1] - e_f_array[0])/1000.0
+       for e_final in numpy.arange(e_f_array[0], e_f_array[-1]+delta , delta):
            e_f.append(e_final)
-           d_e_i.append(1/r)
-           #d_e_i.append(1/e_final_vs_e_initial_instance.derivative_of_e_final_wrt_e_initial(e_initial, e_final_vs_e_initial_instance.smooth_function))
-       plt.plot(e_i, d_e_i)
-       plt.xlabel("final Eccentricity")
-       plt.ylabel('Derivative of initial Eccentricity wrt final Eccentricity')
-       fig_file_name = "%(dirname)s/plots/test79_d_e_i_vs_e_f_for_Porb_%(Porb)f_when_alpha_%(alpha)f_Pbr_%(Pbr)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
+           e_initial = e_final_vs_e_initial_instance.smooth_inverse_function(e_final)
+           a.logger.debug("e_initial is YYYYYYYYYYYYY %(e)f" % dict(e=e_initial))
+           d_e_i.append(1/e_final_vs_e_initial_instance.derivative_of_e_final_wrt_e_initial(e_initial, e_final_vs_e_initial_instance.smooth_function))
+       plt.plot(e_f, d_e_i)
+       plt.xlabel("Final Eccentricity")
+       plt.ylabel('Derivative of Initial Eccentricity wrt Final Eccentricity')
+       fig_file_name = "%(dirname)s/plots/test77_d_e_i_vs_e_f_for_Porb_%(Porb)f_when_alpha_%(alpha)f_Pbr_%(Pbr)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
                                                                                                                                              Porb=Porb_2,
                                                                                                                                              alpha=3,
                                                                                                                                              Pbr=1.0,
@@ -743,64 +695,42 @@ if __name__ == '__main__':
        e_now_lower_uncertainty = -0.05
        rice_distribution = rice_from_error_bars(measured_e_now, e_now_upper_uncertainty, math.fabs(e_now_lower_uncertainty))
        a.logger.debug("The rice of 0.3 is %(x)f" % dict(x=rice_distribution.pdf(0.3)))
-       raw_moment1 = rice_distribution.moment(1)
-       raw_moment2 = rice_distribution.moment(2)
-       raw_moment3 = rice_distribution.moment(3)
-       raw_moment4 = rice_distribution.moment(4)
-       a.logger.debug("raw moment 1 = %(x)f" % dict(x=raw_moment1))
-       a.logger.debug("raw moment 2 = %(x)f" % dict(x=raw_moment2))
-       a.logger.debug("raw moment 3 = %(x)f" % dict(x=raw_moment3))
-       a.logger.debug("raw moment 4 = %(x)f" % dict(x=raw_moment4))
-       nu_square = math.sqrt(2 * (raw_moment2 ** 2) - raw_moment4)
-       sigma_square = (raw_moment2 - nu_square)/2
-       a.logger.debug("nu square = %(x)f" % dict(x=nu_square))
-       a.logger.debug("sigma square = %(x)f" % dict(x=sigma_square))
-
-       eccentricity_distribution_instance = eccentricity_distribution_class(sigma_square, nu_square)
 
        def integrand(e_f):
-           p = eccentricity_distribution_instance.eccentricity_distribution(e_f)
+           p = eccentricity_distribution(e_f, rice_distribution)/(2 * math.pi * e_f)
            e_i = e_final_vs_e_initial_instance.smooth_inverse_function(e_f)
-           r = e_final_vs_e_initial_instance.derivative_of_e_f_wrt_e_i_smooth(e_i)
-           #r = (e_final_vs_e_initial_instance.smooth_function(e_i+0.005) - e_final_vs_e_initial_instance.smooth_function(e_i))/0.005
-           #r = derivative(e_final_vs_e_initial_instance.smooth_function, e_i, dx=0.05)
-           #q = eccentricity_distribution_instance.prior_distribution_of_e_i(e_i)
-           #r = e_final_vs_e_initial_instance.derivative_of_e_final_wrt_e_initial(e_i, e_final_vs_e_initial_instance.smooth_function)
+           q = prior_distribution_of_e_i(e_i)
+           r = e_final_vs_e_initial_instance.derivative_of_e_final_wrt_e_initial(e_i, e_final_vs_e_initial_instance.smooth_function)
            if r == 0: return math.inf
-           return p/r
+           return p*q/r
        def integrand_linear(e_f):
-           p = eccentricity_distribution_instance.eccentricity_distribution(e_f)
+           p = eccentricity_distribution(e_f, rice_distribution)/(2 * math.pi * e_f)
            e_i = e_final_vs_e_initial_instance.linear_inverse_function(e_f)
-           #r = e_final_vs_e_initial_instance.derivative_of_e_f_wrt_e_i_smooth(e_i)
-           r = (e_final_vs_e_initial_instance.linear_function(e_i+0.005) - e_final_vs_e_initial_instance.linear_function(e_i))/0.005
-           #r = derivative(e_final_vs_e_initial_instance.linear_function, e_i, dx=0.05)
-           #q = eccentricity_distribution_instance.prior_distribution_of_e_i(e_i)
-           #r = e_final_vs_e_initial_instance.derivative_of_e_final_wrt_e_initial(e_i, e_final_vs_e_initial_instance.linear_function)
+           q = prior_distribution_of_e_i(e_i)
+           r = e_final_vs_e_initial_instance.derivative_of_e_final_wrt_e_initial(e_i, e_final_vs_e_initial_instance.linear_function)
            if r == 0: return math.inf
-           return p/r
+           return p*q/r
        e_f_max = e_final_vs_e_initial_instance.smooth_function(0.8)
-       result = integrate.quad(integrand, 0.005, e_f_max)
-       result_linear = integrate.quad(integrand_linear, 0.005, e_f_max)
+       result = integrate.quad(integrand, 0.04, e_f_max)
+       result_linear = integrate.quad(integrand_linear, 0.04, e_f_max)
        a.logger.debug("The result for smooth curve is %(x)f" % dict(x=result[0]))
-       a.logger.debug("TTTTT The result for linear curve is %(x)f" % dict(x=result_linear[0]))
+       a.logger.debug("The result for linear curve is %(x)f" % dict(x=result_linear[0]))
        integ = []
        integ_linear = []
-       p = []
        e_f = []
        delta = (e_f_array[-1] - e_f_array[0])/1000.0
        for e_final in numpy.arange(e_f_array[0], e_f_array[-1]+delta , delta):
            e_f.append(e_final)
            integ.append(integrand(e_final))
            integ_linear.append(integrand_linear(e_final))
-           p.append(eccentricity_distribution_instance.eccentricity_distribution(e_final))
        plt.plot(e_f, integ)
        plt.xlabel("Final Eccentricity")
-       plt.ylabel('integrand_smooth')
-       fig_file_name = "%(dirname)s/plots/test80_integrand_vs_e_f_for_Porb_%(Porb)f_when_alpha_%(alpha)f_Pbr_%(Pbr)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
-                                                                                                                                                 Porb=Porb_2,
-                                                                                                                                                 alpha=3,
-                                                                                                                                                 Pbr=1.0,
-                                                                                                                                                 lgQpl=5)
+       plt.ylabel('integrand')
+       fig_file_name = "%(dirname)s/plots/test8_integrand_vs_e_f_for_Porb_%(Porb)f_when_alpha_%(alpha)f_Pbr_%(Pbr)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
+                                                                                                                                                Porb=Porb_2,
+                                                                                                                                                alpha=3,
+                                                                                                                                                Pbr=1.0,
+                                                                                                                                                lgQpl=5)
        ensure_directory(fig_file_name)
        plt.savefig(fig_file_name)
        plt.cla()
@@ -809,24 +739,11 @@ if __name__ == '__main__':
        plt.plot(e_f, integ_linear)
        plt.xlabel("Final Eccentricity")
        plt.ylabel('integrand_linear')
-       fig_file_name = "%(dirname)s/plots/test90_integrand_linear_vs_e_f_for_Porb_%(Porb)f_when_alpha_%(alpha)f_Pbr_%(Pbr)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
-                                                                                                                                                        Porb=Porb_2,
-                                                                                                                                                        alpha=3,
-                                                                                                                                                        Pbr=1.0,
-                                                                                                                                                        lgQpl=5)
-       ensure_directory(fig_file_name)
-       plt.savefig(fig_file_name)
-       plt.cla()
-       plt.clf()
-
-       plt.plot(e_f, p)
-       plt.xlabel("Final Eccentricity")
-       plt.ylabel('rice over 2 pi e_f')
-       fig_file_name = "%(dirname)s/plots/test990_p_vs_e_f_for_Porb_%(Porb)f_when_alpha_%(alpha)f_Pbr_%(Pbr)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
-                                                                                                                                          Porb=Porb_2,
-                                                                                                                                          alpha=3,
-                                                                                                                                          Pbr=1.0,
-                                                                                                                                          lgQpl=5)
+       fig_file_name = "%(dirname)s/plots/test9_integrand_linear_vs_e_f_for_Porb_%(Porb)f_when_alpha_%(alpha)f_Pbr_%(Pbr)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
+                                                                                                                                                       Porb=Porb_2,
+                                                                                                                                                       alpha=3,
+                                                                                                                                                       Pbr=1.0,
+                                                                                                                                                       lgQpl=5)
        ensure_directory(fig_file_name)
        plt.savefig(fig_file_name)
        plt.cla()
