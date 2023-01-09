@@ -17,7 +17,7 @@ from stellar_evolution.manager import StellarEvolutionManager
 from stellar_evolution.library_interface import library as stellar_evol_lib
 
 from process_e_Q_grid import LinearEccentricityEnvelope
-
+from eccentricity_distro import eccentricity_kde_distro_gen
 
 _data_dir = path.join(
     path.dirname(
@@ -303,6 +303,57 @@ def plot_eccentricity_vs_period(plot_fname, available_kic):
         pyplot.savefig(plot_fname)
 
 
+def plot_eccentricity_distribution(kic_id,
+                                   plot_fname,
+                                   kernel_width,
+                                   bins):
+    """
+    Plot KDE estimated eccentricity distribution and histogram for given KIC.
+
+    Args:
+        kic_id(int):    The KIC identifier of the Windemuth et. al. (2019)
+            binary to plot the eccentricity distribution of.
+
+        plot_fname(str):    The filename to save the plot. If empty, the plot
+            is shown but not saved.
+
+        kernel_width(float):    The width of the kernel to use for KDE.
+
+        bins(int or sequence of floats or str):    The bins to use for buliding
+            the histogram to show. See `numpy.histogram` for details. The numpy.
+            derived bins are then scaled by the inverse of the area
+            corresponding to each bin.
+
+    Returns:
+        None
+    """
+
+    w19_samples = get_samples(kic_id)
+    e_samples = numpy.sqrt(w19_samples['esinw']**2 + w19_samples['ecosw']**2)
+    hist, bin_edges = numpy.histogram(e_samples,
+                                      bins=bins,
+                                      density=True,
+                                      range=(0, e_samples.max()))
+    hist /= bin_edges[1:]**2 - bin_edges[:-1]**2
+    hist /= (hist * (bin_edges[1:] - bin_edges[:-1])).sum()
+    pyplot.bar(x=bin_edges[:-1],
+               height=hist,
+               width=bin_edges[1:] - bin_edges[:-1],
+               align='edge',
+               color='none',
+               edgecolor='black')
+    kde_distro = eccentricity_kde_distro_gen(e_samples, kernel_width)
+    plot_x = numpy.linspace(max(bin_edges[0] - 3.0 * kernel_width, 0.0),
+                            bin_edges[-1] + 3.0 * kernel_width,
+                            10 * bin_edges.size)
+    pyplot.plot(plot_x, kde_distro.pdf(plot_x), color='red')
+#    pyplot.yscale('log')
+    if not plot_fname:
+        pyplot.show()
+    else:
+        pyplot.savefig(plot_fname)
+
+
 def generate_slurm_scripts(hpc, available_kic, slurm_dir, sampling_mode):
     """Create slurm scripts for a given HPC cluster to sample W19 systems."""
 
@@ -370,6 +421,30 @@ def parse_command_line():
         'instead of saving.'
     )
     parser.add_argument(
+        '--create-e-distro-plot',
+        nargs=2,
+        default=None,
+        help='If specified, it should select a KIC and filename for the plot. '
+        'A plot of the eccentricity distribution for the selected KIC will be '
+        'created. The plot will show binned eccentricity samples, with bin '
+        'heights divided by the area of the annulus in (ecosw, esinw) '
+        'space corresponding to each bin as well as the KDE estimated '
+        'eccentricity distrubition.'
+    )
+    parser.add_argument(
+        '--e-distro-kernel-width',
+        type=float,
+        default=1e-4,
+        help='The width of the kernel to use for estimating eccentricity PDF.'
+    )
+    parser.add_argument(
+        '--e-distro-histogram-bins',
+        type=int,
+        default=30,
+        help='The number of bins to use for plotting eccentricity ditribution.'
+    )
+
+    parser.add_argument(
         '--list-valid-systems',
         action='store_true',
         help='If passed, output a list of systems for which circularization '
@@ -421,9 +496,16 @@ def main(config):
 
     logging.basicConfig(level=logging.INFO)
 
-    available_kic = get_available_kic(interpolator,
-                                      config.max_porb,
-                                      config.max_eccentricity)
+    if (
+        config.list_valid_systems
+        or
+        config.create_pe_plot is not None
+        or
+        config.generate_slurm_scripts
+    ):
+        available_kic = get_available_kic(interpolator,
+                                          config.max_porb,
+                                          config.max_eccentricity)
 
     if config.list_valid_systems:
         print('\n'.join(map(repr, available_kic)))
@@ -436,6 +518,14 @@ def main(config):
                                available_kic,
                                config.slurm_dir,
                                config.generate_slurm_scripts)
+    if config.create_e_distro_plot is not None:
+        plot_eccentricity_distribution(
+            kic_id=int(config.create_e_distro_plot[0]),
+            plot_fname=config.create_e_distro_plot[1],
+            kernel_width=config.e_distro_kernel_width,
+            bins=config.e_distro_histogram_bins
+        )
+
 
 if __name__ == '__main__':
     main(parse_command_line())

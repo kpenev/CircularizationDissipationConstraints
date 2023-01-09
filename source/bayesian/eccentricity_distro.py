@@ -7,27 +7,6 @@ from scipy import stats, special
 from scipy.integrate import quad
 import numpy
 
-#Naming scheme used by scipy.stats
-#pylint: disable=invalid-name
-class EccentricityDistroUnnorm_gen(stats.rv_continuous):
-    """Not normalized distribution to use for KDE(eccentricity) from samples."""
-
-    #scipy.stats are meant to have different params
-    #pylint: disable=arguments-differ
-    def _pdf(self, x, s_to_n):
-        return stats.rice.pdf(x, s_to_n) / x
-
-    def _argcheck(self, s_to_n):
-        return s_to_n >= 0
-    #pylint: enable=arguments-differ
-#pylint: enable=invalid-name
-
-
-EccentricityDistroUnnorm = EccentricityDistroUnnorm_gen(
-    name='EccentricityKernelUnnorm',
-    a=0.0
-)
-
 #Naming convention comes from scipy.stats
 #Method arguments also come from scipy.stats
 #pylint: disable=invalid-name
@@ -83,7 +62,7 @@ class eccentricity_kde_distro_gen(stats.rv_continuous):
                                 s_to_n + 10.0,
                                 10)
         points = numpy.concatenate(([0], points[points>0]))
-        return 1.0 / (
+        return (
             quad(
                 self._norm_integrand,
                 a=0,
@@ -97,7 +76,7 @@ class eccentricity_kde_distro_gen(stats.rv_continuous):
                 b=numpy.inf,
                 args=(s_to_n,)
             )[0]
-        ) / uncertainty
+        )
 
 
     def _pdf(self, x):
@@ -113,8 +92,8 @@ class eccentricity_kde_distro_gen(stats.rv_continuous):
                 numpy.exp(-(eval_x-self._s_to_n)*(eval_x-self._s_to_n)/2.0)
                 *
                 special.i0e(eval_x*self._s_to_n)
-            ) * self._norms
-        ).sum(axis=0)
+            )
+        ).sum(axis=0) * self._norm
 
         try:
             return result.reshape(x.shape)
@@ -144,83 +123,29 @@ class eccentricity_kde_distro_gen(stats.rv_continuous):
         e_samples = numpy.atleast_1d(e_samples)[:, None]
         self._width = kernel_width
         self._s_to_n = e_samples / kernel_width
-        self._norms = numpy.vectorize(self._calc_norm)(
+        self._norm = 1.0 / numpy.vectorize(self._calc_norm)(
             e_samples,
             kernel_width
-        ) / e_samples.size
+        ).sum() / kernel_width
+        print('Norm: ' + repr(self._norm))
 #pylint: enable=invalid-name
 #pylint: enable=arguments-differ
-
-
-class EccentricityDistro:
-    """Eccentricity distribution with e being U(0,1) instead of esinw, ecosw."""
-
-    @staticmethod
-    def _calc_norm(center, uncertainty):
-        """Calculate the normalization for single center/uncertainty combo."""
-
-        points = numpy.linspace(center - 10.0 * uncertainty,
-                                center + 10.0 * uncertainty,
-                                10)
-        points = numpy.concatenate(([0], points[points>0]))
-        distro = EccentricityDistroUnnorm(s_to_n=center/uncertainty,
-                                          scale=uncertainty)
-        return (
-            quad(distro.pdf, a=0, b=points[-1], points=points)[0]
-            +
-            quad(distro.pdf, a=points[-1], b=numpy.inf)[0]
-        )
-
-
-    def __init__(self, center, uncertainty):
-        """Set the location and uncertainty (floats or vectors) of distro."""
-
-        s_to_n = center/uncertainty
-        self._distro = EccentricityDistroUnnorm(s_to_n=s_to_n,
-                                                scale=uncertainty)
-        self._zero_val = numpy.exp(-s_to_n**2/2) / uncertainty
-        self._norm = numpy.vectorize(self._calc_norm)(center, uncertainty)
-
-
-    def pdf(self, x):
-        """Evaluate the PDF fixing x=0 and x<0 values."""
-
-        x = numpy.atleast_1d(x)
-        result = self._distro.pdf(x)
-        result[x==0] = self._zero_val
-        result[x<0] = 0.0
-        result /= self._norm
-        return result
-
-    def cdf(self, x):
-        """Evaluate the CDF fixing x=0 and x<0 values."""
-
-        x = numpy.atleast_1d(x)
-        result = self._distro.cdf(x) / self._norm
-        result[x<=0] = 0.0
-        return result
 
 if __name__ == '__main__':
     val=0.05
     unc=0.001
-    e_distro1 = eccentricity_kde_distro_gen([0.0, val], unc)
-    e_distro2 = EccentricityDistro(val, unc)
+    e_distro = eccentricity_kde_distro_gen([0.0, val], unc)
 
     plot_x = numpy.linspace(0.0, val + 5.0 * unc, 1000)
     pyplot.plot(
         plot_x,
-        e_distro1.pdf(plot_x),
+        e_distro.pdf(plot_x),
         label='e-distro 1 PDF'
-    )
-    pyplot.plot(
-        plot_x,
-        e_distro2.pdf(plot_x),
-        label='e-distro 2 PDF'
     )
 
     pyplot.plot(
         plot_x,
-        e_distro1.cdf(plot_x),
+        e_distro.cdf(plot_x),
         label='e-distro CDF'
     )
     pyplot.axhline(y=1)
