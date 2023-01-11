@@ -5,8 +5,11 @@ from os import path
 import logging
 from subprocess import run
 import platform
+from collections import defaultdict
 
 from matplotlib import pyplot
+from matplotlib.backends.backend_pdf import PdfPages
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import numpy
 import scipy.stats
 import pandas
@@ -36,6 +39,69 @@ eccentricity_envelope = LinearEccentricityEnvelope(min_period=1.0,
                                                    min_eccenticity=0.02,
                                                    max_eccentricity=0.8)
 
+def get_eccentricity_kernel_widths():
+    """Return dict of eccentricity kernel widths for each KIC."""
+
+
+    result =  defaultdict(lambda: 5e-4)
+    for kic, kernel_width in [
+            (10268903, 1.5e-4),
+            (6962018, 8e-6),
+            (11616200, 2e-5),
+            (4380283, 1e-5),
+            (9110346, 2e-5),
+            (7732791, 5e-5),
+            (5039441, 1e-4),
+            (9656543, 1e-4),
+            (3834364, 1.2e-3),
+            (11228612, 2e-4),
+            (10960995, 3e-6),
+            (3241344, 2e-4),
+            (5022440, 3e-6),
+            (5802470, 2e-6),
+            (4815612, 1e-6),
+            (7377033, 1e-3),
+            (11867071, 3e-3),
+            (3427776, 2e-3),
+            (10935310, 1.5e-3),
+            (10031409, 5e-6),
+            (9532421, 1.5e-3),
+            (3973504, 1.5e-3),
+            (8957954, 2e-6),
+            (6521542, 2e-4),
+            (11252617, 1e-3),
+            (4285087, 1e-5),
+            (7025851, 4e-5),
+            (4346875, 1.2e-3),
+            (7691527, 2e-4),
+            (6227560, 1e-4),
+            (8302455, 1e-5),
+            (12004679, 3e-4),
+            (7369523, 1e-4),
+            (9971475, 1.5e-5),
+            (7129465, 2e-6),
+            (5181455, 5e-6),
+            (8381592, 1e-3),
+            (7376500, 2e-4),
+            (8618226, 2e-5),
+            (9649222, 5e-6),
+            (6546508, 8e-4),
+            (10385682, 1e-4),
+            (8460600, 1.5e-3),
+            (7125636, 7e-4),
+            (8580438, 5e-5),
+            (5597970, 5e-6),
+            (8746310, 1e-5),
+            (7362852, 7e-5),
+            (12557713, 2e-3),
+            (4753988, 3e-4),
+            (10923260, 1e-4),
+            (3003991, 2.0e-2),
+            (6927629, 3e-6),
+            (8364119, 3e-4)
+    ]:
+        result[kic] = kernel_width
+    return result
 
 _logger = logging.getLogger(__name__)
 
@@ -303,21 +369,19 @@ def plot_eccentricity_vs_period(plot_fname, available_kic):
         pyplot.savefig(plot_fname)
 
 
-def plot_eccentricity_distribution(kic_id,
+def plot_eccentricity_distribution(kic_id_list,
                                    plot_fname,
-                                   kernel_width,
                                    bins):
     """
     Plot KDE estimated eccentricity distribution and histogram for given KIC.
 
     Args:
-        kic_id(int):    The KIC identifier of the Windemuth et. al. (2019)
-            binary to plot the eccentricity distribution of.
+        kic_id_list([int,...]):    The KIC identifiers of the Windemuth et. al.
+            (2019) binaries to plot the eccentricity distribution of. A
+            multi-page PDF is created with each KIC plot on a separate page.
 
-        plot_fname(str):    The filename to save the plot. If empty, the plot
-            is shown but not saved.
-
-        kernel_width(float):    The width of the kernel to use for KDE.
+        plot_fname(str):    The filename to save the plot. If empty, the plots
+            are shown but not saved.
 
         bins(int or sequence of floats or str):    The bins to use for buliding
             the histogram to show. See `numpy.histogram` for details. The numpy.
@@ -328,30 +392,141 @@ def plot_eccentricity_distribution(kic_id,
         None
     """
 
-    w19_samples = get_samples(kic_id)
-    e_samples = numpy.sqrt(w19_samples['esinw']**2 + w19_samples['ecosw']**2)
-    hist, bin_edges = numpy.histogram(e_samples,
-                                      bins=bins,
-                                      density=True,
-                                      range=(0, e_samples.max()))
-    hist /= bin_edges[1:]**2 - bin_edges[:-1]**2
-    hist /= (hist * (bin_edges[1:] - bin_edges[:-1])).sum()
-    pyplot.bar(x=bin_edges[:-1],
-               height=hist,
-               width=bin_edges[1:] - bin_edges[:-1],
-               align='edge',
-               color='none',
-               edgecolor='black')
-    kde_distro = eccentricity_kde_distro_gen(e_samples, kernel_width)
-    plot_x = numpy.linspace(max(bin_edges[0] - 3.0 * kernel_width, 0.0),
-                            bin_edges[-1] + 3.0 * kernel_width,
-                            10 * bin_edges.size)
-    pyplot.plot(plot_x, kde_distro.pdf(plot_x), color='red')
-#    pyplot.yscale('log')
-    if not plot_fname:
-        pyplot.show()
-    else:
-        pyplot.savefig(plot_fname)
+
+    custom_zoom = {7732791: (0.0, 0.005),
+                   9656543: (0.0, 1e-3),
+                   10960995: (0.0, 1e-4),
+                   5022440: (0.0, 1e-4),
+                   5802470: (0.0, 1e-4),
+                   4815612: (0.0, 4e-5),
+                   10031409: (0.0, 2e-4),
+                   8957954: (0.0, 1e-4),
+                   4285087: (0.0, 2e-4),
+                   6227560: (0.0, 2e-3),
+                   8302455: (0.0, 2e-4),
+                   9971475: (0.0, 5e-4),
+                   7129465: (0.0, 1e-4),
+                   5181455: (0.0, 2e-4),
+                   7376500: (0.41, 0.42),
+                   8618226: (0.0, 5e-4),
+                   9649222: (0.0, 2e-4),
+                   5597970: (0.0, 2e-4),
+                   8746310: (0.0, 2e-4),
+                   10923260: (0.4, 0.42),
+                   3003991: (0.0, 0.2),
+                   6927629: (0.0, 1e-4)}
+    eccentricity_pdf_kernel_widths = get_eccentricity_kernel_widths()
+
+    if plot_fname:
+        pdf = PdfPages(plot_fname)
+    for kic_id in kic_id_list:
+        w19_samples = get_samples(kic_id)
+        e_samples = numpy.sort(
+            numpy.sqrt(w19_samples['esinw']**2
+                       +
+                       w19_samples['ecosw']**2)
+        )
+        kernel_width = eccentricity_pdf_kernel_widths[kic_id]
+        kde_distro = eccentricity_kde_distro_gen(e_samples, kernel_width)
+#        plot_x = numpy.linspace(0.0, e_samples[-1], 100)
+#        pyplot.plot(plot_x, kde_distro.cdf(plot_x), color='red')
+#        pyplot.axhline(y=0.1)
+#        pyplot.axhline(y=0.9)
+#        pyplot.show()
+#        pyplot.clf()
+
+
+        plot_ranges = [
+            (
+                0,
+                e_samples[-1]
+            ),
+            custom_zoom.get(kic_id,
+                            (kde_distro.ppf(0.1), kde_distro.ppf(0.9)))
+        ]
+        if (
+            plot_ranges[1][1] - plot_ranges[1][0]
+            >
+            0.2 * (plot_ranges[0][1] - plot_ranges[0][0])
+            and
+            kic_id not in custom_zoom
+        ):
+            print(
+                'Full range (%g, %g) and zoom range (%g, %g) comparable. No '
+                'zoom plot necessary.'
+                %
+                (plot_ranges[0] + plot_ranges[1])
+            )
+            plot_ranges = plot_ranges[:1]
+        else:
+            print('Adding zoom-in plot for KIC %d: %g < ef < %g'
+                  %
+                  ((kic_id,) + plot_ranges[1]))
+
+
+        for e_range in plot_ranges:
+            hist, bin_edges = numpy.histogram(
+                e_samples,
+                bins=int(numpy.ceil(
+                    bins
+                    *
+                    (plot_ranges[0][1] - plot_ranges[0][0])
+                    /
+                    (e_range[1] - e_range[0])
+                )),
+                density=True
+            )
+
+            hist /= bin_edges[1:]**2 - bin_edges[:-1]**2
+            hist /= (hist * (bin_edges[1:] - bin_edges[:-1])).sum()
+            pyplot.bar(x=bin_edges[:-1],
+                       height=hist,
+                       width=bin_edges[1:] - bin_edges[:-1],
+                       align='edge',
+                       color='none',
+                       edgecolor='black')
+
+            plot_x = numpy.linspace(max(bin_edges[0] - 3.0 * kernel_width, 0.0),
+                                    bin_edges[-1] + 3.0 * kernel_width,
+                                    10 * bin_edges.size)
+            plot_y = kde_distro.pdf(plot_x)
+            pyplot.plot(plot_x, plot_y, color='red')
+            pyplot.xlim(*e_range)
+            pyplot.suptitle(str(kic_id) + ' PDF($e_f$)')
+
+            if plot_x.min() >= 0.5 * sum(e_range):
+                inset_location = 'upper left'
+            elif plot_x.max() <= 0.5 * sum(e_range):
+                inset_location = 'upper right'
+            elif (
+                plot_y[plot_x < 0.5 * sum(e_range)].max()
+                <
+                plot_y[plot_x > 0.5 * sum(e_range)].max()
+            ):
+                inset_location = 'upper left'
+            else:
+                inset_location = 'upper right'
+
+            inset = inset_axes(pyplot.gca(),
+                               width='35%',
+                               height='35%',
+                               loc=inset_location)
+
+            inset.plot(w19_samples['ecosw'],
+                       w19_samples['esinw'],
+                       'ok',
+                       markersize=0.5)
+            inset.axhline(y=0, linewidth=0.5)
+            inset.axvline(x=0, linewidth=0.5)
+
+    #    pyplot.yscale('log')
+            if plot_fname:
+                pdf.savefig()
+                pyplot.close()
+            else:
+                pyplot.show()
+    if plot_fname:
+        pdf.close()
 
 
 def generate_slurm_scripts(hpc, available_kic, slurm_dir, sampling_mode):
@@ -432,12 +607,6 @@ def parse_command_line():
         'eccentricity distrubition.'
     )
     parser.add_argument(
-        '--e-distro-kernel-width',
-        type=float,
-        default=1e-4,
-        help='The width of the kernel to use for estimating eccentricity PDF.'
-    )
-    parser.add_argument(
         '--e-distro-histogram-bins',
         type=int,
         default=30,
@@ -496,16 +665,10 @@ def main(config):
 
     logging.basicConfig(level=logging.INFO)
 
-    if (
-        config.list_valid_systems
-        or
-        config.create_pe_plot is not None
-        or
-        config.generate_slurm_scripts
-    ):
-        available_kic = get_available_kic(interpolator,
-                                          config.max_porb,
-                                          config.max_eccentricity)
+    available_kic = get_available_kic(interpolator,
+                                      config.max_porb,
+                                      config.max_eccentricity)
+    print('KIC 74: ' + repr(available_kic[74]))
 
     if config.list_valid_systems:
         print('\n'.join(map(repr, available_kic)))
@@ -520,9 +683,11 @@ def main(config):
                                config.generate_slurm_scripts)
     if config.create_e_distro_plot is not None:
         plot_eccentricity_distribution(
-            kic_id=int(config.create_e_distro_plot[0]),
+            kic_id_list=(
+                available_kic[:74] if config.create_e_distro_plot[0] == 'all'
+                else [int(config.create_e_distro_plot[0])]
+            ),
             plot_fname=config.create_e_distro_plot[1],
-            kernel_width=config.e_distro_kernel_width,
             bins=config.e_distro_histogram_bins
         )
 

@@ -101,6 +101,36 @@ class eccentricity_kde_distro_gen(stats.rv_continuous):
             return result[0]
 
 
+    def _cdf_single(self, x):
+        """Print what is being evaluated."""
+
+        points = numpy.linspace(self._s_to_n.min(),
+                                self._s_to_n.max(),
+                                10) * self._width
+        points = numpy.concatenate((
+            [0],
+            points[numpy.logical_and(points > 0, points < x)]
+        ))
+        return (
+            quad(
+                self._pdf,
+                a=0,
+                b=points[-1],
+                points=points,
+                limit=200
+            )[0]
+            +
+            quad(
+                self._pdf,
+                a=points[-1],
+                b=x,
+                limit=200
+            )[0]
+        )
+#        print('Evaluated CDF(%g) = %g' % (x, result))
+#        return result
+
+
     def __init__(self, e_samples, kernel_width, **kwargs):
         r"""
         Specify the samples, kernel width, and distribution config.
