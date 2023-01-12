@@ -98,7 +98,86 @@ def get_eccentricity_kernel_widths():
             (10923260, 1e-4),
             (3003991, 2.0e-2),
             (6927629, 3e-6),
-            (8364119, 3e-4)
+            (8364119, 3e-4),
+            (6949550, 3e-6),
+            (9532123, 3e-4),
+            (9892471, 3e-5),
+            (2445134, 1.5e-4),
+            (4948863, 1.5e-4),
+            (9775253, 5e-7),
+            (4839180, 4e-5),
+            (5652260, 1e-4),
+            (6707942, 1.7e-3),
+            (7597703, 3e-6),
+            (11232745, 2e-5),
+            (8984706, 1.3e-4),
+            (11409698, 1e-4),
+            (9353182, 3e-5),
+            (6594972, 1e-4),
+            (9025914, 1e-4),
+            (9665503, 1e-4),
+            (6185717, 2e-4),
+            (8414159, 2.5e-5),
+            (6301030, 1e-5),
+            (11499757, 5e-5),
+            (11704044, 3e-6),
+            (6359798, 2e-5),
+            (7118545, 3e-5),
+            (12251779, 8e-5),
+            (4678171, 7e-5),
+            (8111622, 2e-5),
+            (5622250, 5e-5),
+            (8879427, 3e-4),
+            (5979863, 1e-3),
+            (9001468, 2e-4),
+            (6522750, 2e-4),
+            (6131659, 5e-5),
+            (12316447, 3e-5),
+            (7624297, 2e-4),
+            (10992733, 8e-5),
+            (7021177, 1.5e-4),
+            (10753734, 3e-5),
+            (10711913, 1.5e-3),
+            (10518735, 1e-4),
+            (9016295, 6e-4),
+            (10258558, 2.5e-4),
+            (4252226, 1e-4),
+            (4633434, 2e-3),
+            (12017140, 1e-4),
+            (9838060, 2e-3),
+            (6672229, 2.5e-4),
+            (7821010, 2e-4),
+            (10849244, 5e-5),
+            (10215422, 1e-6),
+            (5983348, 6e-4),
+            (7767733, 1.5e-3),
+            (10651945, 1.5e-4),
+            (4773155, 8e-5),
+            (5553624, 2e-4),
+            (12356914, 2e-3),
+            (8572936, 2e-5),
+            (8973000, 1e-4),
+            (2998124, 1e-4),
+            (6431670, 1e-5),
+            (4847832, 1e-5),
+            (8183389, 1e-3),
+            (5003117, 1.2e-3),
+            (12644769, 1e-4),
+            (8553907, 1e-4),
+            (12217907, 2e-4),
+            (7541502, 3e-5),
+            (10420279, 7e-5),
+            (4247023, 1.5e-4),
+            (9164836, 1e-4),
+            (8610483, 1.5e-4),
+            (9714123, 1e-3),
+            (9837544, 1e-5),
+            (8560285, 1.5e-3),
+            (8044608, 5e-5),
+            (10292238, 1.5e-4),
+            (4824268, 3e-4),
+            (8760135, 5e-5),
+            (9839062, 1e-3)
     ]:
         result[kic] = kernel_width
     return result
@@ -414,7 +493,20 @@ def plot_eccentricity_distribution(kic_id_list,
                    8746310: (0.0, 2e-4),
                    10923260: (0.4, 0.42),
                    3003991: (0.0, 0.2),
-                   6927629: (0.0, 1e-4)}
+                   6927629: (0.0, 1e-4),
+                   6949550: (0.26477, 0.26493),
+                   9892471: (0, 0.002),
+                   9775253: (0, 3e-5),
+                   7597703: (0, 2e-4),
+                   11232745: (0, 1e-3),
+                   8414159: (0, 0.002),
+                   11499757: (0.26, 0.263),
+                   11704044: (0, 2e-4),
+                   8879427: (0.45, 0.465),
+                   12316447: (0.368, 0.370),
+                   7021177: (0.584, 0.596),
+                   8572936: (0.5170, 0.5195),
+                   8973000: (0.52, 0.53)}
     eccentricity_pdf_kernel_widths = get_eccentricity_kernel_widths()
 
     if plot_fname:
@@ -426,9 +518,12 @@ def plot_eccentricity_distribution(kic_id_list,
                        +
                        w19_samples['ecosw']**2)
         )
+        print('Ecccentricity samples:\n' + repr(e_samples))
         kernel_width = eccentricity_pdf_kernel_widths[kic_id]
         kde_distro = eccentricity_kde_distro_gen(e_samples, kernel_width)
-#        plot_x = numpy.linspace(0.0, e_samples[-1], 100)
+#        plot_x = numpy.linspace(e_samples[0] - 5.0 * kernel_width,
+#                                e_samples[-1] + 5.0 * kernel_width,
+#                                100)
 #        pyplot.plot(plot_x, kde_distro.cdf(plot_x), color='red')
 #        pyplot.axhline(y=0.1)
 #        pyplot.axhline(y=0.9)
@@ -442,7 +537,7 @@ def plot_eccentricity_distribution(kic_id_list,
                 e_samples[-1]
             ),
             custom_zoom.get(kic_id,
-                            (kde_distro.ppf(0.1), kde_distro.ppf(0.9)))
+                            (kde_distro.ppf(0.025), kde_distro.ppf(0.975)))
         ]
         if (
             plot_ranges[1][1] - plot_ranges[1][0]
@@ -470,9 +565,12 @@ def plot_eccentricity_distribution(kic_id_list,
                 bins=int(numpy.ceil(
                     bins
                     *
-                    (plot_ranges[0][1] - plot_ranges[0][0])
-                    /
-                    (e_range[1] - e_range[0])
+                    max(
+                        1,
+                        (e_samples[-1] - e_samples[0])
+                        /
+                        (e_range[1] - e_range[0])
+                    )
                 )),
                 density=True
             )
@@ -486,22 +584,16 @@ def plot_eccentricity_distribution(kic_id_list,
                        color='none',
                        edgecolor='black')
 
-            plot_x = numpy.linspace(max(bin_edges[0] - 3.0 * kernel_width, 0.0),
-                                    bin_edges[-1] + 3.0 * kernel_width,
-                                    10 * bin_edges.size)
+            plot_x = numpy.linspace(e_range[0], e_range[1], 300)
             plot_y = kde_distro.pdf(plot_x)
             pyplot.plot(plot_x, plot_y, color='red')
             pyplot.xlim(*e_range)
             pyplot.suptitle(str(kic_id) + ' PDF($e_f$)')
 
-            if plot_x.min() >= 0.5 * sum(e_range):
-                inset_location = 'upper left'
-            elif plot_x.max() <= 0.5 * sum(e_range):
-                inset_location = 'upper right'
-            elif (
-                plot_y[plot_x < 0.5 * sum(e_range)].max()
+            if (
+                plot_y[plot_x < 0.6 * e_range[0] + 0.4 * e_range[1]].max()
                 <
-                plot_y[plot_x > 0.5 * sum(e_range)].max()
+                plot_y[plot_x > 0.4 * e_range[0] + 0.6 * e_range[1]].max()
             ):
                 inset_location = 'upper left'
             else:
@@ -668,7 +760,6 @@ def main(config):
     available_kic = get_available_kic(interpolator,
                                       config.max_porb,
                                       config.max_eccentricity)
-    print('KIC 74: ' + repr(available_kic[74]))
 
     if config.list_valid_systems:
         print('\n'.join(map(repr, available_kic)))
@@ -684,7 +775,7 @@ def main(config):
     if config.create_e_distro_plot is not None:
         plot_eccentricity_distribution(
             kic_id_list=(
-                available_kic[:74] if config.create_e_distro_plot[0] == 'all'
+                available_kic if config.create_e_distro_plot[0] == 'all'
                 else [int(config.create_e_distro_plot[0])]
             ),
             plot_fname=config.create_e_distro_plot[1],
