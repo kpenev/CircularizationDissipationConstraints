@@ -104,8 +104,8 @@ class eccentricity_kde_distro_gen(stats.rv_continuous):
     def _cdf_single(self, x):
         """Print what is being evaluated."""
 
-        points = numpy.linspace(self._s_to_n.min(),
-                                self._s_to_n.max(),
+        points = numpy.linspace(self._s_to_n.min() - 2,
+                                self._s_to_n.max() + 2,
                                 10) * self._width
         points = numpy.concatenate((
             [0],
@@ -127,8 +127,6 @@ class eccentricity_kde_distro_gen(stats.rv_continuous):
                 limit=200
             )[0]
         )
-#        print('Evaluated CDF(%g) = %g' % (x, result))
-#        return result
 
 
     def __init__(self, e_samples, kernel_width, **kwargs):
@@ -157,7 +155,6 @@ class eccentricity_kde_distro_gen(stats.rv_continuous):
             e_samples,
             kernel_width
         ).sum() / kernel_width
-        print('Norm: ' + repr(self._norm))
 #pylint: enable=invalid-name
 #pylint: enable=arguments-differ
 
