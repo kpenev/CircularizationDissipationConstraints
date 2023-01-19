@@ -148,41 +148,25 @@ class Initialization:
 
 
 class FinalVsInitialEccentricity:
-    def __init__(self,
-                 logging_fname = "/work/08529/mmmahmud/scratch/finalVsInitialEccentricity/finalVsInitialEccentricity.log",
-                 logger_name = "/work/08529/mmmahmud/scratch/finalVsInitialEccentricity/logger_for_finalVsInitialEccentricity",
-                 reset = False,
-                 obliquity = 0,
-                 spin_frequency_breaks_for_planet=None,
-                 spin_frequency_powers_for_planet=numpy.array([0.0]),
-                 directory="/work/08529/mmmahmud/finalVsInitialEccentricity/recordsOnEfinalVsPorb",
-                 primary_mass=1,
-                 secondary_mass=1,
-                 secondary_radius=1,
-                 initial_stellar_spin=10,
-                 tidal_break_period=get_Pbr(),
-                 argument_of_phase_lag_function_for_planet=get_lgQpl(),
-                 power_law_argument=get_alpha(),
-                 stellar_age=4.57,
-                 stellar_metallicity=0):
+    def __init__(self, logging_fname = "/work/08529/mmmahmud/scratch/finalVsInitialEccentricity/finalVsInitialEccentricity.log", reset = False):
         self.logging_fname = logging_fname
         ensure_directory(self.logging_fname)
-        self.logger_name = logger_name
+        logger_name = "/work/08529/mmmahmud/scratch/finalVsInitialEccentricity/logger_for_finalVsInitialEccentricity"
         logging_level = logging.DEBUG
-        self.logger = setup_logger(self.logger_name, self.logging_fname, level=logging_level)
-        self.obliquity = obliquity
-        self.spin_frequency_breaks_for_planet=spin_frequency_breaks_for_planet
-        self.spin_frequency_powers_for_planet=spin_frequency_powers_for_planet
-        self.directory = directory
-        self.primary_mass = primary_mass
-        self.secondary_mass = secondary_mass
-        self.secondary_radius = secondary_radius
-        self.initial_stellar_spin = initial_stellar_spin
-        self.tidal_break_period = tidal_break_period
-        self.argument_of_phase_lag_function_for_planet = argument_of_phase_lag_function_for_planet
-        self.power_law_argument = power_law_argument
-        self.stellar_age = stellar_age
-        self.stellar_metallicity = stellar_metallicity
+        self.logger = setup_logger(logger_name, logging_fname, level=logging_level)
+        self.obliquity = 0
+        self.spin_frequency_breaks_for_planet=None
+        self.spin_frequency_powers_for_planet=numpy.array([0.0])
+        self.directory = "/work/08529/mmmahmud/finalVsInitialEccentricity/recordsOnEfinalVsPorb"
+        self.primary_mass = 1
+        self.secondary_mass = 1
+        self.secondary_radius = 1
+        self.initial_stellar_spin = 10
+        self.tidal_break_period = get_Pbr()
+        self.argument_of_phase_lag_function_for_planet = get_lgQpl()
+        self.power_law_argument = get_alpha()
+        self.stellar_age = 4.57
+        self.stellar_metallicity = 0
         self.reset = reset
 
     def find_Porb_for_a_target_e_final(self,
@@ -243,7 +227,7 @@ class FinalVsInitialEccentricity:
             self.logger.debug("Porbs excluding those values for which e_finals are Nan, are %(porbs)s" % dict(porbs=repr(arg)))
             efinalVsPorb_instance = EfinalVsPorb(checks, arg)
             save_object(efinalVsPorb_instance, filename)
-
+         
         if math.fabs(checks[0]-efinal)<tol: return arg[0]
         if math.fabs(checks[-1]-efinal)<tol: return arg[-1]
         if checks[0]==checks[-1]: return None
@@ -291,7 +275,7 @@ class FinalVsInitialEccentricity:
                                     'secondary radius': self.secondary_radius,
                                     'secondary mass': self.secondary_mass,
                                     'initial stellar spin': self.initial_stellar_spin,
-                                    'tidal break period': self.tidal_break_period,
+                                    'tidal break period': self.tidal_break_period, #10**((math.log10(0.5)+1)/2),
                                     'argument of phase lag function for planet': self.argument_of_phase_lag_function_for_planet,
                                     'power law argument': self.power_law_argument,
                                     'stellar age': self.stellar_age,
@@ -385,6 +369,11 @@ class e_final_vs_e_initial:
     def __init__(self, e_i_array, e_f_array):
         self.e_i_array = e_i_array
         self.e_f_array = e_f_array
+        self.raw_e_f_as_a_smooth_function_of_e_i = self.build_lagrangian_function(self.e_i_array, self.e_f_array)
+        e_f_array_for_smooth_inverse_function, e_i_array_for_smooth_inverse_function = self.build_x_array_and_y_array_for_smooth_inverse_function()
+        self.raw_e_i_as_a_smooth_function_of_e_f = self.build_lagrangian_function(e_f_array_for_smooth_inverse_function, e_i_array_for_smooth_inverse_function)
+        e_i_array_for_derivative_of_e_f_wrt_e_i_smooth, d_e_f_wrt_e_i_array_for_derivative_of_e_f_wrt_e_i_smooth = self.build_x_array_and_y_array_for_derivative_of_e_f_wrt_e_i_smooth()
+        self.derivative_of_e_f_wrt_e_i_smooth = self.build_lagrangian_function(e_i_array_for_derivative_of_e_f_wrt_e_i_smooth, d_e_f_wrt_e_i_array_for_derivative_of_e_f_wrt_e_i_smooth)
 
     def piecewise_linear_function(self, e_i):
         a = 0
@@ -442,86 +431,120 @@ class e_final_vs_e_initial:
         if e_i>1: e_i=1
         return e_i
 
-def find_e_f_for_a_certain_e_i_and_Porb(ar, a, dirname = "/work/08529/mmmahmud/finalVsInitialEccentricity"):
-    # a is an instance of FinalVsInitialEccentricity class
-    # ar is an instance of argument class
+    def build_lagrangian_function(self, x_array, y_array):
+        def lagrangian_function(x):
+            y = 0
+            i = 0
+            while i<len(x_array):
+                A = y_array[i]
+                B = 1
+                C = 1
+                j = 0
+                while j<len(x_array):
+                    if j != i:
+                        B = B * (x - x_array[j])
+                        C = C * (x_array[i] - x_array[j])
+                    j = j + 1
+                y = y + A * B / C
+                i = i + 1
+            return y
+        return lagrangian_function
 
-    filename = "%(dirname)s/arguments/Porb_%(Porb)f/alpha_%(alpha)f/lgQpl_%(lgQpl)f/Porb_%(Porb)f_e_i_%(e_i)f_when_Pbr_%(Pbr)f_alpha_%(alpha)f_lgQpl_%(lgQpl)f.pkl" % dict(dirname = dirname,
-                                                                                                                                                                           Porb=ar.Porb,
-                                                                                                                                                                           e_i=ar.e_i,
-                                                                                                                                                                           alpha=a.power_law_argument,
-                                                                                                                                                                           Pbr=a.tidal_break_period,
-                                                                                                                                                                           lgQpl=a.argument_of_phase_lag_function_for_planet)
-    ensure_directory(filename)
-    a.logger.debug("fileName = %(x)s" % dict(x=filename))
-    file_exists = os.path.exists(filename)
-    if file_exists and (not reset()):
-        a.logger.debug("file exists. We are retrieving data.")
-        element = pickle.load(open(filename, "rb"))
-        if element.e_f is not None:
-            a.logger.debug("element e_final is = %(x)f" % dict(x=element.e_f))
-            return element.e_f
-    a.logger.debug("File was not there. We are calculating e_final.")
-    e = a.find_e_final(ar.Porb, ar.e_i)
-    a.logger.debug("Calculated e_final is %(x)s" % dict(x=repr(e)))
-    if e is not None: ar.e_f = e
-    save_object(ar, filename)
-    return e
+    def smooth_function(self, e_i):
+        e_f = self.raw_e_f_as_a_smooth_function_of_e_i(e_i)
+        if e_f <0: return 0
+        if e_f>1: return 1
+        return e_f
 
-def plot_e_i_vs_e_f_for_the_finetuned_Porb_for_which_a_target_e_f_can_be_reached_at_present_age_by_starting_evolution_from_e_i_max(Porb_, alpha, Pbr, lgQpl, a,
-                                                                                                                                   dirname = "/work/08529/mmmahmud/finalVsInitialEccentricity"):
-    Porb = Porb_
-    a.power_law_argument = alpha
-    a.tidal_break_period = Pbr
-    a.argument_of_phase_lag_function_for_planet = lgQpl
-    arg = []
-    for e_init in numpy.arange(0.1, 0.9, 0.1):
-        x = argument(e_init, Porb)
-        arg.append(x)
-    with Pool(processes=len(arg)) as pool:
-        checks = pool.map(func, arg)
-    e_i = []
-    e_f = []
-    e_i.append(0)
-    e_f.append(0)
-    e_init = 0.01
-    for e_init in numpy.arange(0.1, 0.9, 0.1):
-        filename = "%(dirname)s/arguments/Porb_%(Porb)f/alpha_%(alpha)f/lgQpl_%(lgQpl)f/Porb_%(Porb)f_e_i_%(e_i)f_when_Pbr_%(Pbr)f_alpha_%(alpha)f_lgQpl_%(lgQpl)f.pkl" % dict(dirname = dirname,
-                                                                                                                                                                               Porb=Porb,
-                                                                                                                                                                               e_i=e_init,
-                                                                                                                                                                               alpha=alpha,
-                                                                                                                                                                               Pbr=Pbr,
-                                                                                                                                                                               lgQpl=lgQpl)
-        file_exists = os.path.exists(filename)
-        if file_exists:
-            element = pickle.load(open(filename, "rb"))
-            if element.e_f is not None:
-                e_i.append(e_init)
-                e_f.append(element.e_f)
+    def smooth_inverse_function_aux(self, e_f):
+        delta = (self.e_f_array[-1] - self.e_f_array[0])/1000.0
+        e_i_a = self.e_i_array[0]
+        e_i_b = self.e_i_array[-1]
+        e_f_a = self.smooth_function(e_i_a)
+        e_f_b = self.smooth_function(e_i_b)
+        if math.fabs(e_f-e_f_a) < delta: return e_i_a
+        if math.fabs(e_f-e_f_b) < delta: return e_i_b
+        if e_f>e_f_b and math.fabs(e_f-e_f_b)>delta:
+            e_i_a = e_i_b
+            e_i_b = 1.0
+            e_f_a = e_f_b
+            e_f_b = self.smooth_function(e_i_b)
+        if e_f<e_f_a and math.fabs(e_f-e_f_a)>delta:
+            e_i_b = e_i_a
+            e_i_a = 0.0
+            e_f_b = e_f_a
+            e_f_a = self.smooth_function(e_i_a)
+        while (e_f>e_f_a and e_f<e_f_b):
+            e_i_c = (e_i_a + e_i_b)/2.0
+            e_f_c = self.smooth_function(e_i_c)
+            if math.fabs(e_f_c - e_f)<delta:
+                e_i = e_i_c
+                if e_i<0: e_i=0
+                if e_i>1: e_i=1
+                return e_i
+            if e_f_c < e_f:
+                e_i_a = e_i_c
+                e_f_a = self.smooth_function(e_i_a)
+            if e_f_c > e_f:
+                e_i_b = e_i_c
+                e_f_b = self.smooth_function(e_i_b)
+            if math.fabs(e_f-e_f_a) < delta: return e_i_a
+            if math.fabs(e_f-e_f_b) < delta: return e_i_b
 
-    plt.plot(e_i, e_f)
-    plt.xlabel("Initial Eccentricity")
-    plt.ylabel('Final Eccentricity')
-    fig_file_name = "%(dirname)s/plots/comp_e_f_vs_e_in_for_Porb_%(Porb)f_when_alpha_%(alpha)f_Pbr_%(Pbr)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
-                                                                                                                                       Porb=Porb,
-                                                                                                                                       alpha=a.power_law_argument,
-                                                                                                                                       Pbr=a.tidal_break_period,
-                                                                                                                                       lgQpl=a.argument_of_phase_lag_function_for_planet)
-    ensure_directory(fig_file_name)
-    plt.savefig(fig_file_name)
-    plt.cla()
-    plt.clf()
-    return e_i, e_f
+    def build_x_array_and_y_array_for_smooth_inverse_function(self):
+        e_i_array = self.e_i_array
+        e_f_array = self.e_f_array
+        k =(e_i_array[-1]-e_i_array[0])/(e_i_array[1]-e_i_array[0])
+        del_e_f = (e_f_array[-1] - e_f_array[0])/(k)
+
+        x_array = []
+        y_array = []
+
+        e_f = e_f_array[0]
+        while e_f < (e_f_array[-1]+del_e_f):
+            e_i = self.smooth_inverse_function_aux(e_f)
+            if e_i is not None:
+                x_array.append(e_f)
+                y_array.append(e_i)
+            e_f = e_f + del_e_f
+        return x_array, y_array
+
+    def smooth_inverse_function(self, e_f):
+        e_i = self.raw_e_i_as_a_smooth_function_of_e_f(e_f)
+        if e_i < 0: return 0
+        if e_i > 1: return 1
+        return e_i
+
+    def build_x_array_and_y_array_for_derivative_of_e_f_wrt_e_i_smooth(self):
+        e_i_array = self.e_i_array
+        e_f_array = self.e_f_array
+        x_array = []
+        y_array = []
+
+        k = (e_i_array[-1] - e_i_array[0])/(e_i_array[1] - e_i_array[0])
+        del_e_i = (e_i_array[-1] - e_i_array[0])/(5*k)
+
+        e_i = e_i_array[0]
+        while e_i < e_i_array[-1]:
+            d_e_f_wrt_e_i = (self.smooth_function(e_i + del_e_i) - self.smooth_function(e_i))/del_e_i
+            if d_e_f_wrt_e_i is not None:
+                x_array.append(e_i)
+                y_array.append(d_e_f_wrt_e_i)
+            e_i = e_i + del_e_i
+
+        return x_array, y_array
+
+    def derivative_of_e_final_wrt_e_initial(self, e_i, function):
+        delta = 0.05
+        d = derivative(function, e_i, dx=delta)
+        return d
 
 
 class eccentricity_distribution_class:
     def __init__(self, sigma_square, nu_square):
         self.sigma_square = sigma_square
         self.nu_square = nu_square
-        if math.fabs(self.nu_square)<0.000001:
-            self.nu = 0
-        else:
-            self.nu = math.sqrt(self.nu_square)
+        self.nu = math.sqrt(self.nu_square)
 
     def eccentricity_distribution(self, e):
         if self.nu_square == 0:
@@ -537,13 +560,34 @@ if __name__ == '__main__':
     Initialization()
     dirname = "/work/08529/mmmahmud/finalVsInitialEccentricity"
     arg = []
-    find_e_final_vs_e_init_for_different_Porb = True
+    find_e_final_vs_e_init_for_different_Porb = False
     find_Porb_with_target_e_f = True
     a = FinalVsInitialEccentricity()
-    
+    def func(ar):
+       filename = "%(dirname)s/arguments/Porb_%(Porb)f/alpha_%(alpha)f/lgQpl_%(lgQpl)f/Porb_%(Porb)f_e_i_%(e_i)f_when_Pbr_%(Pbr)f_alpha_%(alpha)f_lgQpl_%(lgQpl)f.pkl" % dict(dirname = dirname,
+                                                                                                                                                                              Porb=ar.Porb,
+                                                                                                                                                                              e_i=ar.e_i,
+                                                                                                                                                                              alpha=a.power_law_argument,
+                                                                                                                                                                              Pbr=a.tidal_break_period,
+                                                                                                                                                                              lgQpl=a.argument_of_phase_lag_function_for_planet)
+       ensure_directory(filename)
+       a.logger.debug("fileName = %(x)s" % dict(x=filename))
+       file_exists = os.path.exists(filename)
+       if file_exists and (not reset()):
+           a.logger.debug("file exists. We are retrieving data.")
+           element = pickle.load(open(filename, "rb"))
+           if element.e_f is not None:
+               a.logger.debug("element e_final is = %(x)f" % dict(x=element.e_f))
+               return element.e_f
+       a.logger.debug("File was not there. We are calculating e_final.")
+       e = a.find_e_final(ar.Porb, ar.e_i)
+       a.logger.debug("Calculated e_final is %(x)s" % dict(x=repr(e)))
+       if e is not None: ar.e_f = e
+       save_object(ar, filename)
+       return e
+
     if find_e_final_vs_e_init_for_different_Porb:
        arg = []
-       func = partial(find_e_f_for_a_certain_e_i_and_Porb, a = a, dirname = dirname)
        for Porb in numpy.arange(1.0, 7, 0.5):
            for e_init in numpy.arange(0.1, 0.9, 0.1):
                x = argument(e_init, Porb)
@@ -570,11 +614,11 @@ if __name__ == '__main__':
            plt.plot(e_i, e_f)
            plt.xlabel("Initial Eccentricity")
            plt.ylabel('Final Eccentricity')
-           fig_file_name = "%(dirname)s/plots/k_e_f_vs_e_in_for_Porb_%(Porb)f_when_Pbr_%(Pbr)f_alpha_%(alpha)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
-                                                                                                                                           Porb=Porb,
-                                                                                                                                           alpha=get_alpha(),
-                                                                                                                                           Pbr=get_Pbr(),
-                                                                                                                                           lgQpl=get_lgQpl())
+           fig_file_name = "%(dirname)s/plots/e_f_vs_e_in_for_Porb_%(Porb)f_when_Pbr_%(Pbr)f_alpha_%(alpha)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
+                                                                                                                                         Porb=Porb,
+                                                                                                                                         alpha=get_alpha(),
+                                                                                                                                         Pbr=get_Pbr(),
+                                                                                                                                         lgQpl=get_lgQpl())
            ensure_directory(fig_file_name)
            plt.savefig(fig_file_name)
            plt.cla()
@@ -592,13 +636,52 @@ if __name__ == '__main__':
        lgQpl = 5
        Porb = Porb_5
        a.logger.debug("Porb = %(x)f" % dict(x=Porb))
+       def plot_e_i_vs_e_f_for_the_finetuned_Porb_for_which_a_target_e_f_can_be_reached_at_present_age_by_starting_evolution_from_e_i_max(Porb_, alpha, Pbr, lgQpl):
+           Porb = Porb_
+           a.power_law_argument = alpha
+           a.tidal_break_period = Pbr
+           a.argument_of_phase_lag_function_for_planet = lgQpl
+           arg = []
 
-       e_i_array, e_f_array = plot_e_i_vs_e_f_for_the_finetuned_Porb_for_which_a_target_e_f_can_be_reached_at_present_age_by_starting_evolution_from_e_i_max(Porb,
-                                                                                                                                                             alpha=alpha,
-                                                                                                                                                             Pbr=Pbr,
-                                                                                                                                                             lgQpl = lgQpl,
-                                                                                                                                                             a = a,
-                                                                                                                                                             dirname=dirname)
+           for e_init in numpy.arange(0.1, 0.9, 0.1):
+               x = argument(e_init, Porb)
+               arg.append(x)
+
+           with Pool(processes=len(arg)) as pool:
+               checks = pool.map(func, arg)
+           e_i = []
+           e_f = []
+           e_i.append(0)
+           e_f.append(0)
+           e_init = 0.01
+           for e_init in numpy.arange(0.1, 0.9, 0.1):
+               filename = "%(dirname)s/arguments/Porb_%(Porb)f/alpha_%(alpha)f/lgQpl_%(lgQpl)f/Porb_%(Porb)f_e_i_%(e_i)f_when_Pbr_%(Pbr)f_alpha_%(alpha)f_lgQpl_%(lgQpl)f.pkl" % dict(dirname = dirname,
+                                                                                                                                                                                      Porb=Porb,
+                                                                                                                                                                                      e_i=e_init,
+                                                                                                                                                                                      alpha=alpha,
+                                                                                                                                                                                      Pbr=Pbr,
+                                                                                                                                                                                      lgQpl=lgQpl)
+               file_exists = os.path.exists(filename)
+               if file_exists:
+                   element = pickle.load(open(filename, "rb"))
+                   if element.e_f is not None:
+                       e_i.append(e_init)
+                       e_f.append(element.e_f)
+
+           plt.plot(e_i, e_f)
+           plt.xlabel("Initial Eccentricity")
+           plt.ylabel('Final Eccentricity')
+           fig_file_name = "%(dirname)s/plots/comp_e_f_vs_e_in_for_Porb_%(Porb)f_when_alpha_%(alpha)f_Pbr_%(Pbr)f_lgQpl_%(lgQpl)f.pdf" % dict(dirname=dirname,
+                                                                                                                                              Porb=Porb,
+                                                                                                                                              alpha=a.power_law_argument,
+                                                                                                                                              Pbr=a.tidal_break_period,
+                                                                                                                                              lgQpl=a.argument_of_phase_lag_function_for_planet)
+           ensure_directory(fig_file_name)
+           plt.savefig(fig_file_name)
+           plt.cla()
+           plt.clf()
+           return e_i, e_f
+       e_i_array, e_f_array = plot_e_i_vs_e_f_for_the_finetuned_Porb_for_which_a_target_e_f_can_be_reached_at_present_age_by_starting_evolution_from_e_i_max(Porb, alpha=alpha, Pbr=Pbr, lgQpl = lgQpl)
        e_final_vs_e_initial_instance = e_final_vs_e_initial(e_i_array, e_f_array)
        e_i = []
        e_f = []
@@ -643,14 +726,18 @@ if __name__ == '__main__':
        e_f = []
        delta = (e_i_array[1] - e_i_array[0])/4
        i = 0
+       #for e_initial in numpy.arange(e_i_array[0], e_i_array[-1] + 4*delta , 4*delta):
        while i<len(e_i_array):
+           #e_i.append(e_initial)
            e_initial = e_i_array[i]
            e_final = e_final_vs_e_initial_instance.piecewise_linear_function(e_initial)
+           #r = e_final_vs_e_initial_instance.derivative_of_e_f_wrt_e_i_smooth(e_initial)
            r = (e_final_vs_e_initial_instance.piecewise_linear_function(e_initial+delta)-e_final_vs_e_initial_instance.piecewise_linear_function(e_initial))/delta
            if not (math.fabs(r)<0.000001):
                e_f.append(e_final)
                d_e_i.append(1/r)
            i = i+1
+           #d_e_i.append(1/e_final_vs_e_initial_instance.derivative_of_e_final_wrt_e_initial(e_initial, e_final_vs_e_initial_instance.smooth_function))
        plt.plot(e_f, d_e_i)
        plt.xlabel("final Eccentricity")
        plt.ylabel('Derivative of initial Eccentricity wrt final Eccentricity')
@@ -690,13 +777,22 @@ if __name__ == '__main__':
        def integrand(e_f):
            p = eccentricity_distribution_instance.eccentricity_distribution(e_f)
            e_i = e_final_vs_e_initial_instance.piecewise_linear_inverse_function(e_f)
+           #r = e_final_vs_e_initial_instance.derivative_of_e_f_wrt_e_i_smooth(e_i)
            r = (e_final_vs_e_initial_instance.piecewise_linear_function(e_i+delta)-e_final_vs_e_initial_instance.piecewise_linear_function(e_i))/delta
+           #r = (e_final_vs_e_initial_instance.smooth_function(e_i+0.005) - e_final_vs_e_initial_instance.smooth_function(e_i))/0.005
+           #r = derivative(e_final_vs_e_initial_instance.smooth_function, e_i, dx=0.05)
+           #q = eccentricity_distribution_instance.prior_distribution_of_e_i(e_i)
+           #r = e_final_vs_e_initial_instance.derivative_of_e_final_wrt_e_initial(e_i, e_final_vs_e_initial_instance.smooth_function)
            if r == 0: return math.inf
            return p/r
        def integrand_linear(e_f):
            p = eccentricity_distribution_instance.eccentricity_distribution(e_f)
            e_i = e_final_vs_e_initial_instance.linear_inverse_function(e_f)
+           #r = e_final_vs_e_initial_instance.derivative_of_e_f_wrt_e_i_smooth(e_i)
            r = (e_final_vs_e_initial_instance.linear_function(e_i+delta) - e_final_vs_e_initial_instance.linear_function(e_i))/delta
+           #r = derivative(e_final_vs_e_initial_instance.linear_function, e_i, dx=0.05)
+           #q = eccentricity_distribution_instance.prior_distribution_of_e_i(e_i)
+           #r = e_final_vs_e_initial_instance.derivative_of_e_final_wrt_e_initial(e_i, e_final_vs_e_initial_instance.linear_function)
            if r == 0: return math.inf
            return p/r
        e_f_max = e_final_vs_e_initial_instance.piecewise_linear_function(0.8)
@@ -726,7 +822,7 @@ if __name__ == '__main__':
        plt.savefig(fig_file_name)
        plt.cla()
        plt.clf()
-
+       
        plt.plot(e_f, integ_linear)
        plt.xlabel("Final Eccentricity")
        plt.ylabel('integrand_linear')
@@ -752,4 +848,3 @@ if __name__ == '__main__':
        plt.savefig(fig_file_name)
        plt.cla()
        plt.clf()
-
