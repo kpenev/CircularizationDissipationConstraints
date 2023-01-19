@@ -17,6 +17,7 @@ from rice_distribution_utils import rice_from_error_bars
 from scipy import integrate
 from scipy.misc import derivative
 from scipy.special import i0
+from EnvelopeEccentricityDistribution import *
 
 sys.path.append('/home1/08529/mmmahmud/CircularizationDissipationConstraints/source')
 sys.path.append('/home1/08529/mmmahmud/general_purpose_python_modules')
@@ -561,7 +562,7 @@ class record:
         self.integral_e_dist_linear_function = integral_e_dist_linear_function
         self.integral_e_dist_piecewise_linear_function = integral_e_dist_piecewise_linear_function
 
-class FinalEccentricityDistributionIntegral_for_a_particular_system:
+class FinalEccentricityDistribution:
     def __init__(self,
                  system,
                  measured_e_now,
@@ -783,6 +784,22 @@ def sp(n):
         s = s + " "
         i = i + 1
     return s
+
+def extracting_data():
+    ins =EnvelopeEccentricityDistribution.EnvelopeEccentricityDistribution()
+    index = ins.print_properties_of_binary_systems_satisfying_constraints()
+    i = 0
+    while i<len(index):
+        system = ins.planet_name[index[i]]
+        measured_e_now = ins.eccentricity_now[index[i]]
+        e_now_upper_uncertainty = ins.eccentricity_now_upper_uncertainty[index[i]]
+        e_now_lower_uncertainty = ins.eccentricity_now_lower_uncertainty[index[i]]
+        a = FinalEccentricityDistribution(system=system, measured_e_now= measured_e_now, e_now_upper_uncertainty=e_now_upper_uncertainty, 
+                                          e_now_lower_uncertainty=e_now_lower_uncertainty)
+        a.find_all_cases()
+        i = i+1
+
+
 if __name__ == '__main__':
     Initialization()
     dirname = "/work/08529/mmmahmud/finalVsInitialEccentricity"
@@ -1010,11 +1027,12 @@ if __name__ == '__main__':
         string = "System%(g1)sPorb%(g2)sTarget_e_f%(g3)salpha%(g4)sPbr%(g5)slgQpl%(g6)smeasured_e_now%(g7)se_now_upper_uncertainty%(g8)se_now_lower_uncertainty%(g9)sintegral_linear%(g10)sintegral_piecewise_linear" % dict(g1=sp(14),g2=sp(19),g3=sp(5),g4=sp(8),g5=sp(10),g6=sp(8),g7=sp(5),g8=sp(5),g9=sp(5),g10=sp(8))
         f.write(string)
         f.close()
-    a = FinalEccentricityDistributionIntegral_for_a_particular_system(system="Kepler-45 b", measured_e_now= 0.11, e_now_upper_uncertainty=0.1, e_now_lower_uncertainty=-0.09)
+    #a = FinalEccentricityDistribution(system="Kepler-45 b", measured_e_now= 0.11, e_now_upper_uncertainty=0.1, e_now_lower_uncertainty=-0.09)
     #Porb, b = a.find_e_final_vs_e_initial_instance_for_which_Porb_is_finetuned_to_reach_a_target_e_f(target_e_f=0.5, alpha=-3, Pbr=1, lgQpl=5)
     #x = a.find_final_eccentricity_distribution_integral_linear_function(b)
     #y = a.find_final_eccentricity_distribution_integral_piecewise_linear_function(b)
     #a.plot(b, Porb, -3, 1, 5)
     #instance_FinalVsInitialEccentricity.logger.debug("The result for piecewise linear curve is %(x)f" % dict(x=y))
     #instance_FinalVsInitialEccentricity.logger.debug("The result for linear curve is %(x)f" % dict(x=x))
-    a.find_all_cases()
+    #a.find_all_cases()
+    extracting_data()
