@@ -790,13 +790,19 @@ def extracting_data():
     index = ins.print_properties_of_binary_systems_satisfying_constraints()
     i = 0
     while i<len(index):
-        system = ins.planet_name[index[i]]
-        measured_e_now = ins.eccentricity_now[index[i]]
-        e_now_upper_uncertainty = ins.eccentricity_now_upper_uncertainty[index[i]]
-        e_now_lower_uncertainty = ins.eccentricity_now_lower_uncertainty[index[i]]
-        a = FinalEccentricityDistribution(system=system, measured_e_now= measured_e_now, e_now_upper_uncertainty=e_now_upper_uncertainty, 
-                                          e_now_lower_uncertainty=e_now_lower_uncertainty)
-        a.find_all_cases()
+        means, stdev, sysname = ins.properties_of_ith_binary_system_if_satisfies_constraints(index[i])
+        system = sysname
+        measured_e_now = means['present eccentricity']
+        e_now_upper_uncertainty = stdev['eccentricity_now_upper_uncertainty']
+        e_now_lower_uncertainty = stdev['eccentricity_now_lower_uncertainty']
+        logging.debug("system %(s)s" % dict(s=system))
+        logging.debug("e %(e)f" % dict(e=measured_e_now))
+        logging.debug("e_u %(e)s" % dict(e=repr(e_now_upper_uncertainty)))
+        logging.debug("e_l %(e)s" % dict(e=repr(e_now_lower_uncertainty)))
+        if (e_now_upper_uncertainty is not None) and (e_now_lower_uncertainty is not None):
+            a = FinalEccentricityDistribution(system=system, measured_e_now= measured_e_now, e_now_upper_uncertainty=e_now_upper_uncertainty, 
+                                              e_now_lower_uncertainty=e_now_lower_uncertainty)
+            a.find_all_cases()
         i = i+1
 
 
