@@ -118,7 +118,7 @@ class PriorTransform:
                  system = "Star-Exoplanet",
                  dirname = "/work/08529/mmmahmud",
                  max_argument_of_phase_lag_function_for_planet=12,
-                 min_argument_of_phase_lag_function_for_planet=1,
+                 min_argument_of_phase_lag_function_for_planet=3,
                  min_log_tidal_break_period=math.log(0.5,10),
                  max_log_tidal_break_period=1,
                  min_power_law_argument=-5,
@@ -274,7 +274,7 @@ class LogLikelihood:
                  prior_transform_instance,
                  orbital_period,
                  obliquity,
-                 probability_density_of_eccentricity,
+                 eccentricity_distribution,
                  e_env,
                  system_name = 'Star-Exoplanet',
                  directory_name = '/work/08529/mmmahmud/p0andmcmc',
@@ -288,7 +288,7 @@ class LogLikelihood:
         self.prior_transform_instance = prior_transform_instance
         self.orbital_period = orbital_period
         self.obliquity = obliquity
-        self.probability_density_of_eccentricity = probability_density_of_eccentricity
+        self.eccentricity_distribution = eccentricity_distribution
         self.constraints = constraints
         self.initial_eccentricity = initial_eccentricity
         self.spin_frequency_breaks_for_planet = spin_frequency_breaks_for_planet
@@ -302,23 +302,7 @@ class LogLikelihood:
 
         self.means = self.prior_transform_instance.means
 
-        def retrieve_lgQmin(BigPlanet):
-            if BigPlanet:
-                lgQplmin_file_name  = '%(dir)s/BigPlanet/lgQplmin.npy' % dict(dir=self.directory_name)
-            else:
-                lgQplmin_file_name  = '%(dir)s/SmallPlanet/lgQplmin.npy' % dict(dir=self.directory_name)
-            lgQplmin_file_exists = os.path.exists(lgQplmin_file_name)
-            if lgQplmin_file_exists:
-                if self.logger is not None: self.logger.debug("File containing lgQpl_min exists")
-                lgQplmin_file = open(lgQplmin_file_name, 'rb')
-                lgQplmin_a = numpy.load(lgQplmin_file)
-                lgQplmin_file.close()
-                if self.logger is not None: self.logger.debug("lg Qpl_min found in the previously existing file is : %(x)f" % dict(x=lgQplmin_a[0]))
-                self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet = lgQplmin_a[0]
-            else:
-                if self.logger is not None: self.logger.debug("File containing lgQpl_min does not exists")
-
-        if (not (self.probability_density_of_eccentricity is None)) and (not (self.e_env is None)):
+        if (not (self.eccentricity_distribution is None)) and (not (self.e_env is None)):
             if 'secondary radius' in self.means:
                 rad = self.means['secondary radius']
                 if not self.logger is None: self.logger.debug("secondary radius is directly found in the list of parameters that is %(x)f" % dict(x=rad))
@@ -335,12 +319,10 @@ class LogLikelihood:
                 if not self.logger is None: self.logger.debug("secondary radius in Jupiter mass is %(x)f" % dict(x=rad_j))
                 if rad_j > 0.6:
                     self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet = 3
-                    retrieve_lgQmin(True)
                     if self.logger is not None: self.logger.debug("min argument of phase lag function for this BIG planet %(x)f"
                                                                   % dict(x=self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet))
                 else:
                     self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet = 1
-                    retrieve_lgQmin(False)
                     if self.logger is not None: self.logger.debug("min argument of phase lag function for this SMALL planet %(x)f"
                                                                   % dict(x=self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet))
 
@@ -391,7 +373,7 @@ class LogLikelihood:
                               'stellar age': stellar_age})
 
         if not priors:
-            return -numpy.inf, 0
+            return -numpy.inf
 
         star_exoplanet_binary_system = StarExoplanetSystem.System(primary_mass=primary_mass * un.solMass,
                                               secondary_mass=secondary_mass * un.earthMass,
@@ -508,21 +490,24 @@ class LogLikelihood:
         self.calculated_eccentricity_now = calculated_eccentricity_now
 
         if calculated_eccentricity_now >= 0 and calculated_eccentricity_now <= 1:
-            probability_density_of_the_calculated_eccentricity = self.probability_density_of_eccentricity(
-                calculated_eccentricity_now)
-            probability_density = probability_density_of_the_calculated_eccentricity * priors
-            if self.logger is not None: self.logger.debug("Probability density of the calculated eccentricity is %(p)f " % dict(p = probability_density))
-            if probability_density == 0:
-                logging.debug("log of probability density of e is %(x)f " % dict(x=-numpy.inf))
-                if self.logger is not None: self.logger.debug("log of probability density of e is %(x)f " % dict(x=-numpy.inf))
+            if calculated_eccentricity_now > self.e_env:
+                if self.logger is not None: self.logger.debug("Calculated eccentricity_now is greater than the envelope eccentricity")
                 return -numpy.inf
-            if probability_density < 0:
-                logging.warning('Probability density cannot be less than zero.')
-                if self.logger is not None: self.logger.warning('Probability density cannot be less than zero.')
+            integral = self.eccentricity_distribution.cdf(
+                calculated_eccentricity_now)/calculated_eccentricity_now
+            probability = integral * priors
+            if self.logger is not None: self.logger.debug("Probability of the calculated eccentricity is %(p)f " % dict(p = probability))
+            if probability == 0:
+                logging.debug("log of probability of e is %(x)f " % dict(x=-numpy.inf))
+                if self.logger is not None: self.logger.debug("log of probability of e is %(x)f " % dict(x=-numpy.inf))
                 return -numpy.inf
-            logging.debug("log of probability density of e is %(x)f " % dict(x=numpy.log(probability_density)))
-            if not self.logger is None: self.logger.debug("log of probability density of e is %(x)f " % dict(x=numpy.log(probability_density)))
-            return numpy.log(probability_density)
+            if probability < 0:
+                logging.warning('Probability cannot be less than zero.')
+                if self.logger is not None: self.logger.warning('Probability cannot be less than zero.')
+                return -numpy.inf
+            logging.debug("log of probability of e is %(x)f " % dict(x=numpy.log(probability)))
+            if not self.logger is None: self.logger.debug("log of probability of e is %(x)f " % dict(x=numpy.log(probability)))
+            return numpy.log(probability)
         logging.warning('Calculated present eccentricity can neither be less than zero nor greater than one')
         if not self.logger is None: self.logger.warning('Calculated present eccentricity can neither be less than zero nor greater than one')
         return -numpy.inf
@@ -1009,12 +994,12 @@ class SamplingPropertiesOfSystem:
                  means,
                  standard_deviations,
                  system_name = 'Star-Exoplanet',
-                 dirname = "/work/08529/mmmahmud"
+                 dirname = "/work/08529/mmmahmud",
                  envelope_eccentricity_function=EnvelopeEccentricityDistribution.envelope_eccentricity_function,
                  initial_eccentricity=0.8,
                  initial_stellar_spin=5,
                  max_argument_of_phase_lag_function_for_planet=12,
-                 min_argument_of_phase_lag_function_for_planet=1,
+                 min_argument_of_phase_lag_function_for_planet=3,
                  min_log_of_tidal_break_period=math.log(0.5, 10),
                  max_log_of_tidal_break_period=1,
                  min_power_law_argument=-5,
@@ -1079,26 +1064,28 @@ class SamplingPropertiesOfSystem:
             else:
                 rad = None
 
+            rad_j = 0
             if rad is not None:
+                rad_j = rad * const.R_earth.value / const.R_jup.value
                 self.e_env = self.envelope_eccentricity_function(x=self.means['semi major axis'] / rad, logger=logger)
             else:
                 self.e_env = 0.5
             logger.info("The envelope eccentricity for the system %(system)s is %(eenv)f" % dict(system=system_name, eenv=self.e_env))
-            if rad is not None and self.e_env > self.means['present eccentricity']:
+            if rad is not None and rad_j>0.6 and self.e_env > self.means['present eccentricity']:
                 logger.debug("EnccentricityDistribution instance is going to be created.")
                 eccentricity_distribution_object = EccentricityDistribution.EccentricityDistribution(self.means['present eccentricity'],
                                                                             self.standard_deviations[
                                                                                 'eccentricity_now_upper_uncertainty'],
                                                                             self.standard_deviations[
                                                                                 'eccentricity_now_lower_uncertainty'],
-                                                                            self.e_env, eccentricity_flag_limit = self.means['eccentricity now limit flag'],
+                                                                            eccentricity_flag_limit = self.means['eccentricity now limit flag'],
                                                                             system_name = system_name, logger = logger)
 
                 logger.debug("EccentricityDistribution instance is created. Now probability density of eccentricity vs. eccentricity graph will be plotted.")
 
                 eccentricity_distribution_object.plot_probability_density_of_eccentricity_vs_eccentricity_graph()
                 logger.debug("The graph is plotted")
-                self.probability_density_of_eccentricity = eccentricity_distribution_object.probability_density_of_eccentricity
+                self.eccentricity_distribution = eccentricity_distribution_object.eccentricity_distribution
                 logger.info("PriorTransform instance is going to be created for the %(system)s" % dict(system=system_name))
                 self.prior_transform_instance = PriorTransform(means,
                                                                standard_deviations,
@@ -1116,7 +1103,7 @@ class SamplingPropertiesOfSystem:
                 self.log_likelihood_instance = LogLikelihood(prior_transform_instance = self.prior_transform_instance,
                                                              orbital_period = self.means['orbital period'],
                                                              obliquity = 0,  # obliquity
-                                                             probability_density_of_eccentricity = self.probability_density_of_eccentricity,
+                                                             eccentricity_distribution = self.eccentricity_distribution,
                                                              e_env = self.e_env,
                                                              system_name = system_name,
                                                              directory_name = '/work/08529/mmmahmud/p0andmcmc',
@@ -1131,7 +1118,10 @@ class SamplingPropertiesOfSystem:
                 self.log_likelihood_instance.MCMC()
                 logger.debug("MCMC is done")
             else:
-                logger.debug("Envelope eccentricity is lower than the present eccentricity for this system.")
+                if rad_j is not None:
+                    logger.debug("The planet's radius is less than 0.6 R_j")
+                else:
+                    logger.debug("Envelope eccentricity is lower than the present eccentricity for this system.")
 
 if __name__ == '__main__':
 

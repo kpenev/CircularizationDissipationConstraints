@@ -1,3 +1,4 @@
+from abc import ABCMeta, abstractmethod
 from scipy.special import erf
 import math
 from scipy.stats import rice
@@ -14,9 +15,11 @@ import sys
 from rice_distribution_utils import rice_from_error_bars
 from eccentricity_kde_distro_gen import eccentricity_kde_distro_gen
 sys.path.append('/home1/08529/mmmahmud/general_purpose_python_modules')
+from rice_distribution_utils import rice_from_error_bars
 
 def phi(z):
     return 0.5 * (1 + erf(z / math.sqrt(2)))
+
 
 class EccentricityDistribution:
     def __init__(self,
@@ -42,6 +45,7 @@ class EccentricityDistribution:
 
         self.system_name = system_name
         self.logger = logger
+        self.eccentricity_distribution_is_delta = False
 
         self.output_directory = "%(output_directory)s/%(system)s/%(system)s_edist" % dict(output_directory=output_directory, system=system_name)
         if os.path.exists(self.output_directory):
@@ -52,14 +56,64 @@ class EccentricityDistribution:
             if os.path.exists(self.output_directory):
                  if self.logger is not None: self.logger.debug("Now it is created: %(directory)s " % dict(directory=self.output_directory))
         self.eccentricity_distribution = None
-        if eccentricity_flag_limit < 2:
+        if (measured_eccentricity > 0) and (eccentricity_upper_uncertainty != 0) and (eccentricity_lower_uncertainty != 0) and eccentricity_flag_limit == 0:
+            if measured_eccentricity/eccentricity_upper_uncertainty < crit or measured_eccentricity/math.fabs(eccentricity_lower_uncertainty) < crit:
+                 if self.logger is not None: self.logger.debug("Eccentricity distribution for this system is a Rice Distribution/2pi.eccentricity")
+                 self.rice_distribution = rice_from_error_bars(self.measured_e_now, self.e_now_upper_uncertainty, math.fabs(self.e_now_lower_uncertainty))
+                 self.raw_moment1 = self.rice_distribution.moment(1)
+                 self.raw_moment2 = self.rice_distribution.moment(2)
+                 self.raw_moment3 = self.rice_distribution.moment(3)
+                 self.raw_moment4 = self.rice_distribution.moment(4)
+                 self.nu_square = math.sqrt(2 * (self.raw_moment2 ** 2) - self.raw_moment4)
+                 self.sigma_square = (self.raw_moment2 - self.nu_square)/2
+                 self.nu = math.sqrt(self.nu_square)
+                 self.eccentricity_distribution = self.get_eccentricity_distribution()
+
+                 rice_params = rice_from_error_bars(self.measured_e_now, self.e_now_upper_uncertainty, math.fabs(self.e_now_lower_uncertainty)).kwds
+                 self.nu_ = rice_params['b']*rice_params['scale']
+                 self.sigma_square_ = rice_params['scale']**2
+                 self.eccentricity_distribution_ = eccentricity_kde_distro_gen([rice_params['b'] * rice_params['scale']], rice_params['scale']).pdf
+            else:
+                 #self.rice_distribution = rice_from_error_bars(self.measured_e_now, self.e_now_upper_uncertainty, math.fabs(self.e_now_lower_uncertainty))
+                 #self.raw_moment1 = self.rice_distribution.moment(1)
+                 #self.raw_moment2 = self.rice_distribution.moment(2)
+                 #self.raw_moment3 = self.rice_distribution.moment(3)
+                 #self.raw_moment4 = self.rice_distribution.moment(4)
+                 #self.nu_square = math.sqrt(2 * (self.raw_moment2 ** 2) - self.raw_moment4)
+                 #self.sigma_square = (self.raw_moment2 - self.nu_square)/2
+                 #self.nu = math.sqrt(self.nu_square)
+                 rice_params = rice_from_error_bars(self.measured_e_now, self.e_now_upper_uncertainty, math.fabs(self.e_now_lower_uncertainty)).kwds
+                 self.nu = rice_params['b']*rice_params['scale']
+                 self.sigma_square = rice_params['scale']**2
+                 self.nu_square = self.nu * self.nu
+                 self.eccentricity_distribution = self.get_eccentricity_distribution()
+
+                 if self.logger is not None: self.logger.debug("Eccentricity distribution for this system is approximately a Normal distribution.")
+                 rice_params = rice_from_error_bars(self.measured_e_now, self.e_now_upper_uncertainty, math.fabs(self.e_now_lower_uncertainty)).kwds
+                 self.nu_ = rice_params['b']*rice_params['scale']
+                 self.sigma_square_ = rice_params['scale']**2
+                 self.eccentricity_distribution_ = eccentricity_kde_distro_gen([rice_params['b'] * rice_params['scale']], rice_params['scale']).pdf
+
+        if (measured_eccentricity == 0) and (eccentricity_upper_uncertainty != 0) and (eccentricity_lower_uncertainty == 0):
+            if self.logger is not None: self.logger.debug("The eccentricity upper uncertainty is non zero and eccentricity lower uncertainty is zero.")
+            b, s = self.roots_for_Rice_parameters()
+            if self.logger is not None: self.logger.debug("b is %(b)f and s is %(s)f" % dict(b=b, s=s))
+            self.sigma_square = s*s
+            self.nu = b*s
+            self.nu_square = self.nu * self.nu
+            self.eccentricity_distribution = self.get_eccentricity_distribution()
+
             rice_params = rice_from_error_bars(self.measured_e_now, self.e_now_upper_uncertainty, math.fabs(self.e_now_lower_uncertainty)).kwds
-            self.eccentricity_distribution = eccentricity_kde_distro_gen([rice_params['b'] * rice_params['scale']], rice_params['scale'])
-        else:
-            if self.logger is not None: self.logger.debug("The eccentricity upper uncertainty is non zero and eccentricity lower uncertainty is zero. Flag limit > 1")
-            rice_params_b, rice_params_scale = self.roots_for_Rice_parameters()
-            if self.logger is not None: self.logger.debug("b is %(b)f and s is %(s)f" % dict(b=rice_params_b, s=rice_params_scale))
-            self.eccentricity_distribution = eccentricity_kde_distro_gen([rice_params_b * rice_params_scale], rice_params_scale)
+            self.nu_ = rice_params['b']*rice_params['scale']
+            self.sigma_square_ = rice_params['scale']**2
+            self.eccentricity_distribution_ = eccentricity_kde_distro_gen([rice_params['b'] * rice_params['scale']], rice_params['scale']).pdf
+
+    def get_eccentricity_distribution(self):
+        def eccentricity_distribution(e):
+            if math.fabs(self.nu)< 0.000001:
+                return (1/2/math.pi/self.sigma_square)*math.exp(-e**2/2/self.sigma_square)
+            return (1/2/math.pi/self.sigma_square)*math.exp(-(e**2 + self.nu_square)/2/self.sigma_square) #* i0(e * self.nu/self.sigma_square)
+        return eccentricity_distribution
 
     def equations_to_be_solved_for_Rice_distribution_parameters(self, x):
         b = x[0]
@@ -81,7 +135,6 @@ class EccentricityDistribution:
             if self.logger is not None: self.logger.error('Iteration for working out Rice parameters does not converge')
             self.rice_parameters_are_found = False
         return [eqn]
-
     def roots_for_Rice_parameters(self):
         estimated_s = self.e_now_upper_uncertainty
         if self.logger is not None: self.logger.debug("estimated s = %(es)f" % dict(es=estimated_s))
@@ -123,31 +176,29 @@ class EccentricityDistribution:
     def plot_probability_density_of_eccentricity_vs_eccentricity_graph(self):
         eccentricity = np.linspace(0, 1, 100)
         probability_density_of_eccentricity = []
-        eccentricity_cdf = []
+        probability_density_of_eccentricity_ = []
+        probability_density_of_eccentricity__ = []
+        w = self.eccentricity_distribution(0.1)/self.eccentricity_distribution_(0.1)
         for i in range(0, len(eccentricity)):
             probability_density_of_eccentricity = probability_density_of_eccentricity + [
-                self.eccentricity_distribution.pdf(eccentricity[i])]
-            eccentricity_cdf = eccentricity_cdf + [
-                self.eccentricity_distribution.cdf(eccentricity[i])]
+                self.eccentricity_distribution(eccentricity[i])]
+            probability_density_of_eccentricity_ = probability_density_of_eccentricity_ + [
+                self.eccentricity_distribution_(eccentricity[i])]
+            probability_density_of_eccentricity__ = probability_density_of_eccentricity__ + [
+                w * self.eccentricity_distribution_(eccentricity[i])]
 
+        #w = self.eccentricity_distribution(0.1)/self.eccentricity_distribution_(0.1)
         if self.logger is not None: self.logger.info("We are going to save the probability distribution of eccentricity ")
         plt.plot(eccentricity, probability_density_of_eccentricity, label="Probality density of eccentricity (f(e)) vs. eccentricity (e)")
+        plt.plot(eccentricity, probability_density_of_eccentricity_)
+        plt.plot(eccentricity, probability_density_of_eccentricity__)
         plt.xlabel('Eccentricity (e)')
-        plt.ylabel('probability density of eccentricity (f(e))')
-        plt.title('Probability density of eccentricity vs. eccentricity for %(system)s' % dict(system=self.system_name))
+        plt.ylabel('probability density of eccentricity (f(e)), w=%(w)f' % dict(w=w))
+        #plt.title('Probability density of eccentricity vs. eccentricity for %(system)s' % dict(system=self.system_name))
+        plt.title('sigmasq1=%(x)f,sigmasq2=%(y)f,nu1=%(z)f,nu2=%(t)f' % dict(x=self.sigma_square,y=self.sigma_square_,z=self.nu,t=self.nu_))
         fname = '%(output_directory)s/Probability density of eccentricity vs. eccentricity for %(system)s.pdf' % dict(output_directory = self.output_directory, system=self.system_name)
         plt.savefig(fname)
         plt.clf()
-
-        if self.logger is not None: self.logger.info("We are going to save the CDF of eccentricity ")
-        plt.plot(eccentricity, eccentricity_cdf, label="CDF of eccentricity (f(e)) vs. eccentricity (e)")
-        plt.xlabel('Eccentricity (e)')
-        plt.ylabel('CDF of eccentricity (f(e))')
-        plt.title('CDF of eccentricity vs. eccentricity for %(system)s' % dict(system=self.system_name))
-        fname = '%(output_directory)s/CDF of eccentricity vs. eccentricity for %(system)s.pdf' % dict(output_directory = self.output_directory, system=self.system_name)
-        plt.savefig(fname)
-        plt.clf()
-
         return
 
 if __name__ == '__main__':
