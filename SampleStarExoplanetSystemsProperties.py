@@ -1056,7 +1056,7 @@ class SamplingPropertiesOfSystem:
             self.standard_deviations = standard_deviations
 
             if 'secondary radius' in self.means:
-                rad = self.means_['secondary radius']
+                rad = self.means['secondary radius']
             elif ('ratio of planet and stellar radius' in self.means) and ('primary radius' in self.means):
                 rad = self.means['ratio of planet and stellar radius'] * self.means['primary radius'] * const.R_sun.value / const.R_earth.value
             elif ('transit depth' in self.means) and ('primary radius' in self.means):

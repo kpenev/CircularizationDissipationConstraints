@@ -386,7 +386,7 @@ class EnvelopeEccentricityDistribution:
         plt.xscale("log")
         fig_file_name = "%(outdir)s/Envelope Eccentricity Distribution.pdf" % dict(outdir=self.output_directory)
         plt.savefig(fig_file_name)
-        plt.show()
+        plt.clf()
         return
 
     def properties_of_ith_binary_system_if_satisfies_constraints(self,
