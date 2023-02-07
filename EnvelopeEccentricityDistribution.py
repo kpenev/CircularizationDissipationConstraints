@@ -20,7 +20,7 @@ def getPathOfExoplanetSystemsData():
     return '/home1/08529/mmmahmud/CircularizationDissipationConstraints/data/PS_2022.10.19_20.26.52.csv'
 
 def envelope_eccentricity_function(x,
-                                   threshold_value_of_envelope_eccentricity = 0.01,
+                                   threshold_value_of_envelope_eccentricity = 0.03,
                                    largest_acceptable_value_of_envelope_eccentricity = 0.5,
                                    logger = None):
 
@@ -66,7 +66,7 @@ class EnvelopeEccentricityDistribution:
 
     def __init__(self,
                  maximum_number_of_data_points=math.inf,
-                 threshold_value_of_envelope_eccentricity=0.001,
+                 threshold_value_of_envelope_eccentricity=0.03,
                  constraints=Constraints_for_selecting_systems.constraints_for_eccentricity_envelope(),
                  largest_acceptable_value_of_envelope_eccentricity=0.5
                  ):
@@ -198,13 +198,14 @@ class EnvelopeEccentricityDistribution:
                             secondary_radius=self.secondary_radius[i],
                             planet_mass=self.secondary_mass[i],
                             constraints=constraints)):
-                        records_of_log_orbital_period_and_eccentricity_now = (
-                                records_of_log_orbital_period_and_eccentricity_now
-                                + [{'log of orbital period': math.log(self.orbital_period[i], 10),
-                                    'present eccentricity': self.eccentricity_now[i],
-                                    'planet name': self.planet_name[i],
-                                    'primary mass': self.primary_mass[i],
-                                    'orbital eccentricity limit flag': self.eccentricity_now_limit_flag[i]}])
+                        records_of_log_semi_major_axis_over_planetary_radius_and_eccentricity_now.append({'log of orbital period': math.log(self.orbital_period[i], 10),
+                                                                                                          'present eccentricity': self.eccentricity_now[i],
+                                                                                                          'planet name': self.planet_name[i],
+                                                                                                          'primary mass': self.primary_mass[i],
+                                                                                                          'orbital eccentricity limit flag': self.eccentricity_now_limit_flag[i],
+                                                                                                          'present eccentricity upper uncertainty': self.eccentricity_now_upper_uncertainty[i],
+                                                                                                          'present eccentricity lower uncertainty':self.eccentricity_now_lower_uncertainty[i]})
+
                         j = j + 1
                 if j >= maximum_number_of_data_points - 1:
                     break
@@ -223,22 +224,20 @@ class EnvelopeEccentricityDistribution:
                 if not (math.isnan(self.semi_major_axis[i])
                         or math.isnan(self.secondary_radius[i])
                         or math.isnan(self.eccentricity_now[i])
-                ) and self.eccentricity_now_limit_flag[i] == 0 and self.semi_major_axis_flag_limit[i] == 0 and not (
+                ) and not ( #and self.eccentricity_now_limit_flag[i] == 0 and self.semi_major_axis_flag_limit[i] == 0 and
                         self.planet_name[i] in eliminate):
                     if (Constraints_for_selecting_systems.constraints_for_eccentricity_envelope_are_satisfied(
                             secondary_radius=self.secondary_radius[i],
                             planet_mass=self.secondary_mass[i],
                             constraints=constraints)):
-                        records_of_log_semi_major_axis_over_planetary_radius_and_eccentricity_now = (
-                                records_of_log_semi_major_axis_over_planetary_radius_and_eccentricity_now
-                                + [{'log of semi major axis over planetary radius': (
-                            math.log(self.semi_major_axis[i] / self.secondary_radius[i], 10)),
-                            'present eccentricity': self.eccentricity_now[i],
-                            'planet name': self.planet_name[i],
-                            'primary mass': self.primary_mass[i],
-                            'orbital eccentricity limit flag': self.eccentricity_now_limit_flag[i],
-                            'present eccentricity upper uncertainty': self.eccentricity_now_upper_uncertainty[i],
-                            'present eccentricity lower uncertainty': self.eccentricity_now_lower_uncertainty[i]}])
+                        log_a_over_R_p = (math.log(self.semi_major_axis[i]/self.secondary_radius[i], 10))
+                        records_of_log_semi_major_axis_over_planetary_radius_and_eccentricity_now.append({'log of semi major axis over planetary radius': log_a_over_R_p,
+                                                                                                          'present eccentricity': self.eccentricity_now[i],
+                                                                                                          'planet name': self.planet_name[i],
+                                                                                                          'primary mass': self.primary_mass[i],
+                                                                                                          'orbital eccentricity limit flag': self.eccentricity_now_limit_flag[i],
+                                                                                                          'present eccentricity upper uncertainty': self.eccentricity_now_upper_uncertainty[i],
+                                                                                                          'present eccentricity lower uncertainty':self.eccentricity_now_lower_uncertainty[i]})
                         j = j + 1
 
                 if j >= maximum_number_of_data_points - 1:
@@ -326,9 +325,9 @@ class EnvelopeEccentricityDistribution:
         ydata = []
         xdata_ = []
         for i in range(0, len(xdata)):
-            ydata = ydata + [envelope_eccentricity_function(10 ** xdata[i])]
+            ydata.append(envelope_eccentricity_function(10 ** xdata[i]))
         for i in range(0, len(xdata)):
-            xdata_ = xdata_ + [10**(xdata[i] + 4.37023)]
+            xdata_.append(10**(xdata[i] + 4.37023))
 
         x_1 = []
         eccentricity_now_1 = []
@@ -344,32 +343,50 @@ class EnvelopeEccentricityDistribution:
         eccentricity_now_errormin_3 = []
         for i in range(0, len(records_of_x_attribute_and_eccentricity_now)):
             if primary_mass[i] < 1.2:
-                x_1 = x_1 + [10**(x[i] + 4.37023)]
-                eccentricity_now_1 = eccentricity_now_1 + [eccentricity_now[i]]
-                eccentricity_now_errormax_1 = eccentricity_now_errormax_1 + [eccentricity_now_errormax[i]]
-                eccentricity_now_errormin_1 = eccentricity_now_errormin_1 + [eccentricity_now_errormin[i]]
+                x_1.append(10**(x[i] + 4.37023))
+                eccentricity_now_1.append(eccentricity_now[i])
+                eccentricity_now_errormax_1.append(eccentricity_now_errormax[i])
+                eccentricity_now_errormin_1.append(eccentricity_now_errormin[i])
             else:
-                x_2 = x_2 + [10**(x[i]+4.37023)]
-                eccentricity_now_2 = eccentricity_now_2 + [eccentricity_now[i]]
-                eccentricity_now_errormax_2 = eccentricity_now_errormax_2 + [eccentricity_now_errormax[i]]
-                eccentricity_now_errormin_2 = eccentricity_now_errormin_2 + [eccentricity_now_errormin[i]]
-            x_3 = x_3 + [10**(x[i]+4.37023)]
-            eccentricity_now_3 = eccentricity_now_3 + [eccentricity_now[i]]
-            eccentricity_now_errormax_3 = eccentricity_now_errormax_3 + [eccentricity_now_errormax[i]]
-            eccentricity_now_errormin_3 = eccentricity_now_errormin_3 + [eccentricity_now_errormin[i]]
+                x_2.append(10**(x[i]+4.37023))
+                eccentricity_now_2.append(eccentricity_now[i])
+                eccentricity_now_errormax_2.append(eccentricity_now_errormax[i])
+                eccentricity_now_errormin_2.append(eccentricity_now_errormin[i])
+            x_3.append(10**(x[i]+4.37023))
+            eccentricity_now_3.append(eccentricity_now[i])
+            eccentricity_now_errormax_3.append(eccentricity_now_errormax[i])
+            eccentricity_now_errormin_3.append(eccentricity_now_errormin[i])
 
         #plt.plot(x_1, eccentricity_now_1, 'x')
-        y_error = [eccentricity_now_errormax_1, eccentricity_now_errormin_1]
-        plt.errorbar(x_1, eccentricity_now_1, yerr = y_error, fmt = 'x')
+        #y_error = [eccentricity_now_errormin_1, eccentricity_now_errormax_1]
+        #plt.errorbar(x_1, eccentricity_now_1, yerr = y_error, fmt = 'x')
 
         #plt.plot(x_2, eccentricity_now_2, 'o')
-        y_error = [eccentricity_now_errormax_2, eccentricity_now_errormin_2]
-        plt.errorbar(x_2, eccentricity_now_2, yerr = y_error, fmt = 'o')
+        #y_error = [eccentricity_now_errormin_2, eccentricity_now_errormax_2]
+        #plt.errorbar(x_2, eccentricity_now_2, yerr = y_error, fmt = 'o')
 
         #plt.plot(x_3, eccentricity_now_3, 'x')
+
+        i = 0
+        while i<len(eccentricity_now_3):
+            logging.debug("i = %(i)f" % dict(i=i))
+            logging.debug("System = %(system)s" % dict(system = records_of_x_attribute_and_eccentricity_now[i]['planet name']))
+            logging.debug("Eccentricity = %(e)f and %(et)f" % dict(e=records_of_x_attribute_and_eccentricity_now[i]['present eccentricity'], et=eccentricity_now_3[i]))
+            logging.debug("Eccentricity_upper_uncertainty = %(un)f and %(uc)f" % dict(un = records_of_x_attribute_and_eccentricity_now[i]['present eccentricity upper uncertainty'],
+                                                                                      uc = eccentricity_now_errormax_3[i]))
+            logging.debug("Eccentricity_lower_uncertainty = %(un)f and %(uc)f" % dict(un = records_of_x_attribute_and_eccentricity_now[i]['present eccentricity lower uncertainty'],
+                                                                                      uc = eccentricity_now_errormin_3[i]))
+            logging.debug("log a over R_p = %(a)f and %(b)f" % dict(a = records_of_x_attribute_and_eccentricity_now[i]['log of semi major axis over planetary radius'],
+                                                                    b =math.log10(x_3[i])-4.37023))
+            logging.debug("a over R_p = %(x)f" % dict(x = x_3[i]))
+            logging.debug("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+
+
+            i = i + 1
+
         plt.plot(xdata_, ydata)
-        #y_error = [eccentricity_now_errormax_3, eccentricity_now_errormin_3]
-        #plt.errorbar(x_3, eccentricity_now_3, yerr = y_error, fmt = 'o')
+        y_error = [eccentricity_now_errormin_3, eccentricity_now_errormax_3]
+        plt.errorbar(x_3, eccentricity_now_3, yerr = y_error, fmt = 'x')
 
         #plt.plot(x_on_envelope, eccentricity_now_on_envelope, '.')
         # naming the x axis
@@ -384,7 +401,7 @@ class EnvelopeEccentricityDistribution:
         #string = 'Present Eccentricity vs. ' + x_attribute_
         #plt.title(string)
         plt.xscale("log")
-        fig_file_name = "%(outdir)s/Envelope Eccentricity Distribution.pdf" % dict(outdir=self.output_directory)
+        fig_file_name = "%(outdir)s/Envelope_Eccentricity_Distribution.pdf" % dict(outdir=self.output_directory)
         plt.savefig(fig_file_name)
         plt.clf()
         return
@@ -461,6 +478,7 @@ class EnvelopeEccentricityDistribution:
                          'orbital period': self.orbital_period[i],
                          'stellar age': self.stellar_age[i]
                          }
+
                 standard_deviations = {'primary_mass_upper_uncertainty': self.primary_mass_upper_uncertainty[i],
                                        'primary_mass_lower_uncertainty': self.primary_mass_lower_uncertainty[i],
                                        'secondary_mass_upper_uncertainty': self.secondary_mass_upper_uncertainty[i],
@@ -542,6 +560,18 @@ class EnvelopeEccentricityDistribution:
                       standard_deviations['transit_depth_lower_uncertainty'] = self.transit_depth_lower_uncertainty[i]
                 if standard_deviations['eccentricity_now_upper_uncertainty'] == 0:
                       return None, None, None
+                if 'secondary radius' in means:
+                    rad = means['secondary radius']
+                elif ('ratio of planet and stellar radius' in means) and ('primary radius' in means):
+                    rad = means['ratio of planet and stellar radius'] * means['primary radius'] * const.R_sun.value / const.R_earth.value
+                elif ('transit depth' in means) and ('primary radius' in means):
+                    rad = ((means['transit depth']/100)**0.5) *  means['primary radius'] * const.R_sun.value / const.R_earth.value
+                else:
+                    rad = None
+                if rad is not None:
+                    rad_j = rad * const.R_earth.value / const.R_jup.value
+                    if rad_j < 0.6: return None, None, None
+
                 return means, standard_deviations, self.planet_name[i]
         return None, None, None
 

@@ -370,7 +370,7 @@ class PriorTransform:
         primary_radius = primary_rad(stellar_age)
         secondary_radius = None
         if 'transit depth' in self.means:
-            if self.standard_deviations['transit_depth_upper_uncertainty'] is not None and self.standard_deviations['transit_depth_lower_uncertainty'] is None:
+            if self.standard_deviations['transit_depth_upper_uncertainty'] is not None and self.standard_deviations['transit_depth_lower_uncertainty'] is not None:
                 square_of_the_ratio_of_planet_to_stellar_radius = norm.ppf(u[3], loc=self.means['transit depth'],
                                                                            scale=(self.standard_deviations['transit_depth_upper_uncertainty']
                                                                                  - self.standard_deviations['transit_depth_lower_uncertainty'])/2)/100.0

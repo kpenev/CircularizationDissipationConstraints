@@ -228,7 +228,7 @@ class PriorTransform:
         primary_radius = primary_rad(stellar_age)
         secondary_radius = None
         if 'transit depth' in self.means:
-            if self.standard_deviations['transit_depth_upper_uncertainty'] is not None and self.standard_deviations['transit_depth_lower_uncertainty'] is None:
+            if self.standard_deviations['transit_depth_upper_uncertainty'] is not None and self.standard_deviations['transit_depth_lower_uncertainty'] is not None:
                 square_of_the_ratio_of_planet_to_stellar_radius = norm.ppf(u[3], loc=self.means['transit depth'],
                                                                            scale=(self.standard_deviations['transit_depth_upper_uncertainty']
                                                                                  - self.standard_deviations['transit_depth_lower_uncertainty'])/2)/100.0
@@ -296,7 +296,6 @@ class LogLikelihood:
         self.e_env = e_env
         self.system_name = system_name
         self.directory_name = directory_name
-        self.calculated_eccentricity_now = None
         self.logger = logger
         self.number_of_parallel_processes = number_of_parallel_processes
 
@@ -410,91 +409,94 @@ class LogLikelihood:
         e_in = self.initial_eccentricity
         e_in_of_previous_iteration = e_in + 0.01
         if self.logger is not None: self.logger.debug("****************************** the initial eccentricity is %(e)f" % dict(e=e_in))
-        linear_to_exponential_decrement_of_e_in = False
-        t = 0
-        while (not evolution_complete):
+
+        dummy = True
+        calculated_eccentricity = 0.8 * (argument_of_phase_lag_function_for_planet**2)/144.0
+        while (not evolution_complete) and (not dummy):
             try:
-                 if self.logger is not None: self.logger.debug("find_evolution method is being called.")
-                 evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
-                                                       interpolator=FeHConditionalLikelihoodBase.interpolator,
-                                                       dissipation=dissipation,
-                                                       max_age=stellar_age * un.Gyr,
-                                                       initial_eccentricity=e_in * un.dimensionless_unscaled,
-                                                       initial_obliquity=0.0,
-                                                       disk_period=initial_stellar_spin * un.d,
-                                                       disk_dissipation_age=2e-2 * un.Gyr,
-                                                       primary_wind_strength=0.17,
-                                                       primary_wind_saturation=2.78,
-                                                       primary_core_envelope_coupling_timescale=0.05 * un.Gyr,
-                                                       secondary_wind_strength=0.0,
-                                                       secondary_wind_saturation=100.0,
-                                                       secondary_core_envelope_coupling_timescale=0.05 * un.Gyr,
-                                                       orbital_period_tolerance=1e-6,
-                                                       solve=True,
-                                                       secondary_is_star=False)
-            except AssertionError:
-                 if not linear_to_exponential_decrement_of_e_in:
-                     e_in_of_previous_iteration = e_in
-                     e_in = e_in - 0.01
-                 if e_in < self.e_env or linear_to_exponential_decrement_of_e_in:
-                     linear_to_exponential_decrement_of_e_in = True
-                 if linear_to_exponential_decrement_of_e_in:
-                     e_in_of_previous_iteration = self.e_env + 0.01 * math.exp(-10*(t-0.01)/(-self.e_env+self.initial_eccentricity))
-                     e_in = self.e_env + 0.01 * math.exp(-10*t/(-self.e_env+self.initial_eccentricity))
-                     t = t + 0.01
-                 logging.warning('Calculating evolution failed, trying initial eccentricity = %(e)f' % dict(e=e_in))
-                 if self.logger is not None: self.logger.warning('Calculating evolution failed, trying initial eccentricity = %(e)f' % dict(e=e_in))
-                 evolution_complete = False
-                 if math.fabs(e_in - e_in_of_previous_iteration)<0.000001:
-                     if self.logger is not None: self.logger.debug("This lgQ_pl for the chosen parameters does not suit")
-                     return -numpy.inf
+                if self.logger is not None:
+                    self.logger.debug("find_evolution method for %(system)s is being called." % dict(system=self.system_name))
+                    self.logger.debug("dissipation: %(dissipation)s" % dict(dissipation = json.dumps(dissipation_string)))
+                evolutionary_history = find_evolution(system=star_exoplanet_binary_system,
+                                                      interpolator=FeHConditionalLikelihoodBase.interpolator,
+                                                      dissipation=dissipation,
+                                                      max_age=parameters_for_evolution['stellar age'] * un.Gyr,
+                                                      initial_eccentricity=e_in * un.dimensionless_unscaled,
+                                                      initial_obliquity=0.0,
+                                                      disk_period=parameters_for_evolution['initial stellar spin'] * un.d,
+                                                      disk_dissipation_age=2e-2 * un.Gyr,
+                                                      primary_wind_strength=0.17,
+                                                      primary_wind_saturation=2.78,
+                                                      primary_core_envelope_coupling_timescale=0.05 * un.Gyr,
+                                                      secondary_wind_strength=0.0,
+                                                      secondary_wind_saturation=100.0,
+                                                      secondary_core_envelope_coupling_timescale=0.05 * un.Gyr,
+                                                      orbital_period_tolerance=1e-6,
+                                                      solve=True,
+                                                      secondary_is_star=False)
+            except RuntimeError as runerror:
+                logging.error('Runtime error occurs for %(s)s: %(error)s' % dict(s=self.system_name, error= str(runerror)))
+                if self.logger is not None: self.logger.warning(traceback.format_exc())
+                e_in_of_previous_iteration = e_in
+                e_in = e_in - 0.01
+                if (e_in < self.e_env + 0.2):
+                    if self.logger is not None: self.logger.debug("e_in becomes less than e_env + 0.2, so loglikelihood is -inf")
+                    return 0
+
+                logging.warning('Calculating evolution for %(s)s with initial eccentricity %(ep)f failed, now trying initial eccentricity = %(e)f'
+                                 % dict(e=e_in, s=self.system_name, ep=e_in_of_previous_iteration ))
+                if self.logger is not None: self.logger.warning('Calculating evolution failed, trying initial eccentricity = %(e)f' % dict(e=e_in))
+                evolution_complete = False
+
             except ValueError as verror:
-                 logging.error('Invalid parameter values encountered: %(error)s' % dict(error= str(verror)))
-                 if self.logger is not None: self.logger.error('Invalid parameter values encountered: %(error)s' % dict(error= str(verror)))
-                 return  -numpy.inf
-            except:
-                 logging.error("General Error occurs while calculating evolution")
-                 if self.logger is not None: self.logger.error("Error occurs while calculating evolution")
-                 return -numpy.inf
+                if self.logger is not None: self.logger.warning(traceback.format_exc())
+                logging.error('Invalid parameter values encountered for %(s)s: %(error)s' % dict(s=self.system_name, error= str(verror)))
+                if self.logger is not None: self.logger.error('Invalid parameter values encountered for %(s)s: %(error)s' % dict(error= str(verror), s=self.system_name))
+                return 0
+            except Exception as exc:
+                if self.logger is not None: self.logger.warning(traceback.format_exc())
+                logging.error("General Error occurs while calculating evolution for %(s)s" % dict(s=self.system_name))
+                if self.logger is not None: self.logger.error("Error occurs while calculating evolution for %(s)s" % dict(s=self.system_name))
+                return 0
             else:
-                 evolution_complete = True
-                 if self.logger is not None:
-                      self.logger.debug("Evolution is calculated.")
-                 calculated_eccentricity_now = evolutionary_history.eccentricity[- 1]
-                 age_upto_which_evolution_is_calculated = evolutionary_history.age[-1]
+                evolution_complete = True
+                calculated_eccentricity_now = evolutionary_history.eccentricity[-1]
+                age_upto_which_evolution_is_calculated = evolutionary_history.age[-1]
+                if self.logger is not None:
+                    self.logger.debug("Evolution is calculated for %(s)s." % dict(s=self.system_name))
+                    self.logger.debug("%(s)s : calculated e = %(a)f, e_env = %(b)f, stellar age = %(c)f, calculated stellar age = %(d)f" % dict(a=calculated_eccentricity_now,
+                                                                                                                                                b=self.e_env,
+                                                                                                                                                c=parameters_for_evolution['stellar age'],
+                                                                                                                                                d=age_upto_which_evolution_is_calculated,
+                                                                                                                                                s=self.system_name))
+                if math.fabs(stellar_age - age_upto_which_evolution_is_calculated) <0.00001:
+                    self.logger.debug("Evolution of %(s)s is calculated up to the stellar age." % dict(s=self.system_name))
 
-                 if self.logger is not None: self.logger.debug("Calculated eccentricity now in the log_prob method is %(e)f" % dict(e=calculated_eccentricity_now))
-                 logging.debug("Calculated eccentricity now in the log_prob method is %(e)f" % dict(e=calculated_eccentricity_now))
-                 if self.logger is not None:
-                      if math.fabs(stellar_age - age_upto_which_evolution_is_calculated) <0.00001:
-                          self.logger.debug("Evolution is calculated up to the stellar age.")
-                      else:
-                          self.logger.debug("Evolution is NOT calculated up to the stellar age.")
-
-                 if calculated_eccentricity_now < self.e_env and math.fabs(stellar_age - age_upto_which_evolution_is_calculated) <0.00001:
-                      if self.logger is not None:
-                          self.logger.debug("calculated e = %(a)f, e_env = %(b)f, stellar age = %(c)f, calculated stellar age = %(d)f" % dict(a=calculated_eccentricity_now,
-                                                                                                                                              b=self.e_env,
-                                                                                                                                              c=stellar_age,
-                                                                                                                                              d=age_upto_which_evolution_is_calculated))
-                          self.logger.debug("calculated e is less than the envelope e and stellar age is almost same to the age upto which the evolution is calculated.")
-                 else:
-                      if self.logger is not None:
-                          self.logger.debug("calculated e = %(a)f, e_env = %(b)f, stellar age = %(c)f, calculated stellar age = %(d)f" % dict(a=calculated_eccentricity_now,
-                                                                                                                                              b=self.e_env,
-                                                                                                                                              c=stellar_age,
-                                                                                                                                              d=age_upto_which_evolution_is_calculated))
-                          self.logger.debug("either calculated e is more than the envelope e, or stellar age is not equal to the age upto which the evolution is calculated.")
-                      return -numpy.inf
-
-        self.calculated_eccentricity_now = calculated_eccentricity_now
+                    if calculated_eccentricity_now < self.e_env:
+                        if self.logger is not None:
+                            self.logger.debug("calculated e = %(a)f, e_env = %(b)f, stellar age = %(c)f, calculated stellar age = %(d)f" % dict(a=calculated_eccentricity_now,
+                                                                                                                                                b=self.e_env,
+                                                                                                                                                c=stellar_age,
+                                                                                                                                                d=age_upto_which_evolution_is_calculated))
+                            self.logger.debug("calculated e is less than the envelope e and stellar age is almost same to the age upto which the evolution is calculated.")
+                    else:
+                        if self.logger is not None:
+                            self.logger.debug("calculated e = %(a)f, e_env = %(b)f, stellar age = %(c)f, calculated stellar age = %(d)f" % dict(a=calculated_eccentricity_now,
+                                                                                                                                                b=self.e_env,
+                                                                                                                                                c=stellar_age,
+                                                                                                                                                d=age_upto_which_evolution_is_calculated))
+                        self.logger.debug("The calculated e is more than the envelope e.")
+                        return -numpy.inf
+                else:
+                    self.logger.debug("Evolution of %(s)s is NOT calculated up to the stellar age." % dict(s=self.system_name))
+                    return -numpy.inf
 
         if calculated_eccentricity_now >= 0 and calculated_eccentricity_now <= 1:
-            if calculated_eccentricity_now > self.e_env:
-                if self.logger is not None: self.logger.debug("Calculated eccentricity_now is greater than the envelope eccentricity")
-                return -numpy.inf
-            integral = self.eccentricity_distribution.cdf(
-                calculated_eccentricity_now)/calculated_eccentricity_now
+            if math.fabs(calculated_eccentricity_now)<0.0001:
+                integral = self.eccentricity_distribution.pdf(0)
+            else:
+                integral = self.eccentricity_distribution.cdf(
+                    calculated_eccentricity_now)/calculated_eccentricity_now
             probability = integral * priors
             if self.logger is not None: self.logger.debug("Probability of the calculated eccentricity is %(p)f " % dict(p = probability))
             if probability == 0:
@@ -505,9 +507,10 @@ class LogLikelihood:
                 logging.warning('Probability cannot be less than zero.')
                 if self.logger is not None: self.logger.warning('Probability cannot be less than zero.')
                 return -numpy.inf
-            logging.debug("log of probability of e is %(x)f " % dict(x=numpy.log(probability)))
-            if not self.logger is None: self.logger.debug("log of probability of e is %(x)f " % dict(x=numpy.log(probability)))
-            return numpy.log(probability)
+            log_likelihood = numpy.log(probability)
+            logging.debug("log of probability of e is %(x)f " % dict(x=log_likelihood))
+            if not self.logger is None: self.logger.debug("log of probability of e is %(x)f " % dict(x=log_likelihood))
+            return log_likelihood
         logging.warning('Calculated present eccentricity can neither be less than zero nor greater than one')
         if not self.logger is None: self.logger.warning('Calculated present eccentricity can neither be less than zero nor greater than one')
         return -numpy.inf
@@ -591,7 +594,6 @@ class LogLikelihood:
                 y = y_start
                 spin_u = (y + numpy.random.rand()) * del_spin_u
                 while not (loop_y_complete or walker_found):
-                    self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet = lgQpl_min
                     u[5] = spin_u % 1 if spin_u > 1 else spin_u
                     temp = numpy.random.rand() * del_lgQpl_u
                     u[6] = temp % 1 if temp > 1 else temp
@@ -603,7 +605,24 @@ class LogLikelihood:
                     if self.logger is not None: self.logger.debug("Modified u is %(u)s" % dict(u=numpy.array2string(u)))
                     log_likelihood, parameters_for_evolution = self(u)
                     logging.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood, p=numpy.array2string(parameters_for_evolution)))
-                    if self.logger is not None: self.logger.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood, p=numpy.array2string(parameters_for_evolution)))
+                    if self.logger is not None: self.logger.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u),
+                                                                                                                                       n=log_likelihood,
+                                                                                                                                       p=numpy.array2string(parameters_for_evolution)))
+                    t=0.0
+                    if math.isinf(log_likelihood):
+                        u[6] = numpy.random.rand()
+                        i = i+1
+                        setup_logging_messaging_file(i)
+                        logging.debug("Loglikelihood is found to be -inf even for lowest lgQpl. Now we are trying with any value of lgQpl between min and max")
+                        if self.logger is not None:
+                            self.logger.debug("Loglikelihood is found to be -inf even for lowest lgQpl. Now we are trying with any value of lgQpl between min and max")
+                        log_likelihood, parameters_for_evolution = self(u)
+                        logging.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood, p=numpy.array2string(parameters_for_evolution)))
+                        if self.logger is not None:
+                            self.logger.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u),
+                                                                                                                   n=log_likelihood,
+                                                                                                                   p=numpy.array2string(parameters_for_evolution)))
+                        if not math.isinf(log_likelihood): t=u[6]
                     if (not math.isinf(log_likelihood)) and (log_likelihood < min_log_likelihood):
                         logging.debug("Start: log likelihood is not negative infinity for this u")
                         if self.logger is not None: self.logger.debug("Start: log likelihood is not negative infinity for this u")
@@ -619,7 +638,7 @@ class LogLikelihood:
                         if self.logger is not None: self.logger.debug("u = %(u)s log likelihood = %(n)f for parameters: %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood,
                                                                                                                                       p=numpy.array2string(parameters_for_evolution)))
                         while log_likelihood < min_log_likelihood:
-                            while math.isinf(log_likelihood):
+                            while math.isinf(log_likelihood) and math.fabs(c-a)>0.0001:
                                 b = c
                                 c = (a+b)/2.0
                                 c = c % 1 if c>1 else c
@@ -635,6 +654,7 @@ class LogLikelihood:
                             a = c
                             c = (a+b)/2.0
                             c = c % 1 if c > 1 else c
+                            if math.fabs(b-c)<0.0001: break
                             u[6] = c
                             logging.debug("c = %(s)f  " % dict(s = c))
                             if self.logger is not None: self.logger.debug("c =  %(s)f " % dict(s = c))
@@ -643,62 +663,65 @@ class LogLikelihood:
                             log_likelihood, parameters_for_evolution = self(u)
                             logging.debug("log likelihood = %(s)f  " % dict(s = log_likelihood))
                             if self.logger is not None: self.logger.debug("log likelihood =  %(s)f " % dict(s = log_likelihood))
-                    if (not math.isinf(log_likelihood)) and (log_likelihood > min_log_likelihood):
-                        logging.debug("we got a range of u[6] for the acceptable walkers. The extreme u = %(u)s with log likelihood %(n)f" % dict(u=numpy.array2string(u), n=log_likelihood))
-                        if self.logger is not None: self.logger.debug(logging.debug("we got a range of u[6] for the acceptable walkers. The extreme u = %(u)s with log likelihood %(n)f"
-                                                                                    % dict(u=numpy.array2string(u), n=log_likelihood)))
-                        logging.debug("corresponding extreme parameters are: %(p)s" % dict(p=numpy.array2string(parameters_for_evolution)))
-                        if self.logger is not None: self.logger.debug("corresponding extreme parameters are: %(p)s" % dict(p=numpy.array2string(parameters_for_evolution)))
-                        x = numpy.random.uniform(0.0, u[6], 1)
-                        u[6] = x[0]
-                        logging.debug("a value of u[6] picked up randomly from 0 and the extremum u[6]. That is %(x)f" % dict(x= u[6]))
-                        if self.logger is not None: self.logger.debug("a value of u[6] picked up randomly from 0 and the extremum u[6]. That is %(x)f" % dict(x= u[6]))
-                        i = i+1
-                        setup_logging_messaging_file(i)
-                        log_likelihood, parameters_for_evolution = self(u)
-                        if not math.isinf(log_likelihood):
-                            logging.debug('The discovered walker is u  = %(u)s' % dict(u=numpy.array2string(u)))
-                            logging.debug('log p = %(logp)f' % dict(logp = log_likelihood))
-                            logging.debug('parameters for evolution = %(params)s' % dict(params=numpy.array2string(parameters_for_evolution)))
-                            if self.logger is not None:
-                                self.logger.debug('u  = %(u)s' % dict(u=numpy.array2string(u)))
-                                self.logger.debug('log p = %(logp)f' % dict(logp = log_likelihood))
-                                self.logger.debug('parameters for evolution = %(params)s' % dict(params=numpy.array2string(parameters_for_evolution)))
+                    if (not math.isinf(log_likelihood)):
+                        if (log_likelihood > min_log_likelihood):
+                            logging.debug("we got a range of u[6] for the acceptable walkers. The extreme u = %(u)s with log likelihood %(n)f" % dict(u=numpy.array2string(u), n=log_likelihood))
+                            if self.logger is not None: self.logger.debug(logging.debug("we got a range of u[6] for the acceptable walkers. The extreme u = %(u)s with log likelihood %(n)f"
+                                                                                       % dict(u=numpy.array2string(u), n=log_likelihood)))
+                            logging.debug("corresponding extreme parameters are: %(p)s" % dict(p=numpy.array2string(parameters_for_evolution)))
+                            if self.logger is not None: self.logger.debug("corresponding extreme parameters are: %(p)s" % dict(p=numpy.array2string(parameters_for_evolution)))
+                            x = numpy.random.uniform(t, u[6], 1)
+                            u[6] = x[0]
+                            logging.debug("a value of u[6] picked up randomly from init_u[6] and the extremum u[6]. That is %(x)f" % dict(x= u[6]))
+                            if self.logger is not None: self.logger.debug("a value of u[6] picked up randomly from init_u[6] and the extremum u[6]. That is %(x)f" % dict(x= u[6]))
+                            i = i+1
+                            setup_logging_messaging_file(i)
+                            log_likelihood, parameters_for_evolution = self(u)
+                            if not math.isinf(log_likelihood):
+                                logging.debug('The discovered walker is u  = %(u)s' % dict(u=numpy.array2string(u)))
+                                logging.debug('log p = %(logp)f' % dict(logp = log_likelihood))
+                                logging.debug('parameters for evolution = %(params)s' % dict(params=numpy.array2string(parameters_for_evolution)))
+                                if self.logger is not None:
+                                    self.logger.debug('u  = %(u)s' % dict(u=numpy.array2string(u)))
+                                    self.logger.debug('log p = %(logp)f' % dict(logp = log_likelihood))
+                                    self.logger.debug('parameters for evolution = %(params)s' % dict(params=numpy.array2string(parameters_for_evolution)))
+                        else:
+                            u[6]=t
 
-                            p0_file_exists = os.path.exists(p0_file_name)
-                            logging.debug('number of discovered walkers = %(x)f' % dict(x=number_of_discovered_walkers.value))
-                            if self.logger is not None: self.logger.debug('number of discovered walkers = %(x)f' % dict(x=number_of_discovered_walkers.value))
-                            if p0_file_exists:
-                                while True:
-                                     if ((p0_file_is_being_updated.value == 0) and (number_of_discovered_walkers.value < nwalkers)):
-                                         p0_file_is_being_updated.value = 1
-                                         p0_file = open(p0_file_name, 'rb')
-                                         p0 = numpy.load(p0_file)
-                                         p0_file.close()
-                                         p0_file = open(p0_file_name, 'wb')
-                                         p0 = numpy.vstack((p0, u))
-                                         numpy.save(p0_file, p0)
-                                         p0_file.close()
-                                         walkers.put(u)
-                                         number_of_discovered_walkers.value = number_of_discovered_walkers.value + 1
-                                         p0_file_is_being_updated.value = 0
-                                         break
-                                     if not (number_of_discovered_walkers.value < nwalkers):
-                                         break
-                            else:
-                                while True:
-                                     if ((p0_file_is_being_updated.value == 0) and (number_of_discovered_walkers.value < nwalkers)):
-                                         p0_file_is_being_updated.value = 1
-                                         p0_file = open(p0_file_name, 'wb')
-                                         numpy.save(p0_file, u)
-                                         p0_file.close()
-                                         walkers.put(u)
-                                         number_of_discovered_walkers.value = number_of_discovered_walkers.value + 1
-                                         p0_file_is_being_updated.value = 0
-                                         break
-                                     if not (number_of_discovered_walkers.value < nwalkers):
-                                         break
-                            walker_found = True
+                        p0_file_exists = os.path.exists(p0_file_name)
+                        logging.debug('number of discovered walkers = %(x)f' % dict(x=number_of_discovered_walkers.value))
+                        if self.logger is not None: self.logger.debug('number of discovered walkers = %(x)f' % dict(x=number_of_discovered_walkers.value))
+                        if p0_file_exists:
+                            while True:
+                                if ((p0_file_is_being_updated.value == 0) and (number_of_discovered_walkers.value < nwalkers)):
+                                    p0_file_is_being_updated.value = 1
+                                    p0_file = open(p0_file_name, 'rb')
+                                    p0 = numpy.load(p0_file)
+                                    p0_file.close()
+                                    p0_file = open(p0_file_name, 'wb')
+                                    p0 = numpy.vstack((p0, u))
+                                    numpy.save(p0_file, p0)
+                                    p0_file.close()
+                                    walkers.put(u)
+                                    number_of_discovered_walkers.value = number_of_discovered_walkers.value + 1
+                                    p0_file_is_being_updated.value = 0
+                                    break
+                                if not (number_of_discovered_walkers.value < nwalkers):
+                                    break
+                        else:
+                            while True:
+                                if ((p0_file_is_being_updated.value == 0) and (number_of_discovered_walkers.value < nwalkers)):
+                                    p0_file_is_being_updated.value = 1
+                                    p0_file = open(p0_file_name, 'wb')
+                                    numpy.save(p0_file, u)
+                                    p0_file.close()
+                                    walkers.put(u)
+                                    number_of_discovered_walkers.value = number_of_discovered_walkers.value + 1
+                                    p0_file_is_being_updated.value = 0
+                                    break
+                                if not (number_of_discovered_walkers.value < nwalkers):
+                                    break
+                        walker_found = True
                     if y == y_end: loop_y_complete = True
                     y = y + 1
                     if y > n_spin-1: y = 0
