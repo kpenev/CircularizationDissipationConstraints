@@ -89,34 +89,11 @@ def setup_basic_logging(logging_file_name, msg_file_name):
     logging.basicConfig(**logging_config)
     return
 
-class Element:
-    def __init__(self, teff=None, feh=None, logg=None, mean_density=None, debug_plot=None):
-        self.Teff = teff
-        self.age_cdf_interp_tolerance = 0.0001
-        self.debug_plot = debug_plot
-        self.debug_plot_dpi = 300
-        self.feh = feh
-        self.feh_max_cdf_step = 0.1
-        self.feh_max_step = 0.1
-        self.grid_refine_algorithm = 'worst'
-        self.logg = logg
-        self.mass_cdf_interp_tolerance = 0.0001
-        self.mass_max_step = 0.1
-        self.max_discarded_feh_probability = 1e-08
-        self.mean_density = mean_density
-        self.num_parallel_processes = 16
-        self.star_sampler_pickle_fname = 'star_sampler.pkl'
-        self.stellar_evolution_interpolator_dir = getStellarEvolutionInterpolatorsDirectory()
-        self.time_ode_atol = 1e-08
-        self.time_ode_max_step = 0.1
-        self.time_ode_rtol = 1e-06
-
 class PriorTransform:
     def __init__(self,
                  means,
                  standard_deviations,
                  system = "Star-Exoplanet",
-                 dirname = "/work/08529/mmmahmud",
                  max_argument_of_phase_lag_function_for_planet=12,
                  min_argument_of_phase_lag_function_for_planet=3,
                  min_log_tidal_break_period=math.log(0.5,10),
@@ -130,7 +107,6 @@ class PriorTransform:
         self.means = means
         self.standard_deviations = standard_deviations
         self.system = system
-        self.dirname = "%(dirname)s/star_sampler" % dict(dirname=dirname)
         self.max_argument_of_phase_lag_function_for_planet = max_argument_of_phase_lag_function_for_planet
         self.min_argument_of_phase_lag_function_for_planet = min_argument_of_phase_lag_function_for_planet
         self.min_log_tidal_break_period = min_log_tidal_break_period
@@ -149,81 +125,9 @@ class PriorTransform:
         if self.logging_fname is not None: logging.basicConfig(filename = self.logging_fname, level=logging.DEBUG, force = True, format='%(asctime)s %(message)s')
         logging.debug("Basic Config for the log file is done for the system %(s)s" % dict(s=system))
 
-        def construct_star_sampler():
-            debug_plot = [('interpolation_performance', 'interp_performance.pdf')]
-            teff = None
-            feh = None
-            logg = None
-            mean_density = None
-            if 'stellar effective temperature' in self.means:
-                if not math.isnan(self.means['stellar effective temperature']):
-                    teff = split_normal.freeze_error_bar(
-                        mode=self.means['stellar effective temperature'],
-                        abs_plus_error=self.standard_deviations['stellar_effective_temperature_upper_uncertainty'],
-                        abs_minus_error=-self.standard_deviations['stellar_effective_temperature_lower_uncertainty'])
-            if 'stellar metallicity' in self.means:
-                if not math.isnan(self.means['stellar metallicity']):
-                    feh = split_normal.freeze_error_bar(
-                        mode=self.means['stellar metallicity'],
-                        abs_plus_error=self.standard_deviations['stellar_metallicity_upper_uncertainty'],
-                        abs_minus_error=-self.standard_deviations['stellar_metallicity_lower_uncertainty'])
-            if 'stellar log g' in self.means:
-                if not math.isnan(self.means['stellar log g']):
-                    logg = split_normal.freeze_error_bar(
-                        mode=self.means['stellar log g'],
-                        abs_plus_error=self.standard_deviations['stellar_log_g_upper_uncertainty'],
-                        abs_minus_error=-self.standard_deviations['stellar_log_g_lower_uncertainty'])
-            if 'stellar density' in self.means:
-                if not math.isnan(self.means['stellar density']):
-                    mean_density = split_normal.freeze_error_bar(
-                                mode=self.means['stellar density'],
-                                abs_plus_error=self.standard_deviations['stellar_density_upper_uncertainty'],
-                                abs_minus_error=-self.standard_deviations['stellar_density_lower_uncertainty'])
-
-            config = Element(teff=teff, feh=feh, logg=logg, mean_density=mean_density, debug_plot=debug_plot)
-            constraints = dict()
-            if not (config.Teff is None): constraints['teff'] = config.Teff
-            if not (config.logg is None): constraints['logg'] = config.logg
-            if not (config.mean_density is None): constraints['rho'] = config.mean_density
-
-            if self.logger is not None:
-                self.logger.debug("POETInterpLikelihood instance for %(system)s is going to be created." % dict(system=self.system))
-            likelihood = None
-            try:
-                likelihood = POETInterpLikelihood(
-                    **constraints,
-                    rtol=config.time_ode_rtol,
-                    atol=config.time_ode_atol,
-                    max_step=config.time_ode_max_step
-                )
-            except:
-                if self.logger is not None: self.logger.debug("An exception occurs while creating POETInterpLikelihood instance for %(s)s" % dict(s=system))
-            else:
-                if self.logger is not None: self.logger.debug("POETInterpLikelihood instance is successfully created for %(s)s" % dict(s=system))
-            star_sampler = None
-            try:
-                if likelihood is not None:
-                    star_sampler = StarSampler(likelihood, config)
-            except:
-                if self.logger is not None: self.logger.debug("An exception occurs while creating star sampler for %(s)s" % dict(s=self.system))
-                star_sampler = None
-            else:
-                if self.logger is not None and star_sampler is not None: self.logger.debug("star sampler is successfully created for %(s)s" % dict(s=self.system))
-            return star_sampler
-
-        self.star_sampler_fname = "%(dirname)s/%(system)s_star_sampler.pkl" % dict(dirname=self.dirname, system=self.system)
-        ensure_directory(self.star_sampler_fname)
-        file_exists = os.path.exists(self.star_sampler_fname)
-        self.star_sampler = None
-        if file_exists:
-            self.star_sampler = pickle.load(open(self.star_sampler_fname, "rb"))
-        if self.star_sampler is None:
-            self.star_sampler = construct_star_sampler()
-            save_object(self.star_sampler, self.star_sampler_fname)
 
     def __call__(self, u):
-        unit_cube = numpy.array([u[0], u[1], u[2]])
-        stellar_metallicity, primary_mass, stellar_age = self.star_sampler.__call__(unit_cube)
+        self.logger.debug("We are about to pickup stellar metalllicity, stellar mass and age from their normal distributions.")
         stellar_metallicity = norm.ppf(u[0], loc=self.means['stellar metallicity'], scale=(self.standard_deviations[
                                                                                           'stellar_metallicity_upper_uncertainty'] -
                                                                                           self.standard_deviations[
@@ -238,13 +142,8 @@ class PriorTransform:
                                                                            'stellar_age_lower_uncertainty'])/2)
         self.logger.debug("stellar metallicity = %(a)f, primary mass = %(b)f and stellar age = %(c)f" % dict(a=stellar_metallicity, b=primary_mass, c=stellar_age))
 
-        if not FeHConditionalLikelihoodBase.interpolator.in_range(primary_mass, stellar_metallicity):
-            return None
         primary_rad = FeHConditionalLikelihoodBase.interpolator('RADIUS', primary_mass, stellar_metallicity)
-        if stellar_age <= primary_rad.min_age or stellar_age >= primary_rad.max_age:
-            return None
         primary_radius = primary_rad(stellar_age)
-        if self.logger is not None: self.logger.debug("primary_radius is %(x)f" % dict(x=primary_radius))
         secondary_radius = None
         if 'transit depth' in self.means:
             if self.standard_deviations['transit_depth_upper_uncertainty'] is not None and self.standard_deviations['transit_depth_lower_uncertainty'] is not None:
@@ -361,7 +260,6 @@ class LogLikelihood:
         return priors
 
     def log_prob(self, parameters_for_evolution):
-        if parameters_for_evolution is None: return -numpy.inf, self.initial_eccentricity
         primary_mass = parameters_for_evolution['primary mass']
         stellar_age = parameters_for_evolution['stellar age']
         secondary_radius = parameters_for_evolution['secondary radius']
@@ -549,10 +447,6 @@ class LogLikelihood:
                                     output_dirname = "/work/08529/mmmahmud/scratch/circularization_exoplanet_system/sampling_output"
                                     ):
         numpy.random.seed()
-        #pid = os.getpid()
-        #date_time = datetime.now().strftime('%Y%m%d%H%M%S')
-        #logging_file_name = '%(outdir)s/%(system)s/P0_processor_logging/p0_%(now)s_%(pid)d.logging' % dict(outdir=output_dirname, system=self.system_name, now=date_time, pid=pid)
-        #msg_file_name = '%(outdir)s/%(system)s/P0_processor_message/p0_%(now)s_%(pid)d.txt' % dict(outdir=output_dirname, system=self.system_name, now=date_time, pid=pid)
         pid = os.getpid()
         logging_folder_name = '%(outdir)s/%(system)s/P0_processor_logging/p0_%(pid)d/' % dict(outdir=output_dirname, system=self.system_name, pid=pid)
         msg_folder_name = '%(outdir)s/%(system)s/P0_processor_message/p0_%(pid)d/' % dict(outdir=output_dirname, system=self.system_name, pid=pid)
@@ -564,8 +458,6 @@ class LogLikelihood:
             msg_file_name = '%(folder)sp0_%(now)s_%(pid)d_i_%(i)d.txt' % dict(folder=msg_folder_name, now=date_time, pid=pid, i = i)
             setup_basic_logging(logging_file_name, msg_file_name)
 
-
-        #setup_basic_logging(logging_file_name, msg_file_name)
         if self.logger is not None:
             self.logger.debug("generate_successsful_walkers_aux method is called. ")
             self.logger.debug("u = %(u)s " % dict(u=numpy.array2string(u)))
@@ -921,10 +813,8 @@ class LogLikelihood:
 
         with Pool(self.number_of_parallel_processes,
                   initializer=setup_basic_logging_for_mcmc,
-                  #initargs=[config],
                   maxtasksperchild=1) as pool:
 
-            #backend = emcee.backends.HDFBackend(mcmc_progress_file_name)
             backend = HDFBackend(mcmc_progress_file_name)
             if reset_backend:
                 backend.reset(nwalkers, ndim)
@@ -985,7 +875,7 @@ class LogLikelihood:
             if u[i] > 1 or u[i] < 0:
                 return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None])
         parameters_for_evolution = self.prior_transform_instance(u)
-        if parameters_for_evolution is None: return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None])
+
         params = numpy.array([parameters_for_evolution['primary mass'],
                            parameters_for_evolution['stellar age'],
                            parameters_for_evolution['secondary radius'],
@@ -1024,8 +914,6 @@ class InitializationOfSamplingPropertiesOfSystem:
         return cls.eccentricity_expansion_fname
 
     def __init__(self):
-        # mp.set_start_method('forkserver')
-        #print('serialized directory ', self.serialized_directory)
         manager = StellarEvolutionManager(self.serialized_directory)
         interpolator = manager.get_interpolator_by_name('default')
         FeHConditionalLikelihoodBase.set_interpolator(interpolator)
@@ -1058,7 +946,6 @@ class SamplingPropertiesOfSystem:
                  means,
                  standard_deviations,
                  system_name = 'Star-Exoplanet',
-                 dirname = "/work/08529/mmmahmud",
                  envelope_eccentricity_function=EnvelopeEccentricityDistribution.envelope_eccentricity_function,
                  initial_eccentricity=0.8,
                  initial_stellar_spin=5,
@@ -1154,7 +1041,6 @@ class SamplingPropertiesOfSystem:
                 self.prior_transform_instance = PriorTransform(means,
                                                                standard_deviations,
                                                                system_name,
-                                                               dirname,
                                                                max_argument_of_phase_lag_function_for_planet,
                                                                min_argument_of_phase_lag_function_for_planet,
                                                                min_log_of_tidal_break_period,

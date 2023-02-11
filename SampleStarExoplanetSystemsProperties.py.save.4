@@ -241,7 +241,7 @@ class PriorTransform:
         if not FeHConditionalLikelihoodBase.interpolator.in_range(primary_mass, stellar_metallicity):
             return None
         primary_rad = FeHConditionalLikelihoodBase.interpolator('RADIUS', primary_mass, stellar_metallicity)
-        if stellar_age <= primary_rad.min_age or stellar_age >= primary_rad.max_age:
+        if stellar_age <= primary_rad.min_age or age >= primary_rad.max_age:
             return None
         primary_radius = primary_rad(stellar_age)
         if self.logger is not None: self.logger.debug("primary_radius is %(x)f" % dict(x=primary_radius))
@@ -986,6 +986,7 @@ class LogLikelihood:
                 return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None])
         parameters_for_evolution = self.prior_transform_instance(u)
         if parameters_for_evolution is None: return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None])
+
         params = numpy.array([parameters_for_evolution['primary mass'],
                            parameters_for_evolution['stellar age'],
                            parameters_for_evolution['secondary radius'],
