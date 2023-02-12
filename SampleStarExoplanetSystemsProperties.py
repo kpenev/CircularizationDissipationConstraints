@@ -119,6 +119,8 @@ class PriorTransform:
                  dirname = "/work/08529/mmmahmud",
                  max_argument_of_phase_lag_function_for_planet=12,
                  min_argument_of_phase_lag_function_for_planet=3,
+                 max_argument_of_phase_lag_function_for_star=12, #
+                 min_argument_of_phase_lag_function_for_star=5, #
                  min_log_tidal_break_period=math.log(0.5,10),
                  max_log_tidal_break_period=1,
                  min_power_law_argument=-5,
@@ -133,6 +135,9 @@ class PriorTransform:
         self.dirname = "%(dirname)s/star_sampler" % dict(dirname=dirname)
         self.max_argument_of_phase_lag_function_for_planet = max_argument_of_phase_lag_function_for_planet
         self.min_argument_of_phase_lag_function_for_planet = min_argument_of_phase_lag_function_for_planet
+        self.max_argument_of_phase_lag_function_for_star = max_argument_of_phase_lag_function_for_star #
+        self.min_argument_of_phase_lag_function_for_star = min_argument_of_phase_lag_function_for_star #
+
         self.min_log_tidal_break_period = min_log_tidal_break_period
         self.max_log_tidal_break_period = max_log_tidal_break_period
         self.min_power_law_argument = min_power_law_argument
@@ -276,6 +281,9 @@ class PriorTransform:
                     self.max_log_tidal_break_period - self.min_log_tidal_break_period))
         power_law_argument = self.min_power_law_argument + u[8] * (
                     self.max_power_law_argument - self.min_power_law_argument)
+        argument_of_phase_lag_function_for_star = self.min_argument_of_phase_lag_function_for_star + u[9] * ( #
+                    self.max_argument_of_phase_lag_function_for_star - self.min_argument_of_phase_lag_function_for_star) #
+
 
         parameters_for_evolution = {'primary mass': primary_mass,
                                     'stellar age': stellar_age,
@@ -284,6 +292,7 @@ class PriorTransform:
                                     'secondary mass': secondary_mass,
                                     'initial stellar spin': initial_stellar_spin,
                                     'argument of phase lag function for planet': argument_of_phase_lag_function_for_planet,
+                                    'argument of phase lag function for star': argument_of_phase_lag_function_for_star, #
                                     'tidal break period': tidal_break_period,
                                     'power law argument': power_law_argument}
         return parameters_for_evolution
@@ -301,6 +310,8 @@ class LogLikelihood:
                  constraints = Constraints_for_selecting_systems.constraints(),
                  spin_frequency_breaks_for_planet=None,
                  spin_frequency_powers_for_planet=numpy.array([0.0]),
+                 spin_frequency_breaks_for_star=None, #
+                 spin_frequency_powers_for_star=numpy.array([0.0]), #
                  logger = None, number_of_parallel_processes = 16
                  ):
 
@@ -312,6 +323,8 @@ class LogLikelihood:
         self.initial_eccentricity = initial_eccentricity
         self.spin_frequency_breaks_for_planet = spin_frequency_breaks_for_planet
         self.spin_frequency_powers_for_planet = spin_frequency_powers_for_planet
+        self.spin_frequency_breaks_for_star = spin_frequency_breaks_for_star #
+        self.spin_frequency_powers_for_star = spin_frequency_powers_for_star #
         self.e_env = e_env
         self.system_name = system_name
         self.directory_name = directory_name
@@ -370,6 +383,9 @@ class LogLikelihood:
         initial_stellar_spin = parameters_for_evolution['initial stellar spin']
         argument_of_phase_lag_function_for_planet = parameters_for_evolution[
             'argument of phase lag function for planet']
+        argument_of_phase_lag_function_for_star = parameters_for_evolution[ #
+            'argument of phase lag function for star'] #
+
         tidal_break_period = parameters_for_evolution['tidal break period']
         power_law_argument = parameters_for_evolution['power law argument']
 
@@ -383,6 +399,7 @@ class LogLikelihood:
             self.logger.info('secondary mass = %(m)f'% dict(m= secondary_mass))
             self.logger.info('initial stellar spin = %(spin)f '% dict(spin=initial_stellar_spin))
             self.logger.info('argument of phase lag function for planet = %(ar)f '% dict(ar= argument_of_phase_lag_function_for_planet))
+            self.logger.info('argument of phase lag function for star = %(ar)f '% dict(ar= argument_of_phase_lag_function_for_star))
             self.logger.info('tidal break period = %(bp)f '% dict(bp= tidal_break_period))
             self.logger.info('power law argument = %(alpha)f' % dict(alpha= power_law_argument))
 
@@ -413,8 +430,17 @@ class LogLikelihood:
             tidal_frequency_powers_for_planet = numpy.array([0.0, power_law_argument, 0.0])
             reference_argument_of_phase_lag_function_for_planet += power_law_argument * math.log10(tidal_frequency_breaks_for_planet[1]/tidal_frequency_breaks_for_planet[0])
 
+        tidal_frequency_breaks_for_star = None #
+        tidal_frequency_powers_for_star = numpy.array([0.0]) #
+
         dissipation = dict(
-            primary=None,
+            primary=dict( #
+                tidal_frequency_breaks=tidal_frequency_breaks_for_star, #
+                spin_frequency_breaks=self.spin_frequency_breaks_for_star, #
+                tidal_frequency_powers=tidal_frequency_powers_for_star, #
+                spin_frequency_powers=self.spin_frequency_powers_for_star, #
+                reference_phase_lag=phase_lag(argument_of_phase_lag_function_for_star) #
+            ), #
             secondary=dict(
                 tidal_frequency_breaks=tidal_frequency_breaks_for_planet,
                 spin_frequency_breaks=self.spin_frequency_breaks_for_planet,
@@ -572,6 +598,8 @@ class LogLikelihood:
 
         lgQpl_max = self.prior_transform_instance.max_argument_of_phase_lag_function_for_planet
         lgQpl_min = self.prior_transform_instance.min_argument_of_phase_lag_function_for_planet
+        lgQst_max = self.prior_transform_instance.max_argument_of_phase_lag_function_for_star #
+        lgQst_min = self.prior_transform_instance.min_argument_of_phase_lag_function_for_star #
         lgPbr_max = self.prior_transform_instance.max_log_tidal_break_period
         lgPbr_min = self.prior_transform_instance.min_log_tidal_break_period
         alpha_max = self.prior_transform_instance.max_power_law_argument
@@ -580,19 +608,24 @@ class LogLikelihood:
         init_spin_min = self.prior_transform_instance.min_initial_stellar_spin
 
         del_lgQpl_u = 0.25/(lgQpl_max - lgQpl_min)
+        del_lgQst_u = 0.25/(lgQst_max - lgQst_min) #
         del_lgPbr_u = 0.10/(lgPbr_max - lgPbr_min)
         del_alpha_u = 0.5/(alpha_max - alpha_min)
         del_spin_u = 1/(init_spin_max - init_spin_min)
 
         n_lgQpl = int(1.0/del_lgQpl_u)
+        n_lgQst = int(1.0/del_lgQst_u) #
         n_lgPbr = int(1.0/del_lgPbr_u)
         n_alpha = int(1.0/del_alpha_u)
         n_spin  = int(1.0/del_spin_u)
 
+        v_start = numpy.random.randint(0, n_lgQst) #
         w_start = numpy.random.randint(0, n_alpha)
         x_start = numpy.random.randint(0, n_lgPbr)
         y_start = numpy.random.randint(0, n_spin)
 
+        v_end = v_start - 1 #
+        if v_end < 0: v_end = n_lgQst - 1 #
         w_end = w_start - 1
         if w_end < 0: w_end = n_alpha - 1
         x_end = x_start - 1
@@ -600,90 +633,104 @@ class LogLikelihood:
         y_end = y_start - 1
         if y_end < 0: y_end = n_spin - 1
 
+        loop_v_complete = False #
         loop_w_complete = False
         loop_x_complete = False
         loop_y_complete = False
         walker_found = False
         i = 0
-
-        w = w_start
-        alpha_u = w * del_alpha_u + numpy.random.rand() * del_alpha_u
-        while not (loop_w_complete or walker_found):
-            x = x_start
-            lgPbr_u = (x + numpy.random.rand()) * del_lgPbr_u
-            while not (loop_x_complete or walker_found):
-                y = y_start
-                spin_u = (y + numpy.random.rand()) * del_spin_u
-                while not (loop_y_complete or walker_found):
-                    u[5] = spin_u % 1 if spin_u > 1 else spin_u
-                    temp = numpy.random.rand() * del_lgQpl_u
-                    u[6] = temp % 1 if temp > 1 else temp
-                    u[7] = lgPbr_u % 1 if lgPbr_u > 1 else lgPbr_u
-                    u[8] = alpha_u % 1 if alpha_u > 1 else alpha_u
-                    i = i+1
-                    setup_logging_messaging_file(i)
-                    logging.debug("Modified u is %(u)s" % dict(u=numpy.array2string(u)))
-                    if self.logger is not None: self.logger.debug("Modified u is %(u)s" % dict(u=numpy.array2string(u)))
-                    log_likelihood, parameters_for_evolution = self(u)
-                    logging.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood, p=numpy.array2string(parameters_for_evolution)))
-                    if self.logger is not None: self.logger.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u),
-                                                                                                                                       n=log_likelihood,
-                                                                                                                                       p=numpy.array2string(parameters_for_evolution)))
-                    t=u[6]
-                    if math.isinf(log_likelihood):
-                        u[6] = numpy.random.rand()
+        v = v_start #
+        lgQst_u = v * del_lgQst_u + numpy.random.rand() * del_lgQst_u #
+        while not (loop_v_complete or walker_found):  #
+            w = w_start
+            alpha_u = w * del_alpha_u + numpy.random.rand() * del_alpha_u
+            while not (loop_w_complete or walker_found):
+                x = x_start
+                lgPbr_u = (x + numpy.random.rand()) * del_lgPbr_u
+                while not (loop_x_complete or walker_found):
+                    y = y_start
+                    spin_u = (y + numpy.random.rand()) * del_spin_u
+                    while not (loop_y_complete or walker_found):
+                        u[5] = spin_u % 1 if spin_u > 1 else spin_u
+                        temp = numpy.random.rand() * del_lgQpl_u
+                        u[6] = temp % 1 if temp > 1 else temp
+                        u[7] = lgPbr_u % 1 if lgPbr_u > 1 else lgPbr_u
+                        u[8] = alpha_u % 1 if alpha_u > 1 else alpha_u
                         i = i+1
                         setup_logging_messaging_file(i)
-                        logging.debug("Loglikelihood is found to be -inf even for lowest lgQpl. Now we are trying with any value of lgQpl between min and max")
-                        if self.logger is not None:
-                            self.logger.debug("Loglikelihood is found to be -inf even for lowest lgQpl. Now we are trying with any value of lgQpl between min and max")
+                        logging.debug("Modified u is %(u)s" % dict(u=numpy.array2string(u)))
+                        if self.logger is not None: self.logger.debug("Modified u is %(u)s" % dict(u=numpy.array2string(u)))
                         log_likelihood, parameters_for_evolution = self(u)
                         logging.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood, p=numpy.array2string(parameters_for_evolution)))
-                        if self.logger is not None:
-                            self.logger.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u),
-                                                                                                                   n=log_likelihood,
-                                                                                                                   p=numpy.array2string(parameters_for_evolution)))
-                        if not math.isinf(log_likelihood): t=u[6]
-                    if (not math.isinf(log_likelihood)):
-                        logging.debug("Start: log likelihood is not negative infinity for this u")
-                        if self.logger is not None: self.logger.debug("Start: log likelihood is not negative infinity for this u")
-                        a = u[6]
-                        b = 1.0
-                        i = i+1
-                        setup_logging_messaging_file(i)
-                        if self.logger is not None:
-                            self.logger.debug("loglikelihood is going to be calculated for maximum lgQpl")
-                        u[6] = b
-                        log_likelihood, parameters_for_evolution = self(u)
-                        logging.debug("loglikelihood for maximum lgQpl is %(x)f" % dict(x=log_likelihood))
-                        if self.logger is not None:
-                            self.logger.debug("loglikelihood for maximum lgQpl is %(x)f" % dict(x=log_likelihood))
-                        if (not math.isinf(log_likelihood)):
-                            i = i + 1
-                            setup_logging_messaging_file(i)
-                            logging.debug("loglikelihoods are finite for maximum and minimum lgQpl. We are now randomly picking up any value of lgQpl between them" )
-                            if self.logger is not None:
-                                self.logger.debug("loglikelihoods are finite for maximum and minimum lgQpl. We are now randomly picking up any value of lgQpl between them" )
-                            u[6] = numpy.random.uniform(a, b, 1)
-                            log_likelihood, parameters_for_evolution = self(u)
-                            if not math.isinf(log_likelihood):
-                                if self.logger is not None:
-                                    self.logger.debug("log likelihood is finite: %(x)f" % dict(x=log_likelihood))
-                        else:
-                            c = (a+b)/2.0
-                            c = c % 1 if c > 1 else c
-                            u[6] = c
+                        if self.logger is not None: self.logger.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u),
+                                                                                                                                           n=log_likelihood,
+                                                                                                                                           p=numpy.array2string(parameters_for_evolution)))
+                        t=u[6]
+                        if math.isinf(log_likelihood):
+                            u[6] = numpy.random.rand()
                             i = i+1
                             setup_logging_messaging_file(i)
+                            logging.debug("Loglikelihood is found to be -inf even for lowest lgQpl. Now we are trying with any value of lgQpl between min and max")
+                            if self.logger is not None:
+                                self.logger.debug("Loglikelihood is found to be -inf even for lowest lgQpl. Now we are trying with any value of lgQpl between min and max")
                             log_likelihood, parameters_for_evolution = self(u)
-                            logging.debug("u = %(u)s log likelihood = %(n)f for parameters: %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood, p=numpy.array2string(parameters_for_evolution)))
-                            if self.logger is not None: self.logger.debug("u = %(u)s log likelihood = %(n)f for parameters: %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood,
-                                                                                                                                          p=numpy.array2string(parameters_for_evolution)))
-                            while math.fabs(b-c)>0.0001:
-                                while math.isinf(log_likelihood):
-                                    b = c
+                            logging.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood, p=numpy.array2string(parameters_for_evolution)))
+                            if self.logger is not None:
+                                self.logger.debug("log likelihood for u = %(u)s is %(n)f with parameters %(p)s" % dict(u=numpy.array2string(u),
+                                                                                                                       n=log_likelihood,
+                                                                                                                       p=numpy.array2string(parameters_for_evolution)))
+                            if not math.isinf(log_likelihood): t=u[6]
+                        if (not math.isinf(log_likelihood)):
+                            logging.debug("Start: log likelihood is not negative infinity for this u")
+                            if self.logger is not None: self.logger.debug("Start: log likelihood is not negative infinity for this u")
+                            a = u[6]
+                            b = 1.0
+                            i = i+1
+                            setup_logging_messaging_file(i)
+                            if self.logger is not None:
+                                self.logger.debug("loglikelihood is going to be calculated for maximum lgQpl")
+                            u[6] = b
+                            log_likelihood, parameters_for_evolution = self(u)
+                            logging.debug("loglikelihood for maximum lgQpl is %(x)f" % dict(x=log_likelihood))
+                            if self.logger is not None:
+                                self.logger.debug("loglikelihood for maximum lgQpl is %(x)f" % dict(x=log_likelihood))
+                            if (not math.isinf(log_likelihood)):
+                                i = i + 1
+                                setup_logging_messaging_file(i)
+                                logging.debug("loglikelihoods are finite for maximum and minimum lgQpl. We are now randomly picking up any value of lgQpl between them" )
+                                if self.logger is not None:
+                                    self.logger.debug("loglikelihoods are finite for maximum and minimum lgQpl. We are now randomly picking up any value of lgQpl between them" )
+                                u[6] = numpy.random.uniform(a, b, 1)
+                                log_likelihood, parameters_for_evolution = self(u)
+                                if not math.isinf(log_likelihood):
+                                    if self.logger is not None:
+                                        self.logger.debug("log likelihood is finite: %(x)f" % dict(x=log_likelihood))
+                            else:
+                                c = (a+b)/2.0
+                                c = c % 1 if c > 1 else c
+                                u[6] = c
+                                i = i+1
+                                setup_logging_messaging_file(i)
+                                log_likelihood, parameters_for_evolution = self(u)
+                                logging.debug("u = %(u)s log likelihood = %(n)f for parameters: %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood, p=numpy.array2string(parameters_for_evolution)))
+                                if self.logger is not None: self.logger.debug("u = %(u)s log likelihood = %(n)f for parameters: %(p)s" % dict(u=numpy.array2string(u), n=log_likelihood,
+                                                                                                                                              p=numpy.array2string(parameters_for_evolution)))
+                                while math.fabs(b-c)>0.0001:
+                                    while math.isinf(log_likelihood):
+                                        b = c
+                                        c = (a+b)/2.0
+                                        c = c % 1 if c>1 else c
+                                        u[6] = c
+                                        logging.debug("c = %(s)f  " % dict(s = c))
+                                        if self.logger is not None: self.logger.debug("c =  %(s)f " % dict(s = c))
+                                        i = i+1
+                                        setup_logging_messaging_file(i)
+                                        log_likelihood, parameters_for_evolution = self(u)
+                                        logging.debug("log likelihood = %(s)f  " % dict(s = log_likelihood))
+                                        if self.logger is not None: self.logger.debug("log likelihood =  %(s)f " % dict(s = log_likelihood))
+                                    a = c
                                     c = (a+b)/2.0
-                                    c = c % 1 if c>1 else c
+                                    c = c % 1 if c > 1 else c
                                     u[6] = c
                                     logging.debug("c = %(s)f  " % dict(s = c))
                                     if self.logger is not None: self.logger.debug("c =  %(s)f " % dict(s = c))
@@ -692,92 +739,87 @@ class LogLikelihood:
                                     log_likelihood, parameters_for_evolution = self(u)
                                     logging.debug("log likelihood = %(s)f  " % dict(s = log_likelihood))
                                     if self.logger is not None: self.logger.debug("log likelihood =  %(s)f " % dict(s = log_likelihood))
-                                a = c
-                                c = (a+b)/2.0
-                                c = c % 1 if c > 1 else c
-                                u[6] = c
-                                logging.debug("c = %(s)f  " % dict(s = c))
-                                if self.logger is not None: self.logger.debug("c =  %(s)f " % dict(s = c))
+                                if not math.isinf(log_likelihood):
+                                    a = c
+                                logging.debug("we got a range of u[6] for the acceptable walkers. The extreme u = %(u)s with log likelihood %(n)f" % dict(u=numpy.array2string(u), n=log_likelihood))
+                                if self.logger is not None: self.logger.debug(logging.debug("we got a range of u[6] for the acceptable walkers. The extreme u = %(u)s with log likelihood %(n)f"
+                                                                                           % dict(u=numpy.array2string(u), n=log_likelihood)))
+                                logging.debug("corresponding extreme parameters are: %(p)s" % dict(p=numpy.array2string(parameters_for_evolution)))
+                                if self.logger is not None: self.logger.debug("corresponding extreme parameters are: %(p)s" % dict(p=numpy.array2string(parameters_for_evolution)))
+                                x = numpy.random.uniform(t, a, 1)
+                                u[6] = x[0]
+                                logging.debug("a value of u[6] picked up randomly from init_u[6] and the extremum u[6]. That is %(x)f" % dict(x= u[6]))
+                                if self.logger is not None: self.logger.debug("a value of u[6] picked up randomly from init_u[6] and the extremum u[6]. That is %(x)f" % dict(x= u[6]))
                                 i = i+1
                                 setup_logging_messaging_file(i)
                                 log_likelihood, parameters_for_evolution = self(u)
-                                logging.debug("log likelihood = %(s)f  " % dict(s = log_likelihood))
-                                if self.logger is not None: self.logger.debug("log likelihood =  %(s)f " % dict(s = log_likelihood))
-                            if not math.isinf(log_likelihood):
-                                a = c
-                            logging.debug("we got a range of u[6] for the acceptable walkers. The extreme u = %(u)s with log likelihood %(n)f" % dict(u=numpy.array2string(u), n=log_likelihood))
-                            if self.logger is not None: self.logger.debug(logging.debug("we got a range of u[6] for the acceptable walkers. The extreme u = %(u)s with log likelihood %(n)f"
-                                                                                       % dict(u=numpy.array2string(u), n=log_likelihood)))
-                            logging.debug("corresponding extreme parameters are: %(p)s" % dict(p=numpy.array2string(parameters_for_evolution)))
-                            if self.logger is not None: self.logger.debug("corresponding extreme parameters are: %(p)s" % dict(p=numpy.array2string(parameters_for_evolution)))
-                            x = numpy.random.uniform(t, a, 1)
-                            u[6] = x[0]
-                            logging.debug("a value of u[6] picked up randomly from init_u[6] and the extremum u[6]. That is %(x)f" % dict(x= u[6]))
-                            if self.logger is not None: self.logger.debug("a value of u[6] picked up randomly from init_u[6] and the extremum u[6]. That is %(x)f" % dict(x= u[6]))
-                            i = i+1
-                            setup_logging_messaging_file(i)
-                            log_likelihood, parameters_for_evolution = self(u)
-                            if not math.isinf(log_likelihood):
-                                logging.debug('The discovered walker is u  = %(u)s' % dict(u=numpy.array2string(u)))
-                                logging.debug('log p = %(logp)f' % dict(logp = log_likelihood))
-                                logging.debug('parameters for evolution = %(params)s' % dict(params=numpy.array2string(parameters_for_evolution)))
-                                if self.logger is not None:
-                                    self.logger.debug('u  = %(u)s' % dict(u=numpy.array2string(u)))
-                                    self.logger.debug('log p = %(logp)f' % dict(logp = log_likelihood))
-                                    self.logger.debug('parameters for evolution = %(params)s' % dict(params=numpy.array2string(parameters_for_evolution)))
+                                if not math.isinf(log_likelihood):
+                                    logging.debug('The discovered walker is u  = %(u)s' % dict(u=numpy.array2string(u)))
+                                    logging.debug('log p = %(logp)f' % dict(logp = log_likelihood))
+                                    logging.debug('parameters for evolution = %(params)s' % dict(params=numpy.array2string(parameters_for_evolution)))
+                                    if self.logger is not None:
+                                        self.logger.debug('u  = %(u)s' % dict(u=numpy.array2string(u)))
+                                        self.logger.debug('log p = %(logp)f' % dict(logp = log_likelihood))
+                                        self.logger.debug('parameters for evolution = %(params)s' % dict(params=numpy.array2string(parameters_for_evolution)))
+                                else:
+                                    u[6]=t
+                            p0_file_exists = os.path.exists(p0_file_name)
+                            logging.debug('number of discovered walkers = %(x)f' % dict(x=number_of_discovered_walkers.value))
+                            if self.logger is not None: self.logger.debug('number of discovered walkers = %(x)f' % dict(x=number_of_discovered_walkers.value))
+                            if p0_file_exists:
+                                while True:
+                                    if ((p0_file_is_being_updated.value == 0) and (number_of_discovered_walkers.value < nwalkers)):
+                                        p0_file_is_being_updated.value = 1
+                                        p0_file = open(p0_file_name, 'rb')
+                                        p0 = numpy.load(p0_file)
+                                        p0_file.close()
+                                        p0_file = open(p0_file_name, 'wb')
+                                        p0 = numpy.vstack((p0, u))
+                                        numpy.save(p0_file, p0)
+                                        p0_file.close()
+                                        walkers.put(u)
+                                        number_of_discovered_walkers.value = number_of_discovered_walkers.value + 1
+                                        p0_file_is_being_updated.value = 0
+                                        break
+                                    if not (number_of_discovered_walkers.value < nwalkers):
+                                        break
                             else:
-                                u[6]=t
+                                while True:
+                                    if ((p0_file_is_being_updated.value == 0) and (number_of_discovered_walkers.value < nwalkers)):
+                                        p0_file_is_being_updated.value = 1
+                                        p0_file = open(p0_file_name, 'wb')
+                                        numpy.save(p0_file, u)
+                                        p0_file.close()
+                                        walkers.put(u)
+                                        number_of_discovered_walkers.value = number_of_discovered_walkers.value + 1
+                                        p0_file_is_being_updated.value = 0
+                                        break
+                                    if not (number_of_discovered_walkers.value < nwalkers):
+                                        break
+                            walker_found = True
+                        if y == y_end: loop_y_complete = True
+                        y = y + 1
+                        if y > n_spin-1: y = 0
+                        spin_u = (y + numpy.random.rand()) * del_spin_u
+                        spin_u = spin_u % 1 if spin_u > 1 else spin_u
+                    if x == x_end: loop_x_complete = True
+                    x = x + 1
+                    if x > n_lgPbr-1: x = 0
+                    lgPbr_u = (x + numpy.random.rand()) *  del_lgPbr_u
+                    lgPbr_u = lgPbr_u % 1 if lgPbr_u > 1 else lgPbr_u
+                if w == w_end: loop_w_complete = True
+                w = w + 1
+                if w > n_alpha-1: w = 0
+                alpha_u = (w + numpy.random.rand()) * del_alpha_u
+                alpha_u = alpha_u % 1 if alpha_u > 1 else alpha_u
+            if v == v_end: loop_v_complete = True #
+            v = v + 1 #
+            if v > n_lgQst-1: v = 0 #
+            lgQst_u = (v + numpy.random.rand()) * del_lgQst_u #
+            lgQst_u = lgQst_u % 1 if lgQst_u > 1 else lgQst_u #
 
-                        p0_file_exists = os.path.exists(p0_file_name)
-                        logging.debug('number of discovered walkers = %(x)f' % dict(x=number_of_discovered_walkers.value))
-                        if self.logger is not None: self.logger.debug('number of discovered walkers = %(x)f' % dict(x=number_of_discovered_walkers.value))
-                        if p0_file_exists:
-                            while True:
-                                if ((p0_file_is_being_updated.value == 0) and (number_of_discovered_walkers.value < nwalkers)):
-                                    p0_file_is_being_updated.value = 1
-                                    p0_file = open(p0_file_name, 'rb')
-                                    p0 = numpy.load(p0_file)
-                                    p0_file.close()
-                                    p0_file = open(p0_file_name, 'wb')
-                                    p0 = numpy.vstack((p0, u))
-                                    numpy.save(p0_file, p0)
-                                    p0_file.close()
-                                    walkers.put(u)
-                                    number_of_discovered_walkers.value = number_of_discovered_walkers.value + 1
-                                    p0_file_is_being_updated.value = 0
-                                    break
-                                if not (number_of_discovered_walkers.value < nwalkers):
-                                    break
-                        else:
-                            while True:
-                                if ((p0_file_is_being_updated.value == 0) and (number_of_discovered_walkers.value < nwalkers)):
-                                    p0_file_is_being_updated.value = 1
-                                    p0_file = open(p0_file_name, 'wb')
-                                    numpy.save(p0_file, u)
-                                    p0_file.close()
-                                    walkers.put(u)
-                                    number_of_discovered_walkers.value = number_of_discovered_walkers.value + 1
-                                    p0_file_is_being_updated.value = 0
-                                    break
-                                if not (number_of_discovered_walkers.value < nwalkers):
-                                    break
-                        walker_found = True
-                    if y == y_end: loop_y_complete = True
-                    y = y + 1
-                    if y > n_spin-1: y = 0
-                    spin_u = (y + numpy.random.rand()) * del_spin_u
-                    spin_u = spin_u % 1 if spin_u > 1 else spin_u
-                if x == x_end: loop_x_complete = True
-                x = x + 1
-                if x > n_lgPbr-1: x = 0
-                lgPbr_u = (x + numpy.random.rand()) *  del_lgPbr_u
-                lgPbr_u = lgPbr_u % 1 if lgPbr_u > 1 else lgPbr_u
-            if w == w_end: loop_w_complete = True
-            w = w + 1
-            if w > n_alpha-1: w = 0
-            alpha_u = (w + numpy.random.rand()) * del_alpha_u
-            alpha_u = alpha_u % 1 if alpha_u > 1 else alpha_u
 
+        #*****************
         if number_of_discovered_walkers.value < nwalkers:
             numpy.random.seed(pid)
             u = numpy.random.rand(ndim)
@@ -795,7 +837,7 @@ class LogLikelihood:
     def generate_successful_walkers(self,
                                 p0_file_name,
                                 nwalkers=64,
-                                ndim=9,
+                                ndim=10, #
                                 nprocessors = 16):
 
         if self.logger is not None: self.logger.debug("Initial walkers are going to be generated now.")
@@ -835,7 +877,7 @@ class LogLikelihood:
 
     def MCMC(self,
              nwalkers=64,
-             ndim=9,
+             ndim=10, #
              reset_backend = False,
              iterations = 16):
 
@@ -967,9 +1009,10 @@ class LogLikelihood:
                                                   'Fe/H_*', #Stellar Metallicity
                                                   'Mp', #Planetary mass
                                                   'initSpin*', #Initial stellar spin
-                                                  'Qpl', #Log of the tidal quality factor for planet, i.e. argument of phase lag function
+                                                  'lgQpl', #Log of the tidal quality factor for planet, i.e. argument of phase lag function
                                                   'tidal break point',
                                                   'alpha',
+                                                  'lgQst', #
                                                   'e_now', #Present eccentricity
                                                   'log(f(e_now))'], #log likelihood of present eccentricity
                                    quantiles=[0.16, 0.5, 0.84],
@@ -981,11 +1024,11 @@ class LogLikelihood:
         return
 
     def __call__(self, u):
-        for i in range(0, 9):
+        for i in range(0, 10): #
             if u[i] > 1 or u[i] < 0:
-                return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None])
+                return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None, None]) #
         parameters_for_evolution = self.prior_transform_instance(u)
-        if parameters_for_evolution is None: return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None])
+        if parameters_for_evolution is None: return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None, None])
         params = numpy.array([parameters_for_evolution['primary mass'],
                            parameters_for_evolution['stellar age'],
                            parameters_for_evolution['secondary radius'],
@@ -994,11 +1037,12 @@ class LogLikelihood:
                            parameters_for_evolution['initial stellar spin'],
                            parameters_for_evolution['argument of phase lag function for planet'],
                            parameters_for_evolution['tidal break period'],
-                           parameters_for_evolution['power law argument']])
+                           parameters_for_evolution['power law argument'], #
+                           parameters_for_evolution['argument of phase lag function for star']]) #
         log_prob_parameters_for_evolution, calculated_eccentricity_now = self.log_prob(parameters_for_evolution)
         if numpy.isinf(-log_prob_parameters_for_evolution):
             logging.debug("Actual params are: %(x)s " % dict(x=json.dumps(parameters_for_evolution)))
-            return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None])
+            return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None, None]) #
         params = numpy.append(params, [calculated_eccentricity_now, log_prob_parameters_for_evolution])
         logging.debug("The params are %(p)s" % dict(p=repr(params)))
         return log_prob_parameters_for_evolution, params
@@ -1064,6 +1108,8 @@ class SamplingPropertiesOfSystem:
                  initial_stellar_spin=5,
                  max_argument_of_phase_lag_function_for_planet=12,
                  min_argument_of_phase_lag_function_for_planet=3,
+                 max_argument_of_phase_lag_function_for_star=12, #
+                 min_argument_of_phase_lag_function_for_star=5, #
                  min_log_of_tidal_break_period=math.log(0.5, 10),
                  max_log_of_tidal_break_period=1,
                  min_power_law_argument=-5,
@@ -1073,6 +1119,8 @@ class SamplingPropertiesOfSystem:
                  constraints=Constraints_for_selecting_systems.constraints(),
                  spin_frequency_breaks_for_planet=None,
                  spin_frequency_powers_for_planet=numpy.array([0.0]),
+                 spin_frequency_breaks_for_star=None, #
+                 spin_frequency_powers_for_star=numpy.array([0.0]), #
                  output_dirname="/work/08529/mmmahmud/scratch/circularization_exoplanet_system/sampling_output",
                  logging_level=logging.DEBUG):
 
@@ -1090,6 +1138,10 @@ class SamplingPropertiesOfSystem:
         self.max_argument_of_phase_lag_function_for_planet = max_argument_of_phase_lag_function_for_planet
         logger.info("Minimum argument of phase lag function for planet = %(Q)f" % dict(Q=min_argument_of_phase_lag_function_for_planet))
         self.min_argument_of_phase_lag_function_for_planet = min_argument_of_phase_lag_function_for_planet
+        logger.info("Maximum argument of phase lag function for star = %(Q)f" % dict(Q=max_argument_of_phase_lag_function_for_star)) #
+        self.max_argument_of_phase_lag_function_for_star = max_argument_of_phase_lag_function_for_star #
+        logger.info("Minimum argument of phase lag function for star = %(Q)f" % dict(Q=min_argument_of_phase_lag_function_for_star)) #
+        self.min_argument_of_phase_lag_function_for_star = min_argument_of_phase_lag_function_for_star #
         logger.info("Maximum log of tidal break period = %(p)f" % dict(p = max_log_of_tidal_break_period))
         self.max_log_of_tidal_break_period = max_log_of_tidal_break_period
         logger.info("Minimum log of tidal break period = %(p)f" % dict(p = min_log_of_tidal_break_period))
@@ -1104,6 +1156,8 @@ class SamplingPropertiesOfSystem:
         self.min_initial_stellar_spin = min_initial_stellar_spin
         self.spin_frequency_breaks_for_planet = spin_frequency_breaks_for_planet
         self.spin_frequency_powers_for_planet = spin_frequency_powers_for_planet
+        self.spin_frequency_breaks_for_star = spin_frequency_breaks_for_star #
+        self.spin_frequency_powers_for_star = spin_frequency_powers_for_star #
 
         self.envelope_eccentricity_function = envelope_eccentricity_function
 
@@ -1157,6 +1211,8 @@ class SamplingPropertiesOfSystem:
                                                                dirname,
                                                                max_argument_of_phase_lag_function_for_planet,
                                                                min_argument_of_phase_lag_function_for_planet,
+                                                               max_argument_of_phase_lag_function_for_star, #
+                                                               min_argument_of_phase_lag_function_for_star, #
                                                                min_log_of_tidal_break_period,
                                                                max_log_of_tidal_break_period,
                                                                min_power_law_argument, max_power_law_argument,
@@ -1175,6 +1231,8 @@ class SamplingPropertiesOfSystem:
                                                              constraints = constraints,
                                                              spin_frequency_breaks_for_planet = spin_frequency_breaks_for_planet,
                                                              spin_frequency_powers_for_planet = spin_frequency_powers_for_planet,
+                                                             spin_frequency_breaks_for_star = spin_frequency_breaks_for_star, #
+                                                             spin_frequency_powers_for_star = spin_frequency_powers_for_star, #
                                                              logger=logger, number_of_parallel_processes = 16
                                                              )
 
