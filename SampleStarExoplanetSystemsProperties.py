@@ -233,11 +233,11 @@ class PriorTransform:
                                                                                           'stellar_metallicity_upper_uncertainty'] -
                                                                                           self.standard_deviations[
                                                                                           'stellar_metallicity_lower_uncertainty'])/2)
-        primary_mass = norm.ppf(u[0], loc=self.means['primary mass'], scale=(self.standard_deviations[
+        primary_mass = norm.ppf(u[1], loc=self.means['primary mass'], scale=(self.standard_deviations[
                                                                             'primary_mass_upper_uncertainty'] -
                                                                             self.standard_deviations[
                                                                             'primary_mass_lower_uncertainty'])/2)
-        stellar_age = norm.ppf(u[0], loc=self.means['stellar age'], scale=(self.standard_deviations[
+        stellar_age = norm.ppf(u[2], loc=self.means['stellar age'], scale=(self.standard_deviations[
                                                                            'stellar_age_upper_uncertainty'] -
                                                                            self.standard_deviations[
                                                                            'stellar_age_lower_uncertainty'])/2)
