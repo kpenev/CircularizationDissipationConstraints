@@ -48,11 +48,11 @@ if __name__ == '__main__':
         logging.debug('index = %(x)s' % dict(x = repr(inputting_instance.index)))
 
         InitializationOfSamplingPropertiesOfSystem()
-        test3 = SamplingPropertiesOfSystem(measured_values,
-                                           standard_deviations,
-                                           system_name=system_name,
-                                           envelope_eccentricity_function=EnvelopeEccentricityDistribution.envelope_eccentricity_function
-                                           )
+        test3 = SamplingPropertiesOfSystemTesting(measured_values,
+                                                  standard_deviations,
+                                                  system_name=system_name,
+                                                  envelope_eccentricity_function=EnvelopeEccentricityDistribution.envelope_eccentricity_function
+                                                  )
         #string_measured_values = json.dumps(measured_values)
         #string_standard_deviations = json.dumps(standard_deviations)
         #string = 'python3 SampleStarExoplanetSystemsProperties.py --measured_values \'' + string_measured_values + '\' --standard_deviations \'' + string_standard_deviations + '\' --system \'' + system_name + '\''
@@ -60,3 +60,4 @@ if __name__ == '__main__':
         #logging.debug(string)
         #os.system(string)
     logging.debug('This is the end of Inputting.py ***************')
+

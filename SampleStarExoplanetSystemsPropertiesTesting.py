@@ -971,26 +971,67 @@ class LogLikelihood:
         def setup_basic_logging_for_mcmc():
             pid = os.getpid()
             date_time = datetime.now().strftime('%Y%m%d%H%M%S')
-            logging_file_name='/work/08529/mmmahmud/scratch/circularization_exoplanet_system/sampling_output/%(system)s/mcmc_processor_logging/mcmc_%(now)s_%(pid)d.logging'%dict(system=self.system_name,
-                                                                                                                                                                                  pid=pid,
-                                                                                                                                                                                  now=date_time)
-            msg_file_name='/work/08529/mmmahmud/scratch/circularization_exoplanet_system/sampling_output/%(system)s/mcmc_processor_message/mcmc_%(now)s_%(pid)d.txt' % dict(system=self.system_name,
-                                                                                                                                                                            pid=pid,
-                                                                                                                                                                            now=date_time)
+            logging_file_name='/work/08529/mmmahmud/scratch/circularization_exoplanet_system/sampling_output/%(system)s/mcmc_processor_logging/mcmc__%(pid)d.logging'%dict(system=self.system_name,
+                                                                                                                                                                                  pid=pid)
+            msg_file_name='/work/08529/mmmahmud/scratch/circularization_exoplanet_system/sampling_output/%(system)s/mcmc_processor_message/mcmc_%(pid)d.txt' % dict(system=self.system_name,
+                                                                                                                                                                            pid=pid)
             ensure_directory(logging_file_name)
             ensure_directory(msg_file_name)
             setup_basic_logging(logging_file_name, msg_file_name)
+        backend = HDFBackend(mcmc_progress_file_name)
+        if self.logger is not None: self.logger.debug('Backend is %(x)s' % dict(x=repr(backend)))
+        if reset_backend:
+            backend.reset(nwalkers, ndim)
+        else:
+            if self.logger is not None: self.logger.debug("We are not resetting")
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool=pool, backend=backend)
+        if not backend_file_exists:
+            if self.logger is not None: self.logger.debug("backend file does not exist.")
+
+        if backend_file_exists:
+            if self.logger is not None: self.logger.debug('Backend file exists.')
+            logging.debug("Backend file exists.")
+            chain_exists = backend.initialized and (backend.iteration > 0)
+            if self.logger is not None:
+                self.logger.debug('Backend iterations = %(x)f ' % dict(x= backend.iteration))
+                self.logger.debug('backend initialized = %(x)s' % dict(x= backend.initialized))
+            logging.debug('Backend iterations = %(x)f ' % dict(x= backend.iteration))
+            logging.debug('backend initialized = %(x)s' % dict(x= backend.initialized))
+            if reset_backend == False and chain_exists:
+                if self.logger is not None:
+                    self.logger.debug('Backend file is not subject to reset. The chain size is not zero.')
+                    self.logger.debug('Next samples will be drawn from the end of the previously worked out chain.')
+                logging.debug('Backend file is not subject to reset. The chain size is not zero. Next samples will be drawn from the end of the previously worked out chain.')
+                sampler.run_mcmc(None, iterations, progress = True)
+            else:
+                if self.logger is not None:
+                    self.logger.debug('Either the backend file is subject to reset or previously calculated chain size is zero.')
+                    self.logger.debug('Samples will be drawn for the first time.')
+                logging.debug('Either the backend file is subject to reset or previously calculated chain size is zero.')
+                logging.debug('Samples will be drawn for the first time.')
+                backend.reset(nwalkers, ndim)
+                #sampler.run_mcmc(p0, iterations, progress = True)
+        else:
+            logging.debug('Backend file did not exist previously')
+            if self.logger is not None: self.logger.debug('Backend file did not exist previously')
+            #sampler.run_mcmc(p0, iterations, progress = True)
 
         with Pool(self.number_of_parallel_processes,
-                  initializer=setup_basic_logging_for_mcmc,
+                  #initializer=setup_basic_logging_for_mcmc,
                   #initargs=[config],
                   maxtasksperchild=1) as pool:
 
             #backend = emcee.backends.HDFBackend(mcmc_progress_file_name)
             backend = HDFBackend(mcmc_progress_file_name)
+            if self.logger is not None: self.logger.debug('Backend is %(x)s' % dict(x=repr(backend)))
             if reset_backend:
                 backend.reset(nwalkers, ndim)
+            else:
+                if self.logger is not None: self.logger.debug("We are not resetting")
             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool=pool, backend=backend)
+
+            if not backend_file_exists:
+                if self.logger is not None: self.logger.debug("backend file does not exist.")
 
             if backend_file_exists:
                 if self.logger is not None: self.logger.debug('Backend file exists.')

@@ -562,8 +562,8 @@ class EnvelopeEccentricityDistribution:
                       return None, None, None
                 if 'secondary radius' in means:
                     rad = means['secondary radius']
-                elif ('ratio of planet and stellar radius' in means) and ('primary radius' in means):
-                    rad = means['ratio of planet and stellar radius'] * means['primary radius'] * const.R_sun.value / const.R_earth.value
+                elif ('ratio of planet to stellar radius' in means) and ('primary radius' in means):
+                    rad = means['ratio of planet to stellar radius'] * means['primary radius'] * const.R_sun.value / const.R_earth.value
                 elif ('transit depth' in means) and ('primary radius' in means):
                     rad = ((means['transit depth']/100)**0.5) *  means['primary radius'] * const.R_sun.value / const.R_earth.value
                 else:
@@ -582,7 +582,7 @@ class EnvelopeEccentricityDistribution:
         for i in range(0, len(self.planet_name)):
             means, standard_deviations, planet_name = self.properties_of_ith_binary_system_if_satisfies_constraints(i,
                                                                                                                     constraints=constraints)
-            if not (means == None or standard_deviations == None or planet_name == None):
+            if not (means is None or standard_deviations is None or planet_name is None):
                 logging.debug('______________________________')
                 k = k + 1
                 logging.debug('k = %(k)s'% dict(k=str(k)))
@@ -601,7 +601,7 @@ class EnvelopeEccentricityDistribution:
                       logging.debug('log of semi major axis over secondary radius = %(val)s' % dict(val=str(log_a_over_Rpl)))
                       envelope_eccentricity = self.envelope_eccentricity_function(a_over_Rpl)
                       logging.debug('Envelope eccentricity for semi major axis over secondary radius = %(va)s is = %(ba)s' % dict(va=str(a_over_Rpl), ba=str(envelope_eccentricity)))
-                index_of_binary_system_with_constrained_properties = index_of_binary_system_with_constrained_properties + [i]
+                index_of_binary_system_with_constrained_properties.append(i)
         return index_of_binary_system_with_constrained_properties
 
 if __name__ == '__main__':
