@@ -5,7 +5,7 @@ from datetime import datetime
 import math
 import json
 import h5py
-
+import traceback
 sys.path.append('/home1/08529/mmmahmud/CircularizationDissipationConstraints/source')
 sys.path.append('/home1/08529/mmmahmud/general_purpose_python_modules')
 sys.path.append('/home1/08529/mmmahmud/CircularizationDissipationConstraints/data')
@@ -220,15 +220,15 @@ class PriorTransform:
         ensure_directory(self.star_sampler_fname)
         file_exists = os.path.exists(self.star_sampler_fname)
         self.star_sampler = None
-        if file_exists:
-            self.star_sampler = pickle.load(open(self.star_sampler_fname, "rb"))
-        if self.star_sampler is None:
-            self.star_sampler = construct_star_sampler()
-            save_object(self.star_sampler, self.star_sampler_fname)
+        #if file_exists:
+            #self.star_sampler = pickle.load(open(self.star_sampler_fname, "rb"))
+        #if self.star_sampler is None:
+            #self.star_sampler = construct_star_sampler()
+            #save_object(self.star_sampler, self.star_sampler_fname)
 
     def __call__(self, u):
         unit_cube = numpy.array([u[0], u[1], u[2]])
-        stellar_metallicity, primary_mass, stellar_age = self.star_sampler.__call__(unit_cube)
+        #stellar_metallicity, primary_mass, stellar_age = self.star_sampler.__call__(unit_cube)
         stellar_metallicity = norm.ppf(u[0], loc=self.means['stellar metallicity'], scale=(self.standard_deviations[
                                                                                           'stellar_metallicity_upper_uncertainty'] -
                                                                                           self.standard_deviations[
@@ -460,7 +460,7 @@ class LogLikelihood:
             reference_phase_lag=phase_lag(argument_of_phase_lag_function_for_star) #
         )
         dissipation = dict(
-            primary=primary, #
+            primary=None, #
             secondary=dict(
                 tidal_frequency_breaks=tidal_frequency_breaks_for_planet,
                 spin_frequency_breaks=self.spin_frequency_breaks_for_planet,
@@ -493,19 +493,19 @@ class LogLikelihood:
                                                       disk_dissipation_age=2e-2 * un.Gyr,
                                                       primary_wind_strength=0.17,
                                                       primary_wind_saturation=2.78,
-                                                      primary_core_envelope_coupling_timescale=0.05 * un.Gyr,
+                                                      primary_core_envelope_coupling_timescale=0.005 * un.Gyr,
                                                       secondary_wind_strength=0.0,
                                                       secondary_wind_saturation=100.0,
-                                                      secondary_core_envelope_coupling_timescale=0.05 * un.Gyr,
+                                                      secondary_core_envelope_coupling_timescale=0.005 * un.Gyr,
                                                       orbital_period_tolerance=1e-6,
                                                       solve=True,
                                                       secondary_is_star=False)
             except RuntimeError as runerror:
                 logging.error('Runtime error occurs for %(s)s: %(error)s' % dict(s=self.system_name, error= str(runerror)))
-                if self.logger is not None: self.logger.warning(traceback.format_exc())
+                if self.logger is not None: self.logger.error(traceback.format_exc())
                 e_in_of_previous_iteration = e_in
                 e_in = e_in - 0.01
-                if (e_in < self.e_env + 0.2):
+                if (e_in < max(self.e_env + 0.2, 0.5)):
                     if self.logger is not None: self.logger.debug("e_in becomes less than e_env + 0.2, so loglikelihood is -inf")
                     return -numpy.inf, self.initial_eccentricity
 
@@ -1010,14 +1010,14 @@ class LogLikelihood:
                 logging.debug('Either the backend file is subject to reset or previously calculated chain size is zero.')
                 logging.debug('Samples will be drawn for the first time.')
                 backend.reset(nwalkers, ndim)
-                #sampler.run_mcmc(p0, iterations, progress = True)
+                sampler.run_mcmc(p0, iterations, progress = True)
         else:
             logging.debug('Backend file did not exist previously')
             if self.logger is not None: self.logger.debug('Backend file did not exist previously')
-            #sampler.run_mcmc(p0, iterations, progress = True)
+            sampler.run_mcmc(p0, iterations, progress = True)
 
         with Pool(self.number_of_parallel_processes,
-                  #initializer=setup_basic_logging_for_mcmc,
+                  initializer=setup_basic_logging_for_mcmc,
                   #initargs=[config],
                   maxtasksperchild=1) as pool:
 
@@ -1111,7 +1111,7 @@ class LogLikelihood:
         logging.debug("The params are %(p)s" % dict(p=repr(params)))
         return log_prob_parameters_for_evolution, params
 
-class InitializationOfSamplingPropertiesOfSystem:
+class InitializationOfSamplingPropertiesOfSystemTesting:
     serialized_directory = getStellarEvolutionInterpolatorsDirectory()
     eccentricity_expansion_fname = getEccentricityExpansionCoefficientsFile()
 
@@ -1161,7 +1161,7 @@ def setup_logger(name,
     return logger
 
 
-class SamplingPropertiesOfSystem:
+class SamplingPropertiesOfSystemTesting:
     def __init__(self,
                  means,
                  standard_deviations,
@@ -1335,13 +1335,15 @@ if __name__ == '__main__':
         InitializationOfSamplingPropertiesOfSystem.set_serialized_directory(args.path_of_the_stellar_evolution_interpolators_directory)
     if args.path_of_the_eccentricity_expansion_coefficients_file:
         InitializationOfSamplingPropertiesOfSystem.set_eccentricity_expansion_fname(args.path_of_the_eccentricity_expansion_coefficients_file)
-
-    InitializationOfSamplingPropertiesOfSystem()
+    logger.debug("Initialization is going to take place")
+    InitializationOfSamplingPropertiesOfSystemTesting()
+    logger.debug("Initialization is completed")
     if args.measured_values and args.standard_deviations and args.system:
-        test3 = SamplingPropertiesOfSystem(args.measured_values,
-                                           args.standard_deviations,
-                                           system_name=args.system,
-                                           envelope_eccentricity_function=EnvelopeEccentricityDistribution.envelope_eccentricity_function
-                                           )
+        logger.debug("Sampling is going to run")
+        test3 = SamplingPropertiesOfSystemTesting(args.measured_values,
+                                                  args.standard_deviations,
+                                                  system_name=args.system,
+                                                  envelope_eccentricity_function=EnvelopeEccentricityDistribution.envelope_eccentricity_function
+                                                  )
 
 

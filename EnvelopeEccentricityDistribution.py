@@ -571,7 +571,9 @@ class EnvelopeEccentricityDistribution:
                 if rad is not None:
                     rad_j = rad * const.R_earth.value / const.R_jup.value
                     if rad_j < 0.6: return None, None, None
-
+                    a_over_Rpl = means['semi major axis'] / rad
+                    envelope_eccentricity = self.envelope_eccentricity_function(a_over_Rpl)
+                    if envelope_eccentricity<means['present eccentricity']: return None, None, None
                 return means, standard_deviations, self.planet_name[i]
         return None, None, None
 

@@ -36,6 +36,7 @@ from bayesian.stellar_param_sampling.feh_conditional_likelihood_base import \
 from reproduce_system import *
 from orbital_evolution.evolve_interface import library as \
     orbital_evolution_library
+import traceback
 
 if not sys.warnoptions:
     import warnings
@@ -220,15 +221,15 @@ class PriorTransform:
         ensure_directory(self.star_sampler_fname)
         file_exists = os.path.exists(self.star_sampler_fname)
         self.star_sampler = None
-        if file_exists:
-            self.star_sampler = pickle.load(open(self.star_sampler_fname, "rb"))
-        if self.star_sampler is None:
-            self.star_sampler = construct_star_sampler()
-            save_object(self.star_sampler, self.star_sampler_fname)
+        #if file_exists:
+            #self.star_sampler = pickle.load(open(self.star_sampler_fname, "rb"))
+        #if self.star_sampler is None:
+            #self.star_sampler = construct_star_sampler()
+            #save_object(self.star_sampler, self.star_sampler_fname)
 
     def __call__(self, u):
         unit_cube = numpy.array([u[0], u[1], u[2]])
-        stellar_metallicity, primary_mass, stellar_age = self.star_sampler.__call__(unit_cube)
+        #stellar_metallicity, primary_mass, stellar_age = self.star_sampler.__call__(unit_cube)
         stellar_metallicity = norm.ppf(u[0], loc=self.means['stellar metallicity'], scale=(self.standard_deviations[
                                                                                           'stellar_metallicity_upper_uncertainty'] -
                                                                                           self.standard_deviations[
@@ -493,10 +494,10 @@ class LogLikelihood:
                                                       disk_dissipation_age=2e-2 * un.Gyr,
                                                       primary_wind_strength=0.17,
                                                       primary_wind_saturation=2.78,
-                                                      primary_core_envelope_coupling_timescale=0.05 * un.Gyr,
+                                                      primary_core_envelope_coupling_timescale=0.005 * un.Gyr,
                                                       secondary_wind_strength=0.0,
                                                       secondary_wind_saturation=100.0,
-                                                      secondary_core_envelope_coupling_timescale=0.05 * un.Gyr,
+                                                      secondary_core_envelope_coupling_timescale=0.005 * un.Gyr,
                                                       orbital_period_tolerance=1e-6,
                                                       solve=True,
                                                       secondary_is_star=False)
@@ -505,7 +506,7 @@ class LogLikelihood:
                 if self.logger is not None: self.logger.warning(traceback.format_exc())
                 e_in_of_previous_iteration = e_in
                 e_in = e_in - 0.01
-                if (e_in < self.e_env + 0.2):
+                if (e_in < max(self.e_env + 0.2, 0.5)):
                     if self.logger is not None: self.logger.debug("e_in becomes less than e_env + 0.2, so loglikelihood is -inf")
                     return -numpy.inf, self.initial_eccentricity
 

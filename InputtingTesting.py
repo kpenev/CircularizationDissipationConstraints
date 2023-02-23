@@ -3,7 +3,7 @@ import EnvelopeEccentricityDistribution
 import argparse
 import os
 import json
-from SampleStarExoplanetSystemsProperties import *
+from SampleStarExoplanetSystemsPropertiesTesting import *
 
 
 class Inputting:
@@ -34,8 +34,6 @@ if __name__ == '__main__':
                         type = int
                         )
     args = parser.parse_args()
-    if not args.i:
-        logging.debug("Here I am.")
     if args.i or args.i==0:
         logging.debug('* i = %(i)f' % dict(i=args.i))
         logging.debug('* index = %(x)s' % dict(x = repr(inputting_instance.index)))
@@ -44,10 +42,13 @@ if __name__ == '__main__':
         logging.debug("** measured_values are %(x)s" % dict(x=repr(measured_values)))
         logging.debug("** standard deviations are %(x)s" % dict(x=repr(standard_deviations)))
         logging.debug("** system name is %(x)s" % dict(x=system_name))
-        logging.debug('i = %(i)f' % dict(i=args.i))
+        logging.debug('i = %(i)s' % dict(i=repr(args.i)))
         logging.debug('index = %(x)s' % dict(x = repr(inputting_instance.index)))
-
-        InitializationOfSamplingPropertiesOfSystem()
+        logging.debug('Inputting: measured values are %(x)s' % dict(x=repr(measured_values)))
+        logging.debug('Inputting: standard deviations are %(x)s' % dict(x=repr(standard_deviations)))
+        logging.debug("Initialization is going to take place")
+        InitializationOfSamplingPropertiesOfSystemTesting()
+        logging.debug("Initialization is done.")
         test3 = SamplingPropertiesOfSystemTesting(measured_values,
                                                   standard_deviations,
                                                   system_name=system_name,
@@ -59,5 +60,5 @@ if __name__ == '__main__':
 
         #logging.debug(string)
         #os.system(string)
-    logging.debug('This is the end of Inputting.py ***************')
+    logging.debug('This is the end of InputtingTesting.py ***************')
 
