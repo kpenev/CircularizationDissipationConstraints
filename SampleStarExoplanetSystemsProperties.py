@@ -127,7 +127,7 @@ class PriorTransform:
                  min_power_law_argument=-5,
                  max_power_law_argument=5,
                  max_initial_stellar_spin=15,
-                 min_initial_stellar_spin=5,
+                 min_initial_stellar_spin=14.5,
                  logger=None
                  ):
         self.means = means
@@ -1047,11 +1047,11 @@ class LogLikelihood:
     def __call__(self, u):
         for i in range(0, 10): #
             if u[i] > 1 or u[i] < 0:
-                logging.debug("ui cannot be greater than 1 and less than zero. YYYYYYY")
+                logging.debug("ui cannot be greater than 1 and less than zero.")
                 return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None, None]) #
         parameters_for_evolution = self.prior_transform_instance(u)
         if parameters_for_evolution is None:
-            logging.debug("parameters for evolution is none. &&&&")
+            logging.debug("parameters for evolution is none.")
             return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None, None])
         params = numpy.array([parameters_for_evolution['primary mass'],
                            parameters_for_evolution['stellar age'],
@@ -1065,7 +1065,7 @@ class LogLikelihood:
                            parameters_for_evolution['argument of phase lag function for star']]) #
         log_prob_parameters_for_evolution, calculated_eccentricity_now = self.log_prob(parameters_for_evolution)
         if numpy.isinf(-log_prob_parameters_for_evolution):
-            logging.debug("ZZZZZZZZ Actual params are: %(x)s " % dict(x=json.dumps(parameters_for_evolution)))
+            logging.debug("Actual params are: %(x)s " % dict(x=json.dumps(parameters_for_evolution)))
             return -numpy.inf, numpy.array([None, None, None, None, None, None, None, None, None, None, None, None]) #
         params = numpy.append(params, [calculated_eccentricity_now, log_prob_parameters_for_evolution])
         logging.debug("The params are %(p)s" % dict(p=repr(params)))
@@ -1129,7 +1129,6 @@ class SamplingPropertiesOfSystem:
                  dirname = "/work/08529/mmmahmud",
                  envelope_eccentricity_function=EnvelopeEccentricityDistribution.envelope_eccentricity_function,
                  initial_eccentricity=0.8,
-                 initial_stellar_spin=5,
                  max_argument_of_phase_lag_function_for_planet=12,
                  min_argument_of_phase_lag_function_for_planet=3,
                  max_argument_of_phase_lag_function_for_star=12, #
@@ -1139,7 +1138,7 @@ class SamplingPropertiesOfSystem:
                  min_power_law_argument=-5,
                  max_power_law_argument=5,
                  max_initial_stellar_spin=15,
-                 min_initial_stellar_spin=5,
+                 min_initial_stellar_spin=14.5,
                  constraints=Constraints_for_selecting_systems.constraints(),
                  spin_frequency_breaks_for_planet=None,
                  spin_frequency_powers_for_planet=numpy.array([0.0]),
@@ -1156,8 +1155,6 @@ class SamplingPropertiesOfSystem:
         logger.info("The logger file for the system %(system_name)s is created." % dict(system_name = system_name))
         logger.info("The initial eccentricity = %(e)f " % dict(e= initial_eccentricity))
         self.initial_eccentricity = initial_eccentricity
-        logger.info("The initial stellar spin = %(spin)f " % dict(spin= initial_stellar_spin))
-        self.initial_stellar_spin = initial_stellar_spin
         logger.info("Maximum argument of phase lag function for planet = %(Q)f" % dict(Q=max_argument_of_phase_lag_function_for_planet))
         self.max_argument_of_phase_lag_function_for_planet = max_argument_of_phase_lag_function_for_planet
         logger.info("Minimum argument of phase lag function for planet = %(Q)f" % dict(Q=min_argument_of_phase_lag_function_for_planet))
@@ -1264,10 +1261,10 @@ class SamplingPropertiesOfSystem:
                 self.log_likelihood_instance.MCMC()
                 logger.debug("MCMC is done")
             else:
-                if rad_j is not None:
+                if rad_j < 0.6:
                     logger.debug("The planet's radius is less than 0.6 R_j")
                 else:
-                    logger.debug("Envelope eccentricity is lower than the present eccentricity for this system.")
+                    logger.debug("Envelope eccentricity is lower than the measured present eccentricity for this system.")
 
 if __name__ == '__main__':
 
