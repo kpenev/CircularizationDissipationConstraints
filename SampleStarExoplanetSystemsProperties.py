@@ -632,7 +632,7 @@ class LogLikelihood:
         del_lgQst_u = 0.25/(lgQst_max - lgQst_min) #
         del_lgPbr_u = 0.10/(lgPbr_max - lgPbr_min)
         del_alpha_u = 0.5/(alpha_max - alpha_min)
-        del_spin_u = 1/(init_spin_max - init_spin_min)
+        del_spin_u = 0.125/(init_spin_max - init_spin_min)
 
         n_lgQpl = int(1.0/del_lgQpl_u)
         n_lgQst = int(1.0/del_lgQst_u) #
