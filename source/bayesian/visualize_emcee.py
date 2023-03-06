@@ -304,6 +304,16 @@ def get_tex_label(quantity):
         return r'$e_{max}$'
     if quantity == 'lnP':
         return r'$\ln\mathcal{P}$'
+    if quantity == 'primary_mass':
+        return r'$m_1$'
+    if quantity == 'secondary_mass':
+        return r'$m_2$'
+    if quantity == 'cmd_primary_radius':
+        return r'$r_1$'
+    if quantity == 'cmd_secondary_radius':
+        return r'$r_2$'
+    if quantity == 'orbital_period':
+        return r'$T$'
     return quantity
 
 def save_corner_plot(samples, log_probability, config):

@@ -41,8 +41,20 @@ from bayesian.m35_util import get_photometry as get_m35_photometry
 #pylint: enable=unused-import
 from bayesian.ngc6819_util import get_photometry as get_ngc6819_photometry
 from bayesian.ngc188_util import get_photometry as get_ngc188_photometry
+from bayesian.hyadespraesepe_util import get_photometry as get_hyadespraesepe_photometry
+from bayesian.hyadespraesepe_util import get_binary_data as get_hyadespraesepe_binary_data
 
 from bayesian.cluster_util import select_binary_data
+
+list_of_clusters = ['M35', 'NGC6819', 'NGC188', 'HyadesPraesepe']
+
+def return_id(cluster):
+    if cluster == 'NGC188':
+        return 'PKM'
+    elif cluster == 'HyadesPraesepe':
+        return 'ID'
+    else:
+        return 'WOCS'
 
 def parse_command_line(quantiles_only=False):
     """Parse command line for plotting configuration."""
@@ -173,7 +185,7 @@ def parse_command_line(quantiles_only=False):
     return parser.parse_args()
 
 
-def download_latest_samples(destination):
+def download_latest_samples(destination): #TODO: Doesn't deal with new clusters
     """Download the latest samples files from stampede2 and ganymede."""
 
     for source in [
@@ -249,7 +261,7 @@ def add_orbit_and_photometry(sampling_data):
 
     sb1_orbits = dict()
     photometry = dict()
-    for cluster in ['M35', 'NGC6819', 'NGC188']:
+    for cluster in list_of_clusters:
         sb1_orbits[cluster] = globals()['get_'
                                         +
                                         cluster.lower()
@@ -262,7 +274,7 @@ def add_orbit_and_photometry(sampling_data):
                                         '_photometry']()
     for binary in sampling_data.keys():
         cluster = binary.split('_')[0]
-        id_column = ('PKM' if cluster == 'NGC188' else 'WOCS')
+        id_column = return_id(cluster)
         binary_id = int(binary.split('_')[1])
         sampling_data[binary]['orbit'] = select_binary_data(
             sb1_orbits[cluster],
@@ -498,7 +510,7 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
     axis.set_xscale('log')
     orig_axis = pyplot.gca()
     pyplot.sca(axis)
-    lgq_range = (4.0 if binary.startswith('M35_') else 5.0, 12)
+    lgq_range = (4.0 if binary.startswith('M35_') else 5.0, 12) #TODO: Doesn't deal with new clusters
     config.combined_constraint_lgQ_grid = numpy.linspace(*lgq_range, 50)
     frequency_dependence_plotter = FrequencyDependencePlotter(1, config)
     frequency_dependence_plotter.add_chain(
@@ -529,7 +541,7 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
         binary,
         r"$\log_{10}Q_\star'$",
         config,
-        yticks=[4, 6, 8, 10, 12] if binary.startswith('M35') else [5, 7, 9, 11]
+        yticks=[4, 6, 8, 10, 12] if binary.startswith('M35') else [5, 7, 9, 11] #TODO: Doesn't deal with new clusters
     )
     pyplot.sca(orig_axis)
     return data_behind
@@ -831,7 +843,7 @@ def decorate_subplot(axis,
 
     cluster, binary_id = binary.split('_')
     axis.set_title(
-        ('PKM ' if cluster == 'NGC188' else 'WOCS ') + binary_id,
+        return_id(cluster) + binary_id,
         pad=3
     )
 
@@ -861,7 +873,7 @@ def plot_single_burnin_period(binary, system_data, __, axis, config):
     mark_valid_constraint_range(system_data['quantiles'],
                                 axis,
                                 config)
-    if binary.startswith('M35'):
+    if binary.startswith('M35'): #TODO: Doesn't deal with new clusters
         axis.set_ylim(10, 2500)
     else:
         axis.set_ylim(10, 2000)
@@ -903,7 +915,7 @@ def get_plotting_order(plot_data, restrict_to_cluster=None):
     """Split the given systems by cluster and order them  by orbital period."""
 
     result = dict()
-    cluster_list = (['M35', 'NGC6819', 'NGC188'] if restrict_to_cluster is None
+    cluster_list = (list_of_clusters if restrict_to_cluster is None
                     else [restrict_to_cluster])
     for cluster in cluster_list:
         period_binary = [
@@ -914,13 +926,17 @@ def get_plotting_order(plot_data, restrict_to_cluster=None):
         result[cluster] = [entry[1] for entry in sorted(period_binary)]
 
     if restrict_to_cluster is None or restrict_to_cluster == 'M35':
-        for bad_binary in ['M35_15012',
+        for bad_binary in ['M35_15012', #TODO: Doesn't deal with new clusters
                            'M35_41032',
                            'M35_49043',
                            'NGC188_4999']:
             cluster_name = bad_binary.split('_')[0]
             if not restrict_to_cluster or cluster_name == restrict_to_cluster:
-                result[cluster_name].remove(bad_binary)
+                try:
+                    result[cluster_name].remove(bad_binary)
+                except ValueError:
+                    pass
+
 
     if restrict_to_cluster is None:
         return result
@@ -1014,10 +1030,16 @@ def save_individual_data_behind_figure(data, plot_type, binary, config):
         cdfstd_period=("Standard deviation of the CDF at each quantile vs "
                        "tidal period")
     )
+    temp_cluster = ''
+    if cluster.startswith('NGC'): 
+        temp_cluster = 'NGC ' + cluster[3:]
+    elif cluster.startswith('HyadesPraesepe'):
+        temp_cluster = 'HyadesPraesepe ' + cluster[14:]
+    else:
+        temp_cluster = 'M ' + cluster[1:]
     title_info = dict(
-        cluster=('NGC ' + cluster[3:] if cluster.startswith('NGC')
-                 else 'M ' + cluster[1:]),
-        id_type=('PKM' if cluster == 'NGC188' else 'WOCS'),
+        cluster=temp_cluster,
+        id_type=return_id(cluster),
         binary_id=binary_id,
         quantity=quantity[plot_type]
     )
@@ -1062,7 +1084,7 @@ def plot_individual_constraints(plot_data, config):
             #'tightest_lgQ_posterior'
     ]:
         print('Plot type: ' + plot_type)
-        for cluster in ['M35', 'NGC6819', 'NGC188']:
+        for cluster in list_of_clusters:
             print('\tCluster: ' + cluster)
             for plot_split in plot_type_split[plot_type]:
                 print('\t\tSplit: ' + repr(plot_split))
@@ -1186,14 +1208,14 @@ def plot_combined_constraints(plot_data, config):
 
     fully_combined_n = 1
 
-    assert include_binaries['NGC188'][6] == 'NGC188_4904'
-    include_binaries['NGC188'][6] = include_binaries['NGC188'][-1]
-    include_binaries['NGC188'][-1] = 'NGC188_4904'
+    #assert include_binaries['NGC188'][6] == 'NGC188_4904' #TODO
+    #include_binaries['NGC188'][6] = include_binaries['NGC188'][-1]
+    #include_binaries['NGC188'][-1] = 'NGC188_4904'
 
     selected_quantiles = dict(ptide_grid=config.ptide_grid)
 
     combined_clusters = []
-    for cluster in ['NGC6819', 'NGC188', 'M35']:
+    for cluster in list_of_clusters:
         print(cluster + ':')
         combined_clusters.append(cluster)
         cluster_plotter = FrequencyDependencePlotter(
@@ -1245,7 +1267,7 @@ def plot_combined_constraints(plot_data, config):
                 pyplot.figure(figsize=(11, 8.5), dpi=300, tight_layout=True)
                 pyplot.xscale('log')
                 print('    Adding ' + repr(binary))
-                pyplot.ylim(min_lgq, 6.0 if cluster == 'M35' else 7.0)
+                pyplot.ylim(min_lgq, 6.0 if cluster == 'M35' else 7.0) #TODO: Doesn't deal with new clusters
                 pyplot.xlim(*config.combined_constraint_period_range)
                 plotter.plot_combined_pdf_heat_map()
                 data_behind = plotter.plot_combined_quantiles(
@@ -1290,7 +1312,7 @@ def plot_combined_constraints(plot_data, config):
                 for cdf in config.convergence_quantiles
             ]
         else:
-            selected_quantiles['NGC6819'] = selected_quantiles['NGC188'] = [
+            selected_quantiles['NGC6819'] = selected_quantiles['NGC188'] = [ #TODO: Doesn't deal with new clusters
                 all_combined_plotter.combined_pdf.ppf(cdf)
                 for cdf in config.convergence_quantiles
             ]
@@ -1306,7 +1328,7 @@ def create_tightest_constraint_latex(data_behind, cluster, config):
             r'\multicolumn{{1}}{{c@{{{0}}}}}{{\textbf{{{1}}}}}'.format(
                 (
                     r'\quad\quad\quad' if colname in ['PKM',
-                                                      'WOCS',
+                                                      'WOCS', #TODO: Doesn't deal with new clusters
                                                       'Ptide',
                                                       'CDF-1(97.7%)']
                     else ''
@@ -1336,7 +1358,7 @@ def create_tightest_constraint_latex(data_behind, cluster, config):
                 +
                 r'cccc@{\quad\quad\quad}'
                 +
-                'c'*(2 if cluster == 'M35' else 4)
+                'c'*(2 if cluster == 'M35' else 4) #TODO: Doesn't deal with new clusters
             ),
             header_start=(
                 r'&&\multicolumn{4}{c@{\quad\quad\quad}}{\textbf{Individual CDF$^{-1}$}} & '
@@ -1351,7 +1373,7 @@ def create_tightest_constraint_latex(data_behind, cluster, config):
         ),
         formats={
             colname: (
-                '%6s' if ('{PKM}' in colname or '{WOCS}' in colname)
+                '%6s' if ('{PKM}' in colname or '{WOCS}' in colname) #TODO: Doesn't deal with new clusters
                 else '%5.2f'
             )
             for colname in data_behind.colnames
@@ -1365,9 +1387,9 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
 
     include_binaries = get_plotting_order(plot_data)
     offsets = numpy.zeros(len(config.convergence_ptide_grid), dtype=int)
-    for cluster in ['M35', 'NGC6819', 'NGC188']:
+    for cluster in list_of_clusters:
         pyplot.xscale('log')
-        lgq_range = ((4, 8) if cluster == 'M35' else (5, 9))
+        lgq_range = ((4, 8) if cluster == 'M35' else (5, 9)) #TODO: Doesn't deal with new clusters
         cluster_quantiles = numpy.empty((len(config.convergence_quantiles),
                                          len(include_binaries[cluster])))
         plot_ptide = numpy.empty(len(include_binaries[cluster]))
@@ -1377,7 +1399,7 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
                 numpy.empty(len(include_binaries[cluster]))
             ],
             names=[
-                ('PKM' if cluster == 'NGC188' else 'WOCS'),
+                return_id(cluster),
                 'Ptide'
             ],
             descriptions=[
@@ -1486,7 +1508,7 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
                        bbox_inches='tight',
                        pad_inches=0)
         pyplot.clf()
-        if cluster == 'M35':
+        if cluster == 'M35': #TODO: Doesn't deal with new clusters
             data_behind.remove_columns(['Comb. CDF-1(2.3%)',
                                         'Comb. CDF-1(15.9%)'])
         save_data_behind_figure(
