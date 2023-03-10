@@ -241,16 +241,21 @@ class PriorTransform:
                                                                            'stellar_age_upper_uncertainty'] -
                                                                            self.standard_deviations[
                                                                            'stellar_age_lower_uncertainty'])/2)
-        self.logger.debug("stellar metallicity = %(a)f, primary mass = %(b)f and stellar age = %(c)f" % dict(a=stellar_metallicity, b=primary_mass, c=stellar_age))
+        if self.logger is not None: self.logger.debug("stellar metallicity = %(a)f, primary mass = %(b)f and stellar age = %(c)f" % dict(a=stellar_metallicity, b=primary_mass, c=stellar_age))
         if not FeHConditionalLikelihoodBase.interpolator.in_range(primary_mass, stellar_metallicity):
-            self.logger.debug("primary mass and/or stellar metallicity is not within the range of poet")
+            if self.logger is not None: self.logger.debug("primary mass and/or stellar metallicity is not within the range of poet")
             return None
         primary_rad = FeHConditionalLikelihoodBase.interpolator('RADIUS', primary_mass, stellar_metallicity)
         if stellar_age <= primary_rad.min_age or stellar_age >= primary_rad.max_age:
-            self.logger.debug("stellar age is not within the range of poet")
+            if self.logger is not None: self.logger.debug("stellar age is not within the range of poet")
             return None
         primary_radius = primary_rad(stellar_age)
         if self.logger is not None: self.logger.debug("primary_radius is %(x)f" % dict(x=primary_radius))
+        iconv = FeHConditionalLikelihoodBase.interpolator('ICONV', primary_mass, stellar_metallicity)
+        if min(iconv(numpy.linspace(iconv.min_age, stellar_age, 1000))) <= 0:
+            if self.logger is not None: self.logger.debug("The planet will collapse into the star")
+            return None
+
         secondary_radius_is_found = False
         a = 'transit depth' in self.means
         if a:
@@ -505,7 +510,7 @@ class LogLikelihood:
                 if self.logger is not None: self.logger.error(traceback.format_exc())
                 e_in_of_previous_iteration = e_in
                 e_in = e_in - 0.01
-                if (e_in < max(self.e_env + 0.2, 0.5)):
+                if (e_in < max(self.e_env + 0.2, 0.7)):
                     if self.logger is not None: self.logger.debug("e_in becomes less than e_env + 0.2, so loglikelihood is -inf")
                     return -numpy.inf, self.initial_eccentricity
 
