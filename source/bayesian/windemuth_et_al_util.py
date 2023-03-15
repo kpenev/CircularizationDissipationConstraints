@@ -5,7 +5,6 @@ from os import path
 import logging
 from subprocess import run
 import platform
-from collections import defaultdict
 
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
@@ -20,7 +19,8 @@ from stellar_evolution.manager import StellarEvolutionManager
 from stellar_evolution.library_interface import library as stellar_evol_lib
 
 from process_e_Q_grid import LinearEccentricityEnvelope
-from eccentricity_distro import eccentricity_kde_distro_gen
+from general_purpose_python_modules.eccentricity_kde_distro_gen import \
+    eccentricity_kde_distro_gen
 
 _data_dir = path.join(
     path.dirname(
@@ -38,151 +38,150 @@ eccentricity_envelope = LinearEccentricityEnvelope(min_period=1.0,
                                                    max_period=25.0,
                                                    min_eccenticity=0.02,
                                                    max_eccentricity=0.8)
+_manual_kernel_widths = {
+    10268903: 1.5e-4,
+    6962018: 8e-6,
+    11616200: 2e-5,
+    4380283: 1e-5,
+    9110346: 2e-5,
+    7732791: 5e-5,
+    5039441: 1e-4,
+    9656543: 1e-4,
+    3834364: 1.2e-3,
+    11228612: 2e-4,
+    10960995: 3e-6,
+    3241344: 2e-4,
+    5022440: 3e-6,
+    5802470: 2e-6,
+    4815612: 1e-6,
+    7377033: 1e-3,
+    11867071: 3e-3,
+    3427776: 2e-3,
+    10935310: 1.5e-3,
+    10031409: 5e-6,
+    9532421: 1.5e-3,
+    3973504: 1.5e-3,
+    8957954: 2e-6,
+    6521542: 2e-4,
+    11252617: 1e-3,
+    4285087: 1e-5,
+    7025851: 4e-5,
+    4346875: 1.2e-3,
+    7691527: 2e-4,
+    6227560: 1e-4,
+    8302455: 1e-5,
+    12004679: 3e-4,
+    7369523: 1e-4,
+    9971475: 1.5e-5,
+    7129465: 2e-6,
+    5181455: 5e-6,
+    8381592: 1e-3,
+    7376500: 2e-4,
+    8618226: 2e-5,
+    9649222: 5e-6,
+    6546508: 8e-4,
+    10385682: 1e-4,
+    8460600: 1.5e-3,
+    7125636: 7e-4,
+    8580438: 5e-5,
+    5597970: 5e-6,
+    8746310: 1e-5,
+    7362852: 7e-5,
+    12557713: 2e-3,
+    4753988: 3e-4,
+    10923260: 1e-4,
+    3003991: 2.0e-2,
+    6927629: 3e-6,
+    8364119: 3e-4,
+    6949550: 3e-6,
+    9532123: 3e-4,
+    9892471: 3e-5,
+    2445134: 1.5e-4,
+    4948863: 1.5e-4,
+    9775253: 5e-7,
+    4839180: 4e-5,
+    5652260: 1e-4,
+    6707942: 1.7e-3,
+    7597703: 3e-6,
+    11232745: 2e-5,
+    8984706: 1.3e-4,
+    11409698: 1e-4,
+    9353182: 3e-5,
+    6594972: 1e-4,
+    9025914: 1e-4,
+    9665503: 1e-4,
+    6185717: 2e-4,
+    8414159: 2.5e-5,
+    6301030: 1e-5,
+    11499757: 5e-5,
+    11704044: 3e-6,
+    6359798: 2e-5,
+    7118545: 3e-5,
+    12251779: 8e-5,
+    4678171: 7e-5,
+    8111622: 2e-5,
+    5622250: 5e-5,
+    8879427: 3e-4,
+    5979863: 1e-3,
+    9001468: 2e-4,
+    6522750: 2e-4,
+    6131659: 5e-5,
+    12316447: 3e-5,
+    7624297: 2e-4,
+    10992733: 8e-5,
+    7021177: 1.5e-4,
+    10753734: 3e-5,
+    10711913: 1.5e-3,
+    10518735: 1e-4,
+    9016295: 6e-4,
+    10258558: 2.5e-4,
+    4252226: 1e-4,
+    4633434: 2e-3,
+    12017140: 1e-4,
+    9838060: 2e-3,
+    6672229: 2.5e-4,
+    7821010: 2e-4,
+    10849244: 5e-5,
+    10215422: 1e-6,
+    5983348: 6e-4,
+    7767733: 1.5e-3,
+    10651945: 1.5e-4,
+    4773155: 8e-5,
+    5553624: 2e-4,
+    12356914: 2e-3,
+    8572936: 2e-5,
+    8973000: 1e-4,
+    2998124: 1e-4,
+    6431670: 1e-5,
+    4847832: 1e-5,
+    8183389: 1e-3,
+    5003117: 1.2e-3,
+    12644769: 1e-4,
+    8553907: 1e-4,
+    12217907: 2e-4,
+    7541502: 3e-5,
+    10420279: 7e-5,
+    4247023: 1.5e-4,
+    9164836: 1e-4,
+    8610483: 1.5e-4,
+    9714123: 1e-3,
+    9837544: 1e-5,
+    8560285: 1.5e-3,
+    8044608: 5e-5,
+    10292238: 1.5e-4,
+    4824268: 3e-4,
+    8760135: 5e-5,
+    9839062: 1e-3
+}
 
-def get_eccentricity_kernel_widths():
-    """Return dict of eccentricity kernel widths for each KIC."""
-
-
-    result =  defaultdict(lambda: 5e-4)
-    for kic, kernel_width in [
-            (10268903, 1.5e-4),
-            (6962018, 8e-6),
-            (11616200, 2e-5),
-            (4380283, 1e-5),
-            (9110346, 2e-5),
-            (7732791, 5e-5),
-            (5039441, 1e-4),
-            (9656543, 1e-4),
-            (3834364, 1.2e-3),
-            (11228612, 2e-4),
-            (10960995, 3e-6),
-            (3241344, 2e-4),
-            (5022440, 3e-6),
-            (5802470, 2e-6),
-            (4815612, 1e-6),
-            (7377033, 1e-3),
-            (11867071, 3e-3),
-            (3427776, 2e-3),
-            (10935310, 1.5e-3),
-            (10031409, 5e-6),
-            (9532421, 1.5e-3),
-            (3973504, 1.5e-3),
-            (8957954, 2e-6),
-            (6521542, 2e-4),
-            (11252617, 1e-3),
-            (4285087, 1e-5),
-            (7025851, 4e-5),
-            (4346875, 1.2e-3),
-            (7691527, 2e-4),
-            (6227560, 1e-4),
-            (8302455, 1e-5),
-            (12004679, 3e-4),
-            (7369523, 1e-4),
-            (9971475, 1.5e-5),
-            (7129465, 2e-6),
-            (5181455, 5e-6),
-            (8381592, 1e-3),
-            (7376500, 2e-4),
-            (8618226, 2e-5),
-            (9649222, 5e-6),
-            (6546508, 8e-4),
-            (10385682, 1e-4),
-            (8460600, 1.5e-3),
-            (7125636, 7e-4),
-            (8580438, 5e-5),
-            (5597970, 5e-6),
-            (8746310, 1e-5),
-            (7362852, 7e-5),
-            (12557713, 2e-3),
-            (4753988, 3e-4),
-            (10923260, 1e-4),
-            (3003991, 2.0e-2),
-            (6927629, 3e-6),
-            (8364119, 3e-4),
-            (6949550, 3e-6),
-            (9532123, 3e-4),
-            (9892471, 3e-5),
-            (2445134, 1.5e-4),
-            (4948863, 1.5e-4),
-            (9775253, 5e-7),
-            (4839180, 4e-5),
-            (5652260, 1e-4),
-            (6707942, 1.7e-3),
-            (7597703, 3e-6),
-            (11232745, 2e-5),
-            (8984706, 1.3e-4),
-            (11409698, 1e-4),
-            (9353182, 3e-5),
-            (6594972, 1e-4),
-            (9025914, 1e-4),
-            (9665503, 1e-4),
-            (6185717, 2e-4),
-            (8414159, 2.5e-5),
-            (6301030, 1e-5),
-            (11499757, 5e-5),
-            (11704044, 3e-6),
-            (6359798, 2e-5),
-            (7118545, 3e-5),
-            (12251779, 8e-5),
-            (4678171, 7e-5),
-            (8111622, 2e-5),
-            (5622250, 5e-5),
-            (8879427, 3e-4),
-            (5979863, 1e-3),
-            (9001468, 2e-4),
-            (6522750, 2e-4),
-            (6131659, 5e-5),
-            (12316447, 3e-5),
-            (7624297, 2e-4),
-            (10992733, 8e-5),
-            (7021177, 1.5e-4),
-            (10753734, 3e-5),
-            (10711913, 1.5e-3),
-            (10518735, 1e-4),
-            (9016295, 6e-4),
-            (10258558, 2.5e-4),
-            (4252226, 1e-4),
-            (4633434, 2e-3),
-            (12017140, 1e-4),
-            (9838060, 2e-3),
-            (6672229, 2.5e-4),
-            (7821010, 2e-4),
-            (10849244, 5e-5),
-            (10215422, 1e-6),
-            (5983348, 6e-4),
-            (7767733, 1.5e-3),
-            (10651945, 1.5e-4),
-            (4773155, 8e-5),
-            (5553624, 2e-4),
-            (12356914, 2e-3),
-            (8572936, 2e-5),
-            (8973000, 1e-4),
-            (2998124, 1e-4),
-            (6431670, 1e-5),
-            (4847832, 1e-5),
-            (8183389, 1e-3),
-            (5003117, 1.2e-3),
-            (12644769, 1e-4),
-            (8553907, 1e-4),
-            (12217907, 2e-4),
-            (7541502, 3e-5),
-            (10420279, 7e-5),
-            (4247023, 1.5e-4),
-            (9164836, 1e-4),
-            (8610483, 1.5e-4),
-            (9714123, 1e-3),
-            (9837544, 1e-5),
-            (8560285, 1.5e-3),
-            (8044608, 5e-5),
-            (10292238, 1.5e-4),
-            (4824268, 3e-4),
-            (8760135, 5e-5),
-            (9839062, 1e-3)
-    ]:
-        result[kic] = kernel_width
-    return result
 
 _logger = logging.getLogger(__name__)
+
+
+def get_eccentricity_kernel_width(kic_id):
+    """Return dict of eccentricity kernel widths for each KIC."""
+
+    return _manual_kernel_widths.get(kic_id, 5e-4)
 
 
 def get_max_likelihood_params():
@@ -448,6 +447,57 @@ def plot_eccentricity_vs_period(plot_fname, available_kic):
         pyplot.savefig(plot_fname)
 
 
+def get_eccentricity_distro(kic_id):
+    """Return KDE estimated eccentricity distribution for the given EB."""
+
+    w19_samples = get_samples(kic_id)
+    e_samples = numpy.sort(
+        numpy.sqrt(w19_samples['esinw']**2
+                   +
+                   w19_samples['ecosw']**2)
+    )
+    return eccentricity_kde_distro_gen(
+        e_samples,
+        get_eccentricity_kernel_width(kic_id)
+    )
+
+
+def plot_eccentricity_histogram(e_samples, e_range, unzoomed_bins):
+    """Plot a histogram of the given samples changing the prior to uniform e."""
+
+    hist, bin_edges = numpy.histogram(
+        e_samples,
+        bins=int(numpy.ceil(
+            unzoomed_bins
+            *
+            max(
+                1,
+                (e_samples[-1] - e_samples[0])
+                /
+                (e_range[1] - e_range[0])
+            )
+        )),
+        density=True
+    )
+
+    hist /= bin_edges[1:]**2 - bin_edges[:-1]**2
+    hist /= (hist * (bin_edges[1:] - bin_edges[:-1])).sum()
+    pyplot.bar(x=bin_edges[:-1],
+               height=hist,
+               width=bin_edges[1:] - bin_edges[:-1],
+               align='edge',
+               color='none',
+               edgecolor='black')
+
+
+def plot_ecosw_esinw_samples(w19_samples, axes):
+    """Plot the samples e sin(w) vs e cos(w) in the given axes."""
+
+    axes.plot(w19_samples['ecosw'], w19_samples['esinw'], 'ok', markersize=0.5)
+    axes.axhline(y=0, linewidth=0.5)
+    axes.axvline(x=0, linewidth=0.5)
+
+
 def plot_eccentricity_distribution(kic_id_list,
                                    plot_fname,
                                    bins):
@@ -470,7 +520,6 @@ def plot_eccentricity_distribution(kic_id_list,
     Returns:
         None
     """
-
 
     custom_zoom = {7732791: (0.0, 0.005),
                    9656543: (0.0, 1e-3),
@@ -507,7 +556,6 @@ def plot_eccentricity_distribution(kic_id_list,
                    7021177: (0.584, 0.596),
                    8572936: (0.5170, 0.5195),
                    8973000: (0.52, 0.53)}
-    eccentricity_pdf_kernel_widths = get_eccentricity_kernel_widths()
 
     if plot_fname:
         pdf = PdfPages(plot_fname)
@@ -519,17 +567,8 @@ def plot_eccentricity_distribution(kic_id_list,
                        w19_samples['ecosw']**2)
         )
         print('Ecccentricity samples:\n' + repr(e_samples))
-        kernel_width = eccentricity_pdf_kernel_widths[kic_id]
+        kernel_width = get_eccentricity_kernel_width(kic_id)
         kde_distro = eccentricity_kde_distro_gen(e_samples, kernel_width)
-#        plot_x = numpy.linspace(e_samples[0] - 5.0 * kernel_width,
-#                                e_samples[-1] + 5.0 * kernel_width,
-#                                100)
-#        pyplot.plot(plot_x, kde_distro.cdf(plot_x), color='red')
-#        pyplot.axhline(y=0.1)
-#        pyplot.axhline(y=0.9)
-#        pyplot.show()
-#        pyplot.clf()
-
 
         plot_ranges = [
             (
@@ -558,32 +597,8 @@ def plot_eccentricity_distribution(kic_id_list,
                   %
                   ((kic_id,) + plot_ranges[1]))
 
-
         for e_range in plot_ranges:
-            hist, bin_edges = numpy.histogram(
-                e_samples,
-                bins=int(numpy.ceil(
-                    bins
-                    *
-                    max(
-                        1,
-                        (e_samples[-1] - e_samples[0])
-                        /
-                        (e_range[1] - e_range[0])
-                    )
-                )),
-                density=True
-            )
-
-            hist /= bin_edges[1:]**2 - bin_edges[:-1]**2
-            hist /= (hist * (bin_edges[1:] - bin_edges[:-1])).sum()
-            pyplot.bar(x=bin_edges[:-1],
-                       height=hist,
-                       width=bin_edges[1:] - bin_edges[:-1],
-                       align='edge',
-                       color='none',
-                       edgecolor='black')
-
+            plot_eccentricity_histogram(e_samples, e_range, bins)
             plot_x = numpy.linspace(e_range[0], e_range[1], 300)
             plot_y = kde_distro.pdf(plot_x)
             pyplot.plot(plot_x, plot_y, color='red')
@@ -598,20 +613,14 @@ def plot_eccentricity_distribution(kic_id_list,
                 inset_location = 'upper left'
             else:
                 inset_location = 'upper right'
+            plot_ecosw_esinw_samples(
+                w19_samples,
+                inset_axes(pyplot.gca(),
+                           width='35%',
+                           height='35%',
+                           loc=inset_location)
+            )
 
-            inset = inset_axes(pyplot.gca(),
-                               width='35%',
-                               height='35%',
-                               loc=inset_location)
-
-            inset.plot(w19_samples['ecosw'],
-                       w19_samples['esinw'],
-                       'ok',
-                       markersize=0.5)
-            inset.axhline(y=0, linewidth=0.5)
-            inset.axvline(x=0, linewidth=0.5)
-
-    #    pyplot.yscale('log')
             if plot_fname:
                 pdf.savefig()
                 pyplot.close()

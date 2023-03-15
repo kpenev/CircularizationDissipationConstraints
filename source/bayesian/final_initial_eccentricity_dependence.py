@@ -8,6 +8,8 @@ from functools import partial
 from types import SimpleNamespace
 from os import path
 
+from matplotlib import pyplot
+from matplotlib.backends.backend_pdf import PdfPages
 from configargparse import\
     ArgumentParser,\
     DefaultsFormatter,\
@@ -15,6 +17,8 @@ from configargparse import\
 import numpy
 from scipy.optimize import root_scalar
 from astropy import units
+
+from superphot_pipeline import Evaluator
 
 from general_purpose_python_modules import find_evolution, MultiPickle
 from orbital_evolution.command_line_util import \
@@ -27,6 +31,7 @@ from orbital_evolution.evolve_interface import library as\
 from stellar_evolution.manager import StellarEvolutionManager
 from bayesian.sampling import setup_process
 from bayesian.basic_util import default_logging_format
+from bayesian import windemuth_et_al_util as w19_util
 
 _logger = logging.getLogger(__name__)
 
@@ -40,7 +45,10 @@ _pickle_ignore_config=['config_file',
                        'logging_verbosity',
                        'logging_datetime_format',
                        'logging_message_format',
-                       'pickle_fname']
+                       'pickle_fname',
+                       'compare_likelihood_estimates',
+                       'per_system_plot_fname',
+                       'per_efinal_plot_fname']
 
 
 #Interface specified by argparse module.
@@ -64,7 +72,7 @@ def parse_command_line():
 
     output_dir = path.join(path.dirname(path.dirname(path.abspath(__file__))),
                            'sampling_output',
-                           '%(system)s')
+                           'eccentricity_map')
 
     parser = ArgumentParser(
         description=__doc__,
@@ -166,6 +174,28 @@ def parse_command_line():
         default=None,
         help='How to format date and time as part of filenames (e.g. when '
         'creating output files for multiprocessing.'
+    )
+    parser.add_argument(
+        '--compare-likelihood-estimates',
+        choices=['w19'],
+        default=None,
+        help='If passed selects a collection of systems to compare the '
+        'likelihood functions estimated using lineal ef(ei) approximation vs '
+        'piecewise linear within the ``--initial-eccentricity-grid`` for each '
+        'entry in ``--max-efinal-grid``.'
+    )
+    parser.add_argument(
+        '--per-system-plot-fname',
+        default=path.join(output_dir, 'likelihoods_per_system.pdf'),
+        help='The filaname under which to save the plot of likelihood '
+        'estimates organized by system (vs max final eccentricity).'
+    )
+    parser.add_argument(
+        '--per-efinal-plot-fname',
+        default=path.join(output_dir, 'likelihoods_per_system.pdf'),
+        help='The filaname under which to save the plot of likelihood '
+        'estimates organized by final eccentricity (vs nominal observed '
+        'eccentricity).'
     )
     parser.add_argument(
         '--logging-message-format', '--logging-format', '--log-fmt',
@@ -279,10 +309,10 @@ def get_final_eccentricity(final_porb_initial_e,
     """Return the final eccentricity for given final Porb and initial e."""
 
     find_evolution_kwargs['system'].orbital_period = (
-        final_porb_initial_e[0] * units.day
+        float(final_porb_initial_e[0]) * units.day
     )
     evolution = find_evolution(
-        initial_eccentricity=final_porb_initial_e[1],
+        initial_eccentricity=float(final_porb_initial_e[1]),
         **find_evolution_kwargs,
     )
     _logger.debug('Evolution for final Porb = %s, initial e = %s: %s',
@@ -316,20 +346,28 @@ def get_final_eccentricity(final_porb_initial_e,
     return numpy.nan
 
 
-def get_porb_final(config, process_config, interpolator):
-    """Return the list of final orbital periods that reproduce max final e."""
+def ensure_ready_to_evolve(config):
+    """Make sure the library is ready for calculating evolutions."""
 
-    pickles = MultiPickle(config.pickle_fname,
-                          _pickle_ignore_config + ['initial_eccentricity_grid'])
-    porb_final_list = pickles.check_for_pickled(config)
-    if porb_final_list is None:
+    if not orbital_evolution_library.ready_to_evolve:
         orbital_evolution_library.prepare_eccentricity_expansion(
             config.eccentricity_expansion_fname.encode('ascii'),
             1e-4,
             True,
             True
         )
+        orbital_evolution_library.ready_to_evolve = True
 
+
+def get_porb_final(config, process_config, interpolator):
+    """Return the list of final orbital periods that reproduce max final e."""
+
+    pickles = MultiPickle(config.pickle_fname,
+                          _pickle_ignore_config + ['initial_eccentricity_grid'])
+    config.what = 'porb_final'
+    porb_final_list = pickles.check_for_pickled(config)
+    if porb_final_list is None:
+        ensure_ready_to_evolve(config)
         with Pool(
             config.num_parallel_processes,
             initializer=setup_process,
@@ -343,6 +381,8 @@ def get_porb_final(config, process_config, interpolator):
                 config.max_efinal_grid
             )
         pickles.add_result(config, porb_final_list)
+    else:
+        porb_final_list = porb_final_list[0]
     return porb_final_list
 
 
@@ -389,7 +429,9 @@ def get_find_evolution_kwargs(config, interpolator):
         eccentricity_expansion_fname=(
             config.eccentricity_expansion_fname.encode('ascii')
         ),
-        timeout=config.max_evolution_runtime
+        timeout=config.max_evolution_runtime,
+        learning_features=('final porb', 'e0', 'm1', 'm2', 'lgQ1', 'lgQ2'),
+        ic_model_id='final_initial_e_dependence'
     )
     for param in ['initial_obliquity',
                   'primary_wind_strength',
@@ -401,14 +443,9 @@ def get_find_evolution_kwargs(config, interpolator):
     return find_evolution_kwargs
 
 
-def calculate_efinal(config):
+def calculate_efinal(config, interpolator):
     """Find the final ecc. on a grid of initial ecc. and max final ecc."""
 
-    interpolator = StellarEvolutionManager(
-        config.stellar_evolution[0]
-    ).get_interpolator_by_name(
-        config.stellar_evolution[1]
-    )
     process_config = SimpleNamespace(
         system='eccentricity_map',
         **{
@@ -426,9 +463,11 @@ def calculate_efinal(config):
     porb_final_list = get_porb_final(config, process_config, interpolator)
 
     pickles = MultiPickle(config.pickle_fname, _pickle_ignore_config)
+    config.what = 'e_final'
     e_final_list = pickles.check_for_pickled(config)
     if e_final_list is None:
-        logging.basicConfig(level=logging.DEBUG)
+        ensure_ready_to_evolve(config)
+        _logger.debug('No pickled final eccentricities found! Calculating!')
 
         find_evolution_kwargs = get_find_evolution_kwargs(config, interpolator)
         tasks = [
@@ -449,8 +488,167 @@ def calculate_efinal(config):
             )
 
         pickles.add_result(config, e_final_list)
+    else:
+        assert len(e_final_list) == 1
+        e_final_list = e_final_list[0]
+    _logger.debug('Final eccentricities: %s', repr(e_final_list))
     return porb_final_list, e_final_list
 
 
+def estimate_likelihood(e_initial, e_final, observed_e_distro):
+    """Calculate the likelihood approximating ef(ei) as piecewise linear."""
+
+    result = 0.0
+    e_cdf = observed_e_distro.cdf(e_final)
+    _logger.debug(
+        'CDF(ef=%s, ei=%s) = %s', repr(e_final),
+        repr(e_initial),
+        repr(e_cdf)
+
+    )
+    for ei_0, ei_1, ef_0, ef_1, ecdf_0, ecdf_1 in zip(e_initial[:-1],
+                                                      e_initial[1:],
+                                                      e_final[:-1],
+                                                      e_final[1:],
+                                                      e_cdf[:-1],
+                                                      e_cdf[1:]):
+        result += (ecdf_1 - ecdf_0) * (ei_1 - ei_0) / (ef_1 - ef_0)
+    return result
+
+
+def plot_likelihoods_per_efinal(
+    kic_list,
+    likelihoods,
+    max_e_final,
+    plot_fname,
+    x_expression='(maxlike_esinw**2 + maxlike_ecosw**2)**0.5'
+):
+    """Plot the likelihood estimates and their difference vs summary data."""
+
+    pdf = PdfPages(plot_fname)
+    x_values = Evaluator(
+        w19_util.get_summary_data()
+    )(
+        x_expression
+    )[kic_list].to_numpy()
+    for e_final_index, e_final in enumerate(max_e_final):
+        differences = None
+        for label, likelihood_values in likelihoods.items():
+            pyplot.plot(x_values,
+                        likelihood_values[e_final_index],
+                        'o',
+                        label=label)
+            if differences is None:
+                differences = numpy.copy(likelihood_values)
+            else:
+                differences -= likelihood_values
+        pyplot.figlegend()
+        pyplot.suptitle('$e_{final,max} = %g$' % e_final)
+        pdf.savefig()
+        pyplot.close()
+    pdf.close()
+
+
+def plot_likelihoods_per_system(
+    kic_list,
+    likelihoods,
+    max_e_final,
+    plot_fname
+):
+    """Plot the likelihood estimates and their difference vs summary data."""
+
+    pdf = PdfPages(plot_fname)
+    for kic_index, kic in enumerate(kic_list):
+        differences = None
+        for label, likelihood_values in likelihoods.items():
+            pyplot.plot(max_e_final,
+                        [plot_y[kic_index] for plot_y in likelihood_values],
+                        'o',
+                        label=label)
+            if differences is None:
+                differences = numpy.copy(likelihood_values)
+            else:
+                differences -= likelihood_values
+        pyplot.figlegend()
+        pyplot.suptitle('KIC %d' % kic)
+        pdf.savefig()
+        pyplot.close()
+    pdf.close()
+
+
+
+def compare_likelihood_estimates(config, interpolator):
+    """Report how good linear ef(ei) approximation is for cmdline scenarios."""
+
+    kic_list = w19_util.get_available_kic(interpolator)
+    e_final_list = calculate_efinal(config, interpolator)[1]
+
+    pickles = MultiPickle(config.pickle_fname, _pickle_ignore_config)
+    config.what = 'likelihoods'
+    likelihoods = pickles.check_for_pickled(config)
+
+    if likelihoods is None:
+        likelihoods = dict(linear=[[] for _ in config.max_efinal_grid],
+                           piecewise=[[] for _ in config.max_efinal_grid])
+        for kic, observed_e_distro in zip(
+                kic_list,
+                map(w19_util.get_eccentricity_distro, kic_list)
+        ):
+            _logger.debug('Calculating likelihoods for KIC %d', kic)
+            first_e_final = 0
+            for e_final_i, max_e_final in enumerate(config.max_efinal_grid):
+                last_e_final = (first_e_final
+                                +
+                                len(config.initial_eccentricity_grid)
+                                -
+                                1)
+                e_final = e_final_list[first_e_final: last_e_final]
+                first_e_final = last_e_final
+
+                e_final.append(max_e_final)
+                likelihoods['linear'][e_final_i].append(
+                    estimate_likelihood(
+                        [0, config.initial_eccentricity_grid[-1]],
+                        [e_final[0], e_final[-1]],
+                        observed_e_distro
+                    )
+                )
+                likelihoods['piecewise'][e_final_i].append(
+                    estimate_likelihood(
+                        config.initial_eccentricity_grid,
+                        e_final,
+                        observed_e_distro
+                    )
+                )
+        pickles.add_result(config,
+                           likelihoods['linear'],
+                           likelihoods['piecewise'])
+    else:
+        assert len(likelihoods) == 2
+        likelihoods = dict(linear=likelihoods[0], piecewise=likelihoods[1])
+
+    plot_likelihoods_per_efinal(kic_list,
+                                likelihoods,
+                                config.max_efinal_grid,
+                                config.per_efinal_plot_fname)
+    plot_likelihoods_per_system(kic_list,
+                                likelihoods,
+                                config.max_efinal_grid,
+                                config.per_system_plot_fname)
+
+
+def main(config):
+    """Avoid polluting global namespace."""
+
+    interpolator = StellarEvolutionManager(
+        config.stellar_evolution[0]
+    ).get_interpolator_by_name(
+        config.stellar_evolution[1]
+    )
+    orbital_evolution_library.ready_to_evolve = False
+    compare_likelihood_estimates(config, interpolator)
+
+
 if __name__ == '__main__':
-    calculate_efinal(parse_command_line())
+    logging.basicConfig(level=logging.DEBUG)
+    main(parse_command_line())
