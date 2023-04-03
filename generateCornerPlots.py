@@ -51,12 +51,16 @@ if __name__ == '__main__':
     index = envelope_eccentricity_distribution_instance.print_properties_of_binary_systems_satisfying_constraints()
     merger = PdfMerger()
     i = 0
+    systems = []
     while i<len(index):
         measured_values, standard_deviations, system_name = envelope_eccentricity_distribution_instance.properties_of_ith_binary_system_if_satisfies_constraints(index[i])
-        figure = generate_corner_plot(system_name)
-        figfilename = "/work/08529/mmmahmud/corner_plots/%(system)s_corner_plot.pdf" % dict(system=system_name)
-        merger.append(figfilename)
+        #if not system_name in systems:
+        #systems.append(system_name)
+        if i !=13 and i != 26:
+            figure = generate_corner_plot(system_name)
+            figfilename = "/work/08529/mmmahmud/corner_plots/%(system)s_corner_plot.pdf" % dict(system=system_name)
+            merger.append(figfilename)
         i = i+1
-    all_corner_plots_filename = "/work/08529/mmmahmud/corner_plots/all_corner_plots.pdf"
+    all_corner_plots_filename = "/work/08529/mmmahmud/corner_plots/all_corner_plotS.pdf"
     merger.write(all_corner_plots_filename)
     merger.close()

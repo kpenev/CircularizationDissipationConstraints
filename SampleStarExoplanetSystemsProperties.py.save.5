@@ -273,9 +273,7 @@ class PriorTransform:
                    if self.logger is not None: self.logger.debug("XZ: transit depth = %(x)f" % dict(x=transit_depth))
                    secondary_radius = (transit_depth**0.5)*primary_radius * const.R_sun.value/const.R_earth.value
                    if self.logger is not None: self.logger.debug("XZ: secondary radius = %(x)f, for transit depth = %(y)f" % dict(x=secondary_radius, y=transit_depth))
-                   if secondary_radius is not None:
-                       if not math.isnan(secondary_radius):
-                           secondary_radius_is_found = True
+                   if not math.isnan(secondary_radius): secondary_radius_is_found = True
         b = 'ratio of planet to stellar radius' in self.means
         if b and (not secondary_radius_is_found):
             if self.logger is not None: self.logger.debug("AA: ratio of Rp and Rs is found in self.means.")
@@ -292,9 +290,7 @@ class PriorTransform:
                     if self.logger is not None: self.logger.debug("AC: ratio = %(x)f" % dict(x=ratio_of_planet_to_stellar_radius))
                     secondary_radius = ratio_of_planet_to_stellar_radius * primary_radius * const.R_sun.value/const.R_earth.value
                     if self.logger is not None: self.logger.debug("AC: secondary radius = %(x)f" % dict(x=secondary_radius))
-                    if secondary_radius is not None:
-                        if not math.isnan(secondary_radius):
-                            secondary_radius_is_found = True
+                    if not math.isnan(secondary_radius): secondary_radius_is_found = True
         c = 'secondary radius' in self.means
         if c and (not secondary_radius_is_found):
             if self.logger is not None: self.logger.debug("PP: secondary radius is found in self.means.")
@@ -309,9 +305,7 @@ class PriorTransform:
                                                 scale = (self.standard_deviations['secondary_radius_upper_uncertainty']
                                                          - self.standard_deviations['secondary_radius_lower_uncertainty'])/2)
                     if self.logger is not None: self.logger.debug("PR: secondary radius = %(x)f" % dict(x=secondary_radius))
-                    if secondary_radius is not None:
-                        if not math.isnan(secondary_radius):
-                            secondary_radius_is_found = True
+                    if not math.isnan(secondary_radius): secondary_radius_is_found = True
         if not secondary_radius_is_found:
             secondary_radius = None
             if self.logger is not None: self.logger.debug("secondary radius is %(x)s" % dict(x=repr(secondary_radius)))
