@@ -266,9 +266,13 @@ def get_chain_name(samples_fname, chain_conditions):
         if system_name is None:
             fname, ext = path.splitext(path.basename(samples_fname))
             assert ext in ['.h5', '.hdf5']
-            fname_start, system_name = fname.split('_')
-            assert fname_start == 'system'
-            system_name = int(system_name)
+            if fname.startswith('system'):
+                _, system_name = fname.split('_')
+                system_name = int(system_name)
+            else:
+                system_name, fname_end = fname.split('_', 1)
+                assert system_name.endswith(' b')
+                assert fname_end == 'mcmc_progress'
         return chain_name, system_name
 
 
@@ -276,6 +280,8 @@ def get_backend(samples_fname, chain_conditions):
     """Return the chain to plot."""
 
     chain_name, system_name = get_chain_name(samples_fname, chain_conditions)
+    print('{system:s} chain name: {chain:s}'.format(system=system_name,
+                                                  chain=chain_name))
     backend = emcee.backends.HDFBackend(samples_fname,
                                         name=chain_name,
                                         read_only=True)
@@ -818,6 +824,25 @@ def add_errorbar(samples, config):
 def ensure_uniform_blob_columns(blobs):
     """Ensure output blobs have correct columns for analysis."""
 
+    if blobs.dtype == float:
+        blobs = recfunctions.unstructured_to_structured(
+            blobs,
+            names=['primary_mass',
+                   'age',
+                   'secondary_radius',
+                   'feh',
+                   'secondary_mass',
+                   'initial_star_period',
+                   'lgQ_min',
+                   'lgQ_break_period',
+                   'lgQ_powerlaw',
+                   'lgQ_star',
+                   'e_now',
+                   'log-likelihood']
+        )
+        blobs['secondary_radius'] *= constants.R_earth.to_value('R_jup')
+        blobs['secondary_mass'] *= constants.M_earth.to_value('M_jup')
+
     blob_columns = list(blobs.dtype.names)
     if 'lgQ_min' not in blob_columns:
         blobs['break_period'] = 2.0 * numpy.pi / blobs['break_period']
@@ -852,7 +877,7 @@ def ensure_uniform_blob_columns(blobs):
 #                numpy.full(blobs['lgQ_min'].size, numpy.nan),
 #                float
 #            ).reshape(blobs.shape)
-#    return blobs
+    return blobs
 
 
 def get_plot_data(samples_fname_list, burn_in, chain_condition):
@@ -864,7 +889,8 @@ def get_plot_data(samples_fname_list, burn_in, chain_condition):
         backend, system_name = get_backend(samples_fname, chain_condition)
         assert backend is not None
         blobs = backend.get_blobs()
-        ensure_uniform_blob_columns(blobs)
+        print('Blobs: ' + repr(blobs))
+        blobs = ensure_uniform_blob_columns(blobs)
         logprob = backend.get_log_prob()
 
         if combined_blobs is None:

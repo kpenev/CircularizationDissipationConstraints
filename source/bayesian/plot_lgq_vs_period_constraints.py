@@ -80,7 +80,7 @@ def parse_command_line(quantiles_only=False):
     parser.add_argument(
         '--collection',
         default='w19',
-        choices=['w19', 'sb1'],
+        choices=['w19', 'sb1', 'hj'],
         help='The collection of binary systems to plot constraints for.'
     )
     parser.add_argument(
@@ -288,8 +288,7 @@ def download_latest_samples(download_from, destination, collection, method):
                     +
                     '/work/05392/kpenev/{0:s}/circularization/W19/samples/*.h5'
                 ).format(hpc)
-            else:
-                assert collection == 'sb1'
+            elif collection == 'sb1':
                 if hpc == 'ganymede':
                     source = (
                         host
@@ -304,6 +303,13 @@ def download_latest_samples(download_from, destination, collection, method):
                     )
                 else:
                     assert False
+            else:
+                assert collection == 'hj'
+                source = (
+                    host
+                    +
+                    '/work/08529/mmmahmud/p0andmcmc/*/*.h5'
+                )
         else:
             assert method == 'spin'
             assert hpc == 'ls6'
@@ -405,6 +411,38 @@ def add_sb1_orbit_and_photometry(sampling_data):
         sampling_data[binary]['photometry'] = photometry[cluster][
             photometry[cluster][id_column] == binary_id
         ]
+
+
+def add_fixed_exoplanet_properties(
+    sampling_data,
+    archive_data_fname=path.join(
+        path.dirname(
+            path.dirname(
+                path.dirname(
+                    path.abspath(
+                        __file__
+                    )
+                )
+            )
+        ),
+        'data',
+        'PS_2022.10.19_20.26.52.csv'
+    )
+):
+    """Fon now just add orbital period."""
+
+    archive_data = Table.read(
+        archive_data_fname,
+        format='ascii'
+    ).to_pandas(
+        index='pl_name'
+    )
+    for planet_name in sampling_data.keys():
+        archive_system = archive_data.loc[[planet_name]].iloc[0]
+        print('system: ' + repr(archive_system))
+        sampling_data[planet_name]['summary'] = dict(
+            maxlike_period=float(archive_system['pl_orbper'])
+        )
 
 
 def add_w19_summary_data(sampling_data):
@@ -530,9 +568,11 @@ def get_sampling_data(config, add_quantiles=True):
 
     if config.collection == 'sb1':
         add_sb1_orbit_and_photometry(result)
-    else:
-        assert config.collection == 'w19'
+    elif config.collection == 'w19':
         add_w19_summary_data(result)
+    else:
+        assert config.collection == 'hj'
+        add_fixed_exoplanet_properties(result)
     add_discard_flags(result, config)
     return result
 
@@ -787,10 +827,13 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
     axis.set_xscale('log')
     orig_axis = pyplot.gca()
     pyplot.sca(axis)
-    lgq_range = (
-        4.0 if isinstance(binary, str) and binary.startswith('M35_') else 5.0,
-        11
-    )
+
+    if isinstance(binary, str) and binary.endswith(' b'):
+        lgq_range = (3.0, 10.0)
+    elif isinstance(binary, str) and binary.startswith('M35_'):
+        lgq_range[0] = (4.0, 11.0)
+    else:
+        lgq_range = (5.0, 11)
     orig_lgq_grid = config.lgQ_grid
     config.lgQ_grid = numpy.linspace(*lgq_range, 50)
     frequency_dependence_plotter = FrequencyDependencePlotter(1, config)
@@ -1138,7 +1181,9 @@ def decorate_subplot(axis,
 
     if isinstance(binary, (int, numpy.int32, numpy.int64)):
         axis.set_title('TIC %d' % binary, pad=3)
-    else:
+    elif binary.endswith(' b'):
+        axis.set_title(binary[:-2], pad=3)
+    else :
         cluster, binary_id = binary.split('_')
         axis.set_title(
             ('PKM ' if cluster == 'NGC188' else 'WOCS ') + binary_id,
@@ -1152,6 +1197,8 @@ def plot_single_burnin_period(binary, system_data, __, axis, config):
 
     if isinstance(binary, (int, numpy.int32, numpy.int64)):
         cluster = 'W19'
+    elif binary.endswith(' b'):
+        cluster = 'Planets'
     else:
         cluster = binary.split('_')[0]
 
@@ -1195,6 +1242,8 @@ def plot_single_cdfstd_period(binary, system_data, __, axis, config):
 
     if isinstance(binary, (int, numpy.int32, numpy.int64)):
         cluster = 'W19'
+    elif binary.endswith(' b'):
+        cluster = 'Planets'
     else:
         cluster = binary.split('_')[0]
 
@@ -1262,13 +1311,21 @@ def get_plotting_order(plot_data, collection, restrict_to_cluster=None):
         if restrict_to_cluster is None:
             return result
         return result[cluster]
-
-    assert collection == 'w19'
-    period_binary = [
-        (data['summary']['maxlike_period'], binary)
-        for binary, data in plot_data.items()
-    ]
-    return dict(W19=[entry[1] for entry in sorted(period_binary)])
+    elif collection in ['w19', 'hj']:
+        period_binary = [
+            (data['summary']['maxlike_period'], binary)
+            for binary, data in plot_data.items()
+        ]
+        return {
+            collection.upper(): [entry[1] for entry in sorted(period_binary)]
+        }
+    else:
+        assert False
+        period_planet = [
+            (float(data['orbital_period']), planet_name)
+            for planet_name, data in plot_data.items()
+        ]
+        return dict(HJ=[entry[1] for entry in sorted(period_planet)])
 
 
 def get_subplots(num_systems, plot_type, config):
@@ -1365,14 +1422,23 @@ def save_individual_data_behind_figure(data, plot_type, binary, config):
     )
 
     if isinstance(binary, str):
-        cluster, binary_id = binary.split('_')
-        title = '{quantity} for {cluster} binary {id_type} {binary_id}'.format(
-            cluster=('NGC ' + cluster[3:] if cluster.startswith('NGC')
-                     else 'M ' + cluster[1:]),
-            id_type=('PKM' if cluster == 'NGC188' else 'WOCS'),
-            binary_id=binary_id,
-            quantity=quantity[plot_type]
-        )
+        if binary.endswith(' b'):
+            binary = binary[:-2]
+            title = '{quantity} for {binary}'.format(
+                quantity=quantity[plot_type],
+                binary=binary
+            )
+        else:
+            cluster, binary_id = binary.split('_')
+            title = (
+                '{quantity} for {cluster} binary {id_type} {binary_id}'
+            ).format(
+                cluster=('NGC ' + cluster[3:] if cluster.startswith('NGC')
+                         else 'M ' + cluster[1:]),
+                id_type=('PKM' if cluster == 'NGC188' else 'WOCS'),
+                binary_id=binary_id,
+                quantity=quantity[plot_type]
+            )
     else:
         assert config.collection == 'w19'
         title = '{quantity} for Kepler eclipsing binary KIC {binary:d}'.format(
@@ -1601,19 +1667,21 @@ def plot_combined_constraints(plot_data, config):
         include_binaries['NGC188'][6] = include_binaries['NGC188'][-1]
         include_binaries['NGC188'][-1] = 'NGC188_4904'
 
-    cluster_order = ['NGC6819', 'NGC188', 'M35', 'W19']
+    cluster_order = ['NGC6819', 'NGC188', 'M35', 'W19', 'HJ']
 
     plot_max_lgq = dict(
         M35=6,
         NGC6819=7,
         NGC188=7,
-        W19=10
+        W19=10,
+        HJ=10
     )
     plot_min_lgq = dict(
         M35=4,
         NGC6819=5,
         NGC188=5,
-        W19=5
+        W19=5,
+        HJ=3
     )
 
     selected_quantiles = dict(ptide_grid=config.ptide_grid)
@@ -1721,7 +1789,7 @@ def plot_combined_constraints(plot_data, config):
                 pyplot.clf()
 
             fully_combined_n += 1
-        if cluster in ['M35', 'W19']:
+        if cluster in ['M35', 'W19', 'HJ']:
             selected_quantiles[cluster] = [
                 cluster_plotter.combined_pdf.ppf(cdf)
                 for cdf in config.convergence_quantiles
@@ -1748,6 +1816,8 @@ def create_tightest_constraint_latex(data_behind, cluster):
                 (
                     r'\quad\quad\quad' if colname in ['PKM',
                                                       'WOCS',
+                                                      'Planet',
+                                                      'KIC',
                                                       'Ptide',
                                                       'CDF-1(97.7%)']
                     else ''
@@ -1796,7 +1866,8 @@ def create_tightest_constraint_latex(data_behind, cluster):
             colname: (
                 '%6s' if ('{PKM}' in colname
                           or '{WOCS}' in colname
-                          or '{KIC}' in colname)
+                          or '{KIC}' in colname
+                          or '{Planet}' in colname)
                 else '%5.2f'
             )
             for colname in data_behind.colnames
@@ -1829,7 +1900,7 @@ def get_cluster_tightest_plot_data(*,
             ],
             names=[id_name, 'Ptide'],
             descriptions=[
-                "Binary identifier",
+                "System identifier",
                 (
                     "The tidal period at which the {0:.1f}% quantile of "
                     "log10(Q') of the binary is smallest."
@@ -1841,7 +1912,8 @@ def get_cluster_tightest_plot_data(*,
         NGC188='PKM',
         M35='WOCS',
         NGC6819='WOCS',
-        W19='KIC'
+        W19='KIC',
+        HJ='Planet'
     )
     cluster_quantiles = numpy.empty((len(config.convergence_quantiles),
                                      len(cluster_binaries)))
@@ -1933,6 +2005,8 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
             lgq_range = (4.0, 8.0)
         elif cluster == 'W19':
             lgq_range = (5.0, 10.0)
+        elif cluster == 'HJ':
+            lgq_range = (3.0, 9.0)
         else:
             lgq_range = (5.0, 9.0)
         (
@@ -2046,10 +2120,9 @@ def main(config):
     plot_data = get_sampling_data(config)
     combined_quantiles = None
     plot_individual_constraints(plot_data, config)
-    exit(1)
-#    if config.combined_constraint_period_range is not None:
-#        combined_quantiles = None
-#        combined_quantiles = plot_combined_constraints(plot_data, config)
+    if config.combined_constraint_period_range is not None:
+        combined_quantiles = None
+        combined_quantiles = plot_combined_constraints(plot_data, config)
     if (
             combined_quantiles is None
             and
