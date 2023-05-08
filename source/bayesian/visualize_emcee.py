@@ -19,6 +19,7 @@ import pandas
 from scipy import stats
 from asteval import Interpreter
 from astropy.table import Table
+from astropy import constants
 
 from orbital_evolution.transformations import lgQ
 
