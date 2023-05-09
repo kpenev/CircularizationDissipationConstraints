@@ -232,6 +232,12 @@ def parse_command_line(quantiles_only=False):
         'from processing their samples even if it seems there are no updates.'
         'Can be specified by basename only.'
     )
+    parser.add_argument(
+        '--lgq-label',
+        default=r"$\log_{10}Q_\star'$",
+        help='The label to use for the tidal dissipation parameter being '
+        'constrained.'
+    )
 
     if not quantiles_only:
         add_frequency_dependence_plot_config(
@@ -877,7 +883,7 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
     decorate_subplot(
         axis,
         binary,
-        r"$\log_{10}Q_\star'$",
+        config.lgq_label,
         config,
         yticks=(
             [4, 6, 8, 10, 12]
@@ -969,7 +975,7 @@ def plot_single_lgq_quantiles(binary, system_data, ptide, axis, config):
         axis.axhline(y=quantile_diag[0], zorder=0, color='black')
     decorate_subplot(axis,
                      binary,
-                     r"$\log_{10}Q_\star'$",
+                     config.lgq_label,
                      config,
                      xlabel='emcee step')
 
@@ -1004,7 +1010,7 @@ def plot_single_quantiles_lgq(binary, system_data, ptide, axis, config):
             ).get_color()
     decorate_subplot(axis,
                      binary,
-                     r"$CDF(\log_{10}Q_\star')$",
+                     config.lgq_label,
                      config,
                      xlabel='emcee step')
 
@@ -1384,7 +1390,7 @@ def plot_single_tightest_lgq_posterior(binary, system_data, _, axis, config):
                      binary,
                      'PDF',
                      config,
-                     xlabel=r"$\log_{10}Q_\star'$",
+                     xlabel=config.lgq_label,
                      xticks=[4, 6, 8, 10, 12])
     axis.set_xticks([5, 7, 9, 11], minor=True)
     axis.set_xticklabels(['']*4, minor=True)
@@ -1641,6 +1647,24 @@ def save_combined_data_behind_figure(data,
     tablemaker.toMRT()
 
 
+def get_nonlog_ticklabel(val):
+    """Return non-log tick label for log plot."""
+
+    if val < 10:
+        result = ('%.1g' % val if numpy.allclose(float('%.1g' % val),
+                                                 val,
+                                                 rtol=1e-10,
+                                                 atol=1e-16)
+                  else str(val))
+    else:
+        result = str(int(val) if int(val) == val else val)
+
+    if result.rstrip('0')[-1] in ['1', '2', '4', '6', '8']:
+        return result
+    else:
+        return ''
+
+
 #TODO: simplify
 #pylint: disable=too-many-locals
 #pylint: disable=too-many-statements
@@ -1666,6 +1690,11 @@ def plot_combined_constraints(plot_data, config):
         assert include_binaries['NGC188'][6] == 'NGC188_4904'
         include_binaries['NGC188'][6] = include_binaries['NGC188'][-1]
         include_binaries['NGC188'][-1] = 'NGC188_4904'
+    elif config.collection == 'hj':
+        assert include_binaries['HJ'][47] == 'CoRoT-23 b'
+        include_binaries['HJ'][47] = include_binaries['HJ'][-1]
+        include_binaries['HJ'][-1] = 'CoRoT-23 b'
+
 
     cluster_order = ['NGC6819', 'NGC188', 'M35', 'W19', 'HJ']
 
@@ -1752,7 +1781,7 @@ def plot_combined_constraints(plot_data, config):
                 print('    Adding ' + repr(binary))
                 pyplot.ylim(plot_min_lgq[cluster], plot_max_lgq[cluster])
                 pyplot.xlim(*config.combined_constraint_period_range)
-                plotter.plot_combined_pdf_heat_map()
+                plotter.plot_combined_pdf_heat_map(ylabel=config.lgq_label)
                 data_behind = plotter.plot_combined_quantiles(
                     config.convergence_quantiles,
                     fmt='-k'
@@ -1760,16 +1789,17 @@ def plot_combined_constraints(plot_data, config):
 #                pyplot.figlegend(loc='lower center',
 #                                 ncol=2,
 #                                 bbox_to_anchor=(0.5, 1.0))
+
                 pyplot.gca().set_xticklabels(
                     [
-                        str(int(val) if val - int(val) == 0 else val)
+                        get_nonlog_ticklabel(val)
                         for val in pyplot.gca().get_xticks(minor=False)
                     ],
                     minor=False
                 )
                 pyplot.gca().set_xticklabels(
                     [
-                        str(int(val) if val - int(val) == 0 else val)
+                        get_nonlog_ticklabel(val)
                         for val in pyplot.gca().get_xticks(minor=True)
                     ],
                     minor=True
@@ -1789,16 +1819,20 @@ def plot_combined_constraints(plot_data, config):
                 pyplot.clf()
 
             fully_combined_n += 1
-        if cluster in ['M35', 'W19', 'HJ']:
-            selected_quantiles[cluster] = [
-                cluster_plotter.combined_pdf.ppf(cdf)
-                for cdf in config.convergence_quantiles
-            ]
-        else:
-            selected_quantiles['NGC6819'] = selected_quantiles['NGC188'] = [
-                all_combined_plotter.combined_pdf.ppf(cdf)
-                for cdf in config.convergence_quantiles
-            ]
+            if cluster == 'HJ':
+                selected_quantiles[cluster + ' excluded'] = (
+                    selected_quantiles.get(cluster, None)
+                )
+            if cluster in ['M35', 'W19', 'HJ']:
+                selected_quantiles[cluster] = [
+                    cluster_plotter.combined_pdf.ppf(cdf)
+                    for cdf in config.convergence_quantiles
+                ]
+            else:
+                selected_quantiles['NGC6819'] = selected_quantiles['NGC188'] = [
+                    all_combined_plotter.combined_pdf.ppf(cdf)
+                    for cdf in config.convergence_quantiles
+                ]
     rcParams['font.size'] = orig_font_size
     return selected_quantiles
 #pylint: enable=too-many-locals
@@ -1806,7 +1840,9 @@ def plot_combined_constraints(plot_data, config):
 
 
 
-def create_tightest_constraint_latex(data_behind, cluster):
+def create_tightest_constraint_latex(data_behind,
+                                     cluster,
+                                     fname):
     """Save individual tightest vs global constraints as latex table."""
 
     latex_columns = []
@@ -1838,7 +1874,7 @@ def create_tightest_constraint_latex(data_behind, cluster):
         latex_columns
     )
     data_behind.write(
-        cluster + '_individual_vs_combined_constraints.tex',
+        fname + '.tex',
         format='latex',
         latexdict=dict(
             tabletype=None,
@@ -1992,7 +2028,10 @@ def get_cluster_tightest_plot_data(*,
 
 #TODO: simplify
 #pylint: disable=too-many-locals
-def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
+def plot_tightest_constraints(plot_data,
+                              config,
+                              combined_quantiles=None,
+                              combined_version=''):
     """Plot tightest constraints as error bars vs tidal period."""
 
     pyplot.figure(figsize=(11, 8.5), dpi=300, tight_layout=True)
@@ -2056,9 +2095,11 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
             cluster_quantiles = cluster_quantiles[1:-1]
             break
         if combined_quantiles is not None:
-            for plot_y, label, cdf in zip(combined_quantiles[cluster],
-                                          cdf_labels,
-                                          config.convergence_quantiles):
+            for plot_y, label, cdf in zip(
+                combined_quantiles[cluster + combined_version],
+                cdf_labels,
+                    config.convergence_quantiles
+            ):
                 pyplot.plot(
                     combined_quantiles['ptide_grid'],
                     plot_y,
@@ -2082,17 +2123,22 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
                          100.0 * max(config.convergence_quantiles))
 
         pyplot.xlabel('Tidal Period [days]')
-        pyplot.ylabel(r"$\log_{10}Q_\star'$")
+        pyplot.ylabel(config.lgq_label)
         pyplot.ylim(*lgq_range)
 #        pyplot.legend()
         pyplot.gca().set_xticks(range(2, 11))
         pyplot.gca().set_xticklabels([str(i) for i in range(2, 11)])
 
-        pyplot.savefig(
-            cluster + '_' + config.method + '_tightest_constraints.pdf',
-            bbox_inches='tight',
-            pad_inches=0
-        )
+        fname = (cluster
+                 +
+                 '_'
+                 +
+                 config.method
+                 +
+                 combined_version.replace(' ', '_')
+                 +
+                 '_individual_vs_combined_constraints')
+        pyplot.savefig(fname + '.pdf', bbox_inches='tight', pad_inches=0)
         pyplot.clf()
         if cluster == 'M35':
             data_behind.remove_columns(['Comb. CDF-1(2.3%)',
@@ -2101,10 +2147,10 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
             data_behind,
             'Comparison between the combined constraints and the individual '
             'constraints for the {0} binaries'.format(cluster),
-            cluster + '_individual_vs_combined_constraints.mrt',
+            fname + '.mrt',
             config
         )
-        create_tightest_constraint_latex(data_behind, cluster)
+        create_tightest_constraint_latex(data_behind, cluster, fname)
 #pylint: enable=too-many-branches
 #pylint: enable=too-many-statements
 #pylint: enable=too-many-locals
@@ -2139,7 +2185,16 @@ def main(config):
                 'wb'
         ) as quanntile_pickle:
             pickle.dump(combined_quantiles, quanntile_pickle)
-    plot_tightest_constraints(plot_data, config, combined_quantiles)
+    plot_tightest_constraints(plot_data,
+                              config,
+                              combined_quantiles)
+#    try:
+    plot_tightest_constraints(plot_data,
+                              config,
+                              combined_quantiles,
+                              ' excluded')
+#    except KeyError:
+#        pass
 
 
 if __name__ == '__main__':

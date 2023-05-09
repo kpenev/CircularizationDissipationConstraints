@@ -35,11 +35,16 @@ class ParseGrid(ArgparseAction):
     def __call__(self, parser, namespace, values, option_string=None):
         """Parse a grid option to a numpy.arary()."""
 
+        if len(values) == 3:
+            expander = numpy.linspace
+        else:
+            assert len(values) == 4
+            expander = getattr(numpy, values[3])
         setattr(namespace,
                 self.dest,
-                numpy.linspace(float(values[0]),
-                               float(values[1]),
-                               int(values[2])))
+                expander(float(values[0]),
+                         float(values[1]),
+                         int(values[2])))
 #pylint: enable=too-few-public-methods
 
 def add_frequency_dependence_plot_config(parser, disable=()):
@@ -132,10 +137,10 @@ def add_frequency_dependence_plot_config(parser, disable=()):
     if 'ptide_grid' not in disable:
         parser.add_argument(
             '--ptide-grid',
-            nargs=3,
+            nargs=4,
             default=numpy.logspace(0.0, numpy.log10(50.0), 100),
             action=ParseGrid,
-            metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES'),
+            metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES', 'GRID_TYPE'),
             help='Set the range and resolution of the tidal period to include '
             'in the frequency dependence plot (see '
             '--frequency-dependence-plot-fname argument).'
@@ -687,7 +692,9 @@ class FrequencyDependencePlotter:
             pyplot.colorbar()
 
 
-    def plot_combined_pdf_heat_map(self, xlabel=True, ylabel=True):
+    def plot_combined_pdf_heat_map(self,
+                                   xlabel='Tidal Period [d]',
+                                   ylabel=r"$\log_{10}Q_\star'$"):
         """
         Create a 2-D plot of lgQ vs Ptide color coding KDE of PDF.
 
@@ -737,9 +744,9 @@ class FrequencyDependencePlotter:
             **plot_args
         )
         if xlabel:
-            pyplot.xlabel('Tidal Period [d]')
+            pyplot.xlabel(xlabel)
         if ylabel:
-            pyplot.ylabel(r"$\log_{10}Q_\star'$")
+            pyplot.ylabel(ylabel)
 
 
     def plot_combined_quantiles(self,
