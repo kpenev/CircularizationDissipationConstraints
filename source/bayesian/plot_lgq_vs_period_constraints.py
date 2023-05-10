@@ -513,7 +513,9 @@ def add_discard_flags(sampling_data, config):
         sampling_data[kic]['discard'] = discard
 
 
-def get_sampling_data(config, add_quantiles=True):
+def get_sampling_data(config,
+                      add_quantiles=True,
+                      fname_tail='.h5'):
     """Return dictionary index by system of samples, likelihood, & quantile."""
 
 
@@ -526,7 +528,7 @@ def get_sampling_data(config, add_quantiles=True):
 
     result = dict()
     for samples_fname in listdir(config.samples_dir):
-        if not path.splitext(samples_fname)[1] == '.h5':
+        if not samples_fname.endswith(fname_tail):
             print('Skipping ' + repr(samples_fname))
             continue
         if (
@@ -830,6 +832,7 @@ def get_burnin(system_data, config, binary=''):
 def plot_single_lgq_period(binary, system_data, __, axis, config):
     """Plot the constraint for a single system."""
 
+    print('Plotting on axis: ' + repr(axis))
     axis.set_xscale('log')
     orig_axis = pyplot.gca()
     pyplot.sca(axis)
@@ -1337,6 +1340,10 @@ def get_plotting_order(plot_data, collection, restrict_to_cluster=None):
 def get_subplots(num_systems, plot_type, config):
     """Return a properly configured subplots for all systems in a cluster."""
 
+    if hasattr(config, 'subplots'):
+        return config.subplots.get(plot_type)
+
+    pyplot.clf()
     num_rows = (
         (num_systems + config.subplot_layout[1] - 1)
         //
@@ -1346,7 +1353,8 @@ def get_subplots(num_systems, plot_type, config):
         *config.subplot_layout,
         sharex='col',
         sharey=('row' if plot_type == 'burnin_period' else 'row'),
-        gridspec_kw=dict(wspace=0.1, hspace=0.35)
+        gridspec_kw=dict(wspace=0.1, hspace=0.35),
+        squeeze=False
     )
     axes = axes.flatten()
 
@@ -1519,7 +1527,6 @@ def plot_individual_constraints(plot_data, config):
                             and
                             plot_index == 0
                     ):
-                        pyplot.clf()
                         num_page_plots = min(
                             max_plots_per_page,
                             len(cluster_binaries) - binary_index
@@ -1527,6 +1534,8 @@ def plot_individual_constraints(plot_data, config):
                         axes = get_subplots(num_page_plots,
                                             plot_type,
                                             config)
+                        if axes is None:
+                            break
 
                     config.left = (
                         config.individual_plot_mode == 'pages'
@@ -1593,6 +1602,8 @@ def plot_individual_constraints(plot_data, config):
                                 or
                                 binary_index == len(cluster_binaries) - 1
                             )
+                            and
+                            not hasattr(config, 'subplots')
                     ):
                         if plot_type in ['burnin_period', 'cdfstd_period']:
                             globals()[
