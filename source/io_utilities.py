@@ -14,7 +14,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'data'))
 
 #Need to update search path
 #pylint: disable=wrong-import-position
-from planetary_system_io import read_cds_pipe_table
+from general_purpose_python_modules.planetary_system_io import\
+    read_cds_pipe_table
 from fit_ngc6819_masses import fit_milliman
 from command_line_utilities import data_dir
 #False positive
@@ -524,7 +525,12 @@ def format_hyades_praesepe_binaries(systems,
     ]
 #pylint: enable=too-many-statements
 
-def init_progress_pickle(cmdline_args):
+def init_progress_pickle(cmdline_args,
+                         args_to_ignore=('progress_pickle',
+                                         'num_parallel_processes',
+                                         'use_binary_stars',
+                                         'fallback_initial_eccentricity',
+                                         'known_to_fail')):
     """
     If a pickle file exists check it matches cmdline_args, otherwise create it.
 
@@ -546,11 +552,7 @@ def init_progress_pickle(cmdline_args):
                 pickled_cfg['initial_eccentricity'] = 0.55
             if 'stellar_lgQ' not in pickled_cfg:
                 pickled_cfg['stellar_lgQ'] = numpy.inf
-            for ignore_arg in ['progress_pickle',
-                               'num_parallel_processes',
-                               'use_binary_stars',
-                               'fallback_initial_eccentricity',
-                               'known_to_fail']:
+            for ignore_arg in args_to_ignore:
                 if ignore_arg in pickled_cfg:
                     del pickled_cfg[ignore_arg]
                 if ignore_arg in cmdline_cfg:

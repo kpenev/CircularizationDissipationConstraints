@@ -4,7 +4,9 @@ import numpy
 from astropy import units
 
 from orbital_evolution.transformations import phase_lag
-from reproduce_system import find_evolution, check_if_secondary_is_star
+from general_purpose_python_modules.reproduce_system import \
+    find_evolution,\
+    check_if_secondary_is_star
 
 from io_utilities import pickle_new_result
 
@@ -38,7 +40,9 @@ class CurrentEccentricityCalculator:
                  interpolator,
                  progress,
                  progress_pickle_fname,
-                 progress_lock):
+                 progress_lock,
+                 disk_period=10.0 * units.day,
+                 disk_dissipation_age=20.0 * units.Myr):
         """
         Set-up the object to calculate present day eccentricities for systems.
 
@@ -67,6 +71,8 @@ class CurrentEccentricityCalculator:
         self.progress_pickle_fname = progress_pickle_fname
         self._progress_lock = progress_lock
         self.progress = progress
+        self.disk_period = disk_period
+        self.disk_dissipation_age = disk_dissipation_age
     #pylint: enable=invalid-name
 
     def __call__(self, job):
@@ -101,8 +107,8 @@ class CurrentEccentricityCalculator:
         if system.primary_mass > 1.2 * units.M_sun:
         #pylint: enable=no-member
             print('Skipping %s, lgQ = %g, e0 = %g' % (system.hostname,
-                                                       lgQ,
-                                                       initial_eccentricity))
+                                                      lgQ,
+                                                      initial_eccentricity))
             return None
 
         print('Trying %s, lgQ = %g, e0 = %g' % (system.hostname,
@@ -152,21 +158,24 @@ class CurrentEccentricityCalculator:
                 initial_eccentricity=initial_eccentricity,
                 #False positive.
                 #pylint: disable=no-member
-                disk_period=(4.0 * units.day),
-                disk_dissipation_age=(5e-3 * units.Gyr),
+                disk_period=self.disk_period,
+                disk_dissipation_age=self.disk_dissipation_age,
                 max_age=system.age,
                 secondary_is_star=(check_if_secondary_is_star(system)
                                    and
                                    system.secondary_mass <= 1.2 * units.M_sun),
                 #pylint: enable=no-member
             )
-        except AssertionError:
+        except RuntimeError:
             print('Failed %s, lgQ = %g, e0 = %g' % (system.hostname,
                                                     lgQ,
                                                     initial_eccentricity))
-            return None
+            return numpy.nan
 
-        print(evolution.format())
+        print('Evolution:')
+        for varname, var_evol in vars(evolution).items():
+            print('\t' + varname + ': ' + repr(var_evol))
+
         #False positive
         #pylint: disable=no-member
         if numpy.allclose(evolution.age[-1],
