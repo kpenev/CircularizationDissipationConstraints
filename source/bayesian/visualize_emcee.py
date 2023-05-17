@@ -19,6 +19,7 @@ import pandas
 from scipy import stats
 from asteval import Interpreter
 from astropy.table import Table
+from astropy import constants
 
 from orbital_evolution.transformations import lgQ
 
@@ -34,11 +35,16 @@ class ParseGrid(ArgparseAction):
     def __call__(self, parser, namespace, values, option_string=None):
         """Parse a grid option to a numpy.arary()."""
 
+        if len(values) == 3:
+            expander = numpy.linspace
+        else:
+            assert len(values) == 4
+            expander = getattr(numpy, values[3])
         setattr(namespace,
                 self.dest,
-                numpy.linspace(float(values[0]),
-                               float(values[1]),
-                               int(values[2])))
+                expander(float(values[0]),
+                         float(values[1]),
+                         int(values[2])))
 #pylint: enable=too-few-public-methods
 
 def add_frequency_dependence_plot_config(parser, disable=()):
@@ -131,10 +137,10 @@ def add_frequency_dependence_plot_config(parser, disable=()):
     if 'ptide_grid' not in disable:
         parser.add_argument(
             '--ptide-grid',
-            nargs=3,
+            nargs=4,
             default=numpy.logspace(0.0, numpy.log10(50.0), 100),
             action=ParseGrid,
-            metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES'),
+            metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES', 'GRID_TYPE'),
             help='Set the range and resolution of the tidal period to include '
             'in the frequency dependence plot (see '
             '--frequency-dependence-plot-fname argument).'
@@ -266,9 +272,13 @@ def get_chain_name(samples_fname, chain_conditions):
         if system_name is None:
             fname, ext = path.splitext(path.basename(samples_fname))
             assert ext in ['.h5', '.hdf5']
-            fname_start, system_name = fname.split('_')
-            assert fname_start == 'system'
-            system_name = int(system_name)
+            if fname.startswith('system'):
+                _, system_name = fname.split('_')
+                system_name = int(system_name)
+            else:
+                system_name, fname_end = fname.split('_', 1)
+                assert system_name.endswith(' b')
+                assert fname_end == 'mcmc_progress'
         return chain_name, system_name
 
 
@@ -276,6 +286,8 @@ def get_backend(samples_fname, chain_conditions):
     """Return the chain to plot."""
 
     chain_name, system_name = get_chain_name(samples_fname, chain_conditions)
+    print('{system:s} chain name: {chain:s}'.format(system=system_name,
+                                                  chain=chain_name))
     backend = emcee.backends.HDFBackend(samples_fname,
                                         name=chain_name,
                                         read_only=True)
@@ -680,7 +692,9 @@ class FrequencyDependencePlotter:
             pyplot.colorbar()
 
 
-    def plot_combined_pdf_heat_map(self, xlabel=True, ylabel=True):
+    def plot_combined_pdf_heat_map(self,
+                                   xlabel='Tidal Period [d]',
+                                   ylabel=r"$\log_{10}Q_\star'$"):
         """
         Create a 2-D plot of lgQ vs Ptide color coding KDE of PDF.
 
@@ -730,9 +744,9 @@ class FrequencyDependencePlotter:
             **plot_args
         )
         if xlabel:
-            pyplot.xlabel('Tidal Period [d]')
+            pyplot.xlabel(xlabel)
         if ylabel:
-            pyplot.ylabel(r"$\log_{10}Q_\star'$")
+            pyplot.ylabel(ylabel)
 
 
     def plot_combined_quantiles(self,
@@ -818,6 +832,25 @@ def add_errorbar(samples, config):
 def ensure_uniform_blob_columns(blobs):
     """Ensure output blobs have correct columns for analysis."""
 
+    if blobs.dtype == float:
+        blobs = recfunctions.unstructured_to_structured(
+            blobs,
+            names=['primary_mass',
+                   'age',
+                   'secondary_radius',
+                   'feh',
+                   'secondary_mass',
+                   'initial_star_period',
+                   'lgQ_min',
+                   'lgQ_break_period',
+                   'lgQ_powerlaw',
+                   'lgQ_star',
+                   'e_now',
+                   'log-likelihood']
+        )
+        blobs['secondary_radius'] *= constants.R_earth.to_value('R_jup')
+        blobs['secondary_mass'] *= constants.M_earth.to_value('M_jup')
+
     blob_columns = list(blobs.dtype.names)
     if 'lgQ_min' not in blob_columns:
         blobs['break_period'] = 2.0 * numpy.pi / blobs['break_period']
@@ -852,7 +885,7 @@ def ensure_uniform_blob_columns(blobs):
 #                numpy.full(blobs['lgQ_min'].size, numpy.nan),
 #                float
 #            ).reshape(blobs.shape)
-#    return blobs
+    return blobs
 
 
 def get_plot_data(samples_fname_list, burn_in, chain_condition):
@@ -864,7 +897,8 @@ def get_plot_data(samples_fname_list, burn_in, chain_condition):
         backend, system_name = get_backend(samples_fname, chain_condition)
         assert backend is not None
         blobs = backend.get_blobs()
-        ensure_uniform_blob_columns(blobs)
+        print('Blobs: ' + repr(blobs))
+        blobs = ensure_uniform_blob_columns(blobs)
         logprob = backend.get_log_prob()
 
         if combined_blobs is None:

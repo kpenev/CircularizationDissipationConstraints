@@ -8,9 +8,8 @@ import traceback
 import numpy
 from astropy import units
 
-from general_purpose_python_modules.kde import KDEDistribution
-from general_purpose_python_modules.split_normal_distribution import\
-    split_normal
+from general_purpose_python_modules import KDEDistribution
+from general_purpose_python_modules import split_normal
 
 from bayesian.sampling import setup_process
 from bayesian.parse_command_line import parse_command_line
