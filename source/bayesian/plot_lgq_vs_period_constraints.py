@@ -5,7 +5,7 @@
 """Create grid of color map plots of the constraints ready for article."""
 
 from subprocess import call
-from os import path, listdir
+from os import path, listdir, uname
 import hashlib
 import pickle
 from multiprocessing import Pool
@@ -1945,10 +1945,11 @@ def plot_tightest_constraints(plot_data, config, combined_quantiles=None):
 def main(config):
     """Avoid polluting global namespace."""
 
-    download_latest_samples(config.download_from,
-                            config.samples_dir,
-                            config.collection,
-                            config.method)
+    if not uname().nodename.endswith('tacc.utexas.edu'):
+        download_latest_samples(config.download_from,
+                                config.samples_dir,
+                                config.collection,
+                                config.method)
 
     plot_data = get_sampling_data(config)
     plot_individual_constraints(plot_data, config)
