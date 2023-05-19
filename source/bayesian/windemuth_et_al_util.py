@@ -42,14 +42,14 @@ _manual_kernel_widths = {
     10268903: 1.5e-4,
     6962018: 8e-6,
     11616200: 2e-5,
-    4380283: 1e-5,
-    9110346: 2e-5,
-    7732791: 5e-5,
+    4380283: 2e-5,
+    9110346: 7e-6,
+    7732791: 1e-4,
     5039441: 1e-4,
-    9656543: 1e-4,
+#    9656543: 1e-4,
     3834364: 1.2e-3,
     11228612: 2e-4,
-    10960995: 3e-6,
+    10960995: 1e-3,
     3241344: 2e-4,
     5022440: 3e-6,
     5802470: 2e-6,
@@ -480,7 +480,7 @@ def plot_eccentricity_histogram(e_samples, e_range, unzoomed_bins):
         density=True
     )
 
-    hist /= bin_edges[1:]**2 - bin_edges[:-1]**2
+#    hist /= bin_edges[1:]**2 - bin_edges[:-1]**2
     hist /= (hist * (bin_edges[1:] - bin_edges[:-1])).sum()
     pyplot.bar(x=bin_edges[:-1],
                height=hist,
@@ -521,8 +521,11 @@ def plot_eccentricity_distribution(kic_id_list,
         None
     """
 
-    custom_zoom = {7732791: (0.0, 0.005),
-                   9656543: (0.0, 1e-3),
+    if len(kic_id_list) > 5:
+        kic_id_list = kic_id_list[5:15]
+
+    custom_zoom = {9110346: (0.0, 1e-4),
+                   7732791: (0.0, 0.0003),
                    10960995: (0.0, 1e-4),
                    5022440: (0.0, 1e-4),
                    5802470: (0.0, 1e-4),
@@ -568,7 +571,7 @@ def plot_eccentricity_distribution(kic_id_list,
         )
         print('Ecccentricity samples:\n' + repr(e_samples))
         kernel_width = get_eccentricity_kernel_width(kic_id)
-        kde_distro = eccentricity_kde_distro_gen(e_samples, kernel_width)
+        kde_distro = eccentricity_kde_distro_gen(e_samples, kernel_width, True)
 
         plot_ranges = [
             (
@@ -598,6 +601,7 @@ def plot_eccentricity_distribution(kic_id_list,
                   ((kic_id,) + plot_ranges[1]))
 
         for e_range in plot_ranges:
+            pyplot.subplot(111, position=(0.1, 0.1, 0.85, 0.85))
             plot_eccentricity_histogram(e_samples, e_range, bins)
             plot_x = numpy.linspace(e_range[0], e_range[1], 300)
             plot_y = kde_distro.pdf(plot_x)

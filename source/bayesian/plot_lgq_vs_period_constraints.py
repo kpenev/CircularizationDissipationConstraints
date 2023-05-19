@@ -2109,7 +2109,7 @@ def plot_tightest_constraints(plot_data,
             for plot_y, label, cdf in zip(
                 combined_quantiles[cluster + combined_version],
                 cdf_labels,
-                    config.convergence_quantiles
+                config.convergence_quantiles
             ):
                 pyplot.plot(
                     combined_quantiles['ptide_grid'],
@@ -2195,8 +2195,8 @@ def main(config):
         with open(
                 config.combined_quantiles_pickle,
                 'wb'
-        ) as quanntile_pickle:
-            pickle.dump(combined_quantiles, quanntile_pickle)
+        ) as quantile_pickle:
+            pickle.dump(combined_quantiles, quantile_pickle)
     plot_tightest_constraints(plot_data,
                               config,
                               combined_quantiles)
