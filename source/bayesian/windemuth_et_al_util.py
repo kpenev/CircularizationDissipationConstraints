@@ -20,7 +20,7 @@ from stellar_evolution.library_interface import library as stellar_evol_lib
 
 from process_e_Q_grid import LinearEccentricityEnvelope
 from general_purpose_python_modules.eccentricity_kde_distro_gen import \
-    eccentricity_kde_distro_gen
+    eccentricity_circular_kde_distro_gen as eccentricity_kde_distro_gen
 
 _data_dir = path.join(
     path.dirname(

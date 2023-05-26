@@ -12,6 +12,8 @@ import scipy.interpolate
 from command_line_utilities import data_dir
 #pylint: enable=import-error
 
+raise Exception('Use CMD interpolation from `general_purpose_python_modules`')
+
 class IsochroneFileIterator:
     """
     Iterate over the sections of the isochrone grid file with line generators.

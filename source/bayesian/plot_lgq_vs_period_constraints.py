@@ -1706,6 +1706,10 @@ def plot_combined_constraints(plot_data, config):
         include_binaries['HJ'][47] = include_binaries['HJ'][-1]
         include_binaries['HJ'][-1] = 'CoRoT-23 b'
 
+        assert include_binaries['HJ'][75] == 'K2-132 b'
+        include_binaries['HJ'][75] = include_binaries['HJ'][-2]
+        include_binaries['HJ'][-2] = 'K2-132 b'
+
 
     cluster_order = ['NGC6819', 'NGC188', 'M35', 'W19', 'HJ']
 
@@ -1831,7 +1835,11 @@ def plot_combined_constraints(plot_data, config):
 
             fully_combined_n += 1
             if cluster == 'HJ':
-                selected_quantiles[cluster + ' excluded'] = (
+                selected_quantiles[cluster + ' excluded 2'] = (
+                    selected_quantiles.get(cluster + ' excluded 1', None)
+                )
+
+                selected_quantiles[cluster + ' excluded 1'] = (
                     selected_quantiles.get(cluster, None)
                 )
             if cluster in ['M35', 'W19', 'HJ']:
@@ -2204,7 +2212,7 @@ def main(config):
     plot_tightest_constraints(plot_data,
                               config,
                               combined_quantiles,
-                              ' excluded')
+                              ' excluded 2')
 #    except KeyError:
 #        pass
 
