@@ -1,0 +1,46 @@
+* WASP-19 *
+* HATS-18
+HAT-P-36
+* WASP-4 *
+* WASP-5 *
+* Kepler-412
+* WASP-50 *
+* HAT-P-53 *
+* HATS-57 *
+HATS-54
+* HATS-33
+* WASP-32 *
+HATS-44
+HAT-P-52
+HATS-14
+HAT-P-37
+HATS-32
+* CoRoT-12
+* CoRoT-29 *
+* HAT-P-20
+WASP-23
+* HATS-13
+* Kepler-426
+* WASP-6
+* WASP-124 *
+HAT-P-63
+Kepler-428
+* WASP-22
+* CoRoT-27 *
+* HATS-8
+* HATS-11 *
+* HAT-P-25
+TOI-905
+* HATS-47
+* HAT-P-58
+CoRoT-5
+* K2-30 *
+* HAT-P-59
+* HAT-P-51 *
+* HATS-25
+HATS-43
+* Kepler-12
+HATS-5
+* TOI-2669 *
+TOI-559
+WASP-59
