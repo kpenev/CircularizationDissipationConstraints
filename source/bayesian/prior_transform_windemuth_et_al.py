@@ -34,6 +34,9 @@ class PriorTransformWindemuth(PriorTransformBase):
 
         sampled = dict()
         weights = numpy.copy(self.initial_sample_weights)
+        logger.debug('Initial weights: %s', repr(weights))
+        logger.debug('First assert: %s', repr((weights >= 0).all()))
+        logger.debug('Initial weights sum: %s', repr(weights.sum()))
         for quantity in self._quantities:
             if identify:
                 sampled[quantity] = next(unit_cube_iter)
@@ -132,7 +135,7 @@ class PriorTransformWindemuth(PriorTransformBase):
                 Mtot=0.01,
                 Mratio=0.01,
                 z=0.001,
-                tau=0.1,
+                tau=0.05,#tau=0.1,
                 P=1e-7,
                 e=1e-4
             )
@@ -173,10 +176,12 @@ class PriorTransformWindemuth(PriorTransformBase):
         assert self._sample_weights_envelope is not None
         result['sample_weights_envelope'] = self._sample_weights_envelope
         return result
+    
+    def gaussian_to_uniform(self, gaussian_value, quantity):
+        """Convert Gaussian value to uniform value."""
+        return self._distributions[quantity].cdf(gaussian_value)
 
 if __name__ == '__main__':
-    # We're going to generate two corner plots, BUDDY
-
     #setup_process()
 
     id_list_a = {
@@ -320,35 +325,59 @@ if __name__ == '__main__':
         new_list.append(i)
 
     # Stuff used for both parts
-    labels = ['P', 'Mtot', 'Mratio', 'z', 'tau']
+    labels = ['orbital period', 'primary mass', 'secondary mass', '[Fe/H]', 'age']
 
     # First, we'll generate a corner plot of samples from Windemuth et. al.
     # Just feed corner the Windemuth data and it'll do like all of them
     windemuth_data = numpy.array([])
     for i in new_list:
         i_data = weau.get_samples(i)
-        segment = numpy.array([i_data['P'], i_data['Mtot'], i_data['Mratio'], i_data['z'], i_data['tau']])
+        segment_P = i_data['P']
+
+        Mtot = numpy.array(i_data['Mtot'])
+        Mratio = numpy.array(i_data['Mratio'])
+        segment_m1 = Mtot / (1.0 + Mratio)
+        segment_m2 = segment_m1 * Mratio
+
+        z = i_data['z']
+        segment_feh = numpy.array([])
+        for i in z:
+            feh = poet_stellar_evolution.feh_from_z(i)
+            segment_feh = numpy.append(segment_feh, feh)
+        
+        tau = i_data['tau']
+        segment_age = 10.0**(tau - 9.0)
+
+        #segment = numpy.array([i_data['P'], i_data['Mtot'], i_data['Mratio'], i_data['z'], i_data['tau']])
+        segment = numpy.array(numpy.array([segment_P, segment_m1, segment_m2, segment_feh, segment_age]).tolist())
         windemuth_data=numpy.append(windemuth_data,segment)
         break
     figure1 = corner.corner(segment.T, labels=labels, quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 12})
-    print(i_data)
+    #print(i_data)
+    #print(list(i_data))
+    #print(segment.T)
     
     # Next, we'll run something from here to generate samples and then make a corner plot of that
     # so we have to make a PriorTransformWindemuth object first
     initial_sample_weights = numpy.ones(i_data['P'].size)
     #print(segment.T)
     #print(segment.T.shape)
-    independent_parameter_distributions = list(zip(labels,
-                                                   [KDEDistribution(i_data['P'], ('rdist', (), dict(c=4, scale=1e-7))),
-                                                    KDEDistribution(i_data['Mtot'], ('rdist', (), dict(c=4, scale=0.01))),
-                                                    KDEDistribution(i_data['Mratio'], ('rdist', (), dict(c=4, scale=0.01))),
-                                                    KDEDistribution(i_data['z'], ('rdist', (), dict(c=4, scale=0.001))),
-                                                    KDEDistribution(i_data['tau'], ('rdist', (), dict(c=4, scale=0.1)))
-                                                    ],
-                                                   [units.day, units.M_sun, units.dimensionless_unscaled, units.dimensionless_unscaled, units.Gyr])
-                                                   )
-    model_parameter_order = list(zip(labels, [units.day, units.M_sun, units.dimensionless_unscaled, units.dimensionless_unscaled, units.Gyr]))
-    model_parameter_order.append(('orbital_period', units.day))
+    independent_parameter_distributions = {} #list(zip(labels,
+                                          #         [KDEDistribution(i_data['P'], ('rdist', (), dict(c=4, scale=1e-7))),
+                                          #          KDEDistribution(i_data['Mtot'], ('rdist', (), dict(c=4, scale=0.01))),
+                                          #          KDEDistribution(i_data['Mratio'], ('rdist', (), dict(c=4, scale=0.01))),
+                                          #          KDEDistribution(i_data['z'], ('rdist', (), dict(c=4, scale=0.001))),
+                                          #          KDEDistribution(i_data['tau'], ('rdist', (), dict(c=4, scale=0.1)))
+                                          #          ],
+                                          #         [units.day, units.M_sun, units.dimensionless_unscaled, units.dimensionless_unscaled, units.Gyr])
+                                          #         )
+    #model_parameter_order = list(zip(labels, [units.day, units.M_sun, units.dimensionless_unscaled, units.dimensionless_unscaled, units.Gyr]))
+    #model_parameter_order.append(('orbital_period', units.day))
+    model_parameter_order = (('orbital_period', units.day),
+                             ('primary_mass', units.M_sun),
+                             ('secondary_mass', units.M_sun),
+                             ('feh', units.dimensionless_unscaled),
+                             ('age', units.Gyr))
     #### ^^ I have to include ALL of the parameters in this one, indy and no, so it's not the same as above
     prior_transform = PriorTransformWindemuth(
         samples = i_data,
@@ -356,11 +385,11 @@ if __name__ == '__main__':
         kernels=None,
         independent_parameter_distributions = independent_parameter_distributions,
         model_parameter_order = model_parameter_order)
-    unit_cube_values = numpy.random.rand(10)
+    unit_cube_values = numpy.random.rand(5)
     pt_test_data = numpy.array([prior_transform(unit_cube_values)['parameters']])
-    print(pt_test_data)
-    for i in range(3):#i_data['P'].size - 1):
-        unit_cube_values = numpy.random.rand(10)
+    #print(pt_test_data)
+    for i in range(i_data['P'].size - 1):
+        unit_cube_values = numpy.random.rand(5)
         arg=numpy.array([prior_transform(unit_cube_values)['parameters']])
         pt_test_data = numpy.concatenate((pt_test_data,arg))
     figure2 = corner.corner(pt_test_data, labels=labels, quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 12})
