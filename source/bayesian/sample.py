@@ -9,7 +9,7 @@ import dynesty
 import update_search_paths
 #pylint: enable=unused-import
 
-from bayesian.sampling import setup_process
+from multiprocessing_util import setup_process
 from bayesian import mcmc_sampling
 
 def sample(log_likelihood, prior_transform, config):
@@ -29,7 +29,16 @@ def sample(log_likelihood, prior_transform, config):
     """
 
     #set_start_method('forkserver')
-    setup_process(config, 'manage')
+    setup_process(
+                    fname_datetime_format=config.fname_datetime_format,
+                    system=config.system,
+                    std_out_err_fname=config.std_out_err_fname,
+                    logging_fname=config.logging_fname,
+                    logging_verbosity=config.logging_verbosity,
+                    logging_message_format=config.logging_message_format,
+                    logging_datetime_format=config.logging_datetime_format,
+                    task='manage'
+                  )
 
     num_params = prior_transform.count_sampled_parameters()
 
