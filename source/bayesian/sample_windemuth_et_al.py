@@ -11,7 +11,7 @@ from astropy import units
 from general_purpose_python_modules import KDEDistribution
 from general_purpose_python_modules import split_normal
 
-from bayesian.sampling import setup_process
+from multiprocessing_util import setup_process
 from bayesian.parse_command_line import parse_command_line
 from bayesian.binary_utils import \
     get_common_binary_star_priors,\
@@ -110,8 +110,15 @@ def prepare_sampling(config):
 
 def main(config):
     """Avoid polluting global namespace."""
-
-    setup_process(config, 'init')
+    setup_process(
+                    fname_datetime_format=config.fname_datetime_format,
+                    system=config.system,
+                    std_out_err_fname=config.std_out_err_fname,
+                    logging_fname=config.logging_fname,
+                    logging_verbosity=config.logging_verbosity,
+                    logging_message_format=config.logging_message_format,
+                    logging_datetime_format=config.logging_datetime_format
+                  )
     log_likelihood, prior_transform = prepare_sampling(config)
     sample(log_likelihood, prior_transform, config)
 

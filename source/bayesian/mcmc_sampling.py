@@ -14,7 +14,7 @@ import h5py
 from astropy import units
 from asteval import Interpreter
 
-from bayesian.sampling import get_code_version_str, setup_process
+from multiprocessing_util import get_code_version_str, setup_process
 from bayesian.hacked_emcee_hdf5_backend import HDFBackend
 
 _mutable_config_params = set(['mcmc_nsteps',
@@ -43,7 +43,19 @@ def log_probability(independent_normal_values,
                     log_likelihood,
                     track_final_eccentricity,
                     exclude_from_blob=()):
-    """The posterior for MCMC, will track actual params & likelihood."""
+    """The posterior for MCMC, will track actual params & likelihood.
+       
+         Args: TODO
+                independent_normal_values(numpy.ndarray):    
+
+                prior_transform(PriorTransformBase):    
+
+                log_likelihood(LogLikelihoodBase):
+
+                track_final_eccentricity(bool):
+
+                exclude_from_blob(tuple):    
+    """
 
     unit_cube_values = norm.cdf(independent_normal_values)
     _logger.debug('Evaluating log-probability for i.n.v.(%s) -> U%d(%s)',
@@ -329,7 +341,16 @@ def evaluate_walker_positions(position_queue,
                               config):
     """Pick a random positions for MCMC walker with non zero probability."""
 
-    setup_process(config)
+    setup_process(
+                    fname_datetime_format=config.fname_datetime_format,
+                    system=config.system,
+                    std_out_err_fname=config.std_out_err_fname,
+                    logging_fname=config.logging_fname,
+                    logging_verbosity=config.logging_verbosity,
+                    logging_message_format=config.logging_message_format,
+                    logging_datetime_format=config.logging_datetime_format,
+                    task='init'
+                  )
     _logger.info('Evaluating starting positions.')
     for position in iter(position_queue.get, 'STOP'):
         log_prob_result = log_prob_fn(position)
@@ -704,7 +725,15 @@ def run(config,
         with Pool(
                 config.num_parallel_processes,
                 initializer=setup_process,
-                initargs=[config],
+                initargs=[
+                    config.fname_datetime_format,
+                    config.system,
+                    config.std_out_err_fname,
+                    config.logging_fname,
+                    config.logging_verbosity,
+                    config.logging_message_format,
+                    config.logging_datetime_format
+                  ],
                 maxtasksperchild=1
         ) as workers:
             sampler = emcee.EnsembleSampler(**sampler_config,
