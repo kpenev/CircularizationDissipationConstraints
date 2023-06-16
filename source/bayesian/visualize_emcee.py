@@ -173,7 +173,7 @@ def parse_command_line():
     parser.add_argument(
         '--corner-plot-fname', '--corner-plot', '--corner',
         default=None,
-        help='If specified, a coner plot is created and saved with the given '
+        help='If specified, a corner plot is created and saved with the given '
         'filename.'
     )
     parser.add_argument(
