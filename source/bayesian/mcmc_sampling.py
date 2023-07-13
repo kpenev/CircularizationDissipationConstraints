@@ -62,7 +62,9 @@ def log_probability(independent_normal_values,
                   repr(independent_normal_values),
                   independent_normal_values.size,
                   repr(unit_cube_values))
-    if unit_cube_values.max() == 1:
+    _logger.debug('The max value of unit_cube_values is %s', repr(unit_cube_values.max()))
+    _logger.debug('If we add a little bit to it, then it is %s', repr(unit_cube_values.max()+1e-10))
+    if unit_cube_values.max()+1e-10 >= 1:
         return tuple(
             -numpy.inf if i == 0 else numpy.nan
             for i in range(
@@ -75,6 +77,10 @@ def log_probability(independent_normal_values,
         )
     log_likelihood_value = norm.logpdf(independent_normal_values).sum()
     transformed = prior_transform(unit_cube_values)
+    _logger.debug('Independent normal values: %s', repr(independent_normal_values))
+    _logger.debug('Unit cube values: %s', repr(unit_cube_values))
+    _logger.debug('Log likelihood value: %s', repr(log_likelihood_value))
+    _logger.debug('Transformed values: %s', repr(transformed))
     log_likelihood_value += log_likelihood(**transformed)
     parameters = transformed['parameters']
     if exclude_from_blob:
