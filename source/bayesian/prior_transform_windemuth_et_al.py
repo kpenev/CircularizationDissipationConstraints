@@ -34,8 +34,7 @@ class PriorTransformWindemuth(PriorTransformBase):
 
         sampled = dict()
         weights = numpy.copy(self.initial_sample_weights)
-        logger.debug('Initial weights: %s', repr(weights))
-        logger.debug('First assert: %s', repr((weights >= 0).all()))
+        logger.debug('IN FILL_COUPLED_PARAMETERS. Initial weights: %s', repr(weights))
         logger.debug('Initial weights sum: %s', repr(weights.sum()))
         for quantity in self._quantities:
             if identify:
@@ -57,6 +56,8 @@ class PriorTransformWindemuth(PriorTransformBase):
                         repr(weight_scale),
                         repr(weight_scale.sum())
                     )
+            logger.debug('Weights have been updated to: %s', repr(weights))
+            logger.debug('Weights sum is now: %s', repr(weights.sum()))
 
         if not identify:
             model_parameters['orbital_period'] = sampled['P'] * units.day
@@ -164,13 +165,15 @@ class PriorTransformWindemuth(PriorTransformBase):
         }
 
         self._sample_weights_envelope = None
-
+        logger = logging.getLogger(__name__)
+        logger.debug('IN INIT. Initial weights: %s', repr(self.initial_sample_weights))
         super().__init__(**parent_kwargs)
 
 
     def __call__(self, unit_cube_values):
         """Add sample weights per the envelope eccentricity to return value."""
-
+        logger = logging.getLogger(__name__)
+        logger.debug('IN CALL. Initial weights: %s', repr(self.initial_sample_weights))
         self._sample_weights_envelope = None
         result = super().__call__(unit_cube_values)
         assert self._sample_weights_envelope is not None
@@ -182,7 +185,6 @@ class PriorTransformWindemuth(PriorTransformBase):
         return self._distributions[quantity].cdf(gaussian_value)
 
 if __name__ == '__main__':
-    #setup_process()
 
     id_list_a = {
         10268903: 1.5e-4,
@@ -320,9 +322,9 @@ if __name__ == '__main__':
         9839062: 1e-3
     }
     # take the above dict and extract the keys
-    new_list = []
-    for i in id_list_a:
-        new_list.append(i)
+    new_list = [12356914]
+    #for i in id_list_a:
+        #new_list.append(i)
 
     # Stuff used for both parts
     labels = ['orbital period', 'primary mass', 'secondary mass', '[Fe/H]', 'age']
@@ -348,37 +350,20 @@ if __name__ == '__main__':
         tau = i_data['tau']
         segment_age = 10.0**(tau - 9.0)
 
-        #segment = numpy.array([i_data['P'], i_data['Mtot'], i_data['Mratio'], i_data['z'], i_data['tau']])
         segment = numpy.array(numpy.array([segment_P, segment_m1, segment_m2, segment_feh, segment_age]).tolist())
         windemuth_data=numpy.append(windemuth_data,segment)
         break
     figure1 = corner.corner(segment.T, labels=labels, quantiles=[0.16, 0.5, 0.84], show_titles=True, title_kwargs={"fontsize": 12})
-    #print(i_data)
-    #print(list(i_data))
-    #print(segment.T)
     
     # Next, we'll run something from here to generate samples and then make a corner plot of that
     # so we have to make a PriorTransformWindemuth object first
     initial_sample_weights = numpy.ones(i_data['P'].size)
-    #print(segment.T)
-    #print(segment.T.shape)
-    independent_parameter_distributions = {} #list(zip(labels,
-                                          #         [KDEDistribution(i_data['P'], ('rdist', (), dict(c=4, scale=1e-7))),
-                                          #          KDEDistribution(i_data['Mtot'], ('rdist', (), dict(c=4, scale=0.01))),
-                                          #          KDEDistribution(i_data['Mratio'], ('rdist', (), dict(c=4, scale=0.01))),
-                                          #          KDEDistribution(i_data['z'], ('rdist', (), dict(c=4, scale=0.001))),
-                                          #          KDEDistribution(i_data['tau'], ('rdist', (), dict(c=4, scale=0.1)))
-                                          #          ],
-                                          #         [units.day, units.M_sun, units.dimensionless_unscaled, units.dimensionless_unscaled, units.Gyr])
-                                          #         )
-    #model_parameter_order = list(zip(labels, [units.day, units.M_sun, units.dimensionless_unscaled, units.dimensionless_unscaled, units.Gyr]))
-    #model_parameter_order.append(('orbital_period', units.day))
+    independent_parameter_distributions = {}
     model_parameter_order = (('orbital_period', units.day),
                              ('primary_mass', units.M_sun),
                              ('secondary_mass', units.M_sun),
                              ('feh', units.dimensionless_unscaled),
                              ('age', units.Gyr))
-    #### ^^ I have to include ALL of the parameters in this one, indy and no, so it's not the same as above
     prior_transform = PriorTransformWindemuth(
         samples = i_data,
         initial_sample_weights = initial_sample_weights,
@@ -387,7 +372,6 @@ if __name__ == '__main__':
         model_parameter_order = model_parameter_order)
     unit_cube_values = numpy.random.rand(5)
     pt_test_data = numpy.array([prior_transform(unit_cube_values)['parameters']])
-    #print(pt_test_data)
     for i in range(i_data['P'].size - 1):
         unit_cube_values = numpy.random.rand(5)
         arg=numpy.array([prior_transform(unit_cube_values)['parameters']])
