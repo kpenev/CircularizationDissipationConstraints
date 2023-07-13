@@ -206,7 +206,7 @@ def parse_command_line():
         '--corner-plot-params',
         default=None,
         nargs='+',
-        help='If specified, only the listed parameters are included the corner '
+        help='If specified, only the listed parameters are included in the corner '
         'plot.'
     )
     parser.add_argument(
@@ -286,8 +286,8 @@ def get_backend(samples_fname, chain_conditions):
     """Return the chain to plot."""
 
     chain_name, system_name = get_chain_name(samples_fname, chain_conditions)
-    print('{system:s} chain name: {chain:s}'.format(system=system_name,
-                                                  chain=chain_name))
+    print('{system:s} chain name: {chain:s}'.format(system=str(system_name),
+                                                  chain=str(chain_name)))
     backend = emcee.backends.HDFBackend(samples_fname,
                                         name=chain_name,
                                         read_only=True)
@@ -937,6 +937,7 @@ def get_plot_data(samples_fname_list, burn_in, chain_condition):
             print('Last nan for %s: %d' % (colname, nan_indices.max()))
 
     print('Discarding %d leading nan steps' % (last_nan + 1))
+    print('There are %d burn-in steps' % burn_in)
     combined_blobs = combined_blobs[last_nan + burn_in + 1:]
     combined_logprob = combined_logprob[last_nan + burn_in + 1:]
 
