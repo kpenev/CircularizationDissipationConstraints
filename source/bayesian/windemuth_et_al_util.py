@@ -10,7 +10,7 @@ from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import numpy
-import scipy.stats
+from scipy import stats
 import pandas
 from astropy import units, constants
 from configargparse import ArgumentParser, DefaultsFormatter
@@ -19,8 +19,10 @@ from stellar_evolution.manager import StellarEvolutionManager
 from stellar_evolution.library_interface import library as stellar_evol_lib
 
 from process_e_Q_grid import LinearEccentricityEnvelope
-from general_purpose_python_modules.eccentricity_kde_distro_gen import \
-    eccentricity_circular_kde_distro_gen as eccentricity_kde_distro_gen
+from general_purpose_python_modules.eccentricity_kde_distro_gen import\
+    eccentricity_noncircular_kde_distro_gen,\
+    eccentricity_circular_kde_distro_gen
+
 
 _data_dir = path.join(
     path.dirname(
@@ -39,139 +41,139 @@ eccentricity_envelope = LinearEccentricityEnvelope(min_period=1.0,
                                                    min_eccenticity=0.02,
                                                    max_eccentricity=0.8)
 _manual_kernel_widths = {
-    10268903: 1.5e-4,
-    6962018: 8e-6,
-    11616200: 2e-5,
-    4380283: 2e-5,
-    9110346: 7e-6,
-    7732791: 1e-4,
-    5039441: 1e-4,
-#    9656543: 1e-4,
-    3834364: 1.2e-3,
-    11228612: 2e-4,
-    10960995: 1e-3,
-    3241344: 2e-4,
-    5022440: 3e-6,
-    5802470: 2e-6,
-    4815612: 1e-6,
-    7377033: 1e-3,
-    11867071: 3e-3,
-    3427776: 2e-3,
-    10935310: 1.5e-3,
-    10031409: 5e-6,
-    9532421: 1.5e-3,
-    3973504: 1.5e-3,
-    8957954: 2e-6,
-    6521542: 2e-4,
-    11252617: 1e-3,
-    4285087: 1e-5,
-    7025851: 4e-5,
-    4346875: 1.2e-3,
-    7691527: 2e-4,
-    6227560: 1e-4,
-    8302455: 1e-5,
-    12004679: 3e-4,
-    7369523: 1e-4,
-    9971475: 1.5e-5,
-    7129465: 2e-6,
-    5181455: 5e-6,
-    8381592: 1e-3,
-    7376500: 2e-4,
-    8618226: 2e-5,
-    9649222: 5e-6,
-    6546508: 8e-4,
-    10385682: 1e-4,
-    8460600: 1.5e-3,
-    7125636: 7e-4,
-    8580438: 5e-5,
-    5597970: 5e-6,
-    8746310: 1e-5,
-    7362852: 7e-5,
-    12557713: 2e-3,
-    4753988: 3e-4,
-    10923260: 1e-4,
-    3003991: 2.0e-2,
-    6927629: 3e-6,
-    8364119: 3e-4,
-    6949550: 3e-6,
-    9532123: 3e-4,
-    9892471: 3e-5,
-    2445134: 1.5e-4,
-    4948863: 1.5e-4,
-    9775253: 5e-7,
-    4839180: 4e-5,
-    5652260: 1e-4,
-    6707942: 1.7e-3,
-    7597703: 3e-6,
-    11232745: 2e-5,
-    8984706: 1.3e-4,
-    11409698: 1e-4,
-    9353182: 3e-5,
-    6594972: 1e-4,
-    9025914: 1e-4,
-    9665503: 1e-4,
-    6185717: 2e-4,
-    8414159: 2.5e-5,
-    6301030: 1e-5,
-    11499757: 5e-5,
-    11704044: 3e-6,
-    6359798: 2e-5,
-    7118545: 3e-5,
-    12251779: 8e-5,
-    4678171: 7e-5,
-    8111622: 2e-5,
-    5622250: 5e-5,
-    8879427: 3e-4,
-    5979863: 1e-3,
-    9001468: 2e-4,
-    6522750: 2e-4,
-    6131659: 5e-5,
-    12316447: 3e-5,
-    7624297: 2e-4,
-    10992733: 8e-5,
-    7021177: 1.5e-4,
-    10753734: 3e-5,
-    10711913: 1.5e-3,
-    10518735: 1e-4,
-    9016295: 6e-4,
-    10258558: 2.5e-4,
-    4252226: 1e-4,
-    4633434: 2e-3,
-    12017140: 1e-4,
-    9838060: 2e-3,
-    6672229: 2.5e-4,
-    7821010: 2e-4,
-    10849244: 5e-5,
-    10215422: 1e-6,
-    5983348: 6e-4,
-    7767733: 1.5e-3,
-    10651945: 1.5e-4,
-    4773155: 8e-5,
-    5553624: 2e-4,
-    12356914: 2e-3,
-    8572936: 2e-5,
-    8973000: 1e-4,
-    2998124: 1e-4,
-    6431670: 1e-5,
-    4847832: 1e-5,
-    8183389: 1e-3,
-    5003117: 1.2e-3,
-    12644769: 1e-4,
-    8553907: 1e-4,
-    12217907: 2e-4,
-    7541502: 3e-5,
-    10420279: 7e-5,
-    4247023: 1.5e-4,
-    9164836: 1e-4,
-    8610483: 1.5e-4,
-    9714123: 1e-3,
-    9837544: 1e-5,
-    8560285: 1.5e-3,
-    8044608: 5e-5,
-    10292238: 1.5e-4,
-    4824268: 3e-4,
-    8760135: 5e-5,
-    9839062: 1e-3
+#    10268903: 1.5e-4,
+#    6962018: 8e-6,
+#    11616200: 2e-5,
+#    4380283: 2e-5,
+    9110346: (7e-5, 7e-6),
+    7732791: (2e-3, 1e-5),
+#    5039441: 1e-4,
+    9656543: (7e-4, 1e-5),
+    3834364: (2e-3, 1e-5),
+    11228612: (4e-4, 3e-6),
+#    10960995: 1e-3,
+#    3241344: 2e-4,
+#    5022440: 3e-6,
+#    5802470: 2e-6,
+#    4815612: 1e-6,
+#    7377033: 1e-3,
+#    11867071: 3e-3,
+#    3427776: 2e-3,
+#    10935310: 1.5e-3,
+#    10031409: 5e-6,
+#    9532421: 1.5e-3,
+#    3973504: 1.5e-3,
+#    8957954: 2e-6,
+#    6521542: 2e-4,
+#    11252617: 1e-3,
+#    4285087: 1e-5,
+#    7025851: 4e-5,
+#    4346875: 1.2e-3,
+#    7691527: 2e-4,
+#    6227560: 1e-4,
+#    8302455: 1e-5,
+#    12004679: 3e-4,
+#    7369523: 1e-4,
+#    9971475: 1.5e-5,
+#    7129465: 2e-6,
+#    5181455: 5e-6,
+#    8381592: 1e-3,
+#    7376500: 2e-4,
+#    8618226: 2e-5,
+#    9649222: 5e-6,
+#    6546508: 8e-4,
+#    10385682: 1e-4,
+#    8460600: 1.5e-3,
+#    7125636: 7e-4,
+#    8580438: 5e-5,
+#    5597970: 5e-6,
+#    8746310: 1e-5,
+#    7362852: 7e-5,
+#    12557713: 2e-3,
+#    4753988: 3e-4,
+#    10923260: 1e-4,
+#    3003991: 2.0e-2,
+#    6927629: 3e-6,
+#    8364119: 3e-4,
+#    6949550: 3e-6,
+#    9532123: 3e-4,
+#    9892471: 3e-5,
+#    2445134: 1.5e-4,
+#    4948863: 1.5e-4,
+#    9775253: 5e-7,
+#    4839180: 4e-5,
+#    5652260: 1e-4,
+#    6707942: 1.7e-3,
+#    7597703: 3e-6,
+#    11232745: 2e-5,
+#    8984706: 1.3e-4,
+#    11409698: 1e-4,
+#    9353182: 3e-5,
+#    6594972: 1e-4,
+#    9025914: 1e-4,
+#    9665503: 1e-4,
+#    6185717: 2e-4,
+#    8414159: 2.5e-5,
+#    6301030: 1e-5,
+#    11499757: 5e-5,
+#    11704044: 3e-6,
+#    6359798: 2e-5,
+#    7118545: 3e-5,
+#    12251779: 8e-5,
+#    4678171: 7e-5,
+#    8111622: 2e-5,
+#    5622250: 5e-5,
+#    8879427: 3e-4,
+#    5979863: 1e-3,
+#    9001468: 2e-4,
+#    6522750: 2e-4,
+#    6131659: 5e-5,
+#    12316447: 3e-5,
+#    7624297: 2e-4,
+#    10992733: 8e-5,
+#    7021177: 1.5e-4,
+#    10753734: 3e-5,
+#    10711913: 1.5e-3,
+#    10518735: 1e-4,
+#    9016295: 6e-4,
+#    10258558: 2.5e-4,
+#    4252226: 1e-4,
+#    4633434: 2e-3,
+#    12017140: 1e-4,
+#    9838060: 2e-3,
+#    6672229: 2.5e-4,
+#    7821010: 2e-4,
+#    10849244: 5e-5,
+#    10215422: 1e-6,
+#    5983348: 6e-4,
+#    7767733: 1.5e-3,
+#    10651945: 1.5e-4,
+#    4773155: 8e-5,
+#    5553624: 2e-4,
+#    12356914: 2e-3,
+#    8572936: 2e-5,
+#    8973000: 1e-4,
+#    2998124: 1e-4,
+#    6431670: 1e-5,
+#    4847832: 1e-5,
+#    8183389: 1e-3,
+#    5003117: 1.2e-3,
+#    12644769: 1e-4,
+#    8553907: 1e-4,
+#    12217907: 2e-4,
+#    7541502: 3e-5,
+#    10420279: 7e-5,
+#    4247023: 1.5e-4,
+#    9164836: 1e-4,
+#    8610483: 1.5e-4,
+#    9714123: 1e-3,
+#    9837544: 1e-5,
+#    8560285: 1.5e-3,
+#    8044608: 5e-5,
+#    10292238: 1.5e-4,
+#    4824268: 3e-4,
+#    8760135: 5e-5,
+#    9839062: 1e-3
 }
 
 
@@ -181,7 +183,7 @@ _logger = logging.getLogger(__name__)
 def get_eccentricity_kernel_width(kic_id):
     """Return dict of eccentricity kernel widths for each KIC."""
 
-    return _manual_kernel_widths.get(kic_id, 5e-4)
+    return _manual_kernel_widths.get(kic_id, (1e-3, 1e-4))
 
 
 def get_max_likelihood_params():
@@ -285,13 +287,13 @@ def get_available_kic(interpolator=None, max_porb=numpy.inf, max_e=numpy.inf):
     data = get_summary_data()
 
     valid = data['maxlike_morph'] < 0.5
-    _logger.info('Morphology cut leaves {:d} binaries'.format(valid.sum()))
+    _logger.info('Morphology cut leaves %d binaries', valid.sum())
 
     valid = numpy.logical_and(
         valid,
         data['posterior_tau(log10yr)'] + data['posterior_tau-sigma'] > 8.5
     )
-    _logger.info('Age cut leaves {:d} binaries'.format(valid.sum()))
+    _logger.info('Age cut leaves %d binaries', valid.sum())
 
     valid = numpy.logical_and(
         valid,
@@ -301,7 +303,7 @@ def get_available_kic(interpolator=None, max_porb=numpy.inf, max_e=numpy.inf):
         valid,
         data['posterior_m2(msun)'] + data['posterior_m2+sigma'] < 1.2
     )
-    _logger.info('Mass cut leaves {:d} binaries'.format(valid.sum()))
+    _logger.info('Mass cut leaves %d binaries', valid.sum())
 
     logg = numpy.log10(
         numpy.minimum(
@@ -322,16 +324,16 @@ def get_available_kic(interpolator=None, max_porb=numpy.inf, max_e=numpy.inf):
         )
     )
     valid = numpy.logical_and(valid, logg > 4.0)
-    _logger.info('Log10(g) cut leaves {:d} binaries'.format(valid.sum()))
+    _logger.info('Log10(g) cut leaves %d binaries', valid.sum())
 
     valid = numpy.logical_and(valid, data['maxlike_period'] <= max_porb)
-    _logger.info('Period cut leaves {:d} binaries'.format(valid.sum()))
+    _logger.info('Period cut leaves %d binaries', valid.sum())
 
     valid = numpy.logical_and(
         valid,
         (data['maxlike_esinw']**2 + data['maxlike_ecosw']**2) <= max_e
     )
-    _logger.info('Eccentricity cut leaves {:d} binaries'.format(valid.sum()))
+    _logger.info('Eccentricity cut leaves %d binaries', valid.sum())
 
     if interpolator is not None:
         valid = numpy.logical_and(
@@ -342,7 +344,7 @@ def get_available_kic(interpolator=None, max_porb=numpy.inf, max_e=numpy.inf):
                 )
             )
         )
-        _logger.info('[Fe/H] cut leaves {:d} binaries'.format(valid.sum()))
+        _logger.info('[Fe/H] cut leaves %d binaries', valid.sum())
         #False positive
         #pylint: disable=no-member
         data = data.iloc[valid.to_numpy()]
@@ -359,7 +361,7 @@ def get_available_kic(interpolator=None, max_porb=numpy.inf, max_e=numpy.inf):
                        -
                        9.0)
             )
-        _logger.info('Iconv cut leaves {:d} binaries'.format(valid.sum()))
+        _logger.info('Iconv cut leaves %d binaries', valid.sum())
 
     return data.index[valid].to_numpy()
 
@@ -383,7 +385,7 @@ def plot_eccentricity_vs_period(plot_fname, available_kic):
                                                        ('Mratio_median', float),
                                                        ('Mratio_min', float),
                                                        ('Mratio_max', float)])
-    target_quantiles = scipy.stats.norm().cdf((-1.0, 0.0, 1.0))
+    target_quantiles = stats.norm().cdf((-1.0, 0.0, 1.0))
     for i, kic in enumerate(available_kic):
         samples = get_samples(kic)
         plot_data['KIC'] = kic
@@ -456,7 +458,7 @@ def get_eccentricity_distro(kic_id):
                    +
                    w19_samples['ecosw']**2)
     )
-    return eccentricity_kde_distro_gen(
+    return eccentricity_circular_kde_distro_gen(
         e_samples,
         get_eccentricity_kernel_width(kic_id)
     )
@@ -521,11 +523,9 @@ def plot_eccentricity_distribution(kic_id_list,
         None
     """
 
-    if len(kic_id_list) > 5:
-        kic_id_list = kic_id_list[5:15]
-
     custom_zoom = {9110346: (0.0, 1e-4),
                    7732791: (0.0, 0.0003),
+                   9656543: (0.0, 1e-3),
                    10960995: (0.0, 1e-4),
                    5022440: (0.0, 1e-4),
                    5802470: (0.0, 1e-4),
@@ -570,16 +570,23 @@ def plot_eccentricity_distribution(kic_id_list,
                        w19_samples['ecosw']**2)
         )
         print('Ecccentricity samples:\n' + repr(e_samples))
-        kernel_width = get_eccentricity_kernel_width(kic_id)
-        kde_distro = eccentricity_kde_distro_gen(e_samples, kernel_width, True)
+        sin_kernel_width, cos_kernel_width = get_eccentricity_kernel_width(
+            kic_id
+        )
+        kde_distro = eccentricity_noncircular_kde_distro_gen(
+            esinw_samples=w19_samples['esinw'],
+            ecosw_samples=w19_samples['ecosw'],
+            sin_kernel=stats.norm(scale=sin_kernel_width),#stats.rdist(c=4, scale=sin_kernel_width),
+            cos_kernel=stats.norm(scale=cos_kernel_width),#stats.rdist(c=4, scale=cos_kernel_width),
+            uniform_e_samples=True
+        )
 
         plot_ranges = [
             (
                 0,
                 e_samples[-1]
             ),
-            custom_zoom.get(kic_id,
-                            (kde_distro.ppf(0.025), kde_distro.ppf(0.975)))
+            custom_zoom.get(kic_id, numpy.quantile(e_samples, [0.025, 0.975]))
         ]
         if (
             plot_ranges[1][1] - plot_ranges[1][0]
@@ -589,16 +596,14 @@ def plot_eccentricity_distribution(kic_id_list,
             kic_id not in custom_zoom
         ):
             print(
-                'Full range (%g, %g) and zoom range (%g, %g) comparable. No '
-                'zoom plot necessary.'
-                %
-                (plot_ranges[0] + plot_ranges[1])
+                f'Full range ({plot_ranges[0][0]:g}, {plot_ranges[0][1]:g}) '
+                f'and zoom range ({plot_ranges[1][0]:g}, {plot_ranges[1][1]:g})'
+                ' comparable. No zoom plot necessary.'
             )
             plot_ranges = plot_ranges[:1]
         else:
-            print('Adding zoom-in plot for KIC %d: %g < ef < %g'
-                  %
-                  ((kic_id,) + plot_ranges[1]))
+            print(f'Adding zoom-in plot for KIC {kic_id:d}: '
+                  f'{plot_ranges[1][0]:g} < ef < {plot_ranges[1][1]:g}')
 
         for e_range in plot_ranges:
             pyplot.subplot(111, position=(0.1, 0.1, 0.85, 0.85))
@@ -704,6 +709,7 @@ def parse_command_line():
         '--create-e-distro-plot',
         nargs=2,
         default=None,
+        metavar=('KIC', 'PLOT_FNAME'),
         help='If specified, it should select a KIC and filename for the plot. '
         'A plot of the eccentricity distribution for the selected KIC will be '
         'created. The plot will show binned eccentricity samples, with bin '
