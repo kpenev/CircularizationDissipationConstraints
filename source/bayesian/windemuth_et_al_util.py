@@ -5,6 +5,7 @@ from os import path
 import logging
 from subprocess import run
 import platform
+from multiprocessing import Pool
 
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
@@ -500,9 +501,30 @@ def plot_ecosw_esinw_samples(w19_samples, axes):
     axes.axvline(x=0, linewidth=0.5)
 
 
+def claculate_eccentricity_kde(kic_id, w19_samples, eccentricity_sets):
+    """Estimate PDF(eccentricity) for given KIC using KDE from W19 samples."""
+
+    sin_kernel_width, cos_kernel_width = get_eccentricity_kernel_width(kic_id)
+
+    kde_distro = eccentricity_noncircular_kde_distro_gen(
+        esinw_samples=w19_samples['esinw'],
+        ecosw_samples=w19_samples['ecosw'],
+        sin_kernel=stats.norm(scale=sin_kernel_width),
+        cos_kernel=stats.norm(scale=cos_kernel_width),
+        #stats.rdist(c=4, scale=sin_kernel_width),
+        #stats.rdist(c=4, scale=cos_kernel_width),
+        uniform_e_samples=True
+    )
+    return [kde_distro.pdf(eccentricities)
+            for eccentricities in eccentricity_sets]
+
+
+#No good way to simplify
+#pylint: disable=too-many-locals
 def plot_eccentricity_distribution(kic_id_list,
                                    plot_fname,
-                                   bins):
+                                   bins,
+                                   num_parallel_processes):
     """
     Plot KDE estimated eccentricity distribution and histogram for given KIC.
 
@@ -522,6 +544,46 @@ def plot_eccentricity_distribution(kic_id_list,
     Returns:
         None
     """
+
+
+    def compute_kde(kic_id):
+        """Coumpute KDE data to plot for given KIC ID."""
+
+        w19_samples = get_samples(kic_id)
+        e_samples = numpy.sort(
+            numpy.sqrt(w19_samples['esinw']**2
+                       +
+                       w19_samples['ecosw']**2)
+        )
+        plot_ranges = [
+            (
+                0,
+                e_samples[-1]
+            ),
+            custom_zoom.get(kic_id, numpy.quantile(e_samples, [0.025, 0.975]))
+        ]
+        if (
+                plot_ranges[1][1] - plot_ranges[1][0]
+                >
+                0.2 * (plot_ranges[0][1] - plot_ranges[0][0])
+                and
+                kic_id not in custom_zoom
+        ):
+            print(
+                f'Full range ({plot_ranges[0][0]:g}, {plot_ranges[0][1]:g}) '
+                f'and zoom range ({plot_ranges[1][0]:g}, {plot_ranges[1][1]:g})'
+                ' comparable. No zoom plot necessary.'
+            )
+            plot_ranges = plot_ranges[:1]
+        else:
+            print(f'Adding zoom-in plot for KIC {kic_id:d}: '
+                  f'{plot_ranges[1][0]:g} < ef < {plot_ranges[1][1]:g}')
+
+        plot_x = [numpy.linspace(*e_range, 1000) for  e_range in plot_ranges]
+        plot_y = claculate_eccentricity_kde(kic_id, w19_samples, plot_x)
+
+        return  plot_ranges, plot_x, plot_y
+
 
     custom_zoom = {9110346: (0.0, 1e-4),
                    7732791: (0.0, 0.0003),
@@ -562,7 +624,11 @@ def plot_eccentricity_distribution(kic_id_list,
 
     if plot_fname:
         pdf = PdfPages(plot_fname)
-    for kic_id in kic_id_list:
+
+    with Pool(num_parallel_processes) as pool:
+        kde_plot_data = pool.map(compute_kde, kic_id_list)
+
+    for kic_id, kde_plot_data in zip(kic_id_list, kde_plot_data):
         w19_samples = get_samples(kic_id)
         e_samples = numpy.sort(
             numpy.sqrt(w19_samples['esinw']**2
@@ -570,60 +636,24 @@ def plot_eccentricity_distribution(kic_id_list,
                        w19_samples['ecosw']**2)
         )
         print('Ecccentricity samples:\n' + repr(e_samples))
-        sin_kernel_width, cos_kernel_width = get_eccentricity_kernel_width(
-            kic_id
-        )
-        kde_distro = eccentricity_noncircular_kde_distro_gen(
-            esinw_samples=w19_samples['esinw'],
-            ecosw_samples=w19_samples['ecosw'],
-            sin_kernel=stats.norm(scale=sin_kernel_width),#stats.rdist(c=4, scale=sin_kernel_width),
-            cos_kernel=stats.norm(scale=cos_kernel_width),#stats.rdist(c=4, scale=cos_kernel_width),
-            uniform_e_samples=True
-        )
 
-        plot_ranges = [
-            (
-                0,
-                e_samples[-1]
-            ),
-            custom_zoom.get(kic_id, numpy.quantile(e_samples, [0.025, 0.975]))
-        ]
-        if (
-            plot_ranges[1][1] - plot_ranges[1][0]
-            >
-            0.2 * (plot_ranges[0][1] - plot_ranges[0][0])
-            and
-            kic_id not in custom_zoom
-        ):
-            print(
-                f'Full range ({plot_ranges[0][0]:g}, {plot_ranges[0][1]:g}) '
-                f'and zoom range ({plot_ranges[1][0]:g}, {plot_ranges[1][1]:g})'
-                ' comparable. No zoom plot necessary.'
-            )
-            plot_ranges = plot_ranges[:1]
-        else:
-            print(f'Adding zoom-in plot for KIC {kic_id:d}: '
-                  f'{plot_ranges[1][0]:g} < ef < {plot_ranges[1][1]:g}')
-
-        for e_range in plot_ranges:
+        for e_range, plot_x, plot_y in zip(*kde_plot_data):
             pyplot.subplot(111, position=(0.1, 0.1, 0.85, 0.85))
             plot_eccentricity_histogram(e_samples, e_range, bins)
-            plot_x = numpy.linspace(e_range[0], e_range[1], 300)
-            plot_y = kde_distro.pdf(plot_x)
             pyplot.plot(plot_x, plot_y, color='red')
             pyplot.xlim(*e_range)
             pyplot.suptitle(str(kic_id) + ' PDF($e_f$)')
 
             if (
-                plot_y[plot_x < 0.6 * e_range[0] + 0.4 * e_range[1]].max()
-                <
-                plot_y[plot_x > 0.4 * e_range[0] + 0.6 * e_range[1]].max()
+                    plot_y[plot_x < 0.6 * e_range[0] + 0.4 * e_range[1]].max()
+                    <
+                    plot_y[plot_x > 0.4 * e_range[0] + 0.6 * e_range[1]].max()
             ):
                 inset_location = 'upper left'
             else:
                 inset_location = 'upper right'
             plot_ecosw_esinw_samples(
-                w19_samples,
+                get_samples(kic_id),
                 inset_axes(pyplot.gca(),
                            width='35%',
                            height='35%',
@@ -637,6 +667,7 @@ def plot_eccentricity_distribution(kic_id_list,
                 pyplot.show()
     if plot_fname:
         pdf.close()
+#pylint: enable=too-many-locals
 
 
 def generate_slurm_scripts(hpc, available_kic, slurm_dir, sampling_mode):
@@ -755,6 +786,13 @@ def parse_command_line():
         'is automatically determined from the host name (assuming you are '
         'running this on the cluster you need slurm scripts for).'
     )
+    parser.add_argument(
+        '--num-parallel-processes',
+        type=int,
+        default=4,
+        help='The numbef or parallel processes to use for computing KDE '
+        'estimates of eccentricity distributions for plotting.'
+    )
     config = parser.parse_args()
     if config.hpc is None:
         hostname = platform.node()
@@ -798,7 +836,8 @@ def main(config):
                 else [int(config.create_e_distro_plot[0])]
             ),
             plot_fname=config.create_e_distro_plot[1],
-            bins=config.e_distro_histogram_bins
+            bins=config.e_distro_histogram_bins,
+            num_parallel_processes=config.num_parallel_processes
         )
 
 
