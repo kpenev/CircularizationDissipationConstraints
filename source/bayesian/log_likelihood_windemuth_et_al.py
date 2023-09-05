@@ -34,22 +34,59 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             repr(self.envelope_weights.sum())
         )
 
+    def _handle_parameters(self, parameters, mode):
+        """Handle the parameters passed to the log-likelihood function."""
+
+        if mode == 'first':
+            parameters['solve'] = True
+            parameters['initial_eccentricity'] = 0.8
+        #if 'period' in parameters:
+        #    dsd
+        #if 'eccentricity' in parameters:
+        #    dfdg
+        elif mode == 'second':
+            parameters['initial_eccentricity'] = 'solve'
+
+        return parameters
+
+    def _calculate_likelihood(ef_max,ef_med,dehat_med):
+        sdsdf
 
     def calculate_log_likelihood(self,
                                  parameters,
                                  **other_args):
         """Evaluate the log-likelihood at the given model parameters."""
 
+        def heaviside():
+
+
         assert 'sample_weights_envelope' in other_args
 
-        final_eccentricity = self.calculate_final_eccentricity(parameters)
+        #final_eccentricity = self.calculate_final_eccentricity(parameters)
+        #
+        #if (
+        #        final_eccentricity is None
+        #        or
+        #        not (final_eccentricity <= self.envelope_eccentricity)
+        #):
+        #    return -numpy.inf
 
-        if (
-                final_eccentricity is None
-                or
-                not (final_eccentricity <= self.envelope_eccentricity)
-        ):
-            return -numpy.inf
+        # BEGIN PSEUDOCODE
+        #Work out parameters such that when we pass it to find_evolution, we get the 1D solver in the way we want
+        parameters = self._handle_parameters(parameters,'first')
+        final_eccentricity = find_evolution(parameters)[0][-1]#(finalperiod=parameters['period'],initialeccentricity=0.8)[0][-1]
+        D_e = something
+        ehat = something (ehat(ei=0.8) so possibly just final_eccentricity) # yeah, I think it is, this is how I'll translate it
+        negligible = 1e-3
+        if final_eccentricity > self.envelope_eccentricity:
+            return -numpy.inf   # What is De in this context? How to get ehat in below, and then likelihood? I mean I guess w/ ehat we then continue onwards even though it'll be small?????
+        elif integral(D_e, 0, final_eccentricity) <= negligible:
+            estimate likelihood by reverting back to the old assumption that ehat is a linear function between zero and final_eccentricity
+        
+        if ( integral(D_e, final_eccentricity, self.envelope_eccentricity) / integral(D_e, 0, final_eccentricity) ) <= negligible:
+             run a 2-D solver finding what initial eccentricity and period will result in final eccentricity near the (median or mean or max likelihood) final eccentricity and the value of e_hatprime at that point
+             use the approximation above to calculate the likelihood
+        ########################################### END PSEUDOCODE
 
 
         logger = logging.getLogger(__name__)
