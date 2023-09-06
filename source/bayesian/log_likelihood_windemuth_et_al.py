@@ -63,11 +63,17 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
     def _load_prior_e(self, e):
         # TODO
         return 1
+    
+    def _calc_likelihood_old_assumption(self,):
+        estimate likelihood by reverting back to the old assumption that ehat is a linear function between zero and max_final_eccentricity
+        return 1
 
     def calculate_log_likelihood(self,
                                  parameters,
                                  **other_args):
         """Evaluate the log-likelihood at the given model parameters."""
+
+        logger = logging.getLogger(__name__)
 
         assert 'sample_weights_envelope' in other_args
 
@@ -83,34 +89,56 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         # BEGIN PSEUDOCODE
         #Work out parameters such that when we pass it to find_evolution, we get the 1D solver in the way we want
         parameters = self._handle_parameters(parameters,'first')
-        max_final_eccentricity = find_evolution(parameters)[0][-1]#(finalperiod=parameters['period'],initialeccentricity=0.8)[0][-1]
+        max_final_eccentricity = find_evolution(parameters)[0][-1]
         negligible = 1e-3
 
         # Placeholder for Heaviside. Can remove when I'm done with pseudocode.
         H = 1
-        if (max_final_eccentricity > self.envelope_eccentricity) or (max_final_eccentricity is None) or numpy.isnan(max_final_eccentricity):
+        if (
+            (max_final_eccentricity > self.envelope_eccentricity)
+            or
+            (max_final_eccentricity is None)
+            or
+            numpy.isnan(max_final_eccentricity)
+        ):
                 return -numpy.inf
-        elif integral(self._load_de(e), 0, max_final_eccentricity) <= negligible: # Not part of Heaviside but since we're talking about early exits
-            estimate likelihood by reverting back to the old assumption that ehat is a linear function between zero and max_final_eccentricity
-            return whatever that likelihood is
+        elif scipy.integrate.quad(self._load_de, 0, max_final_eccentricity) <= negligible: # Not part of Heaviside but since we're talking about early exits
+            return self._calc_likelihood_old_assumption()
         
+        # Okay, we're done with that, we're definitely doing this now
         median_e = pull_from_aether()
         parameters = self._handle_parameters(parameters,'second',median_e)
         ehat_prime = find_evolution(parameters)[1][0]
 
         # ?
-        if ( integral(self._load_de(e), max_final_eccentricity, self.envelope_eccentricity) / integral(self._load_de(e), 0, max_final_eccentricity) ) <= negligible:
-             run a 2-D solver finding what initial eccentricity and period will result in final eccentricity near the (median or mean or max likelihood) final eccentricity and the value of e_hatprime at that point
-             use the approximation above to calculate the likelihood
-             get the various values
+        if (
+                scipy.integrate.quad(self._load_de, max_final_eccentricity, self.envelope_eccentricity)
+                /
+                scipy.integrate.quad(self._load_de, 0, max_final_eccentricity)
+        ) <= negligible: # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
+            run a 2-D solver finding what initial eccentricity and period will result in final eccentricity near the (median or mean or max likelihood) final eccentricity and the value of e_hatprime at that point
+            use the approximation of ehat_prime is constant
+            get the various values
 
-        #then I plug those various values into here and call the private function I'm going to make
-        I = integral(self._load_de(e) * self._load_prior_e(e) / ehat_prime, 0, 0.8) #ehat prime is a function of e, now that I think about it
-        L = D_theta * H * Pi_theta * Pi_Q * I
+            #then I plug those various values into here and call the private function I'm going to make
+            I = scipy.integrate.quad(self._load_de * self._load_prior_e / ehat_prime, 0, 0.8)
+            L = D_theta * H * Pi_theta * Pi_Q * I
+            # more 
+
+        elif ( # If D_e is negligible near e=0, but e_hat(e_i=0.8) is sowhere where D_e is not negligible
+            
+        ):
+            # more stuff
+            h
+        elif ( # If D_e(e_final=0) is not negligible
+            not False
+        ):
+            fdsdf
+        else: # This is the case where we must have failed to catch all possible cases
+            logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
+            raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
         ########################################### END PSEUDOCODE
 
-
-        logger = logging.getLogger(__name__)
         efinal_cdfs = self._observed_eccentricity_distro.eval_sample_cdf(
             final_eccentricity
         )
