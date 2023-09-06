@@ -3,7 +3,9 @@
 import logging
 
 import numpy
+import scipy
 from bayesian.log_likelihood_binary_stars import LogLikelihoodBinaryStars
+from general_purpose_python_modules.reproduce_system import find_evolution
 
 class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
     """The log-likelihood for Windemuth et. al. (2019) EBs."""
@@ -34,7 +36,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             repr(self.envelope_weights.sum())
         )
 
-    def _handle_parameters(self, parameters, mode):
+    def _handle_parameters(self, parameters, mode, median_e = 0):
         """Handle the parameters passed to the log-likelihood function."""
 
         if mode == 'first':
@@ -46,19 +48,26 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         #    dfdg
         elif mode == 'second':
             parameters['initial_eccentricity'] = 'solve'
+            parameters['system'].eccentricity = median_e
 
         return parameters
 
-    def _calculate_likelihood(ef_max,ef_med,dehat_med):
-        sdsdf
+    def _calculate_likelihood(self, ef_max,ei_med,dehat_med):
+        # TODO
+        return 1
+
+    def _load_de(self, e):
+        # TODO
+        return 1
+    
+    def _load_prior_e(self, e):
+        # TODO
+        return 1
 
     def calculate_log_likelihood(self,
                                  parameters,
                                  **other_args):
         """Evaluate the log-likelihood at the given model parameters."""
-
-        def heaviside():
-
 
         assert 'sample_weights_envelope' in other_args
 
@@ -74,18 +83,30 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         # BEGIN PSEUDOCODE
         #Work out parameters such that when we pass it to find_evolution, we get the 1D solver in the way we want
         parameters = self._handle_parameters(parameters,'first')
-        final_eccentricity = find_evolution(parameters)[0][-1]#(finalperiod=parameters['period'],initialeccentricity=0.8)[0][-1]
-        D_e = something
-        ehat = something (ehat(ei=0.8) so possibly just final_eccentricity) # yeah, I think it is, this is how I'll translate it
+        max_final_eccentricity = find_evolution(parameters)[0][-1]#(finalperiod=parameters['period'],initialeccentricity=0.8)[0][-1]
         negligible = 1e-3
-        if final_eccentricity > self.envelope_eccentricity:
-            return -numpy.inf   # What is De in this context? How to get ehat in below, and then likelihood? I mean I guess w/ ehat we then continue onwards even though it'll be small?????
-        elif integral(D_e, 0, final_eccentricity) <= negligible:
-            estimate likelihood by reverting back to the old assumption that ehat is a linear function between zero and final_eccentricity
+
+        # Placeholder for Heaviside. Can remove when I'm done with pseudocode.
+        H = 1
+        if (max_final_eccentricity > self.envelope_eccentricity) or (max_final_eccentricity is None) or numpy.isnan(max_final_eccentricity):
+                return -numpy.inf
+        elif integral(self._load_de(e), 0, max_final_eccentricity) <= negligible: # Not part of Heaviside but since we're talking about early exits
+            estimate likelihood by reverting back to the old assumption that ehat is a linear function between zero and max_final_eccentricity
+            return whatever that likelihood is
         
-        if ( integral(D_e, final_eccentricity, self.envelope_eccentricity) / integral(D_e, 0, final_eccentricity) ) <= negligible:
+        median_e = pull_from_aether()
+        parameters = self._handle_parameters(parameters,'second',median_e)
+        ehat_prime = find_evolution(parameters)[1][0]
+
+        # ?
+        if ( integral(self._load_de(e), max_final_eccentricity, self.envelope_eccentricity) / integral(self._load_de(e), 0, max_final_eccentricity) ) <= negligible:
              run a 2-D solver finding what initial eccentricity and period will result in final eccentricity near the (median or mean or max likelihood) final eccentricity and the value of e_hatprime at that point
              use the approximation above to calculate the likelihood
+             get the various values
+
+        #then I plug those various values into here and call the private function I'm going to make
+        I = integral(self._load_de(e) * self._load_prior_e(e) / ehat_prime, 0, 0.8) #ehat prime is a function of e, now that I think about it
+        L = D_theta * H * Pi_theta * Pi_Q * I
         ########################################### END PSEUDOCODE
 
 
