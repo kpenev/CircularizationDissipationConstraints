@@ -36,7 +36,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             repr(self.envelope_weights.sum())
         )
 
-    def _handle_parameters(self, parameters, mode, median_e = 0):
+    def _handle_parameters(self, parameters, mode, final_e = 0):
         """Handle the parameters passed to the log-likelihood function."""
 
         if mode == 'first':
@@ -48,7 +48,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         #    dfdg
         elif mode == 'second':
             parameters['initial_eccentricity'] = 'solve'
-            parameters['system'].eccentricity = median_e
+            parameters['system'].eccentricity = final_e
 
         return parameters
 
@@ -58,15 +58,17 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
     def _load_de(self, e):
         # TODO
-        return 1 #TODO: return a class? That I can just integrate rather than calling this all the time? And like has a kernel width attribute?
+        return 1 #TODO: return a class? That I can just integrate rather than calling this all the time? And like has attributes?
     
-    def _load_prior_e(self, e):
+    def _load_prior_e(self, ehat_approx):
         # TODO
         return 1
     
     def _calc_likelihood_old_assumption(self,):
         estimate likelihood by reverting back to the old assumption that ehat is a linear function between zero and max_final_eccentricity
-        return 1
+        return 1 #Okay actually this is not the route I'm going down. I'll delete this. Eventually.
+                 #Clarification: I shouldn't need to do a separate function, just set up the things that get run so that this happens
+                 #.... i think
 
     def calculate_log_likelihood(self,
                                  parameters,
@@ -105,12 +107,10 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         ):
                 return -numpy.inf
         elif scipy.integrate.quad(De.func, 0, max_final_eccentricity) <= negligible: # Not part of Heaviside but since we're talking about early exits
-            return self._calc_likelihood_old_assumption()
+            return self._calc_likelihood_old_assumption() #TODO: revisit reasoning on Jira here now that I've got to the knowledge checkpoint
         
         # Okay, we're done with that, we're definitely doing this now
         median_e = pull_from_aether()
-        parameters = self._handle_parameters(parameters,'second',median_e)
-        ehat_prime = find_evolution(parameters)[1][0]
 
         logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
         logger.debug('De range = %s',repr((De_min,De_max)))
@@ -122,38 +122,45 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                     / #TODO: if I have the other information do I actually need to do it this way?
                     scipy.integrate.quad(De.func, 0, max_final_eccentricity)
             ) <= negligible: # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
-                run a 2-D solver finding what initial eccentricity and period will result in
-                final eccentricity near the (median or mean or max likelihood) final eccentricity and the value of e_hatprime at that point;
-                use the approximation of ehat_prime is constant
-
-                get the various values
-                
+                parameters = self._handle_parameters(parameters,'second',median_e)
+                result = find_evolution(parameters)
+                init_e,ehat_prime = result[1][1],result[1][0]
+                yintercept = median_e - ehat_prime*init_e #TODO: double check this
                 ehat_approx = lambda e: ehat_prime*e + yintercept
             elif ( # If D_e is negligible near e=0, but e_hat(e_i=0.8) is sowhere where D_e is not negligible
                 De_min <= max_final_eccentricity <= De_max
             ):
-                Run a 2-D solver to find e_initial_min and Porb_inital that reproduce Porb_final and e_final near some small quantile of D_e,
-                and then approximate ehat as linear for e_initial between e_initial_min and 0.8
-
-                Same as 3.1 but use all the available information by finding a quadratic approximation of e_hat such that it matches e_final(e_i=0.8), e_final(e_initial_min),
-                and has the derivative you calculate at e_initial_min
-                
-                ehat_approx = a quadratic approximation.
+                parameters = self._handle_parameters(parameters,'second',De_min)
+                result = find_evolution(parameters)
+                init_e,ehat_prime = result[1][1],result[1][0]
+                x = numpy.array([init_e,0.8])
+                y = numpy.array([De_min,max_final_eccentricity])
+                ehat_approx = numpy.polynomial.polynomial.Polynomial.fit(x,y,2) #domain?   also other parameters
+                ehat_prime = ehat_prime.deriv()
             elif max_final_eccentricity < De_min:
-                TODO
-                ehat_approx = uncertain
+                return self._calc_likelihood_old_assumption()
             else:
                 logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
                 raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
         elif ( # If D_e(e_final=0) is not negligible
             De_min <= 0
         ):
-            if max_final_eccentricity > De_max:
-                TODO
-                ehat_approx = todo
+            logger.debug('D_e(e_final=0) is not negligible.')
+            if max_final_eccentricity >= De_min: # I am currently guessing both cases can be treated the same, but I want a record.
+                if max_final_eccentricity > De_max:
+                    logger.debug('max_final_eccentricity > De_max')
+                else:
+                    logger.debug('De_min <= max_final_eccentricity <= De_max')
+                parameters = self._handle_parameters(parameters,'second',De_max)
+                result = find_evolution(parameters)
+                init_e,ehat_prime = result[1][1],result[1][0]
+                x = numpy.array([0,init_e])
+                y = numpy.array([0,De_max])
+                ehat_approx = numpy.polynomial.polynomial.Polynomial.fit(x,y,2)
+                ehat_prime = ehat_prime.deriv()
             else:
-                TODO
-                ehat_approx = todo
+                logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
+                raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
         else: # This is the case where we must have failed to catch all possible cases
             logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
             raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
