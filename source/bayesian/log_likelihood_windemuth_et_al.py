@@ -58,7 +58,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
     def _load_de(self, e):
         # TODO
-        return 1
+        return 1 #TODO: return a class? That I can just integrate rather than calling this all the time? And like has a kernel width attribute?
     
     def _load_prior_e(self, e):
         # TODO
@@ -91,6 +91,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         parameters = self._handle_parameters(parameters,'first')
         max_final_eccentricity = find_evolution(parameters)[0][-1]
         negligible = 1e-3
+        De = self._load_de()
+        De_min,De_max = De.min,De.max #TODO: define the range as PPF of 1e-3. scipy.stats, etc.
 
         # Placeholder for Heaviside. Can remove when I'm done with pseudocode.
         H = 1
@@ -102,7 +104,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             numpy.isnan(max_final_eccentricity)
         ):
                 return -numpy.inf
-        elif scipy.integrate.quad(self._load_de, 0, max_final_eccentricity) <= negligible: # Not part of Heaviside but since we're talking about early exits
+        elif scipy.integrate.quad(De.func, 0, max_final_eccentricity) <= negligible: # Not part of Heaviside but since we're talking about early exits
             return self._calc_likelihood_old_assumption()
         
         # Okay, we're done with that, we're definitely doing this now
@@ -110,33 +112,57 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         parameters = self._handle_parameters(parameters,'second',median_e)
         ehat_prime = find_evolution(parameters)[1][0]
 
-        # ?
-        if (
-                scipy.integrate.quad(self._load_de, max_final_eccentricity, self.envelope_eccentricity)
-                /
-                scipy.integrate.quad(self._load_de, 0, max_final_eccentricity)
-        ) <= negligible: # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
-            run a 2-D solver finding what initial eccentricity and period will result in final eccentricity near the (median or mean or max likelihood) final eccentricity and the value of e_hatprime at that point
-            use the approximation of ehat_prime is constant
-            get the various values
+        logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
+        logger.debug('De range = %s',repr((De_min,De_max)))
+        logger.debug('Envelope eccentricity = %s',repr(self.envelope_eccentricity))
 
-            #then I plug those various values into here and call the private function I'm going to make
-            I = scipy.integrate.quad(self._load_de * self._load_prior_e / ehat_prime, 0, 0.8)
-            L = D_theta * H * Pi_theta * Pi_Q * I
-            # more 
+        if (De_min > 0):
+            if (
+                    scipy.integrate.quad(De.func, max_final_eccentricity, self.envelope_eccentricity)
+                    / #TODO: if I have the other information do I actually need to do it this way?
+                    scipy.integrate.quad(De.func, 0, max_final_eccentricity)
+            ) <= negligible: # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
+                run a 2-D solver finding what initial eccentricity and period will result in
+                final eccentricity near the (median or mean or max likelihood) final eccentricity and the value of e_hatprime at that point;
+                use the approximation of ehat_prime is constant
 
-        elif ( # If D_e is negligible near e=0, but e_hat(e_i=0.8) is sowhere where D_e is not negligible
-            
-        ):
-            # more stuff
-            h
+                get the various values
+                
+                ehat_approx = lambda e: ehat_prime*e + yintercept
+            elif ( # If D_e is negligible near e=0, but e_hat(e_i=0.8) is sowhere where D_e is not negligible
+                De_min <= max_final_eccentricity <= De_max
+            ):
+                Run a 2-D solver to find e_initial_min and Porb_inital that reproduce Porb_final and e_final near some small quantile of D_e,
+                and then approximate ehat as linear for e_initial between e_initial_min and 0.8
+
+                Same as 3.1 but use all the available information by finding a quadratic approximation of e_hat such that it matches e_final(e_i=0.8), e_final(e_initial_min),
+                and has the derivative you calculate at e_initial_min
+                
+                ehat_approx = a quadratic approximation.
+            elif max_final_eccentricity < De_min:
+                TODO
+                ehat_approx = uncertain
+            else:
+                logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
+                raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
         elif ( # If D_e(e_final=0) is not negligible
-            not False
+            De_min <= 0
         ):
-            fdsdf
+            if max_final_eccentricity > De_max:
+                TODO
+                ehat_approx = todo
+            else:
+                TODO
+                ehat_approx = todo
         else: # This is the case where we must have failed to catch all possible cases
             logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
             raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
+        
+        Prior_e = self._load_prior_e(ehat_approx)
+        
+        #then I plug those various values into here and call the private function I'm going to make
+        I = scipy.integrate.quad(De.func * Prior_e.func / ehat_prime, 0, 0.8)
+        L = D_theta * H * Pi_theta * Pi_Q * I
         ########################################### END PSEUDOCODE
 
         efinal_cdfs = self._observed_eccentricity_distro.eval_sample_cdf(
