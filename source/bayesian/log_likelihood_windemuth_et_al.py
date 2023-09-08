@@ -63,12 +63,6 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
     def _load_prior_e(self, ehat_approx):
         # TODO
         return 1
-    
-    def _calc_likelihood_old_assumption(self,):
-        estimate likelihood by reverting back to the old assumption that ehat is a linear function between zero and max_final_eccentricity
-        return 1 #Okay actually this is not the route I'm going down. I'll delete this. Eventually.
-                 #Clarification: I shouldn't need to do a separate function, just set up the things that get run so that this happens
-                 #.... i think
 
     def calculate_log_likelihood(self,
                                  parameters,
@@ -118,7 +112,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         if (De_min > 0):
             if (
-                    scipy.integrate.quad(De.func, max_final_eccentricity, self.envelope_eccentricity)
+                    scipy.integrate.quad(De.func, max_final_eccentricity, self.envelope_eccentricity) #TODO: do this with CDf (CDF of envelope - CDF of max_final_eccentricity)
                     / #TODO: if I have the other information do I actually need to do it this way?
                     scipy.integrate.quad(De.func, 0, max_final_eccentricity)
             ) <= negligible: # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
@@ -133,36 +127,45 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 parameters = self._handle_parameters(parameters,'second',De_min)
                 result = find_evolution(parameters)
                 init_e,ehat_prime = result[1][1],result[1][0]
-                x = numpy.array([init_e,0.8])
-                y = numpy.array([De_min,max_final_eccentricity])
-                ehat_approx = numpy.polynomial.polynomial.Polynomial.fit(x,y,2) #domain?   also other parameters
-                ehat_prime = ehat_prime.deriv()
+                A = numpy.matrix([
+                                    [init_e**2, init_e, 1],
+                                    [0.8**2,    0.8,    1],
+                                    [2*init_e,  1,      0]
+                                ])
+                B = numpy.matrix([De_min,max_final_eccentricity,ehat_prime])
+                fit = scipy.linalg.lstsq(A,B.T)[0]
+                ehat_approx = lambda e: fit[0]*e**2 + fit[1]*e + fit[2]
+                ehat_prime = lambda e: 2*fit[0]*e + fit[1]
             elif max_final_eccentricity < De_min:
-                return self._calc_likelihood_old_assumption()
+                #return self._calc_likelihood_old_assumption()
+                ehat_approx = lambda e: e * max_final_eccentricity / 0.8
+                ehat_prime = lambda e: max_final_eccentricity / 0.8
             else:
                 logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
                 raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
         elif ( # If D_e(e_final=0) is not negligible
-            De_min <= 0
+            De_min == 0
         ):
             logger.debug('D_e(e_final=0) is not negligible.')
-            if max_final_eccentricity >= De_min: # I am currently guessing both cases can be treated the same, but I want a record.
-                if max_final_eccentricity > De_max:
-                    logger.debug('max_final_eccentricity > De_max')
-                else:
-                    logger.debug('De_min <= max_final_eccentricity <= De_max')
+            if max_final_eccentricity > De_max:
                 parameters = self._handle_parameters(parameters,'second',De_max)
                 result = find_evolution(parameters)
                 init_e,ehat_prime = result[1][1],result[1][0]
-                x = numpy.array([0,init_e])
-                y = numpy.array([0,De_max])
-                ehat_approx = numpy.polynomial.polynomial.Polynomial.fit(x,y,2)
-                ehat_prime = ehat_prime.deriv()
+                A = numpy.matrix([
+                                    [init_e**2, init_e, 1],
+                                    [0,         0,      1],
+                                    [2*init_e,  1,      0]
+                                ])
+                B = numpy.matrix([De_max,0,ehat_prime])
+                fit = scipy.linalg.lstsq(A,B.T)[0]
+                ehat_approx = lambda e: fit[0]*e**2 + fit[1]*e + fit[2]
+                ehat_prime = lambda e: 2*fit[0]*e + fit[1]
             else:
-                logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
-                raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
+                ehat_approx = lambda e: e * max_final_eccentricity / 0.8
+                ehat_prime = lambda e: max_final_eccentricity / 0.8
         else: # This is the case where we must have failed to catch all possible cases
             logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
+            #todo: dump all possible values where something might have gone wrong
             raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
         
         Prior_e = self._load_prior_e(ehat_approx)
