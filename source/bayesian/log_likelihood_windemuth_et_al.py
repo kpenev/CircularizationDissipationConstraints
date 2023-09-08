@@ -120,7 +120,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 result = find_evolution(parameters)
                 init_e,ehat_prime = result[1][1],result[1][0]
                 yintercept = median_e - ehat_prime*init_e #TODO: double check this
-                ehat_approx = lambda e: ehat_prime*e + yintercept
+                ehat_approx = numpy.polynomial.polynomial.Polynomial((yintercept,ehat_prime))
             elif ( # If D_e is negligible near e=0, but e_hat(e_i=0.8) is sowhere where D_e is not negligible
                 De_min <= max_final_eccentricity <= De_max
             ):
@@ -134,11 +134,9 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                                 ])
                 B = numpy.matrix([De_min,max_final_eccentricity,ehat_prime])
                 fit = scipy.linalg.lstsq(A,B.T)[0]
-                ehat_approx = lambda e: fit[0]*e**2 + fit[1]*e + fit[2]
-                ehat_prime = lambda e: 2*fit[0]*e + fit[1]
+                ehat_approx = numpy.polynomial.polynomial.Polynomial((fit[2],fit[1],fit[0]))
             elif max_final_eccentricity < De_min:
-                ehat_approx = lambda e: e * max_final_eccentricity / 0.8
-                ehat_prime = max_final_eccentricity / 0.8
+                ehat_approx = numpy.polynomial.polynomial.Polynomial((0,max_final_eccentricity / 0.8))
             else:
                 logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
                 raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
@@ -157,16 +155,15 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                                 ])
                 B = numpy.matrix([De_max,0,ehat_prime])
                 fit = scipy.linalg.lstsq(A,B.T)[0]
-                ehat_approx = lambda e: fit[0]*e**2 + fit[1]*e + fit[2]
-                ehat_prime = lambda e: 2*fit[0]*e + fit[1]
+                ehat_approx = numpy.polynomial.polynomial.Polynomial((fit[2],fit[1],fit[0]))
             else:
-                ehat_approx = lambda e: e * max_final_eccentricity / 0.8
-                ehat_prime = max_final_eccentricity / 0.8
+                ehat_approx = numpy.polynomial.polynomial.Polynomial((0,max_final_eccentricity / 0.8))
         else: # This is the case where we must have failed to catch all possible cases
             logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
             #todo: dump all possible values where something might have gone wrong
             raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
         
+        ehat_prime = ehat_approx.deriv()
         Prior_e = self._load_prior_e(ehat_approx)
         
         #then I plug those various values into here and call the private function I'm going to make
