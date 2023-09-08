@@ -71,7 +71,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         logger = logging.getLogger(__name__)
 
-        assert 'sample_weights_envelope' in other_args
+        assert 'sample_weights_envelope' in other_args #why?
 
         #final_eccentricity = self.calculate_final_eccentricity(parameters)
         #
@@ -137,9 +137,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 ehat_approx = lambda e: fit[0]*e**2 + fit[1]*e + fit[2]
                 ehat_prime = lambda e: 2*fit[0]*e + fit[1]
             elif max_final_eccentricity < De_min:
-                #return self._calc_likelihood_old_assumption()
                 ehat_approx = lambda e: e * max_final_eccentricity / 0.8
-                ehat_prime = lambda e: max_final_eccentricity / 0.8
+                ehat_prime = max_final_eccentricity / 0.8
             else:
                 logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
                 raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
@@ -162,7 +161,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 ehat_prime = lambda e: 2*fit[0]*e + fit[1]
             else:
                 ehat_approx = lambda e: e * max_final_eccentricity / 0.8
-                ehat_prime = lambda e: max_final_eccentricity / 0.8
+                ehat_prime = max_final_eccentricity / 0.8
         else: # This is the case where we must have failed to catch all possible cases
             logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
             #todo: dump all possible values where something might have gone wrong
