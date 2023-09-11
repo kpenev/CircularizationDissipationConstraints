@@ -36,17 +36,17 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             repr(self.envelope_weights.sum())
         )
 
-    def _handle_parameters(self, parameters, mode, final_e = 0):
+    def _choose_solver(self, parameters, solver = '1d', final_e = 0):
         """Handle the parameters passed to the log-likelihood function."""
 
-        if mode == 'first':
+        if solver == '1d':
             parameters['solve'] = True
             parameters['initial_eccentricity'] = 0.8
         #if 'period' in parameters:
         #    dsd
         #if 'eccentricity' in parameters:
         #    dfdg
-        elif mode == 'second':
+        elif solver == '2d':
             parameters['initial_eccentricity'] = 'solve'
             parameters['system'].eccentricity = final_e
 
@@ -84,7 +84,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         # BEGIN PSEUDOCODE
         #Work out parameters such that when we pass it to find_evolution, we get the 1D solver in the way we want
-        parameters = self._handle_parameters(parameters,'first')
+        parameters = self._choose_solver(parameters,'1d')
         max_final_eccentricity = find_evolution(parameters)[0][-1]
         negligible = 1e-3
         De = self._load_de()
@@ -100,8 +100,6 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             numpy.isnan(max_final_eccentricity)
         ):
                 return -numpy.inf
-        elif scipy.integrate.quad(De.func, 0, max_final_eccentricity) <= negligible: # Not part of Heaviside but since we're talking about early exits
-            return self._calc_likelihood_old_assumption() #TODO: revisit reasoning on Jira here now that I've got to the knowledge checkpoint
         
         # Okay, we're done with that, we're definitely doing this now
         median_e = pull_from_aether()
@@ -110,13 +108,16 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         logger.debug('De range = %s',repr((De_min,De_max)))
         logger.debug('Envelope eccentricity = %s',repr(self.envelope_eccentricity))
 
-        if (De_min > 0):
+        if scipy.integrate.quad(De.func, 0, max_final_eccentricity) <= negligible:
+            ehat_approx = numpy.polynomial.polynomial.Polynomial((0,max_final_eccentricity / 0.8))
+        elif (De_min > 0):
             if (
                     scipy.integrate.quad(De.func, max_final_eccentricity, self.envelope_eccentricity) #TODO: do this with CDf (CDF of envelope - CDF of max_final_eccentricity)
                     / #TODO: if I have the other information do I actually need to do it this way?
                     scipy.integrate.quad(De.func, 0, max_final_eccentricity)
             ) <= negligible: # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
-                parameters = self._handle_parameters(parameters,'second',median_e)
+                logger.debug('D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e.')
+                parameters = self._choose_solver(parameters,'2d',median_e)
                 result = find_evolution(parameters)
                 init_e,ehat_prime = result[1][1],result[1][0]
                 yintercept = median_e - ehat_prime*init_e #TODO: double check this
@@ -124,7 +125,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             elif ( # If D_e is negligible near e=0, but e_hat(e_i=0.8) is sowhere where D_e is not negligible
                 De_min <= max_final_eccentricity <= De_max
             ):
-                parameters = self._handle_parameters(parameters,'second',De_min)
+                logger.debug('D_e is negligible near e=0, but e_hat(e_i=0.8) is sowhere where D_e is not negligible.')
+                parameters = self._choose_solver(parameters,'2d',De_min)
                 result = find_evolution(parameters)
                 init_e,ehat_prime = result[1][1],result[1][0]
                 A = numpy.matrix([
@@ -136,6 +138,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 fit = scipy.linalg.lstsq(A,B.T)[0]
                 ehat_approx = numpy.polynomial.polynomial.Polynomial((fit[2],fit[1],fit[0]))
             elif max_final_eccentricity < De_min:
+                logger.debug('D_e is negligible near e=0, and e_hat(e_i=0.8) is below D_e.')
                 ehat_approx = numpy.polynomial.polynomial.Polynomial((0,max_final_eccentricity / 0.8))
             else:
                 logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
@@ -145,7 +148,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         ):
             logger.debug('D_e(e_final=0) is not negligible.')
             if max_final_eccentricity > De_max:
-                parameters = self._handle_parameters(parameters,'second',De_max)
+                logger.debug('D_e(e_final=0) is not negligible, and e_hat(e_i=0.8) is above D_e.')
+                parameters = self._choose_solver(parameters,'2d',De_max)
                 result = find_evolution(parameters)
                 init_e,ehat_prime = result[1][1],result[1][0]
                 A = numpy.matrix([
@@ -157,10 +161,10 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 fit = scipy.linalg.lstsq(A,B.T)[0]
                 ehat_approx = numpy.polynomial.polynomial.Polynomial((fit[2],fit[1],fit[0]))
             else:
+                logger.debug('D_e(e_final=0) is not negligible, and e_hat(e_i=0.8) is in or below D_e.')
                 ehat_approx = numpy.polynomial.polynomial.Polynomial((0,max_final_eccentricity / 0.8))
         else: # This is the case where we must have failed to catch all possible cases
             logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
-            #todo: dump all possible values where something might have gone wrong
             raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
         
         ehat_prime = ehat_approx.deriv()
