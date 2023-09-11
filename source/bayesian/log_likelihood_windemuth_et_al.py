@@ -82,7 +82,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         parameters = self._choose_solver(parameters,'1d')
         max_final_eccentricity = find_evolution(parameters)[0][-1]
         negligible = 1e-3
-        De_min,De_max = self._de.min,self._de.max #TODO: define the range as PPF of 1e-3. scipy.stats, etc.
+        De_min = self._de.ppf(1e-3)
+        De_max = self._de.ppf(1-1e-3)
 
         # Heaviside
         if (
@@ -98,7 +99,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         De_away_from_zero = De_min > 0
         De_at_zero = not De_away_from_zero
-        De_from_zero_to_max = scipy.integrate.quad(self._de, 0, max_final_eccentricity)
+        De_from_zero_to_max = self._de.cdf(max_final_eccentricity)
 
         logger.debug('Various values:')
         logger.debug('median_e = %s',repr(median_e))
@@ -129,8 +130,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             De_away_from_zero
             and
             (
-                scipy.integrate.quad(self._de, max_final_eccentricity, self.envelope_eccentricity)
-                / #TODO: do this with CDf (CDF of envelope - CDF of max_final_eccentricity)
+                self._de.cdf(self.envelope_eccentricity)
+                -
                 De_from_zero_to_max
             ) <= negligible
         ): # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
