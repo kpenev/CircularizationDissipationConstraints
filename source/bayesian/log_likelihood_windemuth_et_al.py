@@ -125,6 +125,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 max_final_eccentricity <= De_max
             ) # D_e(e_final=0) is not negligible, and e_hat(e_i=0.8) is in or below D_e.
         ):
+            logger.debug('In a case where we assume ehat is linear from 0 to 0.8')
             ehat_approx = numpy.polynomial.polynomial.Polynomial((0,max_final_eccentricity / 0.8))
         elif (
             De_away_from_zero
@@ -135,6 +136,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 De_from_zero_to_max
             ) <= negligible
         ): # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
+            logger.debug('In a case where we assume ehat is linear in the range where D_e is non-negligible')
             parameters = self._handle_parameters(parameters,'second',median_e)
             result = find_evolution(parameters)
             init_e,ehat_prime = result[1][1],result[1][0]
@@ -155,7 +157,13 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 max_final_eccentricity > De_max
             ) # D_e(e_final=0) is not negligible, and e_hat(e_i=0.8) is above D_e
         ):
+            logger.debug('In a case where we want to use quadratic approximation.')
             e_to_match,e_max_initial,e_max_final = (De_min,0.8,max_final_eccentricity) if De_away_from_zero else (De_max,0,0)
+            logger.debug('Values if De_away_from_zero: e_to_match = %s, e_max_initial = %s, e_max_final = %s',repr(De_min),repr(0.8),repr(max_final_eccentricity))
+            logger.debug('Values if De_at_zero: e_to_match = %s, e_max_initial = %s, e_max_final = %s',repr(De_max),repr(0),repr(0))
+            logger.debug('e_to_match = %s',repr(e_to_match))
+            logger.debug('e_max_initial = %s',repr(e_max_initial))
+            logger.debug('e_max_final = %s',repr(e_max_final))
             parameters = self._handle_parameters(parameters,'second',e_to_match)
             result = find_evolution(parameters)
             init_e,ehat_prime = result[1][1],result[1][0]
