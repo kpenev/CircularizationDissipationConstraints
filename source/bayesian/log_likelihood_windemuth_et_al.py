@@ -36,6 +36,9 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             repr(self.envelope_weights.sum())
         )
 
+        self._de = self._load_de(kic)
+        self._pe = self._load_prior_e(kic)
+
     def _choose_solver(self, parameters, solver = '1d', final_e = 0):
         """Handle the parameters passed to the log-likelihood function."""
 
@@ -52,15 +55,15 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         return parameters
 
-    def _calculate_likelihood(self, ef_max,ei_med,dehat_med):
-        # TODO
-        return 1
+    def _calculate_likelihood(self, ef_max,ei_med,dehat_med, ehat_approx,ehat_prime):
+        I = scipy.integrate.quad(self._de * self._pe(ehat_approx) / ehat_prime, 0, 0.8)
+        return I
 
-    def _load_de(self, e):
+    def _load_de(self, kic):
         # TODO
         return 1 #TODO: return a class? That I can just integrate rather than calling this all the time? And like has attributes?
     
-    def _load_prior_e(self, ehat_approx):
+    def _load_prior_e(self, kic):
         # TODO
         return 1
 
@@ -87,11 +90,9 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         parameters = self._choose_solver(parameters,'1d')
         max_final_eccentricity = find_evolution(parameters)[0][-1]
         negligible = 1e-3
-        De = self._load_de()
-        De_min,De_max = De.min,De.max #TODO: define the range as PPF of 1e-3. scipy.stats, etc.
+        De_min,De_max = self._de.min,self._de.max #TODO: define the range as PPF of 1e-3. scipy.stats, etc.
 
-        # Placeholder for Heaviside. Can remove when I'm done with pseudocode.
-        H = 1
+        # Heaviside
         if (
             (max_final_eccentricity > self.envelope_eccentricity)
             or
@@ -110,7 +111,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         De_away_from_zero = De_min > 0
         De_at_zero = not De_away_from_zero
-        De_from_zero_to_max = scipy.integrate.quad(De.func, 0, max_final_eccentricity)
+        De_from_zero_to_max = scipy.integrate.quad(self._de, 0, max_final_eccentricity)
 
         if (
             De_from_zero_to_max <= negligible
@@ -132,7 +133,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             De_away_from_zero
             and
             (
-                scipy.integrate.quad(De.func, max_final_eccentricity, self.envelope_eccentricity)
+                scipy.integrate.quad(self._de, max_final_eccentricity, self.envelope_eccentricity)
                 / #TODO: do this with CDf (CDF of envelope - CDF of max_final_eccentricity)
                 De_from_zero_to_max
             ) <= negligible
@@ -157,14 +158,14 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 max_final_eccentricity > De_max
             ) # D_e(e_final=0) is not negligible, and e_hat(e_i=0.8) is above D_e
         ):
-            e_to_match,e_initial,e_max_final = (De_min,0.8,max_final_eccentricity) if De_away_from_zero else (De_max,0,0)
+            e_to_match,e_max_initial,e_max_final = (De_min,0.8,max_final_eccentricity) if De_away_from_zero else (De_max,0,0)
             parameters = self._handle_parameters(parameters,'second',e_to_match)
             result = find_evolution(parameters)
             init_e,ehat_prime = result[1][1],result[1][0]
             A = numpy.matrix([
-                                [init_e**2,    init_e,    1],
-                                [e_initial**2, e_initial, 1],
-                                [2*init_e,     1,         0]
+                                [init_e**2,        init_e,        1],
+                                [e_max_initial**2, e_max_initial, 1],
+                                [2*init_e,         1,             0]
                             ])
             B = numpy.matrix([e_to_match,e_max_final,ehat_prime])
             fit = scipy.linalg.lstsq(A,B.T)[0]
@@ -174,11 +175,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
         
         ehat_prime = ehat_approx.deriv()
-        Prior_e = self._load_prior_e(ehat_approx)
         
-        #then I plug those various values into here and call the private function I'm going to make
-        I = scipy.integrate.quad(De.func * Prior_e.func / ehat_prime, 0, 0.8)
-        L = D_theta * H * Pi_theta * Pi_Q * I
+        return numpy.log(self._calculate_likelihood())
         ########################################### END PSEUDOCODE
 
         efinal_cdfs = self._observed_eccentricity_distro.eval_sample_cdf(
