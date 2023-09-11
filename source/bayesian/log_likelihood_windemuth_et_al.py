@@ -55,7 +55,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         return parameters
 
-    def _calculate_likelihood(self, ef_max,ei_med,dehat_med, ehat_approx,ehat_prime):
+    def _calculate_likelihood(self, ef_max,ei_med,dehat_med, ehat_approx):
+        ehat_prime = ehat_approx.deriv()
         I = scipy.integrate.quad(self._de * self._pe(ehat_approx) / ehat_prime, 0, 0.8)
         return I
 
@@ -76,15 +77,6 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         assert 'sample_weights_envelope' in other_args #why?
 
-        #final_eccentricity = self.calculate_final_eccentricity(parameters)
-        #
-        #if (
-        #        final_eccentricity is None
-        #        or
-        #        not (final_eccentricity <= self.envelope_eccentricity)
-        #):
-        #    return -numpy.inf
-
         # BEGIN PSEUDOCODE
         #Work out parameters such that when we pass it to find_evolution, we get the 1D solver in the way we want
         parameters = self._choose_solver(parameters,'1d')
@@ -102,16 +94,20 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         ):
                 return -numpy.inf
         
-        # Okay, we're done with that, we're definitely doing this now
         median_e = pull_from_aether()
-
-        logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
-        logger.debug('De range = %s',repr((De_min,De_max)))
-        logger.debug('Envelope eccentricity = %s',repr(self.envelope_eccentricity))
 
         De_away_from_zero = De_min > 0
         De_at_zero = not De_away_from_zero
         De_from_zero_to_max = scipy.integrate.quad(self._de, 0, max_final_eccentricity)
+
+        logger.debug('Various values:')
+        logger.debug('median_e = %s',repr(median_e))
+        logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
+        logger.debug('De range = %s',repr((De_min,De_max)))
+        logger.debug('Envelope eccentricity = %s',repr(self.envelope_eccentricity))
+        logger.debug('De_away_from_zero = %s',repr(De_away_from_zero))
+        logger.debug('De_at_zero = %s',repr(De_at_zero))
+        logger.debug('De_from_zero_to_max = %s',repr(De_from_zero_to_max))
 
         if (
             De_from_zero_to_max <= negligible
@@ -174,9 +170,17 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
             raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
         
-        ehat_prime = ehat_approx.deriv()
+        ehat_prime = ehat_approx.deriv() #TODO (after debugging): remove, already being handled by _calculate_likelihood
+
+        logger.debug('ehat_approx = %s',repr(ehat_approx))
+        logger.debug('ehat_prime = %s',repr(ehat_prime))
         
-        return numpy.log(self._calculate_likelihood())
+        likelihood = self._calculate_likelihood(ehat_approx)
+        assert likelihood >= 0
+        if likelihood == 0:
+            return -numpy.inf
+
+        return numpy.log(likelihood)
         ########################################### END PSEUDOCODE
 
         efinal_cdfs = self._observed_eccentricity_distro.eval_sample_cdf(
