@@ -108,62 +108,68 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         logger.debug('De range = %s',repr((De_min,De_max)))
         logger.debug('Envelope eccentricity = %s',repr(self.envelope_eccentricity))
 
-        if scipy.integrate.quad(De.func, 0, max_final_eccentricity) <= negligible:
-            ehat_approx = numpy.polynomial.polynomial.Polynomial((0,max_final_eccentricity / 0.8))
-        elif (De_min > 0):
-            if (
-                    scipy.integrate.quad(De.func, max_final_eccentricity, self.envelope_eccentricity) #TODO: do this with CDf (CDF of envelope - CDF of max_final_eccentricity)
-                    / #TODO: if I have the other information do I actually need to do it this way?
-                    scipy.integrate.quad(De.func, 0, max_final_eccentricity)
-            ) <= negligible: # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
-                logger.debug('D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e.')
-                parameters = self._choose_solver(parameters,'2d',median_e)
-                result = find_evolution(parameters)
-                init_e,ehat_prime = result[1][1],result[1][0]
-                yintercept = median_e - ehat_prime*init_e #TODO: double check this
-                ehat_approx = numpy.polynomial.polynomial.Polynomial((yintercept,ehat_prime))
-            elif ( # If D_e is negligible near e=0, but e_hat(e_i=0.8) is sowhere where D_e is not negligible
-                De_min <= max_final_eccentricity <= De_max
-            ):
-                logger.debug('D_e is negligible near e=0, but e_hat(e_i=0.8) is sowhere where D_e is not negligible.')
-                parameters = self._choose_solver(parameters,'2d',De_min)
-                result = find_evolution(parameters)
-                init_e,ehat_prime = result[1][1],result[1][0]
-                A = numpy.matrix([
-                                    [init_e**2, init_e, 1],
-                                    [0.8**2,    0.8,    1],
-                                    [2*init_e,  1,      0]
-                                ])
-                B = numpy.matrix([De_min,max_final_eccentricity,ehat_prime])
-                fit = scipy.linalg.lstsq(A,B.T)[0]
-                ehat_approx = numpy.polynomial.polynomial.Polynomial((fit[2],fit[1],fit[0]))
-            elif max_final_eccentricity < De_min:
-                logger.debug('D_e is negligible near e=0, and e_hat(e_i=0.8) is below D_e.')
-                ehat_approx = numpy.polynomial.polynomial.Polynomial((0,max_final_eccentricity / 0.8))
-            else:
-                logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
-                raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
-        elif ( # If D_e(e_final=0) is not negligible
-            De_min == 0
+        De_away_from_zero = De_min > 0
+        De_at_zero = not De_away_from_zero
+        De_from_zero_to_max = scipy.integrate.quad(De.func, 0, max_final_eccentricity)
+
+        if (
+            De_from_zero_to_max <= negligible
+            or
+            (
+                De_away_from_zero
+                and
+                max_final_eccentricity < De_min
+            ) # D_e is negligible near e=0, and e_hat(e_i=0.8) is below D_e.
+            or
+            (
+                De_at_zero
+                and
+                max_final_eccentricity <= De_max
+            ) # D_e(e_final=0) is not negligible, and e_hat(e_i=0.8) is in or below D_e.
         ):
-            logger.debug('D_e(e_final=0) is not negligible.')
-            if max_final_eccentricity > De_max:
-                logger.debug('D_e(e_final=0) is not negligible, and e_hat(e_i=0.8) is above D_e.')
-                parameters = self._choose_solver(parameters,'2d',De_max)
-                result = find_evolution(parameters)
-                init_e,ehat_prime = result[1][1],result[1][0]
-                A = numpy.matrix([
-                                    [init_e**2, init_e, 1],
-                                    [0,         0,      1],
-                                    [2*init_e,  1,      0]
-                                ])
-                B = numpy.matrix([De_max,0,ehat_prime])
-                fit = scipy.linalg.lstsq(A,B.T)[0]
-                ehat_approx = numpy.polynomial.polynomial.Polynomial((fit[2],fit[1],fit[0]))
-            else:
-                logger.debug('D_e(e_final=0) is not negligible, and e_hat(e_i=0.8) is in or below D_e.')
-                ehat_approx = numpy.polynomial.polynomial.Polynomial((0,max_final_eccentricity / 0.8))
-        else: # This is the case where we must have failed to catch all possible cases
+            ehat_approx = numpy.polynomial.polynomial.Polynomial((0,max_final_eccentricity / 0.8))
+        elif (
+            De_away_from_zero
+            and
+            (
+                scipy.integrate.quad(De.func, max_final_eccentricity, self.envelope_eccentricity)
+                / #TODO: do this with CDf (CDF of envelope - CDF of max_final_eccentricity)
+                De_from_zero_to_max
+            ) <= negligible
+        ): # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
+            parameters = self._handle_parameters(parameters,'second',median_e)
+            result = find_evolution(parameters)
+            init_e,ehat_prime = result[1][1],result[1][0]
+            yintercept = median_e - ehat_prime*init_e
+            ehat_approx = numpy.polynomial.polynomial.Polynomial((yintercept,ehat_prime))
+        elif (
+            (
+                De_away_from_zero
+                and
+                (
+                    De_min <= max_final_eccentricity <= De_max
+                )
+            ) # If D_e is negligible near e=0, but e_hat(e_i=0.8) is sowhere where D_e is not negligible
+            or
+            (
+                De_at_zero
+                and
+                max_final_eccentricity > De_max
+            ) # D_e(e_final=0) is not negligible, and e_hat(e_i=0.8) is above D_e
+        ):
+            e_to_match,e_initial,e_max_final = (De_min,0.8,max_final_eccentricity) if De_away_from_zero else (De_max,0,0)
+            parameters = self._handle_parameters(parameters,'second',e_to_match)
+            result = find_evolution(parameters)
+            init_e,ehat_prime = result[1][1],result[1][0]
+            A = numpy.matrix([
+                                [init_e**2,    init_e,    1],
+                                [e_initial**2, e_initial, 1],
+                                [2*init_e,     1,         0]
+                            ])
+            B = numpy.matrix([e_to_match,e_max_final,ehat_prime])
+            fit = scipy.linalg.lstsq(A,B.T)[0]
+            ehat_approx = numpy.polynomial.polynomial.Polynomial((fit[2],fit[1],fit[0]))
+        else:
             logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
             raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
         
