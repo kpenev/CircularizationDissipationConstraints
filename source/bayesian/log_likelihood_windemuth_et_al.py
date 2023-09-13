@@ -6,6 +6,8 @@ import numpy
 import scipy
 from bayesian.log_likelihood_binary_stars import LogLikelihoodBinaryStars
 from general_purpose_python_modules.reproduce_system import find_evolution
+from bayesian.windemuth_eccentricity_distribution import W19EccentricityDistribution
+from functools import partial
 
 class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
     """The log-likelihood for Windemuth et. al. (2019) EBs."""
@@ -14,6 +16,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                  *parent_args,
                  envelope_eccentricity,
                  observed_eccentricity_distro,
+                 de_distro,
+                 pe_distro,
                  **parent_kwargs):
         """
         Prepare the log-likelihood function.
@@ -36,8 +40,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             repr(self.envelope_weights.sum())
         )
 
-        self._de = self._load_de(kic)
-        self._pe = self._load_prior_e(kic)
+        self._de = de_distro
+        self._pe = pe_distro
 
     def _choose_solver(self, parameters, solver = '1d', final_e = 0):
         """Handle the parameters passed to the log-likelihood function."""
@@ -54,19 +58,40 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             parameters['system'].eccentricity = final_e
 
         return parameters
-
-    def _calculate_likelihood(self, ef_max,ei_med,dehat_med, ehat_approx):
-        ehat_prime = ehat_approx.deriv()
-        I = scipy.integrate.quad(self._de * self._pe(ehat_approx) / ehat_prime, 0, 0.8)
-        return I
-
-    def _load_de(self, kic):
-        # TODO
-        return 1 #TODO: return a class? That I can just integrate rather than calling this all the time? And like has attributes?
     
-    def _load_prior_e(self, kic):
-        # TODO
-        return 1
+    def _likelihood_integrand(self,e,ehat_approx):
+        ehat_prime = ehat_approx.deriv()
+
+        ehat_approx_copy = ehat_approx.copy()
+        ehat_approx_copy.coef[0] -= e
+        inverse_ehat_approx = numpy.polynomial.polynomial.Polynomial((ehat_approx_copy)).roots()
+        # We need to figure out which of the values roots returns is real and positive
+        # Also we should check how many there are because there can be only one
+        # We should also check that the value is between 0 and 0.8
+        if inverse_ehat_approx.size > 1:
+            if inverse_ehat_approx[0] > 0:
+                inverse_e = inverse_ehat_approx[0]
+            elif inverse_ehat_approx[1] > 0:
+                inverse_e = inverse_ehat_approx[1]
+            elif inverse_ehat_approx[0] == 0 or inverse_ehat_approx[1] == 0:
+                inverse_e = 0
+            else:
+                raise ValueError('Something is wrong with inverse_ehat_approx: %s',repr(inverse_ehat_approx))
+        elif inverse_ehat_approx.size == 1:
+            if numpy.imag(inverse_ehat_approx[0]) != 0:
+                raise ValueError('Something is wrong with inverse_ehat_approx: %s',repr(inverse_ehat_approx))
+            else:
+                inverse_e = inverse_ehat_approx[0]
+        
+        if inverse_e > 0.8 or inverse_e < 0:
+            raise ValueError('inverse_e should not be outside range. Something is wrong with inverse_ehat_approx: %s',repr(inverse_ehat_approx))
+        
+        return self._de(e) * self._pe(ehat_approx(inverse_e)) / ehat_prime(inverse_e)
+
+    def _calculate_likelihood(self, ef_max,ei_med,dehat_med, ehat_approx): #TODO: should I remove that which is unused?
+        specific_integrand = partial(self._likelihood_integrand,ehat_approx)
+        I = scipy.integrate.quad(specific_integrand, 0, 0.8)
+        return I
 
     def calculate_log_likelihood(self,
                                  parameters,
@@ -95,7 +120,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         ):
                 return -numpy.inf
         
-        median_e = pull_from_aether()
+        median_e = self._de.ppf(0.5) # TODO: ?
 
         De_away_from_zero = De_min > 0
         De_at_zero = not De_away_from_zero
