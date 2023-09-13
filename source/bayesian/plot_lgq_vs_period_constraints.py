@@ -503,14 +503,23 @@ def add_discard_flags(sampling_data, config):
                 'r'
         ) as manual_f:
             manual_data = json.load(manual_f)
-    for kic in sampling_data:
-        if config.collection == 'w19' and str(kic) in manual_data:
-            discard = manual_data[str(kic)]['discard']
+    for system_id in sampling_data:
+        if config.collection == 'w19' and str(system_id) in manual_data:
+            discard = manual_data[str(system_id)]['discard']
             if discard.lower() == 'none':
                 discard = None
+        elif config.collection == 'hj' and system_id in ['CoRoT-30 b',
+                                                         'WASP-59 b',
+                                                         'WASP-185 b',
+                                                         'TOI-559 b',
+                                                         'K2-132 b',
+                                                         'TOI-2158 b',
+                                                         'TOI-172 b',
+                                                         'TOI-1268 b']:
+            discard = 'upper'
         else:
             discard = None
-        sampling_data[kic]['discard'] = discard
+        sampling_data[system_id]['discard'] = discard
 
 
 def get_sampling_data(config,
