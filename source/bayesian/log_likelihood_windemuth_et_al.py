@@ -65,7 +65,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         ehat_approx_copy = ehat_approx.copy()
         ehat_approx_copy.coef[0] -= e
         inverse_ehat_approx = numpy.polynomial.polynomial.Polynomial((ehat_approx_copy)).roots()
-        
+
         if inverse_ehat_approx.size > 1:
             if inverse_ehat_approx[0] > 0:
                 inverse_e = inverse_ehat_approx[0]
@@ -247,3 +247,13 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             return -numpy.inf
 
         return numpy.log(numerator) - numpy.log(denominator)
+
+if __name__ == '__main__':
+    
+    # Testing
+    bob=LogLikelihoodWindemuth(
+        envelope_eccentricity=0.7,
+        observed_eccentricity_distro=scipy.stats.uniform(loc=0,scale=0.8),
+        de_distro=W19EccentricityDistribution(),
+        pe_distro=scipy.stats.uniform(loc=0,scale=0.8)
+    )
