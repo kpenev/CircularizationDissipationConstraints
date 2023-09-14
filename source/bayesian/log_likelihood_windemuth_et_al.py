@@ -88,7 +88,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         
         return self._de(e) * self._pe(ehat_approx(inverse_e)) / ehat_prime(inverse_e)
 
-    def _calculate_likelihood(self, ef_max,ei_med,dehat_med, ehat_approx): #TODO: should I remove that which is unused?
+    def _calculate_likelihood(self, ehat_approx): #  ef_max,ei_med,dehat_med
         specific_integrand = partial(self._likelihood_integrand,ehat_approx)
         I = scipy.integrate.quad(specific_integrand, 0, 0.8)
         return I
@@ -213,6 +213,9 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         assert likelihood >= 0
         if likelihood == 0:
             return -numpy.inf
+        
+        logger.debug('likelihood = %s',repr(likelihood))
+        logger.debug('log(likelihood) = %s',repr(numpy.log(likelihood)))
 
         return numpy.log(likelihood)
         ########################################### END PSEUDOCODE
