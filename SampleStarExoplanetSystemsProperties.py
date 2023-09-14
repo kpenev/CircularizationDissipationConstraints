@@ -929,14 +929,19 @@ class LogLikelihood:
              ndim=10, #
              reset_backend = False,
              iterations = 16):
-
+        if self.logger is not None:
+            self.logger.debug("We are inside the MCMC method.")
         mcmc_progress_file_name = '%(dirname)s/%(system)s/%(system)s_mcmc_progress.h5' % dict(dirname=self.directory_name, system=self.system_name)
         p0_file_name = '%(dirname)s/%(system)s/%(system)s_p0_file.npy' % dict(dirname=self.directory_name, system=self.system_name)
         ensure_directory(mcmc_progress_file_name)
         ensure_directory(p0_file_name)
-
+        if self.logger is not None:
+            self.logger.debug("directories of mcmc progress file and p0 file are ensured.")
         p0_file_exists = os.path.exists(p0_file_name)
         backend_file_exists = os.path.exists(mcmc_progress_file_name)
+        if self.logger is not None:
+            if p0_file_exists: self.logger.debug("p0 file exists.")
+            if backend_file_exists: self.logger.debug("backend file exists")
 
 
         if (not p0_file_exists):
@@ -969,12 +974,20 @@ class LogLikelihood:
                                                       nwalkers,
                                                       ndim)
         else:
+            if self.logger is not None:
+                self.logger.debug("p0 file is found and it existed previously")
             if backend_file_exists and (not reset_backend):
+                if self.logger is not None:
+                    self.logger.debug("backend file exists and we don't want it to be reset at the very first stage.")
                 backend_file_reader = emcee.backends.HDFBackend(mcmc_progress_file_name, read_only=True)
                 ndim_prev = backend_file_reader.shape[1]
                 if ndim != ndim_prev:
+                    if self.logger is not None:
+                        self.logger.debug("backend file is required to be reset since the ndim does not math previous ndim. ndim= %(ndim)f and prevndim = %(ndim_prev)f" % dict(ndim=ndim, ndim_prev = ndim_prev))
                     reset_backend = True
                 if (not backend_file_reader.initialized) or backend_file_reader.iteration <= 0:
+                    if self.logger is not None:
+                        self.logger.debug("backend file is required to be reset since it was not initialized or iteration number was negative")
                     reset_backend = True
             if (not backend_file_exists) or reset_backend:
                 if self.logger is not None:
@@ -1009,14 +1022,25 @@ class LogLikelihood:
             ensure_directory(logging_file_name)
             ensure_directory(msg_file_name)
             setup_basic_logging(logging_file_name, msg_file_name)
-
+        if self.logger is not None:
+            self.logger.debug("We are going to enter Pool.")
         with Pool(self.number_of_parallel_processes,
                   initializer=setup_basic_logging_for_mcmc,
                   #initargs=[config],
                   maxtasksperchild=1) as pool:
 
             #backend = emcee.backends.HDFBackend(mcmc_progress_file_name)
-            backend = HDFBackend(mcmc_progress_file_name)
+            if self.logger is not None:
+                self.logger.debug("We are inside of Pool. 1 The mcmc filename is %(x)s" % dict(x=mcmc_progress_file_name))
+            try:
+                backend = HDFBackend(mcmc_progress_file_name)
+            except Exception as esc:
+                if self.logger is not None: self.logger.warning(traceback.format_exc())
+            else:
+                if self.logger is not None: self.logger.debug("backend object is created.")
+            if self.logger is not None:
+                self.logger.debug("in Pool: mcmc progress file name is %(x)s" % dict(x=mcmc_progress_file_name))
+                self.logger.debug("backend object is %(x)s" % dict(x=repr(backend)))
             if reset_backend:
                 backend.reset(nwalkers, ndim)
             sampler = emcee.EnsembleSampler(nwalkers, ndim, self.__call__, pool=pool, backend=backend)

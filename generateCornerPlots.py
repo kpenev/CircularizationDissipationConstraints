@@ -56,7 +56,7 @@ if __name__ == '__main__':
         measured_values, standard_deviations, system_name = envelope_eccentricity_distribution_instance.properties_of_ith_binary_system_if_satisfies_constraints(index[i])
         #if not system_name in systems:
         #systems.append(system_name)
-        if i !=13 and i != 26:
+        if i !=13:
             figure = generate_corner_plot(system_name)
             figfilename = "/work/08529/mmmahmud/corner_plots/%(system)s_corner_plot.pdf" % dict(system=system_name)
             merger.append(figfilename)

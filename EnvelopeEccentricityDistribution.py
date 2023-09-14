@@ -9,6 +9,7 @@ from astropy import units as unit
 from astropy import constants as const
 import os
 import json
+from matplotlib import rcParams
 
 def ensure_directory(fname):
         """Make sure the directory containing the given name exists."""
@@ -193,7 +194,7 @@ class EnvelopeEccentricityDistribution:
             for i in range(0, len(self.orbital_period)):
                 if not (math.isnan(self.orbital_period[i])
                         or math.isnan(self.eccentricity_now[i])
-                ) and self.eccentricity_now_limit_flag[i] == 0 and not (self.planet_name[i] in eliminate):
+                ) and not (self.planet_name[i] in eliminate):
                     if (Constraints_for_selecting_systems.constraints_for_eccentricity_envelope_are_satisfied(
                             secondary_radius=self.secondary_radius[i],
                             planet_mass=self.secondary_mass[i],
@@ -315,12 +316,14 @@ class EnvelopeEccentricityDistribution:
         eccentricity_now = [element['present eccentricity'] for element in records_of_x_attribute_and_eccentricity_now]
         eccentricity_now_errormax = [math.fabs(element['present eccentricity upper uncertainty']) for element in records_of_x_attribute_and_eccentricity_now]
         eccentricity_now_errormin = [math.fabs(element['present eccentricity lower uncertainty']) for element in records_of_x_attribute_and_eccentricity_now]
+        eccentricity_now_limit_flag = [math.fabs(element['orbital eccentricity limit flag']) for element in records_of_x_attribute_and_eccentricity_now]
         primary_mass = [element['primary mass'] for element in records_of_x_attribute_and_eccentricity_now]
         x_on_envelope = [element[x_attribute] for element in records_of_the_points_on_envelope]
         eccentricity_now_on_envelope = [element['envelope eccentricity'] for element in
                                         records_of_the_points_on_envelope]
         xdata = np.linspace(records_of_x_attribute_and_eccentricity_now[0][x_attribute],
-                            records_of_x_attribute_and_eccentricity_now[-1][x_attribute],
+                            #records_of_x_attribute_and_eccentricity_now[-1][x_attribute],
+                            (2-4.37023),
                             50)
         ydata = []
         xdata_ = []
@@ -333,6 +336,16 @@ class EnvelopeEccentricityDistribution:
         eccentricity_now_1 = []
         eccentricity_now_errormax_1 = []
         eccentricity_now_errormin_1 = []
+        x_11 = []
+        eccentricity_now_11 = []
+        eccentricity_now_errormax_11 = []
+        eccentricity_now_errormin_11 = []
+        x_12 = []
+        eccentricity_now_12 = []
+        eccentricity_now_errormax_12 = []
+        eccentricity_now_errormin_12 = []
+
+
         x_2 = []
         eccentricity_now_2 = []
         eccentricity_now_errormax_2 = []
@@ -342,11 +355,21 @@ class EnvelopeEccentricityDistribution:
         eccentricity_now_errormax_3 = []
         eccentricity_now_errormin_3 = []
         for i in range(0, len(records_of_x_attribute_and_eccentricity_now)):
-            if primary_mass[i] < 1.2:
+            if primary_mass[i] < 1.2 and primary_mass[i] > 0.4 and eccentricity_now_limit_flag[i]==0:
                 x_1.append(10**(x[i] + 4.37023))
                 eccentricity_now_1.append(eccentricity_now[i])
                 eccentricity_now_errormax_1.append(eccentricity_now_errormax[i])
                 eccentricity_now_errormin_1.append(eccentricity_now_errormin[i])
+            elif primary_mass[i] < 1.2 and primary_mass[i] > 0.4 and eccentricity_now_limit_flag[i]==1:
+                x_11.append(10**(x[i] + 4.37023))
+                eccentricity_now_11.append(eccentricity_now[i])
+                eccentricity_now_errormax_11.append(eccentricity_now_errormax[i])
+                eccentricity_now_errormin_11.append(eccentricity_now_errormin[i])
+            elif primary_mass[i] < 1.2 and primary_mass[i] > 0.4 and eccentricity_now_limit_flag[i]==2:
+                x_12.append(10**(x[i] + 4.37023))
+                eccentricity_now_12.append(eccentricity_now[i])
+                eccentricity_now_errormax_12.append(eccentricity_now_errormax[i])
+                eccentricity_now_errormin_12.append(eccentricity_now_errormin[i])
             else:
                 x_2.append(10**(x[i]+4.37023))
                 eccentricity_now_2.append(eccentricity_now[i])
@@ -380,29 +403,37 @@ class EnvelopeEccentricityDistribution:
                                                                     b =math.log10(x_3[i])-4.37023))
             logging.debug("a over R_p = %(x)f" % dict(x = x_3[i]))
             logging.debug("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-
-
             i = i + 1
 
         plt.plot(xdata_, ydata)
-        y_error = [eccentricity_now_errormin_3, eccentricity_now_errormax_3]
-        plt.errorbar(x_3, eccentricity_now_3, yerr = y_error, fmt = 'x')
+        y_error = [eccentricity_now_errormin_1, eccentricity_now_errormax_1]
+        plt.errorbar(x_1, eccentricity_now_1, yerr = y_error, fmt = 'x', color = "black")
+        y_error = [eccentricity_now_errormin_11, eccentricity_now_errormax_11]
+        plt.errorbar(x_11, eccentricity_now_11, yerr = y_error, fmt = 'x', color = "gray")
+        y_error = [eccentricity_now_errormin_12, eccentricity_now_errormax_12]
+        plt.errorbar(x_12, eccentricity_now_12, yerr = y_error, fmt = 'x', color = "gray")
+
 
         #plt.plot(x_on_envelope, eccentricity_now_on_envelope, '.')
         # naming the x axis
         if x_attribute == 'log of semi major axis over planetary radius':
-            x_attribute_ = 'Semi major axis over planetary radius'
+            x_attribute_ = 'Semi major to planet radius ratio'
         else:
             x_attribute_ = x_attribute
-        plt.xlabel(x_attribute_)
+        #rcParams['font.size'] = 24
+        plt.xlim([20, 1000])
+        plt.xticks(fontsize = 16)
+        plt.yticks(fontsize = 16)
+        plt.xlabel(x_attribute_, fontsize=16)
         # naming the y axis
-        plt.ylabel('Present Eccentricity')
+        plt.ylabel('Present Eccentricity', fontsize=16)
         # giving a title to my graph
         #string = 'Present Eccentricity vs. ' + x_attribute_
         #plt.title(string)
         plt.xscale("log")
+        #rcParams['font.size'] = 48
         fig_file_name = "%(outdir)s/Envelope_Eccentricity_Distribution.pdf" % dict(outdir=self.output_directory)
-        plt.savefig(fig_file_name)
+        plt.savefig(fig_file_name, bbox_inches = "tight")
         plt.clf()
         return
 
