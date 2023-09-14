@@ -65,9 +65,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         ehat_approx_copy = ehat_approx.copy()
         ehat_approx_copy.coef[0] -= e
         inverse_ehat_approx = numpy.polynomial.polynomial.Polynomial((ehat_approx_copy)).roots()
-        # We need to figure out which of the values roots returns is real and positive
-        # Also we should check how many there are because there can be only one
-        # We should also check that the value is between 0 and 0.8
+        
         if inverse_ehat_approx.size > 1:
             if inverse_ehat_approx[0] > 0:
                 inverse_e = inverse_ehat_approx[0]
@@ -107,8 +105,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         parameters = self._choose_solver(parameters,'1d')
         max_final_eccentricity = find_evolution(parameters)[0][-1]
         negligible = 1e-3
-        De_min = self._de.ppf(1e-3)
-        De_max = self._de.ppf(1-1e-3)
+        De_min,De_max = self._de.support()
 
         # Heaviside
         if (
@@ -120,7 +117,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         ):
                 return -numpy.inf
         
-        median_e = self._de.ppf(0.5) # TODO: ?
+        median_e = self._de.ppf(0.5)
 
         De_away_from_zero = De_min > 0
         De_at_zero = not De_away_from_zero
