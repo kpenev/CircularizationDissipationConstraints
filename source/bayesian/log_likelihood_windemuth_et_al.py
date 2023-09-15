@@ -8,6 +8,7 @@ from bayesian.log_likelihood_binary_stars import LogLikelihoodBinaryStars
 from general_purpose_python_modules.reproduce_system import find_evolution
 from bayesian.windemuth_eccentricity_distribution import W19EccentricityDistribution
 from functools import partial
+from stellar_evolution.manager import StellarEvolutionManager
 
 class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
     """The log-likelihood for Windemuth et. al. (2019) EBs."""
@@ -30,7 +31,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         super().__init__(*parent_args,
                          envelope_eccentricity=envelope_eccentricity,
                          **parent_kwargs)
-        self.envelope_weights = observed_eccentricity_distro.eval_sample_cdf(
+        self.envelope_weights = observed_eccentricity_distro.cdf(
             envelope_eccentricity
         )
         self._observed_eccentricity_distro = observed_eccentricity_distro
@@ -251,9 +252,17 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 if __name__ == '__main__':
     
     # Testing
+    interpolator = StellarEvolutionManager('/home/vortebo/ctime/poet/stellar_evolution_interpolators').get_interpolator_by_name(
+        'default'
+    )
     bob=LogLikelihoodWindemuth(
         envelope_eccentricity=0.7,
         observed_eccentricity_distro=scipy.stats.uniform(loc=0,scale=0.8),
-        de_distro=W19EccentricityDistribution(),
-        pe_distro=scipy.stats.uniform(loc=0,scale=0.8)
+        de_distro=W19EccentricityDistribution(10268903,pickle_fname='/home/vortebo/ctime/CircularizationDissipationConstraints/windemuth_eccentricity_distros.pkl'),
+        pe_distro=scipy.stats.uniform(loc=0,scale=0.8),
+        powerlaw_dissipation = 5,
+        interpolator=interpolator,
+        evolution_timeout = 1.0,
+        period_search_factor = 2.0,
+        scaled_period_guess = 1.0
     )
