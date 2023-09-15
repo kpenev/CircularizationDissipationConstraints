@@ -57,6 +57,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         elif solver == '2d':
             parameters['initial_eccentricity'] = 'solve'
             parameters['system'].eccentricity = final_e
+        else:
+            raise ValueError('solver must be either 1d or 2d')
 
         return parameters
     
@@ -67,20 +69,11 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         ehat_approx_copy.coef[0] -= e
         inverse_ehat_approx = numpy.polynomial.polynomial.Polynomial((ehat_approx_copy)).roots()
 
-        if inverse_ehat_approx.size > 1:
-            if inverse_ehat_approx[0] > 0:
-                inverse_e = inverse_ehat_approx[0]
-            elif inverse_ehat_approx[1] > 0:
-                inverse_e = inverse_ehat_approx[1]
-            elif inverse_ehat_approx[0] == 0 or inverse_ehat_approx[1] == 0:
-                inverse_e = 0
-            else:
-                raise ValueError('Something is wrong with inverse_ehat_approx: %s',repr(inverse_ehat_approx))
-        elif inverse_ehat_approx.size == 1:
-            if numpy.imag(inverse_ehat_approx[0]) != 0:
-                raise ValueError('Something is wrong with inverse_ehat_approx: %s',repr(inverse_ehat_approx))
-            else:
-                inverse_e = inverse_ehat_approx[0]
+        inverse_e = numpy.real(inverse_ehat_approx[numpy.isreal(inverse_ehat_approx)])
+        if inverse_e.size == 0:
+            raise ValueError('No real roots found for ehat_approx_copy (inverse_ehat_approx): %s (%s)',repr(ehat_approx_copy),repr(inverse_ehat_approx))
+        else:
+            inverse_e = inverse_e[numpy.argmax(inverse_e)]
         
         if inverse_e > 0.8 or inverse_e < 0:
             raise ValueError('inverse_e should not be outside range. Something is wrong with inverse_ehat_approx: %s',repr(inverse_ehat_approx))
@@ -160,7 +153,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             ) <= negligible
         ): # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
             logger.debug('In a case where we assume ehat is linear in the range where D_e is non-negligible')
-            parameters = self._handle_parameters(parameters,'second',median_e)
+            parameters = self._choose_solver(parameters,'2d',median_e)
             result = find_evolution(parameters)
             init_e,ehat_prime = result[1][1],result[1][0]
             yintercept = median_e - ehat_prime*init_e
@@ -187,7 +180,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             logger.debug('e_to_match = %s',repr(e_to_match))
             logger.debug('e_max_initial = %s',repr(e_max_initial))
             logger.debug('e_max_final = %s',repr(e_max_final))
-            parameters = self._handle_parameters(parameters,'second',e_to_match)
+            parameters = self._choose_solver(parameters,'2d',e_to_match)
             result = find_evolution(parameters)
             init_e,ehat_prime = result[1][1],result[1][0]
             A = numpy.matrix([
@@ -248,6 +241,10 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             return -numpy.inf
 
         return numpy.log(numerator) - numpy.log(denominator)
+    
+    def test_internal_functions():
+        #TODO: write tests for _choose_solver, _likelihood_integrand, _calculate_likelihood
+        return 1
 
 if __name__ == '__main__':
     
