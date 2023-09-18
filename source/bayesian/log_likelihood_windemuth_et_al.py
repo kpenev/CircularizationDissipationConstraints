@@ -67,7 +67,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         ehat_approx_copy = ehat_approx.copy()
         ehat_approx_copy.coef[0] -= e
-        inverse_ehat_approx = numpy.polynomial.polynomial.Polynomial((ehat_approx_copy)).roots()
+        inverse_ehat_approx = numpy.polynomial.polynomial.Polynomial((ehat_approx_copy.coef)).roots()
 
         inverse_e = numpy.real(inverse_ehat_approx[numpy.isreal(inverse_ehat_approx)])
         if inverse_e.size == 0:
@@ -78,11 +78,11 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         if inverse_e > 0.8 or inverse_e < 0:
             raise ValueError('inverse_e should not be outside range. Something is wrong with inverse_ehat_approx: %s',repr(inverse_ehat_approx))
         
-        return self._de(e) * self._pe(ehat_approx(inverse_e)) / ehat_prime(inverse_e)
+        return self._de.cdf(e) * self._pe.cdf((ehat_approx(inverse_e))) / ehat_prime(inverse_e) #TODO: am I calling the right Xpfs here?
 
     def _calculate_likelihood(self, ehat_approx): #  ef_max,ei_med,dehat_med
-        specific_integrand = partial(self._likelihood_integrand,ehat_approx)
-        I = scipy.integrate.quad(specific_integrand, 0, 0.8)
+        specific_integrand = partial(self._likelihood_integrand,ehat_approx=ehat_approx)
+        I = scipy.integrate.quad(specific_integrand, 0, 0.8)[0]
         return I
 
     def calculate_log_likelihood(self,
@@ -242,8 +242,49 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         return numpy.log(numerator) - numpy.log(denominator)
     
-    def test_internal_functions():
-        #TODO: write tests for _choose_solver, _likelihood_integrand, _calculate_likelihood
+    def test_internal_functions(self):
+        logger = logging.getLogger(__name__)
+
+        # Test_likelihood_integrand
+        logger.debug('Testing _likelihood_integrand')
+        print('Testing _likelihood_integrand')
+        e_set = numpy.linspace(0,0.8,20)
+        ehat_set = (
+            #numpy.polynomial.polynomial.Polynomial((1)),
+            numpy.polynomial.polynomial.Polynomial((0,1)),
+            numpy.polynomial.polynomial.Polynomial((1,1)),
+            numpy.polynomial.polynomial.Polynomial((0,0,1)),
+            numpy.polynomial.polynomial.Polynomial((-1,0,1)),
+            numpy.polynomial.polynomial.Polynomial((0,1,1)),
+            numpy.polynomial.polynomial.Polynomial((-1,1,1))
+        )
+        for e in e_set:
+            for ehat in ehat_set:
+                logger.debug('e = %s, ehat = %s',repr(e),repr(ehat))
+                print('e = %s, ehat = %s' % (repr(e),repr(ehat)))
+                logger.debug('Integrand value is %s',repr(self._likelihood_integrand(e,ehat)))
+                print('Integrand value is %s' % (repr(self._likelihood_integrand(e,ehat))))
+
+        # Test _calculate_likelihood
+        logger.debug('Testing _calculate_likelihood')
+        print('Testing _calculate_likelihood')
+        ehat_set = (
+            #numpy.polynomial.polynomial.Polynomial((1)),
+            numpy.polynomial.polynomial.Polynomial((0,1)),
+            numpy.polynomial.polynomial.Polynomial((1,1)),
+            numpy.polynomial.polynomial.Polynomial((0,0,1)),
+            numpy.polynomial.polynomial.Polynomial((-1,0,1)),
+            numpy.polynomial.polynomial.Polynomial((0,1,1)),
+            numpy.polynomial.polynomial.Polynomial((-1,1,1))
+        )
+        for ehat in ehat_set:
+            logger.debug('ehat = %s',repr(ehat))
+            print('ehat = %s' % (repr(ehat)))
+            logger.debug('Integral value is %s',repr(self._calculate_likelihood(ehat)))
+            print('Integral value is %s' % (repr(self._calculate_likelihood(ehat))))
+        
+        print('Testing complete.')
+        
         return 1
 
 if __name__ == '__main__':
@@ -263,3 +304,4 @@ if __name__ == '__main__':
         period_search_factor = 2.0,
         scaled_period_guess = 1.0
     )
+    bob.test_internal_functions()
