@@ -5,10 +5,35 @@ import logging
 import numpy
 import scipy
 from bayesian.log_likelihood_binary_stars import LogLikelihoodBinaryStars
-from general_purpose_python_modules.reproduce_system import find_evolution
+#from general_purpose_python_modules.reproduce_system import find_evolution #TODO: re-enable this when the testing is over
 from bayesian.windemuth_eccentricity_distribution import W19EccentricityDistribution
 from functools import partial
 from stellar_evolution.manager import StellarEvolutionManager
+
+def find_evolution(parameters):
+    initial_eccentricity = parameters['initial_eccentricity']
+    final_period = parameters['system'].orbital_period
+    final_eccentricity = parameters['system'].eccentricity
+
+    print('initial_eccentricity = %s' % (repr(initial_eccentricity)))
+    print('initial_period = %s' % (repr(final_period)))
+    print('final_eccentricity = %s' % (repr(final_eccentricity)))
+
+    initial_eccentricity = final_eccentricity**(1/2) if final_eccentricity < .64 else numpy.nan
+    #numpy.sqrt(initial_eccentricity) / 2 if initial_eccentricity > .25 else initial_eccentricity / 2
+    initial_period = final_period * 2 if final_period < 35 else numpy.nan
+
+    ehat_prime = (final_eccentricity - initial_eccentricity) / (final_period - initial_period)
+
+    print((
+            numpy.array([final_period,final_eccentricity]),
+            numpy.array([ehat_prime,initial_eccentricity])
+        )
+    )
+    return (
+        numpy.array([final_period,final_eccentricity]),
+        numpy.array([ehat_prime,initial_eccentricity])
+    )
 
 class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
     """The log-likelihood for Windemuth et. al. (2019) EBs."""
@@ -70,8 +95,22 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         inverse_ehat_approx = numpy.polynomial.polynomial.Polynomial((ehat_approx_copy.coef)).roots()
 
         inverse_e = numpy.real(inverse_ehat_approx[numpy.isreal(inverse_ehat_approx)])
+        print("!~~~~~~DEBUG~~~~~~!")
+        print('ehat_approx = %s' % (repr(ehat_approx)))
+        print('ehat_prime = %s' % (repr(ehat_prime)))
+        print('e = %s' % (repr(e)))
+        print('ehat_approx_copy = %s' % (repr(ehat_approx_copy)))
+        print('inverse_ehat_approx = %s' % (repr(inverse_ehat_approx)))
+        print('inverse_e = %s' % (repr(inverse_e)))
+        for option in inverse_e:
+            if option < 0 or option > 0.8:
+                inverse_e = inverse_e[inverse_e != option]
         if inverse_e.size == 0:
-            raise ValueError('No real roots found for ehat_approx_copy (inverse_ehat_approx): %s (%s)',repr(ehat_approx_copy),repr(inverse_ehat_approx))
+            #raise ValueError('No real roots found for ehat_approx_copy (inverse_ehat_approx): %s (%s)',repr(ehat_approx_copy),repr(inverse_ehat_approx))
+            # this will be an error when we're not doing debug
+            #TODO
+            print('No in-range real roots found for ehat_approx_copy (inverse_ehat_approx): %s (%s)' % (repr(ehat_approx_copy),repr(inverse_ehat_approx)))
+            inverse_e=numpy.nan
         else:
             inverse_e = inverse_e[numpy.argmax(inverse_e)]
         
@@ -92,7 +131,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         logger = logging.getLogger(__name__)
 
-        assert 'sample_weights_envelope' in other_args #why?
+        assert 'sample_weights_envelope' in other_args #why? TODO
 
         # BEGIN PSEUDOCODE
         #Work out parameters such that when we pass it to find_evolution, we get the 1D solver in the way we want
@@ -125,6 +164,14 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         logger.debug('De_away_from_zero = %s',repr(De_away_from_zero))
         logger.debug('De_at_zero = %s',repr(De_at_zero))
         logger.debug('De_from_zero_to_max = %s',repr(De_from_zero_to_max))
+        print('Various values:')
+        print('median_e = %s' % (repr(median_e)))
+        print('max_final_eccentricity = %s' % (repr(max_final_eccentricity)))
+        print('De range = %s' % (repr((De_min,De_max))))
+        print('Envelope eccentricity = %s' % (repr(self.envelope_eccentricity)))
+        print('De_away_from_zero = %s' % (repr(De_away_from_zero)))
+        print('De_at_zero = %s' % (repr(De_at_zero)))
+        print('De_from_zero_to_max = %s' % (repr(De_from_zero_to_max)))
 
         if (
             De_from_zero_to_max <= negligible
@@ -142,6 +189,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             ) # D_e(e_final=0) is not negligible, and e_hat(e_i=0.8) is in or below D_e.
         ):
             logger.debug('In a case where we assume ehat is linear from 0 to 0.8')
+            print('In a case where we assume ehat is linear from 0 to 0.8')
             ehat_approx = numpy.polynomial.polynomial.Polynomial((0,max_final_eccentricity / 0.8))
         elif (
             De_away_from_zero
@@ -153,6 +201,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             ) <= negligible
         ): # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
             logger.debug('In a case where we assume ehat is linear in the range where D_e is non-negligible')
+            print('In a case where we assume ehat is linear in the range where D_e is non-negligible')
             parameters = self._choose_solver(parameters,'2d',median_e)
             result = find_evolution(parameters)
             init_e,ehat_prime = result[1][1],result[1][0]
@@ -174,12 +223,18 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             ) # D_e(e_final=0) is not negligible, and e_hat(e_i=0.8) is above D_e
         ):
             logger.debug('In a case where we want to use quadratic approximation.')
+            print('In a case where we want to use quadratic approximation.')
             e_to_match,e_max_initial,e_max_final = (De_min,0.8,max_final_eccentricity) if De_away_from_zero else (De_max,0,0)
             logger.debug('Values if De_away_from_zero: e_to_match = %s, e_max_initial = %s, e_max_final = %s',repr(De_min),repr(0.8),repr(max_final_eccentricity))
             logger.debug('Values if De_at_zero: e_to_match = %s, e_max_initial = %s, e_max_final = %s',repr(De_max),repr(0),repr(0))
             logger.debug('e_to_match = %s',repr(e_to_match))
             logger.debug('e_max_initial = %s',repr(e_max_initial))
             logger.debug('e_max_final = %s',repr(e_max_final))
+            print('Values if De_away_from_zero: e_to_match = %s, e_max_initial = %s, e_max_final = %s' % (repr(De_min),repr(0.8),repr(max_final_eccentricity)))
+            print('Values if De_at_zero: e_to_match = %s, e_max_initial = %s, e_max_final = %s' % (repr(De_max),repr(0),repr(0)))
+            print('e_to_match = %s' % (repr(e_to_match)))
+            print('e_max_initial = %s' % (repr(e_max_initial)))
+            print('e_max_final = %s' % (repr(e_max_final)))
             parameters = self._choose_solver(parameters,'2d',e_to_match)
             result = find_evolution(parameters)
             init_e,ehat_prime = result[1][1],result[1][0]
@@ -190,7 +245,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                             ])
             B = numpy.matrix([e_to_match,e_max_final,ehat_prime])
             fit = scipy.linalg.lstsq(A,B.T)[0]
-            ehat_approx = numpy.polynomial.polynomial.Polynomial((fit[2],fit[1],fit[0]))
+            ehat_approx = numpy.polynomial.polynomial.Polynomial((fit[2][0],fit[1][0],fit[0][0]))
         else:
             logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
             raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
@@ -199,6 +254,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         logger.debug('ehat_approx = %s',repr(ehat_approx))
         logger.debug('ehat_prime = %s',repr(ehat_prime))
+        print('ehat_approx = %s' % (repr(ehat_approx)))
+        print('ehat_prime = %s' % (repr(ehat_prime)))
         
         likelihood = self._calculate_likelihood(ehat_approx)
         assert likelihood >= 0
@@ -207,6 +264,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         
         logger.debug('likelihood = %s',repr(likelihood))
         logger.debug('log(likelihood) = %s',repr(numpy.log(likelihood)))
+        print('likelihood = %s' % (repr(likelihood)))
+        print('log(likelihood) = %s' % (repr(numpy.log(likelihood))))
 
         return numpy.log(likelihood)
         ########################################### END PSEUDOCODE
@@ -286,6 +345,64 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         print('Testing complete.')
         
         return 1
+    
+    def test_external_functions(self,interpolator):
+        logger = logging.getLogger(__name__)
+        from astropy import units, constants
+        from types import SimpleNamespace
+
+        # Test calculate_log_likelihood
+        logger.debug('Testing calculate_log_likelihood')
+        # print('Testing calculate_log_likelihood')
+        # parameters = dict(
+        #     system=SimpleNamespace(
+        #         primary_mass=1 * units.M_sun,
+        #         secondary_mass=1 * units.M_sun,
+        #         feh=0.4,
+        #         orbital_period=10 * units.day,
+        #         age=1.2 * units.Gyr,
+        #         eccentricity=0.3
+        #     ),
+        #     interpolator=interpolator,
+        #     dissipation =314827856756252354432,
+        #     max_age =None,
+        #     initial_porb =27.3 * units.day,
+        #     initial_eccentricity =0.0,
+        #     initial_obliquity =0.0,
+        #     disk_period=1 * units.day,
+        #     disk_dissipation_age =2e-3 * units.Gyr,
+        #     primary_wind_strength =0.17,
+        #     primary_wind_saturation =2.78,
+        #     primary_core_envelope_coupling_timescale =0.05,
+        #     secondary_wind_strength =0.0,
+        #     secondary_wind_saturation =100.0,
+        #     secondary_core_envelope_coupling_timescale =0.05,
+        #     secondary_disk_period =None,
+        #     orbital_period_tolerance =1e-6,
+        #     eccentricity_tolerance =1e-6,
+        #     obliquity_tolerance =1e-6,
+        #     period_search_factor =2.0,
+        #     scaled_period_guess =1.0,
+        #     eccentricity_upper_limit =0.8,
+        #     solve =True,
+        #     max_iterations =49,
+        #     secondary_is_star =None,
+        #     precision = 1e-2
+        # )
+        parameters = dict(
+            system=SimpleNamespace(
+                orbital_period=27.3,
+                age=5.89,
+                eccentricity=0.44
+            ),
+            initial_porb =35,
+            initial_eccentricity =0.7,
+            solve =True,
+        )
+        # There should be other setup but I haven't thought through what the edge cases I need to test are.
+        self.calculate_log_likelihood(parameters,sample_weights_envelope=0)
+
+        return 1
 
 if __name__ == '__main__':
     
@@ -296,7 +413,7 @@ if __name__ == '__main__':
     bob=LogLikelihoodWindemuth(
         envelope_eccentricity=0.7,
         observed_eccentricity_distro=scipy.stats.uniform(loc=0,scale=0.8),
-        de_distro=W19EccentricityDistribution(10268903,pickle_fname='/home/vortebo/ctime/CircularizationDissipationConstraints/windemuth_eccentricity_distros.pkl'),
+        de_distro=W19EccentricityDistribution(12356914,pickle_fname='/home/vortebo/ctime/CircularizationDissipationConstraints/windemuth_eccentricity_distros.pkl'),
         pe_distro=scipy.stats.uniform(loc=0,scale=0.8),
         powerlaw_dissipation = 5,
         interpolator=interpolator,
@@ -304,4 +421,5 @@ if __name__ == '__main__':
         period_search_factor = 2.0,
         scaled_period_guess = 1.0
     )
-    bob.test_internal_functions()
+    #bob.test_internal_functions()
+    bob.test_external_functions(interpolator)
