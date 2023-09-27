@@ -154,10 +154,9 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         if inverse_e > 0.8 or inverse_e < 0:
             raise ValueError('inverse_e should not be outside range: %s',repr(inverse_e))
         
-        result = self._de.pdf(e) * self._pe.cdf((ehat_approx(inverse_e))) / ehat_prime(inverse_e) #TODO: am I calling the right Xpfs here?
+        result = self._de.pdf(e) * self._pe.pdf((inverse_e)) / ehat_prime(inverse_e)
         print('self._de.pdf(e) = %s' % (repr(self._de.pdf(e))))
-        print('ehat_approx(inverse_e) = %s' % (repr(ehat_approx(inverse_e))))
-        print('self._pe.cdf((ehat_approx(inverse_e))) = %s' % (repr(self._pe.cdf((ehat_approx(inverse_e))))))
+        print('self._pe.pdf((inverse_e)) = %s' % (repr(self._pe.pdf((inverse_e)))))
         print('ehat_prime(inverse_e) = %s' % (repr(ehat_prime(inverse_e))))
         print('result = %s' % (repr(result)))
         return result
