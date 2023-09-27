@@ -175,7 +175,6 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         assert 'sample_weights_envelope' in other_args #why? TODO
 
-        # BEGIN PSEUDOCODE
         e_to_be_near=0.5
         #Work out parameters such that when we pass it to find_evolution, we get the 1D solver in the way we want
         parameters = self._choose_solver(parameters,'1d')
@@ -345,38 +344,6 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         print('log(likelihood) = %s' % (repr(numpy.log(likelihood))))
 
         return numpy.log(likelihood)
-        ########################################### END PSEUDOCODE
-
-        efinal_cdfs = self._observed_eccentricity_distro.eval_sample_cdf(
-            final_eccentricity
-        )
-        numerator = (
-            efinal_cdfs
-            /
-            self.envelope_weights
-            *
-            other_args['sample_weights_envelope']
-        ).sum()
-
-        denominator = other_args['sample_weights_envelope'].sum()
-
-        logger.debug('Observed e CDF(%s) = %s\nSum: %s',
-                     repr(final_eccentricity),
-                     repr(efinal_cdfs),
-                     repr(efinal_cdfs.sum()))
-        logger.debug('envelope_weights = %s\nSum: %s',
-                     repr(self.envelope_weights),
-                     repr(self.envelope_weights.sum()))
-
-        logger.debug('W19 likelihood = %s / %s',
-                     repr(numerator),
-                     repr(denominator))
-
-        assert numerator >= 0
-        if numerator == 0:
-            return -numpy.inf
-
-        return numpy.log(numerator) - numpy.log(denominator)
     
     def test_internal_functions(self):
         logger = logging.getLogger(__name__)
