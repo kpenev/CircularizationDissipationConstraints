@@ -170,9 +170,9 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         print('result = %s' % (repr(result)))
         return result
 
-    def _calculate_likelihood(self, ehat_approx, GARY, e_max): #  ef_max,ei_med,dehat_med
+    def _calculate_likelihood(self, ehat_approx, GARY, e_min, e_max): #  ef_max,ei_med,dehat_med
         specific_integrand = partial(self._likelihood_integrand,ehat_approx=ehat_approx, GARY = GARY)
-        I = scipy.integrate.quad(specific_integrand, 0, e_max)[0]
+        I = scipy.integrate.quad(specific_integrand, e_min, e_max)[0]
         return I
 
     def calculate_log_likelihood(self,
@@ -325,7 +325,16 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             print('e_max_initial = %s' % (repr(e_max_initial)))
             print(-ehat_approx.coef[1]/(2*ehat_approx.coef[2]))
             if e_to_match < -ehat_approx.coef[1]/(2*ehat_approx.coef[2]) < e_max_initial:
-                raise ValueError('We need to revert back to linear.')
+                #raise ValueError('We need to revert back to linear.')
+                print('We need to revert back to linear.')
+                # Making a straight line between the points (e_max_initial,e_max_final) and (init_e,e_to_match)
+                ehat_prime = (e_max_final - e_to_match) / (e_max_initial - init_e)
+                yintercept = e_to_match - ehat_prime*init_e
+                ehat_approx = numpy.polynomial.polynomial.Polynomial((yintercept,ehat_prime))
+                print('(%s,%s) and (%s,%s)' % (repr(e_max_initial),repr(e_max_final),repr(init_e),repr(e_to_match)))
+                test_min,test_max = e_to_match,e_max_final - (e_max_final-e_to_match)/100
+                #integration_min = #max(0,e_to_match)
+                #integration_max = #min(0.8,e_max_final)
         else:
             logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
             raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
@@ -341,11 +350,13 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         #    print('ehat_approx(%s) = %s' % (repr(e),repr(ehat_approx(e))))
         
         #print('INTERCEPTED! WE testing why integrand has discontinuity at max_final_eccentricity')
-        for e in numpy.linspace(test_min,test_max,20):
-            self._likelihood_integrand(e,ehat_approx,GARY)
-        raise ValueError
+        #for e in numpy.linspace(test_min,test_max,20):
+        #    self._likelihood_integrand(e,ehat_approx,GARY)
+        #raise ValueError
         
-        likelihood = self._calculate_likelihood(ehat_approx,GARY)
+        integration_min = max(0,De_min)
+        integration_max = min(0.8,max_final_eccentricity)
+        likelihood = self._calculate_likelihood(ehat_approx,GARY,integration_min,integration_max)
         #assert likelihood >= 0
         #if likelihood == 0:
         #    return -numpy.inf
