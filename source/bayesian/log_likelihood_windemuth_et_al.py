@@ -12,12 +12,15 @@ from stellar_evolution.manager import StellarEvolutionManager
 from orbital_evolution.transformations import phase_lag
 
 def find_evolution(parameters,envelope_eccentricity=None):
+    print('find_evolution()')
+
     initial_eccentricity = parameters['initial_eccentricity']
     final_period = parameters['system'].orbital_period
     final_eccentricity = parameters['system'].eccentricity
 
+    print('Initial')
     print('initial_eccentricity = %s' % (repr(initial_eccentricity)))
-    print('initial_period = %s' % (repr(final_period)))
+    print('final_period = %s' % (repr(final_period)))
     print('final_eccentricity = %s' % (repr(final_eccentricity)))
 
     if initial_eccentricity != 'solve':
@@ -38,19 +41,13 @@ def find_evolution(parameters,envelope_eccentricity=None):
         final_eccentricity_2 = final_eccentricity + delta_eccentricity if (final_eccentricity + delta_eccentricity) <= 0.8 else final_eccentricity - delta_eccentricity
         change = final_eccentricity_2 / 2
         initial_eccentricity_2 = final_eccentricity_2 + change if (final_eccentricity_2 + change) <= 0.8 else 0.8
-    #numpy.sqrt(initial_eccentricity) / 2 if initial_eccentricity > .25 else initial_eccentricity / 2
-    initial_period = final_period * 1.1 if final_period <= 35 else numpy.nan
-    print('initial_period = %s' % (repr(initial_period)))
 
-    #INSERT
-
+    print('After')
     print('initial_eccentricity = %s' % (repr(initial_eccentricity)))
-    print('initial_period = %s' % (repr(final_period)))
     print('final_eccentricity = %s' % (repr(final_eccentricity)))
     print('initial_eccentricity_2 = %s' % (repr(initial_eccentricity_2)))
     print('final_eccentricity_2 = %s' % (repr(final_eccentricity_2)))
 
-    #ehat_prime = (final_eccentricity - initial_eccentricity) / (final_period - initial_period)
     ehat_prime = (final_eccentricity - final_eccentricity_2) / (initial_eccentricity - initial_eccentricity_2)
     print('ehat_prime = %s' % (repr(ehat_prime)))
 
@@ -119,7 +116,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         return parameters
     
-    def _likelihood_integrand(self,e,ehat_approx, GARY):
+    def _likelihood_integrand(self,e,ehat_approx, e_to_be_near):
         ehat_prime = ehat_approx.deriv()
         print('e = %s' % (repr(e)))
 
@@ -128,12 +125,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             ehat_approx_copy.coef[0] -= e
             inverse_ehat_approx = numpy.polynomial.polynomial.Polynomial((ehat_approx_copy.coef)).roots()
             inverse_e = numpy.real(inverse_ehat_approx[numpy.isreal(inverse_ehat_approx)])
-            # print("!~~~~~~DEBUG~~~~~~!")
-            # print('ehat_approx = %s' % (repr(ehat_approx)))
-            # print('ehat_prime = %s' % (repr(ehat_prime)))
             print('e = %s' % (repr(e)))
-            # print('ehat_approx_copy = %s' % (repr(ehat_approx_copy)))
-            # print('inverse_ehat_approx = %s' % (repr(inverse_ehat_approx)))
             print('inverse_e = %s' % (repr(inverse_e)))
             for option in inverse_e:
                 if option < 0 or option > 0.8:
@@ -146,10 +138,10 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 print('No in-range real roots found for ehat_approx_copy (inverse_ehat_approx): %s (%s)' % (repr(ehat_approx_copy),repr(inverse_ehat_approx)))
                 inverse_e=numpy.nan
             else:
-                print('inverse_e-GARY = %s' % (repr(inverse_e-GARY)))
-                print('numpy.abs(inverse_e-GARY) = %s' % (repr(numpy.abs(inverse_e-GARY))))
-                print('numpy.argmin(numpy.abs(inverse_e-GARY)) = %s' % (repr(numpy.argmin(numpy.abs(inverse_e-GARY)))))
-                inverse_e = inverse_e[numpy.argmin(numpy.abs(inverse_e-GARY))]
+                print('inverse_e-e_to_be_near = %s' % (repr(inverse_e-e_to_be_near)))
+                print('numpy.abs(inverse_e-e_to_be_near) = %s' % (repr(numpy.abs(inverse_e-e_to_be_near))))
+                print('numpy.argmin(numpy.abs(inverse_e-e_to_be_near)) = %s' % (repr(numpy.argmin(numpy.abs(inverse_e-e_to_be_near)))))
+                inverse_e = inverse_e[numpy.argmin(numpy.abs(inverse_e-e_to_be_near))]
             print('chosen inverse_e = %s' % (repr(inverse_e)))
         elif ehat_approx.degree() == 1:
             reverse = numpy.polynomial.polynomial.Polynomial((-ehat_approx.coef[0]/ehat_approx.coef[1],1/ehat_approx.coef[1]))
@@ -170,8 +162,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         print('result = %s' % (repr(result)))
         return result
 
-    def _calculate_likelihood(self, ehat_approx, GARY, e_min, e_max): #  ef_max,ei_med,dehat_med
-        specific_integrand = partial(self._likelihood_integrand,ehat_approx=ehat_approx, GARY = GARY)
+    def _calculate_likelihood(self, ehat_approx, e_to_be_near, e_min, e_max): #  ef_max,ei_med,dehat_med
+        specific_integrand = partial(self._likelihood_integrand,ehat_approx=ehat_approx, e_to_be_near = e_to_be_near)
         I = scipy.integrate.quad(specific_integrand, e_min, e_max)[0]
         return I
 
@@ -185,7 +177,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         assert 'sample_weights_envelope' in other_args #why? TODO
 
         # BEGIN PSEUDOCODE
-        GARY=0.5
+        e_to_be_near=0.5
         #Work out parameters such that when we pass it to find_evolution, we get the 1D solver in the way we want
         parameters = self._choose_solver(parameters,'1d')
         #max_final_eccentricity = find_evolution(**parameters)[0].eccentricity[-1]
@@ -203,7 +195,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             or
             numpy.isnan(max_final_eccentricity)
         ):
-                print('uh ohhhhh')
+                print('Heaviside says no')
                 return -numpy.inf
         
         median_e = self._de.ppf(0.5)
@@ -226,11 +218,10 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         print('De range = %s' % (repr((De_min,De_max))))
         print('Envelope eccentricity = %s' % (repr(self.envelope_eccentricity)))
         print('De_away_from_zero = %s' % (repr(De_away_from_zero)))
-        print('De_at_zero = %s' % (repr(De_at_zero)))
         print('De_from_zero_to_max = %s' % (repr(De_from_zero_to_max)))
 
-        test_min = 0
-        test_max = 0.8
+        #test_min = 0
+        #test_max = 0.8
 
         if (
             #De_from_zero_to_max <= negligible
@@ -263,7 +254,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             ) <= negligible
         ): # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
             logger.debug('In a case where we assume ehat is linear in the range where D_e is non-negligible')
-            test_min,test_max = De_min,De_max
+            #test_min,test_max = De_min,De_max
             print('In a case where we assume ehat is linear in the range where D_e is non-negligible')
             parameters = self._choose_solver(parameters,'2d',median_e)
             #result = find_evolution(**parameters)
@@ -291,26 +282,20 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             logger.debug('In a case where we want to use quadratic approximation.')
             print('In a case where we want to use quadratic approximation.')
             e_to_match,e_max_initial,e_max_final = (De_min,0.8,max_final_eccentricity) if De_away_from_zero else (De_max,0,0)
-            logger.debug('Values if De_away_from_zero: e_to_match = %s, e_max_initial = %s, e_max_final = %s',repr(De_min),repr(0.8),repr(max_final_eccentricity))
-            logger.debug('Values if De_at_zero: e_to_match = %s, e_max_initial = %s, e_max_final = %s',repr(De_max),repr(0),repr(0))
             logger.debug('e_to_match = %s',repr(e_to_match))
             logger.debug('e_max_initial = %s',repr(e_max_initial))
             logger.debug('e_max_final = %s',repr(e_max_final))
-            print('Values if De_away_from_zero: e_to_match = %s, e_max_initial = %s, e_max_final = %s' % (repr(De_min),repr(0.8),repr(max_final_eccentricity)))
-            print('Values if De_at_zero: e_to_match = %s, e_max_initial = %s, e_max_final = %s' % (repr(De_max),repr(0),repr(0)))
             print('e_to_match = %s' % (repr(e_to_match)))
             print('e_max_initial = %s' % (repr(e_max_initial)))
             print('e_max_final = %s' % (repr(e_max_final)))
             parameters = self._choose_solver(parameters,'2d',e_to_match)
             #result = find_evolution(**parameters)
             result = find_evolution(parameters)
-            print('result = %s' % (repr(result)))
             #init_e,ehat_prime = result[0].eccentricity[0],result[1][0][0]
             init_e,ehat_prime = result[1][1],result[1][0]
             print('ehat_prime = %s' % (repr(ehat_prime)))
-            print('e_to_match = %s' % (repr(e_to_match)))
             print('init_e = %s' % (repr(init_e)))
-            GARY=init_e
+            e_to_be_near=init_e
             A = numpy.matrix([
                                 [init_e**2,        init_e,        1],
                                 [e_max_initial**2, e_max_initial, 1],
@@ -319,11 +304,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             B = numpy.matrix([e_to_match,e_max_final,ehat_prime])
             fit = scipy.linalg.lstsq(A,B.T)[0]
             ehat_approx = numpy.polynomial.polynomial.Polynomial((fit[2][0],fit[1][0],fit[0][0]))
-            print('ehat_approx = %s' % (repr(ehat_approx)))
-            print('HEADS UP')
-            print('e_to_match = %s' % (repr(e_to_match)))
-            print('e_max_initial = %s' % (repr(e_max_initial)))
-            print(-ehat_approx.coef[1]/(2*ehat_approx.coef[2]))
+            print('Location of maximum: %s' % (repr(-ehat_approx.coef[1]/(2*ehat_approx.coef[2]))))
             if e_to_match < -ehat_approx.coef[1]/(2*ehat_approx.coef[2]) < e_max_initial:
                 #raise ValueError('We need to revert back to linear.')
                 print('We need to revert back to linear.')
@@ -332,9 +313,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 yintercept = e_to_match - ehat_prime*init_e
                 ehat_approx = numpy.polynomial.polynomial.Polynomial((yintercept,ehat_prime))
                 print('(%s,%s) and (%s,%s)' % (repr(e_max_initial),repr(e_max_final),repr(init_e),repr(e_to_match)))
-                test_min,test_max = e_to_match,e_max_final - (e_max_final-e_to_match)/100
-                #integration_min = #max(0,e_to_match)
-                #integration_max = #min(0.8,e_max_final)
+                #test_min,test_max = e_to_match,e_max_final - (e_max_final-e_to_match)/100
         else:
             logger.error('Something went wrong in the Windemuth likelihood function. Please check the code.')
             raise ValueError('Something went wrong in the Windemuth likelihood function. Please check the code.')
@@ -351,12 +330,12 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         
         #print('INTERCEPTED! WE testing why integrand has discontinuity at max_final_eccentricity')
         #for e in numpy.linspace(test_min,test_max,20):
-        #    self._likelihood_integrand(e,ehat_approx,GARY)
+        #    self._likelihood_integrand(e,ehat_approx,e_to_be_near)
         #raise ValueError
         
         integration_min = max(0,De_min)
         integration_max = min(0.8,max_final_eccentricity)
-        likelihood = self._calculate_likelihood(ehat_approx,GARY,integration_min,integration_max)
+        likelihood = self._calculate_likelihood(ehat_approx,e_to_be_near,integration_min,integration_max)
         #assert likelihood >= 0
         #if likelihood == 0:
         #    return -numpy.inf
