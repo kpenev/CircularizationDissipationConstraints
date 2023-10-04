@@ -231,24 +231,24 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
 
         #False positive
         #pylint: disable=no-member
-        if numpy.allclose(evolution.age[-1],
+        if numpy.allclose(evolution[0].age[-1],
                           expected_final_age,
                           rtol=1e-10,
                           atol=1e-10):
 
-            self.final_eccentricity = evolution.eccentricity[-1]
+            self.final_eccentricity = evolution[0].eccentricity[-1]
             #pylint: enable=no-member
 
             logger.info(
                 'Successful evolution found: ef = %g',
-                evolution.eccentricity[-1]
+                evolution[0].eccentricity[-1]
             )
 
-            return evolution.eccentricity[-1]
+            return evolution[0].eccentricity[-1]
 
         logger.error(
             'Evolution terminated prematurely at t=%g (< %g) with ef = %g',
-            evolution.age[-1],
+            evolution[0].age[-1],
             expected_final_age,
             (
                 numpy.nan if self.final_eccentricity is None
