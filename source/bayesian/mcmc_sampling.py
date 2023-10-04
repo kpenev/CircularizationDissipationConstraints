@@ -14,7 +14,7 @@ import h5py
 from astropy import units
 from asteval import Interpreter
 
-from multiprocessing_util import get_code_version_str, setup_process
+from multiprocessing_util import get_code_version_str, setup_process, setup_process_map
 from bayesian.hacked_emcee_hdf5_backend import HDFBackend
 
 _mutable_config_params = set(['mcmc_nsteps',
@@ -359,8 +359,8 @@ def evaluate_walker_positions(position_queue,
                   )
     _logger.info('Evaluating starting positions.')
     for position in iter(position_queue.get, 'STOP'):
-        log_prob_result = log_prob_fn(position)
-        result_queue.put((position, log_prob_result))
+        log_prob_result = log_prob_fn(position[0])
+        result_queue.put((position[0], log_prob_result))
 
 def save_initial_position(position,
                           log_prob_result,
@@ -574,11 +574,11 @@ def get_initial_state(*,
     if config.mcmc_recover_initial_conditions:
         recovered_positions = recover_initial_positions(config, num_params)
         for position in recovered_positions:
-            position_queue.put(position)
+            position_queue.put((position,))
     else:
         recovered_positions = numpy.array([])
     for _ in range(config.mcmc_nwalkers - recovered_positions.shape[0]):
-        position_queue.put(norm.rvs(size=num_params))
+        position_queue.put((norm.rvs(size=num_params),))
 
     workers = [
         Process(
@@ -608,7 +608,7 @@ def get_initial_state(*,
             _logger.debug('%d/%d starting positions found',
                           positions_found,
                           config.mcmc_nwalkers)
-            position_queue.put(norm.rvs(size=num_params))
+            position_queue.put((norm.rvs(size=num_params),))
         else:
             orig_pos_repr = repr(position)
             if position[lgq_min_param_index] >- 2.0:
@@ -625,7 +625,7 @@ def get_initial_state(*,
                 _logger.debug('Declaring starting hopeless: %s -> %s',
                               orig_pos_repr,
                               repr(position))
-            position_queue.put(position)
+            position_queue.put((position,))
 
     for process in workers:
         process.terminate()
@@ -730,17 +730,19 @@ def run(config,
     if config.num_parallel_processes > 1:
         with Pool(
                 config.num_parallel_processes,
-                initializer=setup_process,
+                initializer=setup_process_map,
                 initargs=[
-                    config.fname_datetime_format,
-                    config.system,
-                    config.std_out_err_fname,
-                    config.logging_fname,
-                    config.logging_verbosity,
-                    config.logging_message_format,
-                    config.logging_datetime_format
+                    dict(
+                        fname_datetime_format=config.fname_datetime_format,
+                        system=config.system,
+                        std_out_err_fname=config.std_out_err_fname,
+                        logging_fname=config.logging_fname,
+                        logging_verbosity=config.logging_verbosity,
+                        logging_message_format=config.logging_message_format,
+                        logging_datetime_format=config.logging_datetime_format
+                    )
                   ],
-                maxtasksperchild=1
+                maxtasksperchild=None
         ) as workers:
             sampler = emcee.EnsembleSampler(**sampler_config,
                                             pool=UnchunkedPool(workers))
