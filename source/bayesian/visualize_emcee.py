@@ -93,7 +93,7 @@ def add_frequency_dependence_plot_config(parser, disable=()):
     if 'lgQ_grid' not in disable:
         parser.add_argument(
             '--lgQ-grid',
-            default=numpy.linspace(4, 12, 100),
+            default=list(numpy.linspace(4, 12, 100)),
             action=ParseGrid,
             nargs=3,
             metavar=('MIN_LGQ', 'MAX_LGQ', 'RES'),
@@ -138,7 +138,7 @@ def add_frequency_dependence_plot_config(parser, disable=()):
         parser.add_argument(
             '--ptide-grid',
             nargs=4,
-            default=numpy.logspace(0.0, numpy.log10(50.0), 100),
+            default=list(numpy.logspace(0.0, numpy.log10(50.0), 100)),
             action=ParseGrid,
             metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES', 'GRID_TYPE'),
             help='Set the range and resolution of the tidal period to include '
