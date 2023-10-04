@@ -6,7 +6,10 @@ import logging
 import traceback
 
 import numpy
+import scipy
 from astropy import units
+from types import SimpleNamespace
+import math
 
 from general_purpose_python_modules import KDEDistribution
 from general_purpose_python_modules import split_normal
@@ -23,6 +26,8 @@ from bayesian.windemuth_et_al_util import \
 from bayesian.prior_transform_windemuth_et_al import PriorTransformWindemuth
 from bayesian.log_likelihood_windemuth_et_al import LogLikelihoodWindemuth
 from bayesian.sample import sample
+
+from bayesian.windemuth_eccentricity_distribution import W19EccentricityDistribution
 
 def prepare_sampling(config):
     """Return log-likelihood & prior transform for sampling selected binary."""
@@ -59,6 +64,16 @@ def prepare_sampling(config):
     observed_eccentricity_distro = KDEDistribution(samples['e'],
                                                    eccentricity_kernel)
 
+    # Get the system
+    c=numpy.median(samples['esinw'])
+    d=numpy.median(samples['ecosw'])
+    e=c/math.sin(math.atan(c/d))
+    system=SimpleNamespace(
+                orbital_period=numpy.median(samples['P']),
+                age=10**numpy.median(samples['tau'])/10**9,
+                eccentricity=e
+            )
+
     log_likelihood = LogLikelihoodWindemuth(
         observed_eccentricity_distro=observed_eccentricity_distro,
         interpolator=interpolator,
@@ -71,7 +86,10 @@ def prepare_sampling(config):
         evolution_timeout=config.evolution_timeout,
         period_search_factor=config.initial_period_search_factor,
         scaled_period_guess=config.initial_period_scaled_guess,
-        prior_only=(config.sampling == 'prior')
+        prior_only=(config.sampling == 'prior'),
+        de_distro=W19EccentricityDistribution(3348093,pickle_fname='/home/vortebo/ctime/CircularizationDissipationConstraints/windemuth_eccentricity_distros.pkl'),
+        pe_distro=scipy.stats.uniform(loc=0,scale=0.8),
+        system=system
     )
     independent_parameter_distributions = get_common_binary_star_priors(
         config,
@@ -97,11 +115,7 @@ def prepare_sampling(config):
 
     prior_transform = PriorTransformWindemuth(
         samples,
-        initial_sample_weights=(
-            None
-            if config.sampling == 'prior' else
-            log_likelihood.envelope_weights
-        ),
+        initial_sample_weights=None,
         independent_parameter_distributions=independent_parameter_distributions,
         model_parameter_order=log_likelihood.parameter_order
     )
