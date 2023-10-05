@@ -30,8 +30,8 @@ _data_dir = path.join(
     'windemuth_et_al_19_samples'
 )
 
-eccentricity_envelope = LinearEccentricityEnvelope(min_period=0.8,
-                                                   max_period=23.0,
+eccentricity_envelope = LinearEccentricityEnvelope(min_period=1.0,
+                                                   max_period=18.0,
                                                    min_eccenticity=0.001,
                                                    max_eccentricity=0.8)
 _logger = logging.getLogger(__name__)
