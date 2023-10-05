@@ -115,7 +115,7 @@ def prepare_sampling(config):
 
     prior_transform = PriorTransformWindemuth(
         samples,
-        initial_sample_weights=None,
+        initial_sample_weights=numpy.ones(samples['P'].size, dtype=float),
         independent_parameter_distributions=independent_parameter_distributions,
         model_parameter_order=log_likelihood.parameter_order
     )
