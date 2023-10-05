@@ -30,9 +30,9 @@ _data_dir = path.join(
     'windemuth_et_al_19_samples'
 )
 
-eccentricity_envelope = LinearEccentricityEnvelope(min_period=1.0,
-                                                   max_period=25.0,
-                                                   min_eccenticity=0.02,
+eccentricity_envelope = LinearEccentricityEnvelope(min_period=0.8,
+                                                   max_period=23.0,
+                                                   min_eccenticity=0.001,
                                                    max_eccentricity=0.8)
 _logger = logging.getLogger(__name__)
 
@@ -236,7 +236,8 @@ def plot_eccentricity_vs_period(plot_fname, available_kic):
                                                        ('Mratio_median', float),
                                                        ('Mratio_min', float),
                                                        ('Mratio_max', float)])
-    target_quantiles = stats.norm().cdf((-1.0, 0.0, 1.0))
+    target_quantiles = stats.norm().cdf((-2.0, 0.0, 2.0))
+    print(f'Target quantiles: {target_quantiles!r}')
     for i, kic in enumerate(available_kic):
         samples = get_samples(kic)
         plot_data['KIC'] = kic
@@ -245,12 +246,12 @@ def plot_eccentricity_vs_period(plot_fname, available_kic):
                 plot_data[f'{quantity}_min'][i],
                 plot_data[f'{quantity}_median'][i],
                 plot_data[f'{quantity}_max'][i]
-            ) = numpy.percentile(samples[quantity].array, target_quantiles)
+            ) = numpy.quantile(samples[quantity].array, target_quantiles)
         (
             plot_data['e_min'][i],
             plot_data['e_median'][i],
             plot_data['e_max'][i]
-        ) = numpy.percentile(
+        ) = numpy.quantile(
             numpy.sqrt(
                 samples['esinw'].array**2
                 +
@@ -262,38 +263,46 @@ def plot_eccentricity_vs_period(plot_fname, available_kic):
             plot_data['M1_min'][i],
             plot_data['M1_median'][i],
             plot_data['M1_max'][i]
-        ) = numpy.percentile(
+        ) = numpy.quantile(
             samples['Mtot']
             /
             (1.0 + numpy.minimum(samples['Mratio'], 1.0 / samples['Mratio'])),
             target_quantiles
         )
+        if kic == 12356914:
+            print(f'12356914 plot_data: {plot_data[i:i+1]!r}')
+
 
     selected = plot_data['Mratio_median'] > 0.5
-    for label in ['q > 0.5', 'q <= 0.5']:
-        pyplot.xscale('log')
-        pyplot.errorbar(
-            plot_data['P_median'][selected],
-            plot_data['e_median'][selected],
-            numpy.stack((
-                plot_data['e_median'] - plot_data['e_min'],
-                plot_data['e_max'] - plot_data['e_median']
-            ))[:, selected],
-            numpy.stack((
-                plot_data['P_median'] - plot_data['P_min'],
-                plot_data['P_max'] - plot_data['P_median']
-            ))[:, selected],
-            fmt='o',
-            markerfacecolor='none',
-            label=label
-        )
-        selected = numpy.logical_not(selected)
+    for subplot, yscale in enumerate(['linear', 'log']):
+        pyplot.subplot(2, 1, subplot + 1)
 
-    envelope_x = 10.0**numpy.linspace(-1.0, 3, 1000)
-    pyplot.plot(envelope_x,
-                eccentricity_envelope(envelope_x),
-                '-k')
-    pyplot.legend()
+        pyplot.yscale(yscale)
+        pyplot.xscale('log')
+
+        for label in ['q > 0.5', 'q <= 0.5']:
+            pyplot.errorbar(
+                plot_data['P_median'][selected],
+                plot_data['e_median'][selected],
+                numpy.stack((
+                    plot_data['e_median'] - plot_data['e_min'],
+                    plot_data['e_max'] - plot_data['e_median']
+                ))[:, selected],
+                numpy.stack((
+                    plot_data['P_median'] - plot_data['P_min'],
+                    plot_data['P_max'] - plot_data['P_median']
+                ))[:, selected],
+                fmt='o',
+                markerfacecolor='none',
+                label=label
+            )
+            selected = numpy.logical_not(selected)
+
+        envelope_x = 10.0**numpy.linspace(-1.0, 3, 1000)
+        pyplot.plot(envelope_x,
+                    eccentricity_envelope(envelope_x),
+                    '-k')
+        pyplot.legend()
     if not plot_fname:
         pyplot.show()
     else:
