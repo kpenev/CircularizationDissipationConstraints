@@ -17,30 +17,22 @@ def find_evolution(parameters,envelope_eccentricity=None):
     initial_eccentricity = parameters['initial_eccentricity']
     final_period = parameters['system'].orbital_period
     final_eccentricity = parameters['system'].eccentricity
-
+    logQ = parameters['dissipation']['lgQ_min']
     #print('Initial')
     #print('initial_eccentricity = %s' % (repr(initial_eccentricity)))
     #print('final_period = %s' % (repr(final_period)))
     #print('final_eccentricity = %s' % (repr(final_eccentricity)))
 
     if initial_eccentricity != 'solve':
-        #final_eccentricity = initial_eccentricity**2
-        change = initial_eccentricity / 2
-        #print('change = %s' % (repr(change)))
-        final_eccentricity = initial_eccentricity - change if (initial_eccentricity - change) >= 0.1 else 0.1
+        final_eccentricity = initial_eccentricity * (1 - numpy.exp(-logQ/7))
         delta_eccentricity = 0.01
         initial_eccentricity_2 = initial_eccentricity + delta_eccentricity if (initial_eccentricity + delta_eccentricity) <= 0.8 else initial_eccentricity - delta_eccentricity
-        change = initial_eccentricity_2 / 2
-        final_eccentricity_2 = initial_eccentricity_2 - change if (initial_eccentricity_2 - change) >= 0.1 else 0.1
+        final_eccentricity_2 = initial_eccentricity_2 * (1 - numpy.exp(-logQ/7))
     else:
-        #initial_eccentricity = final_eccentricity**(1/2) if final_eccentricity < .64 else numpy.nan
-        change = final_eccentricity / 2
-        #print('change = %s' % (repr(change)))
-        initial_eccentricity = final_eccentricity + change if (final_eccentricity + change) <= 0.8 else 0.8
+        initial_eccentricity = final_eccentricity / (1 - numpy.exp(-logQ/7))
         delta_eccentricity = 0.01
         final_eccentricity_2 = final_eccentricity + delta_eccentricity if (final_eccentricity + delta_eccentricity) <= 0.8 else final_eccentricity - delta_eccentricity
-        change = final_eccentricity_2 / 2
-        initial_eccentricity_2 = final_eccentricity_2 + change if (final_eccentricity_2 + change) <= 0.8 else 0.8
+        initial_eccentricity_2 = final_eccentricity_2 / (1 - numpy.exp(-logQ/7))
 
     #print('After')
     #print('initial_eccentricity = %s' % (repr(initial_eccentricity)))
@@ -99,6 +91,10 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         self._de = de_distro
         self._pe = pe_distro
         self.system = system
+
+        self.a = 0
+        self.c = 0
+        self.b = 0
 
     def _choose_solver(self, parameters, solver = '1d', final_e = 0):
         """Handle the parameters passed to the log-likelihood function."""
@@ -191,6 +187,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         parameters = self._choose_solver(parameters,'1d')
         #max_final_eccentricity = find_evolution(**parameters)[0].eccentricity[-1]
         max_final_eccentricity = find_evolution(parameters)[0][1]
+        self.final_eccentricity = max_final_eccentricity
         negligible = 1e-3
         De_min,De_max = self._de.support()
 
@@ -203,6 +200,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             (max_final_eccentricity is None)
             or
             numpy.isnan(max_final_eccentricity)
+            or
+            (max_final_eccentricity < De_min)
         ):
                 print('Heaviside says no')
                 return -numpy.inf
@@ -235,12 +234,12 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         if (
             #De_from_zero_to_max <= negligible
             #or
-            (
-                De_away_from_zero
-                and
-                max_final_eccentricity < De_min
-            ) # D_e is negligible near e=0, and e_hat(e_i=0.8) is below D_e.
-            or
+            #(
+            #    De_away_from_zero
+            #    and
+            #    max_final_eccentricity < De_min
+            #) # D_e is negligible near e=0, and e_hat(e_i=0.8) is below D_e.
+            #or
             (
                 De_at_zero
                 and
@@ -353,6 +352,11 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         logger.debug('log(likelihood) = %s',repr(numpy.log(likelihood)))
         print('likelihood = %s' % (repr(likelihood)))
         print('log(likelihood) = %s' % (repr(numpy.log(likelihood))))
+
+        if ehat_approx.degree() == 2:
+            self.a = ehat_approx.coef[2]
+        self.c = ehat_approx.coef[0]
+        self.b = ehat_approx.coef[1]
 
         return numpy.log(likelihood)
     
