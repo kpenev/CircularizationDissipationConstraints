@@ -72,7 +72,7 @@ def log_probability(independent_normal_values,
                 -
                 len(exclude_from_blob)
                 +
-                (2 if track_final_eccentricity else 1)
+                (5 if track_final_eccentricity else 4)
             )
         )
     log_likelihood_value = norm.logpdf(independent_normal_values).sum()
@@ -105,6 +105,15 @@ def log_probability(independent_normal_values,
                     log_likelihood.final_eccentricity)
             ,
         )
+    # also I would like to add the coefficientssssss
+    parameters += (log_likelihood.a,)
+    parameters += (log_likelihood.b,)
+    parameters += (log_likelihood.c,)
+
+    _logger.debug('Final blob with %d parameters: %s.',
+                  len(parameters),
+                  repr(parameters))
+
     return (
         (log_likelihood_value,)
         +
@@ -644,6 +653,11 @@ def get_sampler_config_and_initial_state(config,
 
     if config.track_final_eccentricity:
         blobs_dtype.append(('e_f', float))
+
+    # add labels for the coeffs
+    blobs_dtype.append(('a', float))
+    blobs_dtype.append(('b', float))
+    blobs_dtype.append(('c', float))
 
     blobs_dtype = numpy.dtype(blobs_dtype)
 
