@@ -5,37 +5,39 @@ import logging
 import numpy
 import scipy
 from bayesian.log_likelihood_binary_stars import LogLikelihoodBinaryStars
-#from general_purpose_python_modules.reproduce_system import find_evolution #TODO: re-enable this when the testing is over
+from general_purpose_python_modules.reproduce_system import find_evolution
 from bayesian.windemuth_eccentricity_distribution import W19EccentricityDistribution
 from functools import partial
 from stellar_evolution.manager import StellarEvolutionManager
 from orbital_evolution.transformations import phase_lag
+from astropy import units
+from types import SimpleNamespace
 
-def find_evolution(parameters,envelope_eccentricity=None):
+# def find_evolution(parameters,envelope_eccentricity=None):
 
-    initial_eccentricity = parameters['initial_eccentricity']
-    final_period = parameters['system'].orbital_period
-    final_eccentricity = parameters['system'].eccentricity
-    logQ = parameters['dissipation']['lgQ_min']
+#     initial_eccentricity = parameters['initial_eccentricity']
+#     final_period = parameters['system'].orbital_period
+#     final_eccentricity = parameters['system'].eccentricity
+#     logQ = parameters['dissipation']['lgQ_min']
 
-    if initial_eccentricity != 'solve':
-        final_eccentricity = initial_eccentricity * (1 - numpy.exp(-logQ/7))
-        delta_eccentricity = 0.01
-        initial_eccentricity_2 = initial_eccentricity + delta_eccentricity if (initial_eccentricity + delta_eccentricity) <= 0.8 else initial_eccentricity - delta_eccentricity
-        final_eccentricity_2 = initial_eccentricity_2 * (1 - numpy.exp(-logQ/7))
-    else:
-        initial_eccentricity = final_eccentricity / (1 - numpy.exp(-logQ/7))
-        delta_eccentricity = 0.01
-        final_eccentricity_2 = final_eccentricity + delta_eccentricity if (final_eccentricity + delta_eccentricity) <= 0.8 else final_eccentricity - delta_eccentricity
-        initial_eccentricity_2 = final_eccentricity_2 / (1 - numpy.exp(-logQ/7))
+#     if initial_eccentricity != 'solve':
+#         final_eccentricity = initial_eccentricity * (1 - numpy.exp(-logQ/7))
+#         delta_eccentricity = 0.01
+#         initial_eccentricity_2 = initial_eccentricity + delta_eccentricity if (initial_eccentricity + delta_eccentricity) <= 0.8 else initial_eccentricity - delta_eccentricity
+#         final_eccentricity_2 = initial_eccentricity_2 * (1 - numpy.exp(-logQ/7))
+#     else:
+#         initial_eccentricity = final_eccentricity / (1 - numpy.exp(-logQ/7))
+#         delta_eccentricity = 0.01
+#         final_eccentricity_2 = final_eccentricity + delta_eccentricity if (final_eccentricity + delta_eccentricity) <= 0.8 else final_eccentricity - delta_eccentricity
+#         initial_eccentricity_2 = final_eccentricity_2 / (1 - numpy.exp(-logQ/7))
 
 
-    ehat_prime = (final_eccentricity - final_eccentricity_2) / (initial_eccentricity - initial_eccentricity_2)
+#     ehat_prime = (final_eccentricity - final_eccentricity_2) / (initial_eccentricity - initial_eccentricity_2)
 
-    return (
-        numpy.array([final_period,final_eccentricity]),
-        numpy.array([ehat_prime,initial_eccentricity])
-    )
+#     return (
+#         numpy.array([final_period,final_eccentricity]),
+#         numpy.array([ehat_prime,initial_eccentricity])
+#     )
 
 class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
     """The log-likelihood for Windemuth et. al. (2019) EBs."""
@@ -140,19 +142,101 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         logger = logging.getLogger(__name__)
 
+        interpolator = StellarEvolutionManager('/home/vortebo/ctime/poet/stellar_evolution_interpolators').get_interpolator_by_name(
+            'default'
+        )
+
         parameters = dict()
+        parameters['dissipation'] = dict()
+        parameters['dissipation']['primary'] = dict()
+        parameters['dissipation']['secondary'] = dict()
+        parameters['system'] = SimpleNamespace(
+            orbital_period=0,
+            age=0,
+            eccentricity=0,
+            primary_mass=0,
+            secondary_mass=0,
+            feh=0,
+            Rprimary = 0,
+            Rsecondary = 0
+        )
+        #for big_term in self.parameter_names_units:
+        #    print('big term!: ' + big_term)
+        #    for i in range(len(self.parameter_names_units[big_term])):
+        #        print('small term!: ' + self.parameter_names_units[big_term][i][0])
+        #raise ValueError('kernel panic')
         for big_term in self.parameter_names_units:
-            parameters[big_term] = dict()
-            for i in range(len(self.parameter_names_units[big_term])):
-                parameters[big_term][self.parameter_names_units[big_term][i][0]] = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
-        parameters['system'] = self.system
+            #print(parameters)
+            if big_term == 'evolution':
+                for i in range(len(self.parameter_names_units[big_term])):
+                    if self.parameter_names_units[big_term][i][0] == 'primary_disk_lock_period':
+                        parameters['disk_period'] = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
+                        continue
+                    elif self.parameter_names_units[big_term][i][0] == 'secondary_disk_lock_period':
+                        continue
+                    parameters[self.parameter_names_units[big_term][i][0]] = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
+            elif big_term == 'dissipation':
+                for i in range(len(self.parameter_names_units[big_term])):
+                    term = 'default'
+                    if self.parameter_names_units[big_term][i][0] == 'lgQ_min':
+                        term = 'reference_phase_lag'
+                    elif self.parameter_names_units[big_term][i][0] == 'lgQ_powerlaw':
+                        #term = 'tidal_frequency_powers'
+                        value = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
+                        parameters['dissipation']['primary']['tidal_frequency_powers'] = numpy.array((value,))
+                        continue
+                    elif self.parameter_names_units[big_term][i][0] == 'lgQ_break_period':
+                        value = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0]).to(units.day).value
+                        value = 2 * numpy.pi / value
+                        parameters['dissipation']['primary']['tidal_frequency_breaks'] = numpy.array((value,))
+                        continue
+                    else:
+                        continue
+                    parameters['dissipation']['primary'][term] = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
+            elif big_term == 'system':
+                for i in range(len(self.parameter_names_units[big_term])):
+                    if self.parameter_names_units[big_term][i][0] == 'orbital_period':
+                        parameters['system'].orbital_period = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
+                    elif self.parameter_names_units[big_term][i][0] == 'age':
+                        parameters['system'].age = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
+                    elif self.parameter_names_units[big_term][i][0] == 'primary_mass':
+                        parameters['system'].primary_mass = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
+                    elif self.parameter_names_units[big_term][i][0] == 'secondary_mass':
+                        parameters['system'].secondary_mass = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
+                    elif self.parameter_names_units[big_term][i][0] == 'feh':
+                        parameters['system'].feh = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
+                    elif self.parameter_names_units[big_term][i][0] == 'cmd_primary_radius':
+                        parameters['system'].Rprimary = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
+                    elif self.parameter_names_units[big_term][i][0] == 'cmd_secondary_radius':
+                        parameters['system'].Rsecondary = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
+                    else:
+                        continue
+            else:
+                continue
+            #parameters[big_term] = dict()
+            #for i in range(len(self.parameter_names_units[big_term])):
+            #    parameters[big_term][self.parameter_names_units[big_term][i][0]] = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
+        #parameters['system'] = self.system
+        parameters['system'].eccentricity = self.system.eccentricity
+        parameters['interpolator'] = interpolator
+        #TODO: how should I actually handle these?:
+        parameters['secondary_is_star'] = True
+        #TODO: this should be specified somewhere like a user command or something, right?
+        parameters['precision'] = 1e-2
+        #parameters['dissipation']['primary'] = 
+        parameters['dissipation']['primary']['spin_frequency_powers'] = numpy.array((0.0,))
+        parameters['dissipation']['primary']['spin_frequency_breaks'] = None
+        parameters['dissipation']['secondary'] = parameters['dissipation']['primary']
+        #print('The following parameters have been rated PG by the Motion Picture Association of America:')
+        #print('parameters = %s' % (repr(parameters)))
+        #raise ValueError('kernel panic')
 
         assert 'sample_weights_envelope' in other_args #why? TODO
 
         e_to_be_near=0.5
         #Work out parameters such that when we pass it to find_evolution, we get the 1D solver in the way we want
         parameters = self._choose_solver(parameters,'1d')
-        max_final_eccentricity = find_evolution(parameters)[0][1]
+        max_final_eccentricity = find_evolution(**parameters)[0].eccentricity[-1]
         self.final_eccentricity = max_final_eccentricity
         negligible = 1e-3
         De_min,De_max = self._de.support()
@@ -220,7 +304,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             logger.debug('In a case where we assume ehat is linear in the range where D_e is non-negligible')
             print('In a case where we assume ehat is linear in the range where D_e is non-negligible')
             parameters = self._choose_solver(parameters,'2d',median_e)
-            result = find_evolution(parameters)
+            parameters['system'].eccentricity = median_e
+            result = find_evolution(**parameters)
             print('result = %s' % (repr(result)))
             init_e,ehat_prime = result[1][1],result[1][0]
             yintercept = median_e - ehat_prime*init_e
@@ -250,7 +335,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             print('e_max_initial = %s' % (repr(e_max_initial)))
             print('e_max_final = %s' % (repr(e_max_final)))
             parameters = self._choose_solver(parameters,'2d',e_to_match)
-            result = find_evolution(parameters)
+            parameters['system'].eccentricity = e_to_match
+            result = find_evolution(**parameters)
             init_e,ehat_prime = result[1][1],result[1][0]
             print('ehat_prime = %s' % (repr(ehat_prime)))
             print('init_e = %s' % (repr(init_e)))
@@ -285,14 +371,15 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         integration_min = max(0,De_min)
         integration_max = min(De_max,max_final_eccentricity)
         likelihood = self._calculate_likelihood(ehat_approx,e_to_be_near,integration_min,integration_max)
-        #assert likelihood >= 0
-        #if likelihood == 0:
-        #    return -numpy.inf
         
         logger.debug('likelihood = %s',repr(likelihood))
         logger.debug('log(likelihood) = %s',repr(numpy.log(likelihood)))
         print('likelihood = %s' % (repr(likelihood)))
         print('log(likelihood) = %s' % (repr(numpy.log(likelihood))))
+
+        assert likelihood >= 0
+        if likelihood == 0:
+            return -numpy.inf
 
         if ehat_approx.degree() == 2:
             self.a = ehat_approx.coef[2]
@@ -309,7 +396,6 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         print('Testing _likelihood_integrand')
         e_set = numpy.linspace(0,0.8,20)
         ehat_set = (
-            #numpy.polynomial.polynomial.Polynomial((1)),
             numpy.polynomial.polynomial.Polynomial((0,1)),
             numpy.polynomial.polynomial.Polynomial((1,1)),
             numpy.polynomial.polynomial.Polynomial((0,0,1)),
@@ -328,7 +414,6 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         logger.debug('Testing _calculate_likelihood')
         print('Testing _calculate_likelihood')
         ehat_set = (
-            #numpy.polynomial.polynomial.Polynomial((1)),
             numpy.polynomial.polynomial.Polynomial((0,1)),
             numpy.polynomial.polynomial.Polynomial((1,1)),
             numpy.polynomial.polynomial.Polynomial((0,0,1)),
