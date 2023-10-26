@@ -8,6 +8,8 @@ from orbital_evolution.evolve_interface import library as\
 
 from stellar_evolution.manager import StellarEvolutionManager
 
+import logging
+
 def get_common_binary_star_priors(config):
     """
     Return independent parameters for prior trans shared by all binary datasets.
@@ -120,11 +122,15 @@ def prepare_sampling_common(config):
     ).get_interpolator_by_name(
         'default'
     )
+
+    logger = logging.getLogger(__name__)
+    logger.debug('Now loading: eccentricity expansion coefficients.')
     orbital_evolution_library.prepare_eccentricity_expansion(
         config.eccentricity_expansion_coefficients.encode('ascii'),
         1e-4,
         True,
         True
     )
+    logger.debug('Eccentricity expansion coefficients loaded.')
 
     return interpolator
