@@ -22,7 +22,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                  observed_eccentricity_distro,
                  de_distro,
                  pe_distro,
-                 system,
+                 system_eccentricity,
                  **parent_kwargs):
         """
         Prepare the log-likelihood function.
@@ -47,7 +47,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         self._de = de_distro
         self._pe = pe_distro
-        self.system = system
+        self.system_eccentricity = system_eccentricity
 
         self.upper_limit = 2.0
         self.lower_limit = -2.0
@@ -165,7 +165,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                         continue
             else:
                 continue
-        parameters['system'].eccentricity = self.system.eccentricity
+        parameters['system'].eccentricity = self.system_eccentricity
         parameters['interpolator'] = interpolator
         #TODO: how should I actually handle these?:
         parameters['secondary_is_star'] = True
