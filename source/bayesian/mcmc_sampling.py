@@ -105,7 +105,6 @@ def log_probability(independent_normal_values,
                     log_likelihood.final_eccentricity)
             ,
         )
-    # also I would like to add the coefficientssssss
     parameters += (log_likelihood.a,)
     parameters += (log_likelihood.b,)
     parameters += (log_likelihood.c,)
@@ -560,7 +559,8 @@ def get_initial_state(*,
                       log_prob_fn,
                       config,
                       samples_fname,
-                      chain_name):
+                      chain_name,
+                      log_likelihood):
     """Pick initial positions for walkers avoiding zero probability spots."""
 
     _logger.info('Looking for %d suitable walker starting positions',
@@ -620,13 +620,36 @@ def get_initial_state(*,
             position_queue.put((norm.rvs(size=num_params),))
         else:
             orig_pos_repr = repr(position)
-            if position[lgq_min_param_index] >- 2.0:
+            if log_prob_result[23] > log_likelihood._de.support()[1]:
+                log_likelihood.upper_limit = position[lgq_min_param_index]
                 position[lgq_min_param_index] = norm.ppf(
-                    norm.cdf(position[lgq_min_param_index])
+                    (
+                        norm.cdf(log_likelihood.upper_limit)
+                        -
+                        norm.cdf(log_likelihood.lower_limit)
+                    )
                     *
                     numpy.random.rand()
+                    +
+                    norm.cdf(log_likelihood.lower_limit)
                 )
                 _logger.debug('Tweaking starting position to lower Q: %s -> %s',
+                              orig_pos_repr,
+                              repr(position))
+            elif log_prob_result[23] < log_likelihood._de.support()[0]:
+                log_likelihood.lower_limit = position[lgq_min_param_index]
+                position[lgq_min_param_index] = norm.ppf(
+                    (
+                        norm.cdf(log_likelihood.upper_limit)
+                        -
+                        norm.cdf(log_likelihood.lower_limit)
+                    )
+                    *
+                    numpy.random.rand()
+                    +
+                    norm.cdf(log_likelihood.lower_limit)
+                )
+                _logger.debug('Tweaking starting position to raise Q: %s -> %s',
                               orig_pos_repr,
                               repr(position))
             else:
@@ -703,7 +726,8 @@ def get_sampler_config_and_initial_state(config,
             ),
             config=config,
             samples_fname=samples_fname,
-            chain_name=chain_name
+            chain_name=chain_name,
+            log_likelihood = log_likelihood
         )
 
     return (
