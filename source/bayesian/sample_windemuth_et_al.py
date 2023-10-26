@@ -68,11 +68,18 @@ def prepare_sampling(config):
     c=numpy.median(samples['esinw'])
     d=numpy.median(samples['ecosw'])
     e=c/math.sin(math.atan(c/d))
+
+    primary_mass=numpy.median(samples['Mtot'])/(1+numpy.median(samples['Mratio']))*units.M_sun
+    secondary_mass=numpy.median(samples['Mtot'])*units.M_sun - primary_mass
     system=SimpleNamespace(
-                orbital_period=numpy.median(samples['P']),
-                age=10**numpy.median(samples['tau'])/10**9,
-                eccentricity=e
+                orbital_period=numpy.median(samples['P']) * units.day,
+                age=10**numpy.median(samples['tau'])/10**9  * units.Gyr,
+                eccentricity=e,
+                primary_mass=primary_mass,
+                secondary_mass=secondary_mass,
+                feh=numpy.median(samples['z'])
             )
+
 
     log_likelihood = LogLikelihoodWindemuth(
         observed_eccentricity_distro=observed_eccentricity_distro,
@@ -87,7 +94,7 @@ def prepare_sampling(config):
         period_search_factor=config.initial_period_search_factor,
         scaled_period_guess=config.initial_period_scaled_guess,
         prior_only=(config.sampling == 'prior'),
-        de_distro=W19EccentricityDistribution(3348093,pickle_fname='/home/vortebo/ctime/CircularizationDissipationConstraints/windemuth_eccentricity_distros.pkl'),
+        de_distro=W19EccentricityDistribution(config.system,pickle_fname='/home/vortebo/ctime/CircularizationDissipationConstraints/windemuth_eccentricity_distros.pkl'),
         pe_distro=scipy.stats.uniform(loc=0,scale=0.8),
         system=system
     )
