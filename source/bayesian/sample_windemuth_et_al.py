@@ -84,7 +84,8 @@ def prepare_sampling(config):
         prior_only=(config.sampling == 'prior'),
         de_distro=W19EccentricityDistribution(config.system,pickle_fname='/home/vortebo/ctime/CircularizationDissipationConstraints/windemuth_eccentricity_distros.pkl'),
         pe_distro=scipy.stats.uniform(loc=0,scale=0.8),
-        system_eccentricity=e
+        system_eccentricity=e,
+        system_name = config.system
     )
     independent_parameter_distributions = get_common_binary_star_priors(
         config,
