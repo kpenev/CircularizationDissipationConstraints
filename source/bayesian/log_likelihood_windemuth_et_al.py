@@ -12,9 +12,12 @@ from stellar_evolution.manager import StellarEvolutionManager
 from orbital_evolution.transformations import phase_lag
 from astropy import units
 from types import SimpleNamespace
+from multiprocessing import Manager
 
 class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
     """The log-likelihood for Windemuth et. al. (2019) EBs."""
+
+    _lock = Manager().Lock()
 
     def __init__(self,
                  *parent_args,
@@ -23,6 +26,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                  de_distro,
                  pe_distro,
                  system_eccentricity,
+                 system_name = 'default',
                  **parent_kwargs):
         """
         Prepare the log-likelihood function.
@@ -48,6 +52,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         self._de = de_distro
         self._pe = pe_distro
         self.system_eccentricity = system_eccentricity
+        self.system_name = system_name
 
         self.upper_limit = 2.0
         self.lower_limit = -2.0
@@ -111,6 +116,15 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         specific_integrand = partial(self._likelihood_integrand,ehat_approx=ehat_approx, e_to_be_near = e_to_be_near)
         I = scipy.integrate.quad(specific_integrand, e_min, e_max)[0]
         return I
+    
+    def _get_ai_carepackage(self,parameters):
+        result = dict()
+        result['lgQ_min']=self.get_parameter_value(parameters, 'lgQ_min')
+        result['lgQ_break_period']=self.get_parameter_value(parameters, 'lgQ_break_period')
+        result['lgQ_powerlaw']=self.get_parameter_value(parameters, 'lgQ_powerlaw')
+        result['system_name']=self.system_name
+        result['lock']=self._lock
+        return result
 
     def calculate_log_likelihood(self,
                                  encoded_parameters,
@@ -171,7 +185,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         parameters['secondary_is_star'] = True
         #TODO: this should be specified somewhere like a user command or something, right?
         parameters['precision'] = 1e-5
-        logger.debug('Hey look at this do we ever talk about max time steps?')
+        logger.debug('Hey look at this do we ever talk about max time steps?') #TODO
+        parameters['carepackage'] = self._get_ai_carepackage(encoded_parameters)
         logger.debug('parameters = %s',repr(parameters))
 
         assert 'sample_weights_envelope' in other_args #why? TODO
