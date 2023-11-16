@@ -27,6 +27,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                  pe_distro,
                  system_eccentricity,
                  system_name = 'default',
+                 nn_path = None,
                  **parent_kwargs):
         """
         Prepare the log-likelihood function.
@@ -60,6 +61,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         self.a = 0
         self.c = 0
         self.b = 0
+
+        self.nn_path = nn_path
 
     def _choose_solver(self, parameters, solver = '1d', final_e = 0):
         """Handle the parameters passed to the log-likelihood function."""
@@ -124,6 +127,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         result['lgQ_powerlaw']=self.get_parameter_value(parameters, 'lgQ_powerlaw')
         result['system_name']=self.system_name
         result['lock']=self._lock
+        result['path']= self.nn_path #'/home/vortebo/ctime/ayeye'
         return result
 
     def calculate_log_likelihood(self,

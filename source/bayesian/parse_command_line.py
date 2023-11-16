@@ -540,6 +540,11 @@ def use_parser(parser,
     """
 
     parser.add_argument(
+        '--nn-data-dir',
+        default=os.path.expanduser('~/projects/git/poet/nn_data'),
+        help='The directory to read and write neural network data from and to.'
+    )
+    parser.add_argument(
         '--stellar-evolution-interpolator-dir', '--interpolator-dir',
         default=(
             os.path.expanduser(

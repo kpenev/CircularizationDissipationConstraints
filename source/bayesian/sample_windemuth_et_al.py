@@ -33,6 +33,7 @@ def prepare_sampling(config):
     """Return log-likelihood & prior transform for sampling selected binary."""
 
     interpolator = prepare_sampling_common(config)
+    nn_path = config.nn_data_dir
     samples = get_samples(config.system)
     summary_info = get_summary_data(config.system)
     envelope_eccentricity = eccentricity_envelope(numpy.median(samples['P']))
@@ -85,7 +86,8 @@ def prepare_sampling(config):
         de_distro=W19EccentricityDistribution(config.system,pickle_fname='/home/vortebo/ctime/CircularizationDissipationConstraints/windemuth_eccentricity_distros.pkl'),
         pe_distro=scipy.stats.uniform(loc=0,scale=0.8),
         system_eccentricity=e,
-        system_name = config.system
+        system_name = config.system,
+        nn_path = nn_path
     )
     independent_parameter_distributions = get_common_binary_star_priors(
         config,
