@@ -109,6 +109,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             raise ValueError('ehat_approx should be a polynomial of order 1 or 2. Something is wrong with ehat_approx: %s',repr(ehat_approx))
         
         if inverse_e > 0.8 or inverse_e < 0:
+            logger.error('inverse_e(e) is outside range: %s()',repr(inverse_e),repr(e))
             raise ValueError('inverse_e should not be outside range: %s',repr(inverse_e))
         
         result = self._de.pdf(e) * self._pe.pdf((inverse_e)) / ehat_prime(inverse_e)
@@ -262,11 +263,14 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         elif (
             De_away_from_zero
             and
+            #(
+            #    self._de.cdf(self.envelope_eccentricity)
+            #    -
+            #    De_from_zero_to_max
+            #) <= negligible
             (
-                self._de.cdf(self.envelope_eccentricity)
-                -
-                De_from_zero_to_max
-            ) <= negligible
+                De_max < max_final_eccentricity < self.envelope_eccentricity
+            )
         ): # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
             logger.debug('In a case where we assume ehat is linear in the range where D_e is non-negligible')
             print('In a case where we assume ehat is linear in the range where D_e is non-negligible')
