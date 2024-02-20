@@ -62,6 +62,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         self.c = 0
         self.b = 0
 
+        self.ehat_prime = 0
+
         self.nn_path = nn_path
 
     def _choose_solver(self, parameters, solver = '1d', final_e = 0):
@@ -375,6 +377,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             self.a = ehat_approx.coef[2]
         self.c = ehat_approx.coef[0]
         self.b = ehat_approx.coef[1]
+        self.ehat_prime = ehat_prime.coef[0]
 
         return numpy.log(likelihood)
     

@@ -108,6 +108,7 @@ def log_probability(independent_normal_values,
     parameters += (log_likelihood.a,)
     parameters += (log_likelihood.b,)
     parameters += (log_likelihood.c,)
+    parameters += (log_likelihood.ehat_prime,)
 
     _logger.debug('Final blob with %d parameters: %s.',
                   len(parameters),
@@ -681,6 +682,8 @@ def get_sampler_config_and_initial_state(config,
     blobs_dtype.append(('a', float))
     blobs_dtype.append(('b', float))
     blobs_dtype.append(('c', float))
+    # add label for ehat_prime
+    blobs_dtype.append(('ehat_prime', float))
 
     blobs_dtype = numpy.dtype(blobs_dtype)
 
