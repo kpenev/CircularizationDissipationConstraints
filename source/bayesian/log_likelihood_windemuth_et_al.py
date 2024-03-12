@@ -201,7 +201,12 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         e_to_be_near=0.5
         #Work out parameters such that when we pass it to find_evolution, we get the 1D solver in the way we want
         parameters = self._choose_solver(parameters,'1d')
-        max_final_eccentricity = find_evolution(**parameters)[0].eccentricity[-1]
+        try:
+            max_final_eccentricity = find_evolution(**parameters)[0].eccentricity[-1]
+        except ValueError:
+            logger.error('find_evolution returned a ValueError. Returning -numpy.inf.')
+            logger.error('Error: %s',repr(ValueError))
+            return -numpy.inf
         self.final_eccentricity = max_final_eccentricity
         negligible = 1e-3
         De_min,De_max = self._de.support()
@@ -362,7 +367,12 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         
         integration_min = max(0,De_min)
         integration_max = min(De_max,max_final_eccentricity)
-        likelihood = self._calculate_likelihood(ehat_approx,e_to_be_near,integration_min,integration_max)
+        try:
+            likelihood = self._calculate_likelihood(ehat_approx,e_to_be_near,integration_min,integration_max)
+        except ValueError:
+            logger.error('Error in _calculate_likelihood. Returning -numpy.inf.')
+            logger.error('Error: %s',repr(ValueError))
+            return -numpy.inf
         
         logger.debug('likelihood = %s',repr(likelihood))
         logger.debug('log(likelihood) = %s',repr(numpy.log(likelihood)))
