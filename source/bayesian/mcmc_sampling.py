@@ -621,6 +621,7 @@ def get_initial_state(*,
             position_queue.put((norm.rvs(size=num_params),))
         else:
             orig_pos_repr = repr(position)
+            _logger.debug('Log-likelihood._de.support() = %s',repr(log_likelihood._de.support()))
             if log_prob_result[23] > log_likelihood._de.support()[1]:
                 log_likelihood.upper_limit = position[lgq_min_param_index]
                 position[lgq_min_param_index] = norm.ppf(
