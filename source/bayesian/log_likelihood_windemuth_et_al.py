@@ -111,7 +111,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             raise ValueError('ehat_approx should be a polynomial of order 1 or 2. Something is wrong with ehat_approx: %s',repr(ehat_approx))
         
         if inverse_e > 0.8 or inverse_e < 0:
-            logger.error('inverse_e(e) is outside range: %s()',repr(inverse_e),repr(e))
+            logger.error('inverse_e(e) is outside range: %s(%s)',repr(inverse_e),repr(e))
             raise ValueError('inverse_e should not be outside range: %s',repr(inverse_e))
         
         result = self._de.pdf(e) * self._pe.pdf((inverse_e)) / ehat_prime(inverse_e)
