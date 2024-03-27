@@ -114,7 +114,10 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             logger.error('inverse_e(e) is outside range: %s(%s)',repr(inverse_e),repr(e))
             raise ValueError('inverse_e should not be outside range: %s',repr(inverse_e))
         
-        result = self._de.pdf(e) * self._pe.pdf((inverse_e)) / ehat_prime(inverse_e)
+        ehat_prime_result = ehat_prime(inverse_e)
+        if ehat_prime_result < 0:
+            logger.warning('ehat_prime is negative: %s',repr(ehat_prime_result))
+        result = self._de.pdf(e) * self._pe.pdf((inverse_e)) / ehat_prime_result
         
         return result
 
