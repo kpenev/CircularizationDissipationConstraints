@@ -14,6 +14,43 @@ from astropy import units
 from types import SimpleNamespace
 from multiprocessing import Manager
 
+class twoLines():
+    def __init__(self,existingLine,secondExistingLine=None,belowZero=False,breakPoint=0.5,newY=0.1):
+        self.breakPoint = breakPoint
+        if secondExistingLine is None:
+            breakY = existingLine(breakPoint)
+            if belowZero:
+                newX = 0.0
+                slope = (breakY-newY)/(breakPoint-newX)
+                self.lower_line = numpy.polynomial.polynomial.Polynomial((0.0,slope))
+                self.upper_line = existingLine
+            else:
+                newX = 0.8
+                slope = (newY-breakY)/(newX-breakPoint)
+                yintercept = newY - slope*newX
+                self.lower_line = existingLine
+                self.upper_line = numpy.polynomial.polynomial.Polynomial((yintercept,slope))
+        else:
+            self.lower_line = existingLine
+            self.upper_line = secondExistingLine
+    def __call__(self,x):
+        if x < self.breakPoint:
+            return self.lower_line(x)
+        else:
+            return self.upper_line(x)
+    def deriv(self):
+        # This miiiiight cause problems due to the discontinuity
+        return twoLines(self.lower_line.deriv(),self.upper_line.deriv(),breakPoint=self.breakPoint)
+    def degree(self):
+        return 1
+    def inverse(self,e):
+        if e < self.breakPoint:
+            current_line =  self.lower_line
+        else:
+            current_line = self.upper_line
+        inverse_line = numpy.polynomial.polynomial.Polynomial((-current_line.coef[0]/current_line.coef[1],1/current_line.coef[1]))
+        return inverse_line(e)
+
 class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
     """The log-likelihood for Windemuth et. al. (2019) EBs."""
 
@@ -105,8 +142,9 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             else:
                 inverse_e = inverse_e[numpy.argmin(numpy.abs(inverse_e-e_to_be_near))]
         elif ehat_approx.degree() == 1:
-            reverse = numpy.polynomial.polynomial.Polynomial((-ehat_approx.coef[0]/ehat_approx.coef[1],1/ehat_approx.coef[1]))
-            inverse_e = reverse(e)
+            #reverse = numpy.polynomial.polynomial.Polynomial((-ehat_approx.coef[0]/ehat_approx.coef[1],1/ehat_approx.coef[1]))
+            #inverse_e = reverse(e)
+            inverse_e = ehat_approx.inverse(e)
         else:
             raise ValueError('ehat_approx should be a polynomial of order 1 or 2. Something is wrong with ehat_approx: %s',repr(ehat_approx))
         
@@ -121,9 +159,9 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         
         return result
 
-    def _calculate_likelihood(self, ehat_approx, e_to_be_near, e_min, e_max): #  ef_max,ei_med,dehat_med
+    def _calculate_likelihood(self, ehat_approx, e_to_be_near, e_min, e_max, breakPoint):
         specific_integrand = partial(self._likelihood_integrand,ehat_approx=ehat_approx, e_to_be_near = e_to_be_near)
-        I = scipy.integrate.quad(specific_integrand, e_min, e_max)[0]
+        I = scipy.integrate.quad(specific_integrand, e_min, e_max, points=breakPoint)[0]
         return I
     
     def _get_ai_carepackage(self,parameters):
@@ -256,6 +294,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         print('De_away_from_zero = %s' % (repr(De_away_from_zero)))
         print('De_from_zero_to_max = %s' % (repr(De_from_zero_to_max)))
 
+        breakPoint = None
+
         if (
             De_at_zero
             and
@@ -300,7 +340,26 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             print('ehat_prime = %s' % (repr(ehat_prime)))
             print('init_e = %s' % (repr(init_e)))
             yintercept = median_e - ehat_prime*init_e
-            ehat_approx = numpy.polynomial.polynomial.Polynomial((yintercept,ehat_prime))
+            base_approx = numpy.polynomial.polynomial.Polynomial((yintercept,ehat_prime))
+            base_approx_inverse = numpy.polynomial.polynomial.Polynomial((-base_approx.coef[0]/base_approx.coef[1],1/base_approx.coef[1]))
+            if base_approx_inverse(De_max) > 0.8:
+                logger.debug('Found an instance where we must use twoLines: %s',repr(base_approx_inverse(De_max)))
+                logger.debug('De_max = %s',repr(De_max))
+                logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
+                logger.debug('median_e = %s',repr(median_e))
+                print('This is where we are using twoLines')
+                ehat_approx = twoLines(base_approx,None,False,median_e,max_final_eccentricity)
+                breakPoint = median_e
+            elif base_approx_inverse(De_min) < 0.0:
+                logger.debug('Found an instance where we must use twoLines: %s',repr(base_approx_inverse(De_min)))
+                logger.debug('De_min = %s',repr(De_min))
+                logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
+                logger.debug('median_e = %s',repr(median_e))
+                print('This is where we are using twoLines')
+                ehat_approx = twoLines(base_approx,None,True,median_e,0.0)
+                breakPoint = median_e
+            else:
+                ehat_approx = base_approx
         elif (
             (
                 De_away_from_zero
@@ -370,12 +429,12 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         
         integration_min = max(0,De_min)
         integration_max = min(De_max,max_final_eccentricity)
-        try:
-            likelihood = self._calculate_likelihood(ehat_approx,e_to_be_near,integration_min,integration_max)
-        except ValueError:
-            logger.error('Error in _calculate_likelihood. Returning -numpy.inf.')
-            logger.error('Error: %s',repr(ValueError))
-            return -numpy.inf
+        #try:
+        likelihood = self._calculate_likelihood(ehat_approx,e_to_be_near,integration_min,integration_max,breakPoint)
+        #except ValueError:
+        #    logger.error('Error in _calculate_likelihood. Returning -numpy.inf.')
+        #    logger.error('Error: %s',repr(ValueError))
+        #    return -numpy.inf
         
         logger.debug('likelihood = %s',repr(likelihood))
         logger.debug('log(likelihood) = %s',repr(numpy.log(likelihood)))
