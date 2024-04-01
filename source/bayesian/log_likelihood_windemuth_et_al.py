@@ -142,9 +142,11 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             else:
                 inverse_e = inverse_e[numpy.argmin(numpy.abs(inverse_e-e_to_be_near))]
         elif ehat_approx.degree() == 1:
-            #reverse = numpy.polynomial.polynomial.Polynomial((-ehat_approx.coef[0]/ehat_approx.coef[1],1/ehat_approx.coef[1]))
-            #inverse_e = reverse(e)
-            inverse_e = ehat_approx.inverse(e)
+            if isinstance(ehat_approx, twoLines):
+                inverse_e = ehat_approx.inverse(e)
+            else:
+                reverse = numpy.polynomial.polynomial.Polynomial((-ehat_approx.coef[0]/ehat_approx.coef[1],1/ehat_approx.coef[1]))
+                inverse_e = reverse(e)
         else:
             raise ValueError('ehat_approx should be a polynomial of order 1 or 2. Something is wrong with ehat_approx: %s',repr(ehat_approx))
         
