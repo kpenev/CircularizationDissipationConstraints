@@ -34,7 +34,8 @@ _mutable_config_params = set(['mcmc_nsteps',
                               'config_file',
                               'rv_likelihood_pickle_fname',
                               'mass_sampling_pickle_fname',
-                              'photometric_constraint_pickle_fname'])
+                              'photometric_constraint_pickle_fname',
+                              'nn_data_dir'])
 
 _logger = logging.getLogger(__name__)
 
