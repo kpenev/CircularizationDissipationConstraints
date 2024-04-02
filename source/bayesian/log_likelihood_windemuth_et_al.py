@@ -95,6 +95,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         self.upper_limit = 2.0
         self.lower_limit = -2.0
 
+        self.final_eccentricity = 0.0
+
         self.a = 0
         self.c = 0
         self.b = 0
