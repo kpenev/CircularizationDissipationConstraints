@@ -15,8 +15,12 @@ from types import SimpleNamespace
 from multiprocessing import Manager
 
 class twoLines():
+    coef = []
     def __init__(self,existingLine,secondExistingLine=None,belowZero=False,breakPoint=0.5,newY=0.1):
         self.breakPoint = breakPoint
+        # Any time we want the coefs, it will be from an ehat_approx rather than an ehat_prime,
+        # so this is okay.
+        self.coef = existingLine.coef
         if secondExistingLine is None:
             breakY = existingLine(breakPoint)
             if belowZero:
@@ -96,6 +100,9 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         self.lower_limit = -2.0
 
         self.final_eccentricity = 0.0
+
+        self.median_e = 0.0
+        self.approximation = 0
 
         self.a = 0
         self.c = 0
@@ -276,14 +283,14 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 logger.debug('max_final_eccentricity < De_min: %s',repr(max_final_eccentricity < De_min))
                 return -numpy.inf
         
-        median_e = self._de.ppf(0.5)
+        self.median_e = self._de.ppf(0.5)
 
         De_away_from_zero = De_min > 0
         De_at_zero = not De_away_from_zero
         De_from_zero_to_max = self._de.cdf(max_final_eccentricity)
 
         logger.debug('Various values:')
-        logger.debug('median_e = %s',repr(median_e))
+        logger.debug('median_e = %s',repr(self.median_e))
         logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
         logger.debug('De range = %s',repr((De_min,De_max)))
         logger.debug('Envelope eccentricity = %s',repr(self.envelope_eccentricity))
@@ -291,7 +298,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         logger.debug('De_at_zero = %s',repr(De_at_zero))
         logger.debug('De_from_zero_to_max = %s',repr(De_from_zero_to_max))
         print('Various values:')
-        print('median_e = %s' % (repr(median_e)))
+        print('median_e = %s' % (repr(self.median_e)))
         print('max_final_eccentricity = %s' % (repr(max_final_eccentricity)))
         print('De range = %s' % (repr((De_min,De_max))))
         print('Envelope eccentricity = %s' % (repr(self.envelope_eccentricity)))
@@ -328,8 +335,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         ): # If D_e is clearly away from e_final=0 and e_hat(e_i=0.8) is below the envelope but above D_e
             logger.debug('In a case where we assume ehat is linear in the range where D_e is non-negligible')
             print('In a case where we assume ehat is linear in the range where D_e is non-negligible')
-            parameters = self._choose_solver(parameters,'2d',median_e)
-            parameters['system'].eccentricity = median_e
+            parameters = self._choose_solver(parameters,'2d',self.median_e)
+            parameters['system'].eccentricity = self.median_e
             result = find_evolution(**parameters)
             print('result = %s' % (repr(result)))
             try:
@@ -343,25 +350,27 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 raise
             print('ehat_prime = %s' % (repr(ehat_prime)))
             print('init_e = %s' % (repr(init_e)))
-            yintercept = median_e - ehat_prime*init_e
+            yintercept = self.median_e - ehat_prime*init_e
             base_approx = numpy.polynomial.polynomial.Polynomial((yintercept,ehat_prime))
             base_approx_inverse = numpy.polynomial.polynomial.Polynomial((-base_approx.coef[0]/base_approx.coef[1],1/base_approx.coef[1]))
             if base_approx_inverse(De_max) > 0.8:
                 logger.debug('Found an instance where we must use twoLines: %s',repr(base_approx_inverse(De_max)))
                 logger.debug('De_max = %s',repr(De_max))
                 logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
-                logger.debug('median_e = %s',repr(median_e))
+                logger.debug('median_e = %s',repr(self.median_e))
                 print('This is where we are using twoLines')
-                ehat_approx = twoLines(base_approx,None,False,median_e,max_final_eccentricity)
-                breakPoint = median_e
+                ehat_approx = twoLines(base_approx,None,False,self.median_e,max_final_eccentricity)
+                breakPoint = self.median_e
+                self.approximation = 1
             elif base_approx_inverse(De_min) < 0.0:
                 logger.debug('Found an instance where we must use twoLines: %s',repr(base_approx_inverse(De_min)))
                 logger.debug('De_min = %s',repr(De_min))
                 logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
-                logger.debug('median_e = %s',repr(median_e))
+                logger.debug('median_e = %s',repr(self.median_e))
                 print('This is where we are using twoLines')
-                ehat_approx = twoLines(base_approx,None,True,median_e,0.0)
-                breakPoint = median_e
+                ehat_approx = twoLines(base_approx,None,True,self.median_e,0.0)
+                breakPoint = self.median_e
+                self.approximation = -1
             else:
                 ehat_approx = base_approx
         elif (

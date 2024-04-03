@@ -66,16 +66,21 @@ def log_probability(independent_normal_values,
     _logger.debug('The max value of unit_cube_values is %s', repr(unit_cube_values.max()))
     _logger.debug('If we add a little bit to it, then it is %s', repr(unit_cube_values.max()+1e-10))
     if unit_cube_values.max()+1e-10 >= 1:
-        return tuple(
+        _logger.warning('unit_cube_values is too close to 1')
+        parameters = tuple(
             -numpy.inf if i == 0 else numpy.nan
             for i in range(
                 len(log_likelihood.parameter_order)
                 -
                 len(exclude_from_blob)
                 +
-                (5 if track_final_eccentricity else 4)
+                (6 if track_final_eccentricity else 5)
             )
         )
+        _logger.debug('Final blob with %d parameters: %s.',
+                  len(parameters),
+                  repr(parameters))
+        return parameters
     log_likelihood_value = norm.logpdf(independent_normal_values).sum()
     transformed = prior_transform(unit_cube_values)
     _logger.debug('Independent normal values: %s', repr(independent_normal_values))
@@ -109,6 +114,8 @@ def log_probability(independent_normal_values,
     parameters += (log_likelihood.a,)
     parameters += (log_likelihood.b,)
     parameters += (log_likelihood.c,)
+    #parameters += (log_likelihood.median_e,)
+    #parameters += (log_likelihood.approximation,)
     parameters += (log_likelihood.ehat_prime,)
 
     _logger.debug('Final blob with %d parameters: %s.',
@@ -684,6 +691,8 @@ def get_sampler_config_and_initial_state(config,
     blobs_dtype.append(('a', float))
     blobs_dtype.append(('b', float))
     blobs_dtype.append(('c', float))
+    #blobs_dtype.append(('median_e', float))
+    #blobs_dtype.append(('approximation', float))
     # add label for ehat_prime
     blobs_dtype.append(('ehat_prime', float))
 
