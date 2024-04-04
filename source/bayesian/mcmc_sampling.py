@@ -74,7 +74,7 @@ def log_probability(independent_normal_values,
                 -
                 len(exclude_from_blob)
                 +
-                (6 if track_final_eccentricity else 5)
+                (8 if track_final_eccentricity else 7)
             )
         )
         _logger.debug('Final blob with %d parameters: %s.',
@@ -114,8 +114,8 @@ def log_probability(independent_normal_values,
     parameters += (log_likelihood.a,)
     parameters += (log_likelihood.b,)
     parameters += (log_likelihood.c,)
-    #parameters += (log_likelihood.median_e,)
-    #parameters += (log_likelihood.approximation,)
+    parameters += (log_likelihood.median_e,)
+    parameters += (log_likelihood.approximation,)
     parameters += (log_likelihood.ehat_prime,)
 
     _logger.debug('Final blob with %d parameters: %s.',
@@ -691,8 +691,8 @@ def get_sampler_config_and_initial_state(config,
     blobs_dtype.append(('a', float))
     blobs_dtype.append(('b', float))
     blobs_dtype.append(('c', float))
-    #blobs_dtype.append(('median_e', float))
-    #blobs_dtype.append(('approximation', float))
+    blobs_dtype.append(('median_e', float))
+    blobs_dtype.append(('approximation', float))
     # add label for ehat_prime
     blobs_dtype.append(('ehat_prime', float))
 
