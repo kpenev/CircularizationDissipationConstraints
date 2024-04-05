@@ -54,6 +54,9 @@ class twoLines():
             current_line = self.upper_line
         inverse_line = numpy.polynomial.polynomial.Polynomial((-current_line.coef[0]/current_line.coef[1],1/current_line.coef[1]))
         return inverse_line(e)
+    # Canonical string representation
+    def __repr__(self):
+        return 'twoLines(%s,%s,%s,%s,%s)' % (repr(self.lower_line),repr(self.upper_line),repr(self.breakPoint),repr(self.lower_line(0.5)),repr(self.upper_line(0.5)))
 
 class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
     """The log-likelihood for Windemuth et. al. (2019) EBs."""
