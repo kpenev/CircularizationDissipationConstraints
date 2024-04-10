@@ -258,9 +258,9 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         parameters = self._choose_solver(parameters,'1d')
         try:
             max_final_eccentricity = find_evolution(**parameters)[0].eccentricity[-1]
-        except ValueError:
+        except ValueError as err:
             logger.error('find_evolution returned a ValueError. Returning -numpy.inf.')
-            logger.error('Error: %s',repr(ValueError))
+            logger.error('Error: %s',err)
             return -numpy.inf
         self.final_eccentricity = max_final_eccentricity
         negligible = 1e-3
