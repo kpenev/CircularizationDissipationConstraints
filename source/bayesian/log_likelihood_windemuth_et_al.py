@@ -195,9 +195,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         logger = logging.getLogger(__name__)
 
-        interpolator = StellarEvolutionManager('/home/vortebo/ctime/poet/stellar_evolution_interpolators').get_interpolator_by_name(
-            'default'
-        )
+        interpolator = self._find_evolution_kwargs['interpolator']
 
         parameters = dict()
         parameters['dissipation'] = self.get_dissipation(encoded_parameters)
