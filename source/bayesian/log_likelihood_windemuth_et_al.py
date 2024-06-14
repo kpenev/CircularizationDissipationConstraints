@@ -360,8 +360,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
                 logger.debug('median_e = %s',repr(self.median_e))
                 print('This is where we are using twoLines')
-                ehat_approx = twoLines(base_approx,None,False,self.median_e,max_final_eccentricity)
-                breakPoint = self.median_e
+                breakPoint = base_approx_inverse(self.median_e)
+                ehat_approx = twoLines(base_approx,None,False,breakPoint,max_final_eccentricity)
                 self.approximation = 1
             elif base_approx_inverse(De_min) < 0.0:
                 logger.debug('Found an instance where we must use twoLines: %s',repr(base_approx_inverse(De_min)))
@@ -369,8 +369,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
                 logger.debug('median_e = %s',repr(self.median_e))
                 print('This is where we are using twoLines')
-                ehat_approx = twoLines(base_approx,None,True,self.median_e,0.0)
-                breakPoint = self.median_e
+                breakPoint = base_approx_inverse(self.median_e)
+                ehat_approx = twoLines(base_approx,None,True,breakPoint,0.0)
                 self.approximation = -1
             else:
                 ehat_approx = base_approx
