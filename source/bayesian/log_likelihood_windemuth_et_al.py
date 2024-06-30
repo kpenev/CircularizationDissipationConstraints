@@ -16,8 +16,9 @@ from multiprocessing import Manager
 
 class twoLines():
     coef = []
-    def __init__(self,existingLine,secondExistingLine=None,belowZero=False,breakPoint=0.5,newY=0.1):
+    def __init__(self,existingLine,secondExistingLine=None,belowZero=False,breakPoint=0.5,newY=0.1,inverseBreak=0.5):
         self.breakPoint = breakPoint
+        self.inverseBreak = inverseBreak
         # Any time we want the coefs, it will be from an ehat_approx rather than an ehat_prime,
         # so this is okay.
         self.coef = existingLine.coef
@@ -44,11 +45,11 @@ class twoLines():
             return self.upper_line(x)
     def deriv(self):
         # This miiiiight cause problems due to the discontinuity
-        return twoLines(self.lower_line.deriv(),self.upper_line.deriv(),breakPoint=self.breakPoint)
+        return twoLines(self.lower_line.deriv(),self.upper_line.deriv(),breakPoint=self.breakPoint,inverseBreak=self.inverseBreak)
     def degree(self):
         return 1
     def inverse(self,e):
-        if e < self.breakPoint:
+        if e < self.inverseBreak:
             current_line =  self.lower_line
         else:
             current_line = self.upper_line
@@ -354,26 +355,35 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             yintercept = self.median_e - ehat_prime*init_e
             base_approx = numpy.polynomial.polynomial.Polynomial((yintercept,ehat_prime))
             base_approx_inverse = numpy.polynomial.polynomial.Polynomial((-base_approx.coef[0]/base_approx.coef[1],1/base_approx.coef[1]))
-            if base_approx_inverse(De_max) > 0.8:
-                logger.debug('Found an instance where we must use twoLines: %s',repr(base_approx_inverse(De_max)))
-                logger.debug('De_max = %s',repr(De_max))
-                logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
-                logger.debug('median_e = %s',repr(self.median_e))
-                print('This is where we are using twoLines')
-                breakPoint = base_approx_inverse(self.median_e)
-                ehat_approx = twoLines(base_approx,None,False,breakPoint,max_final_eccentricity)
-                self.approximation = 1
-            elif base_approx_inverse(De_min) < 0.0:
-                logger.debug('Found an instance where we must use twoLines: %s',repr(base_approx_inverse(De_min)))
-                logger.debug('De_min = %s',repr(De_min))
-                logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
-                logger.debug('median_e = %s',repr(self.median_e))
-                print('This is where we are using twoLines')
-                breakPoint = base_approx_inverse(self.median_e)
-                ehat_approx = twoLines(base_approx,None,True,breakPoint,0.0)
-                self.approximation = -1
-            else:
+            too_big = base_approx_inverse(De_max) > 0.8
+            too_small = base_approx_inverse(De_min) < 0.0
+            if not too_big and not too_small:
                 ehat_approx = base_approx
+            else:
+                logger.debug('max_final_eccentricity = %s',repr(max_final_eccentricity))
+                logger.debug('median_e = %s',repr(self.median_e))
+                print('This is where we are using twoLines')
+                breakPoint = base_approx_inverse(self.median_e)
+                if too_big and not too_small:
+                    logger.debug('Found an instance where we must use twoLines: %s',repr(base_approx_inverse(De_max)))
+                    logger.debug('De_max = %s',repr(De_max))
+                    ehat_approx = twoLines(base_approx,None,False,breakPoint,max_final_eccentricity,self.median_e)
+                    self.approximation = 1
+                elif too_small and not too_big:
+                    logger.debug('Found an instance where we must use twoLines: %s',repr(base_approx_inverse(De_min)))
+                    logger.debug('De_min = %s',repr(De_min))
+                    ehat_approx = twoLines(base_approx,None,True,breakPoint,0.0,self.median_e)
+                    self.approximation = -1
+                else:
+                    logger.debug('Out of bounds at both ends.')
+                    logger.debug('Found an instance where we must use twoLines: %s',repr(base_approx_inverse(De_max)))
+                    logger.debug('Found an instance where we must use twoLines: %s',repr(base_approx_inverse(De_min)))
+                    logger.debug('De_max = %s',repr(De_max))
+                    logger.debug('De_min = %s',repr(De_min))
+                    slope = (self.median_e-0.0)/(breakPoint-0.0)
+                    lower_line = numpy.polynomial.polynomial.Polynomial((0.0,slope))
+                    ehat_approx = twoLines(lower_line,None,False,breakPoint,max_final_eccentricity,self.median_e)
+                    self.approximation = 2
         elif (
             (
                 De_away_from_zero
