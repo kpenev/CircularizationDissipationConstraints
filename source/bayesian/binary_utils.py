@@ -7,6 +7,7 @@ from orbital_evolution.evolve_interface import library as\
     orbital_evolution_library
 
 from stellar_evolution.manager import StellarEvolutionManager
+from stellar_evolution.library_interface import MESAInterpolator
 
 import logging
 
@@ -117,6 +118,7 @@ def get_common_binary_star_priors(config):
 def prepare_sampling_common(config):
     """Common sampling initialization steps for all binary star datasets."""
 
+    MESAInterpolator.set_quantity_lower_limit('iconv', 1e-5)
     interpolator = StellarEvolutionManager(
         config.stellar_evolution_interpolator_dir
     ).get_interpolator_by_name(

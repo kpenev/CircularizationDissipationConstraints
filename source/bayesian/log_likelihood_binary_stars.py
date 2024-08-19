@@ -18,7 +18,8 @@ class LogLikelihoodBinaryStars(LogLikelihoodBase, metaclass=ABCMeta):
         star_dissipation = dict(
             spin_frequency_breaks=None,
             spin_frequency_powers=numpy.array([0.0]),
-            reference_phase_lag=phase_lag(
+            age_breaks=None,
+            reference_phase_lags=phase_lag(
                 self.get_parameter_value(parameters, 'lgQ_min')
                 +
                 max(
@@ -53,7 +54,7 @@ class LogLikelihoodBinaryStars(LogLikelihoodBase, metaclass=ABCMeta):
                     powerlaw,
                     0.0
                 ])
-                star_dissipation['reference_phase_lag'] *= numpy.power(
+                star_dissipation['reference_phase_lags'] *= numpy.power(
                     star_dissipation['tidal_frequency_breaks'][0]
                     /
                     star_dissipation['tidal_frequency_breaks'][1],
@@ -70,6 +71,10 @@ class LogLikelihoodBinaryStars(LogLikelihoodBase, metaclass=ABCMeta):
         else:
             star_dissipation['tidal_frequency_breaks'] = None
             star_dissipation['tidal_frequency_powers'] = numpy.array([0.0])
+
+        star_dissipation['reference_phase_lags'] = numpy.array([
+            star_dissipation['reference_phase_lags']
+        ])
 
         dissipation = dict()
         #Avoiding lgQ actually decreases readability
