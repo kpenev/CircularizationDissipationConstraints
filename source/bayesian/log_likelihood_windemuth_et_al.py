@@ -130,7 +130,7 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         return parameters
     
-    def _likelihood_integrand(self,e,ehat_approx, e_to_be_near):
+    def _likelihood_integrand(self,e,ehat_approx, e_to_be_near, report_negative_ehat_prime):
         ehat_prime = ehat_approx.deriv()
         
         logger = logging.getLogger(__name__)
@@ -168,14 +168,21 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             raise ValueError('inverse_e should not be outside range: %s',repr(inverse_e))
         
         ehat_prime_result = ehat_prime(inverse_e)
-        if ehat_prime_result < 0:
+        if ehat_prime_result < 0 and report_negative_ehat_prime:
             logger.warning('ehat_prime is negative: %s',repr(ehat_prime_result))
         result = self._de.pdf(e) * self._pe.pdf((inverse_e)) / ehat_prime_result
         
         return result
 
     def _calculate_likelihood(self, ehat_approx, e_to_be_near, e_min, e_max, breakPoint):
-        specific_integrand = partial(self._likelihood_integrand,ehat_approx=ehat_approx, e_to_be_near = e_to_be_near)
+        logger = logging.getLogger(__name__)
+        report = True
+        ehat_prime = ehat_approx.deriv()
+        if ehat_prime.degree() == 0 and ehat_prime.coef[0] < 0:
+            report = False
+            logger.warning('ehat_prime is negative: %s',repr(ehat_prime.coef[0]))
+        specific_integrand = partial(self._likelihood_integrand,ehat_approx=ehat_approx,
+                                     e_to_be_near = e_to_be_near, report_negative_ehat_prime = report)
         I = scipy.integrate.quad(specific_integrand, e_min, e_max, points=breakPoint)[0]
         return I
     
