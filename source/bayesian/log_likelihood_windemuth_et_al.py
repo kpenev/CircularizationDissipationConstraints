@@ -259,6 +259,15 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         assert 'sample_weights_envelope' in other_args #why? TODO
 
+        # Don't try to evolve systems past where we have interpolation information
+        max_age_1 = interpolator('radius', parameters['system'].primary_mass.to(units.M_sun).value, parameters['system'].feh).max_age
+        max_age_2 = interpolator('radius', parameters['system'].secondary_mass.to(units.M_sun).value, parameters['system'].feh).max_age
+        max_age = min(max_age_1,max_age_2, 11)
+        if parameters['system'].age.to(units.Gyr).value > max_age:
+            logger.warning('System age %s is greater than the maximum age %s for the given stellar parameters. Adjusting.',
+                           repr(parameters['system'].age.to(units.Gyr).value), repr(max_age))
+            parameters['system'].age = max_age * units.Gyr
+
         e_to_be_near=0.5
         #Work out parameters such that when we pass it to find_evolution, we get the 1D solver in the way we want
         parameters = self._choose_solver(parameters,'1d')
@@ -291,15 +300,6 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 logger.debug('numpy.isnan(max_final_eccentricity): %s',repr(numpy.isnan(max_final_eccentricity)))
                 logger.debug('max_final_eccentricity < De_min: %s',repr(max_final_eccentricity < De_min))
                 return -numpy.inf
-        
-        # Don't try to evolve systems past where we have interpolation information
-        max_age_1 = interpolator('radius', parameters['system'].primary_mass.to(units.M_sun).value, parameters['system'].feh).max_age
-        max_age_2 = interpolator('radius', parameters['system'].secondary_mass.to(units.M_sun).value, parameters['system'].feh).max_age
-        max_age = min(max_age_1,max_age_2, 11)
-        if parameters['system'].age.to(units.Gyr).value > max_age:
-            logger.warning('System age %s is greater than the maximum age %s for the given stellar parameters. Adjusting.',
-                           repr(parameters['system'].age.to(units.Gyr).value), repr(max_age))
-            parameters['system'].age = max_age * units.Gyr
         
         self.median_e = self._de.ppf(0.5)
 
