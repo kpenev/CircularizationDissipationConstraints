@@ -259,9 +259,21 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
 
         assert 'sample_weights_envelope' in other_args #why? TODO
 
+        primary_mass = parameters['system'].primary_mass.to(units.M_sun).value
+        if primary_mass > 1.2 or primary_mass < 0.4:
+            logger.warning('Primary mass %s is outside the range 0.4-1.2 Msun. Returning -numpy.inf.',repr(primary_mass))
+            return -numpy.inf
+        secondary_mass = parameters['system'].secondary_mass.to(units.M_sun).value
+        if secondary_mass > 1.2 or secondary_mass < 0.4:
+            logger.warning('Secondary mass %s is outside the range 0.4-1.2 Msun. Returning -numpy.inf.',repr(secondary_mass))
+            return -numpy.inf
+        feh = parameters['system'].feh
+        if feh > 0.537 or feh < -1.014:
+            logger.warning('Metallicity %s is outside the range -1.014-0.537. Returning -numpy.inf.',repr(feh))
+            return -numpy.inf
         # Don't try to evolve systems past where we have interpolation information
-        max_age_1 = interpolator('radius', parameters['system'].primary_mass.to(units.M_sun).value, parameters['system'].feh).max_age
-        max_age_2 = interpolator('radius', parameters['system'].secondary_mass.to(units.M_sun).value, parameters['system'].feh).max_age
+        max_age_1 = interpolator('radius', primary_mass, feh).max_age
+        max_age_2 = interpolator('radius', secondary_mass, feh).max_age
         max_age = min(max_age_1,max_age_2, 11)
         if parameters['system'].age.to(units.Gyr).value > max_age:
             logger.warning('System age %s is greater than the maximum age %s for the given stellar parameters. Adjusting.',
