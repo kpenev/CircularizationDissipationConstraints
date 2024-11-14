@@ -15,6 +15,10 @@ elif [ "$HPC" == "stampede" ]; then
     HPC="stampede2"
     EXPECTED_NSYS=3
     QUEUE="skx-normal"
+elif [ "$HPC" == "josh" ]; then
+    TEMPLATE=template_tacc_josh.slurm
+    EXPECTED_NSYS=8
+    HPC="ls6"
 else
     if [ "$HPC" != "ls6" ]; then
         echo "Unrecognized HPC cluster: ${HPC}"
