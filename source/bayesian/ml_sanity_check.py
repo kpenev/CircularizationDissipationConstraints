@@ -88,9 +88,7 @@ def parse(log_fname, data_fname, label_fname):
                 for _ in range(len(params_1d) - 1):
                     param_match = find(param_rex, (sample_rex,), log_file)
                     params[param_match["name"]] = param_match["value"]
-                porb_initial_match = find(
-                    initial_porb_rex, (sample_rex,), log_file
-                )
+                porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
                 while porb_initial_match:
                     porb_initial = porb_initial_match["value"]
                     try:
@@ -126,20 +124,32 @@ def parse(log_fname, data_fname, label_fname):
                             f"{get_line(test_line_number, label_fname)!r} != "
                             f"{porb_initial!r} for {params!r}"
                         )
-                    porb_initial_match = find(
-                        initial_porb_rex, (sample_rex,), log_file
-                    )
+                    porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
             except SkipParams:
                 pass
-    print(f"Tested {num_tested} entries from {log_fname!r}")
-    print(f"Last tested ML line: {max_tested_line}")
+    return num_tested, max_tested_line
 
 
-if __name__ == "__main__":
+def chehck_all_logs():
+    """Check all logs under ``ml_logs``."""
+
+    total_max_tested_line = 0
+    total_num_tested = 0
     for log_fname in glob("ml_logs/logs/*.log"):
         print(f"Testing {log_fname}")
-        parse(
+        num_tested, max_tested_line = parse(
             log_fname,
             "ml_logs/1dp/data.csv",
             "ml_logs/1dp/label.csv",
         )
+        print(f"Tested {num_tested} entries from {log_fname!r}")
+        print(f"Last tested ML line: {max_tested_line}")
+        total_max_tested_line = max(total_max_tested_line, max_tested_line)
+        total_num_tested += num_tested
+
+    print(f"Total num tested: {total_num_tested}")
+    print(f"Overall max tested line: {total_max_tested_line}")
+
+
+if __name__ == "__main__":
+    chehck_all_logs()
