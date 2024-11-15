@@ -130,7 +130,7 @@ def parse(log_fname, data_fname, label_fname):
     return num_tested, max_tested_line
 
 
-def chehck_all_logs():
+def check_all_logs():
     """Check all logs under ``ml_logs``."""
 
     total_max_tested_line = 0
@@ -152,4 +152,4 @@ def chehck_all_logs():
 
 
 if __name__ == "__main__":
-    chehck_all_logs()
+    check_all_logs()
