@@ -139,7 +139,7 @@ def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/outpu
     #
     log_path = base_path + "sampling_output/" + str(system)
     logs_for_system = glob(log_path + "/init/*.log")
-    logs_for_system = logs_for_system + glob("/calculate/*.log")
+    logs_for_system = logs_for_system + glob(log_path + "/calculate/*.log")
     if datefilter is not None:
         logs_for_system = list(filter(lambda x: datefilter in x, logs_for_system))
     #
