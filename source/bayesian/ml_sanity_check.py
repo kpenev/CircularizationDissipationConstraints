@@ -143,7 +143,7 @@ def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/outpu
     if datefilter is not None:
         logs_for_system = list(filter(lambda x: datefilter in x, logs_for_system))
     #
-    ml_path = base_path + "nn_data/poet_output/1d_period_" + repr(system) + "/datasets/"
+    ml_path = base_path + "nn_data/poet_output/1d_period_" + str(system) + "/datasets/"
     #
     for log_fname in logs_for_system:
         print(f"Testing {log_fname}")
