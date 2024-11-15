@@ -131,7 +131,7 @@ def parse(log_fname, data_fname, label_fname):
     return num_tested, max_tested_line
 
 
-def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/output/W19/"):
+def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/output/W19/", datefilter = None):
     """Check all logs under ``ml_logs``."""
 
     total_max_tested_line = 0
@@ -140,6 +140,8 @@ def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/outpu
     log_path = base_path + "sampling_output/" + str(system)
     logs_for_system = glob(log_path + "/init/20241*.log")
     logs_for_system = logs_for_system + glob("/calculate/20241*.log")
+    if datefilter is not None:
+        logs_for_system = list(filter(lambda x: datefilter in x, logs_for_system))
     #
     ml_path = base_path + "nn_data/poet_output/1d_period_" + repr(system) + "/datasets/"
     #
@@ -161,5 +163,10 @@ def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/outpu
 
 if __name__ == "__main__":
     systemname = str(sys.argv[1])
-    systempath = str(sys.argv[2])
-    check_all_logs(systemname, systempath)
+    systempath = "/work/08402/vortebo/ls6/output/W19/"
+    datefilter = None
+    if len(sys.argv) > 2:
+        systempath = str(sys.argv[2])
+        if len(sys.argv) > 3:
+            datefilter = str(sys.argv[3])
+    check_all_logs(systemname, systempath, datefilter)
