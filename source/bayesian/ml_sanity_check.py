@@ -137,7 +137,7 @@ def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/outpu
     total_max_tested_line = 0
     total_num_tested = 0
     #
-    log_path = base_path + "sampling_output/" * repr(system)
+    log_path = base_path + "sampling_output/" + repr(system)
     logs_for_system = glob(log_path + "/init/20241*.log")
     logs_for_system = logs_for_system + glob("/calculate/20241*.log")
     #
