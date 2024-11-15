@@ -3,6 +3,7 @@
 import re
 from glob import glob
 from itertools import count
+import sys
 
 
 class SkipParams(BaseException):
@@ -130,17 +131,24 @@ def parse(log_fname, data_fname, label_fname):
     return num_tested, max_tested_line
 
 
-def check_all_logs():
+def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/output/W19/"):
     """Check all logs under ``ml_logs``."""
 
     total_max_tested_line = 0
     total_num_tested = 0
-    for log_fname in glob("ml_logs/logs/*.log"):
+    #
+    log_path = base_path + "sampling_output/" * repr(system)
+    logs_for_system = glob(log_path + "/init/20241*.log")
+    logs_for_system = logs_for_system + glob("/calculate/20241*.log")
+    #
+    ml_path = base_path + "nn_data/poet_output/1d_period_" + repr(system) + "/datasets/"
+    #
+    for log_fname in logs_for_system:
         print(f"Testing {log_fname}")
         num_tested, max_tested_line = parse(
             log_fname,
-            "ml_logs/1dp/data.csv",
-            "ml_logs/1dp/label.csv",
+            ml_path + "data.csv",
+            ml_path + "label.csv",
         )
         print(f"Tested {num_tested} entries from {log_fname!r}")
         print(f"Last tested ML line: {max_tested_line}")
@@ -152,4 +160,6 @@ def check_all_logs():
 
 
 if __name__ == "__main__":
-    check_all_logs()
+    systemname = str(sys.argv[1])
+    systempath = str(sys.argv[2])
+    check_all_logs(systemname, systempath)
