@@ -163,6 +163,10 @@ def parse(log_fname, data_fname, label_fname, kind):
                             f"{porb_initial!r} for {params!r}"
                         )
                     porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
+                    matchforwhile = porb_initial_match
+                    if kind == 3:
+                        ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
+                        matchforwhile = ecc_initial_match
             except SkipParams:
                 pass
     return num_tested, max_tested_line
