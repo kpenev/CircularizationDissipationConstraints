@@ -106,7 +106,10 @@ def parse(log_fname, data_fname, label_fname, kind):
                 # porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
                 # if kind == 3:
                 #     ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
-                the_match = find(initial_ecc_rex, (sample_rex,), log_file) if kind == 3 else find(initial_porb_rex, (sample_rex,), log_file)
+                if kind == 3:
+                    the_match = find(initial_ecc_rex, (sample_rex,), log_file)
+                else:
+                    the_match = find(initial_porb_rex, (sample_rex,), log_file)
                 while the_match:
                     # porb_initial = porb_initial_match["value"]
                     # if kind == 3:
@@ -165,7 +168,10 @@ def parse(log_fname, data_fname, label_fname, kind):
                     # porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
                     # if kind == 3:
                     #     ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
-                    the_match = find(initial_ecc_rex, (sample_rex,), log_file) if kind == 3 else find(initial_porb_rex, (sample_rex,), log_file)
+                    if kind == 3:
+                        the_match = find(initial_ecc_rex, (sample_rex,), log_file)
+                    else:
+                        the_match = find(initial_porb_rex, (sample_rex,), log_file)
             except SkipParams:
                 pass
     return num_tested, max_tested_line
@@ -184,9 +190,8 @@ def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/outpu
     elif kind == 3:
         path_kind = "2d_eccentricity_"
     else:
-        print("bad kind")
+        kind = 3
         path_kind = "2d_eccentricity_"
-    print(path_kind)
     #
     log_path = base_path + "sampling_output/" + str(system)
     logs_for_system = glob(log_path + "/init/*.log")
