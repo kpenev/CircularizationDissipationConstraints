@@ -94,6 +94,7 @@ def parse(log_fname, data_fname, label_fname, kind):
             "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
             f"Initial eccentricity: {float_re}"
         )
+        initial_porb_rex = initial_ecc_rex
     max_tested_line = 0
     num_tested = 0
     with open(log_fname, "r", encoding="ascii") as log_file:
@@ -104,10 +105,8 @@ def parse(log_fname, data_fname, label_fname, kind):
                     param_match = find(param_rex, (sample_rex,), log_file)
                     params[param_match["name"]] = param_match["value"]
                 porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
-                # matchforwhile = porb_initial_match
                 if kind == 3:
                     ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
-                    # matchforwhile = ecc_initial_match
                 while (ecc_initial_match if kind == 3 else porb_initial_match):
                     porb_initial = porb_initial_match["value"]
                     if kind == 3:
@@ -163,10 +162,8 @@ def parse(log_fname, data_fname, label_fname, kind):
                             f"{porb_initial!r} for {params!r}"
                         )
                     porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
-                    # matchforwhile = porb_initial_match
                     if kind == 3:
                         ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
-                        # matchforwhile = ecc_initial_match
             except SkipParams:
                 pass
     return num_tested, max_tested_line
