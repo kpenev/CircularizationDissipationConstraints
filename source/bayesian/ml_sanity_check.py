@@ -108,6 +108,8 @@ def parse(log_fname, data_fname, label_fname, kind):
                 if kind == 3:
                     print('initial the_match get')
                     the_match = find(initial_ecc_rex, (sample_rex,), log_file)
+                    print(the_match)
+                    print(the_match["value"])
                 else:
                     the_match = find(initial_porb_rex, (sample_rex,), log_file)
                 while the_match:
