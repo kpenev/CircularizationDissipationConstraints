@@ -127,7 +127,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                             params["final_orbital_period"] = final_porb_match["value"]
                     except SkipParams as exc:
                         if exc.index == 0 and kind != 3:
-                            print('A possible issue',exc.match["value"])
+                            # print('A possible issue',exc.match["value"])
                             the_match = exc.match
                             continue
                         else:
@@ -154,6 +154,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                     param_line = ",".join(params[name] for name in params_1d)
                     test_line_number = get_line_number(param_line, data_fname)
                     if test_line_number is None:
+                        print(match_initial)
                         continue
                     if (
                         get_line(test_line_number, label_fname).strip()
