@@ -71,8 +71,8 @@ def parse(log_fname, data_fname, label_fname, kind):
         "cmd_primary_radius",
         "cmd_secondary_radius",
     ]
-    # if kind != 1:
-    #     params_1d.append("final_eccentricity")
+    if kind != 1:
+        params_1d.append("final_eccentricity")
     param_rex = re.compile(f'^\t(?P<name>{"|".join(params_1d)}): {float_re}')
     initial_porb_rex = re.compile(
         "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
