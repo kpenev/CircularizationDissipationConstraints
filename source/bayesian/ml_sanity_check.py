@@ -109,7 +109,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                     ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
                     matchforwhile = ecc_initial_match
                 while porb_initial_match:
-                    porb_initial = matchforwhile["value"]
+                    porb_initial = porb_initial_match["value"]
                     # if kind == 3:
                     #     porb_initial = ecc_initial_match["value"]
                     try:
