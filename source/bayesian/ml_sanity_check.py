@@ -107,11 +107,11 @@ def parse(log_fname, data_fname, label_fname, kind):
                 # matchforwhile = porb_initial_match
                 if kind == 3:
                     ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
-                    matchforwhile = ecc_initial_match
-                while porb_initial_match:
+                    # matchforwhile = ecc_initial_match
+                while (ecc_initial_match if kind == 3 else porb_initial_match):
                     porb_initial = porb_initial_match["value"]
-                    # if kind == 3:
-                    #     porb_initial = ecc_initial_match["value"]
+                    if kind == 3:
+                        porb_initial = ecc_initial_match["value"]
                     try:
                         final_porb_match = find(
                             final_porb_rex,
@@ -166,7 +166,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                     # matchforwhile = porb_initial_match
                     if kind == 3:
                         ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
-                        matchforwhile = ecc_initial_match
+                        # matchforwhile = ecc_initial_match
             except SkipParams:
                 pass
     return num_tested, max_tested_line
