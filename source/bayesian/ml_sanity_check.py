@@ -90,7 +90,7 @@ def parse(log_fname, data_fname, label_fname, kind):
         )
         ignore_params = 2
     if kind == 3:
-        initial_porb_rex = re.compile(
+        initial_ecc_rex = re.compile(
             "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
             f"Initial eccentricity: {float_re}"
         )
@@ -104,8 +104,12 @@ def parse(log_fname, data_fname, label_fname, kind):
                     param_match = find(param_rex, (sample_rex,), log_file)
                     params[param_match["name"]] = param_match["value"]
                 porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
+                if kind == 3:
+                    ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
                 while porb_initial_match:
                     porb_initial = porb_initial_match["value"]
+                    if kind == 3:
+                        porb_initial = ecc_initial_match["value"]
                     try:
                         final_porb_match = find(
                             final_porb_rex,
