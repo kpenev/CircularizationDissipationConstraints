@@ -93,7 +93,7 @@ def parse(log_fname, data_fname, label_fname, kind):
         while find(sample_rex, (), log_file):
             try:
                 params = {}
-                for _ in range(len(params_1d) - 1):
+                for _ in range(len(params_1d) - 2):
                     param_match = find(param_rex, (sample_rex,), log_file)
                     params[param_match["name"]] = param_match["value"]
                 porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
