@@ -126,7 +126,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                         else:
                             params["final_orbital_period"] = final_porb_match["value"]
                     except SkipParams as exc:
-                        if exc.index == 0:
+                        if exc.index == 0 and kind != 3:
                             print('A possible issue',exc.match["value"])
                             the_match = exc.match
                             continue
@@ -144,7 +144,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                             else:
                                 params["final_eccentricity"] = final_ecc_match["value"]
                         except SkipParams as exc:
-                            if exc.index == 0:
+                            if exc.index == 0 and kind == 3:
                                 print('B possible issue',exc.match["value"])
                                 the_match = exc.match
                                 continue
