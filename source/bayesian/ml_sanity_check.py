@@ -89,12 +89,11 @@ def parse(log_fname, data_fname, label_fname, kind):
             f"Final eccentricity: {float_re}"
         )
         ignore_params = 2
-    if kind == 3:
+    # if kind == 3:
         initial_ecc_rex = re.compile(
             "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
             f"Initial eccentricity: {float_re}"
         )
-        initial_porb_rex = initial_ecc_rex
     max_tested_line = 0
     num_tested = 0
     with open(log_fname, "r", encoding="ascii") as log_file:
@@ -131,7 +130,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                         try:
                             final_ecc_match = find(
                                 final_ecc_rex,
-                                (initial_porb_rex, sample_rex),
+                                (initial_ecc_rex, sample_rex),
                                 log_file,
                             )
                             if final_ecc_match is None:
