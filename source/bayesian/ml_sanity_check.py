@@ -107,6 +107,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                 # if kind == 3:
                 #     ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
                 if kind == 3:
+                    print('initial the_match get')
                     the_match = find(initial_ecc_rex, (sample_rex,), log_file)
                 else:
                     the_match = find(initial_porb_rex, (sample_rex,), log_file)
@@ -154,7 +155,6 @@ def parse(log_fname, data_fname, label_fname, kind):
                     param_line = ",".join(params[name] for name in params_1d)
                     test_line_number = get_line_number(param_line, data_fname)
                     if test_line_number is None:
-                        print(match_initial)
                         continue
                     if (
                         get_line(test_line_number, label_fname).strip()
