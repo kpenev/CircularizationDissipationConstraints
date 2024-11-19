@@ -152,7 +152,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                         continue
                     if (
                         get_line(test_line_number, label_fname).strip()
-                        == the_match.strip()
+                        == match_initial.strip()
                     ):
                         max_tested_line = max(max_tested_line, test_line_number)
                         num_tested += 1
