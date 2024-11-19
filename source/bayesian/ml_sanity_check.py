@@ -104,9 +104,11 @@ def parse(log_fname, data_fname, label_fname, kind):
                     param_match = find(param_rex, (sample_rex,), log_file)
                     params[param_match["name"]] = param_match["value"]
                 porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
+                matchforwhile = porb_initial_match
                 if kind == 3:
                     ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
-                while porb_initial_match:
+                    matchforwhile = ecc_initial_match
+                while matchforwhile:
                     porb_initial = porb_initial_match["value"]
                     if kind == 3:
                         porb_initial = ecc_initial_match["value"]
