@@ -103,13 +103,15 @@ def parse(log_fname, data_fname, label_fname, kind):
                 for _ in range(len(params_1d) - ignore_params):
                     param_match = find(param_rex, (sample_rex,), log_file)
                     params[param_match["name"]] = param_match["value"]
-                porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
-                if kind == 3:
-                    ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
-                while (ecc_initial_match if kind == 3 else porb_initial_match):
-                    porb_initial = porb_initial_match["value"]
-                    if kind == 3:
-                        porb_initial = ecc_initial_match["value"]
+                # porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
+                # if kind == 3:
+                #     ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
+                the_match = find(initial_ecc_rex, (sample_rex,), log_file) if kind == 3 else find(initial_porb_rex, (sample_rex,), log_file)
+                while the_match:
+                    # porb_initial = porb_initial_match["value"]
+                    # if kind == 3:
+                    #     porb_initial = ecc_initial_match["value"]
+                    match_initial = the_match["value"]
                     try:
                         final_porb_match = find(
                             final_porb_rex,
@@ -122,7 +124,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                             params["final_orbital_period"] = final_porb_match["value"]
                     except SkipParams as exc:
                         if exc.index == 0:
-                            porb_initial_match = exc.match
+                            the_match = exc.match
                             continue
                         else:
                             raise
@@ -130,7 +132,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                         try:
                             final_ecc_match = find(
                                 final_ecc_rex,
-                                (initial_ecc_rex, sample_rex),
+                                (initial_porb_rex, sample_rex),
                                 log_file,
                             )
                             if final_ecc_match is None:
@@ -139,7 +141,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                                 params["final_eccentricity"] = final_ecc_match["value"]
                         except SkipParams as exc:
                             if exc.index == 0:
-                                ecc_initial_match = exc.match
+                                the_match = exc.match
                                 continue
                             else:
                                 raise
@@ -150,7 +152,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                         continue
                     if (
                         get_line(test_line_number, label_fname).strip()
-                        == porb_initial.strip()
+                        == the_match.strip()
                     ):
                         max_tested_line = max(max_tested_line, test_line_number)
                         num_tested += 1
@@ -158,11 +160,12 @@ def parse(log_fname, data_fname, label_fname, kind):
                         print(
                             f"Mismatch on line {test_line_number}: "
                             f"{get_line(test_line_number, label_fname)!r} != "
-                            f"{porb_initial!r} for {params!r}"
+                            f"{match_initial!r} for {params!r}"
                         )
-                    porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
-                    if kind == 3:
-                        ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
+                    # porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
+                    # if kind == 3:
+                    #     ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
+                    the_match = find(initial_ecc_rex, (sample_rex,), log_file) if kind == 3 else find(initial_porb_rex, (sample_rex,), log_file)
             except SkipParams:
                 pass
     return num_tested, max_tested_line
