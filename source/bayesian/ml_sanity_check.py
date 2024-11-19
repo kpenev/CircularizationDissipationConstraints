@@ -139,7 +139,7 @@ def parse(log_fname, data_fname, label_fname, kind):
                                 params["final_eccentricity"] = final_ecc_match["value"]
                         except SkipParams as exc:
                             if exc.index == 0:
-                                porb_initial_match = exc.match
+                                ecc_initial_match = exc.match
                                 continue
                             else:
                                 raise
