@@ -54,7 +54,7 @@ def get_line(lineno, fname):
         return file.readline()
 
 
-def parse(log_fname, data_fname, label_fname):
+def parse(log_fname, data_fname, label_fname, kind):
     """Parse the expected entries in ML training data from given log file."""
 
     float_re = "(?P<value>[e0-9.+-]*)"
@@ -71,6 +71,8 @@ def parse(log_fname, data_fname, label_fname):
         "cmd_primary_radius",
         "cmd_secondary_radius",
     ]
+    # if kind != 1:
+    #     params_1d.append("final_eccentricity")
     param_rex = re.compile(f'^\t(?P<name>{"|".join(params_1d)}): {float_re}')
     initial_porb_rex = re.compile(
         "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
@@ -131,11 +133,18 @@ def parse(log_fname, data_fname, label_fname):
     return num_tested, max_tested_line
 
 
-def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/output/W19/", datefilter = None):
+def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/output/W19/", datefilter = None, kind = 1):
     """Check all logs under ``ml_logs``."""
 
     total_max_tested_line = 0
     total_num_tested = 0
+    #
+    if kind == 1:
+        path_kind = "1d_period_"
+    elif kind == 2:
+        path_kind = "2d_period_"
+    else:
+        path_kind = "2d_eccentricity"
     #
     log_path = base_path + "sampling_output/" + str(system)
     logs_for_system = glob(log_path + "/init/*.log")
@@ -143,7 +152,7 @@ def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/outpu
     if datefilter is not None:
         logs_for_system = list(filter(lambda x: datefilter in x, logs_for_system))
     #
-    ml_path = base_path + "nn_data/poet_output/1d_period_" + str(system) + "/datasets/"
+    ml_path = base_path + "nn_data/poet_output/" + path_kind + str(system) + "/datasets/"
     #
     for log_fname in logs_for_system:
         print(f"Testing {log_fname}")
@@ -151,6 +160,7 @@ def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/outpu
             log_fname,
             ml_path + "data.csv",
             ml_path + "label.csv",
+            kind
         )
         print(f"Tested {num_tested} entries from {log_fname!r}")
         print(f"Last tested ML line: {max_tested_line}")
@@ -165,8 +175,11 @@ if __name__ == "__main__":
     systemname = str(sys.argv[1])
     systempath = "/work/08402/vortebo/ls6/output/W19/"
     datefilter = None
+    kind = 1
     if len(sys.argv) > 2:
         systempath = str(sys.argv[2])
         if len(sys.argv) > 3:
             datefilter = str(sys.argv[3])
-    check_all_logs(systemname, systempath, datefilter)
+            if len(sys.argv) > 4:
+                kind = int(sys.argv[4])
+    check_all_logs(systemname, systempath, datefilter, kind)
