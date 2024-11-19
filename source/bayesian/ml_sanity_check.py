@@ -89,6 +89,11 @@ def parse(log_fname, data_fname, label_fname, kind):
             f"Final eccentricity: {float_re}"
         )
         ignore_params = 2
+    if kind == 3:
+        initial_porb_rex = re.compile(
+            "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
+            f"Initial eccentricity: {float_re}"
+        )
     max_tested_line = 0
     num_tested = 0
     with open(log_fname, "r", encoding="ascii") as log_file:
