@@ -82,6 +82,11 @@ def parse(log_fname, data_fname, label_fname, kind):
         "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
         f"Final period: {float_re}"
     )
+    if kind > 1:
+        final_ecc_rex = re.compile(
+            "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
+            f"Final eccentricity: {float_re}"
+        )
     max_tested_line = 0
     num_tested = 0
     with open(log_fname, "r", encoding="ascii") as log_file:
@@ -110,6 +115,23 @@ def parse(log_fname, data_fname, label_fname, kind):
                             continue
                         else:
                             raise
+                    if kind > 1:
+                        try:
+                            final_ecc_match = find(
+                                final_ecc_rex,
+                                (initial_porb_rex, sample_rex),
+                                log_file,
+                            )
+                            if final_ecc_match is None:
+                                break
+                            else:
+                                params["final_eccentricity"] = final_ecc_match["value"]
+                        except SkipParams as exc:
+                            if exc.index == 0:
+                                porb_initial_match = exc.match
+                                continue
+                            else:
+                                raise
 
                     param_line = ",".join(params[name] for name in params_1d)
                     test_line_number = get_line_number(param_line, data_fname)
