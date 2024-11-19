@@ -144,7 +144,7 @@ def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/outpu
     elif kind == 2:
         path_kind = "2d_period_"
     else:
-        path_kind = "2d_eccentricity"
+        path_kind = "2d_eccentricity_"
     #
     log_path = base_path + "sampling_output/" + str(system)
     logs_for_system = glob(log_path + "/init/*.log")
