@@ -71,8 +71,8 @@ def parse(log_fname, data_fname, label_fname, kind):
         "cmd_primary_radius",
         "cmd_secondary_radius",
     ]
-    # if kind != 1:
-    #     params_1d.append("final_eccentricity")
+    if kind != 1:
+        params_1d.append("final_eccentricity")
     param_rex = re.compile(f'^\t(?P<name>{"|".join(params_1d)}): {float_re}')
     initial_porb_rex = re.compile(
         "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
@@ -83,17 +83,17 @@ def parse(log_fname, data_fname, label_fname, kind):
         f"Final period: {float_re}"
     )
     ignore_params = 1
-    # if kind > 1:
-    #     final_ecc_rex = re.compile(
-    #         "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
-    #         f"Final eccentricity: {float_re}"
-    #     )
-    #     ignore_params = 2
-    # if kind == 3:
-    #     initial_ecc_rex = re.compile(
-    #         "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
-    #         f"Initial eccentricity: {float_re}"
-    #     )
+    if kind > 1:
+        final_ecc_rex = re.compile(
+            "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
+            f"Final eccentricity: {float_re}"
+        )
+        ignore_params = 2
+    if kind == 3:
+        initial_ecc_rex = re.compile(
+            "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
+            f"Initial eccentricity: {float_re}"
+        )
     max_tested_line = 0
     num_tested = 0
     with open(log_fname, "r", encoding="ascii") as log_file:
@@ -105,11 +105,11 @@ def parse(log_fname, data_fname, label_fname, kind):
                     params[param_match["name"]] = param_match["value"]
                 porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
                 matchforwhile = porb_initial_match
-                # if kind == 3:
-                #     ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
-                #     matchforwhile = ecc_initial_match
-                while porb_initial_match:
-                    porb_initial = porb_initial_match["value"]
+                if kind == 3:
+                    ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
+                    matchforwhile = ecc_initial_match
+                while matchforwhile:
+                    porb_initial = matchforwhile["value"]
                     # if kind == 3:
                     #     porb_initial = ecc_initial_match["value"]
                     try:
@@ -128,23 +128,23 @@ def parse(log_fname, data_fname, label_fname, kind):
                             continue
                         else:
                             raise
-                    # if kind > 1:
-                    #     try:
-                    #         final_ecc_match = find(
-                    #             final_ecc_rex,
-                    #             (initial_porb_rex, sample_rex),
-                    #             log_file,
-                    #         )
-                    #         if final_ecc_match is None:
-                    #             break
-                    #         else:
-                    #             params["final_eccentricity"] = final_ecc_match["value"]
-                    #     except SkipParams as exc:
-                    #         if exc.index == 0:
-                    #             porb_initial_match = exc.match
-                    #             continue
-                    #         else:
-                    #             raise
+                    if kind > 1:
+                        try:
+                            final_ecc_match = find(
+                                final_ecc_rex,
+                                (initial_porb_rex, sample_rex),
+                                log_file,
+                            )
+                            if final_ecc_match is None:
+                                break
+                            else:
+                                params["final_eccentricity"] = final_ecc_match["value"]
+                        except SkipParams as exc:
+                            if exc.index == 0:
+                                porb_initial_match = exc.match
+                                continue
+                            else:
+                                raise
 
                     param_line = ",".join(params[name] for name in params_1d)
                     test_line_number = get_line_number(param_line, data_fname)
