@@ -74,17 +74,18 @@ def parse(log_fname, data_fname, label_fname, kind):
     if kind != 1:
         params_1d.append("final_eccentricity")
     param_rex = re.compile(f'^\t(?P<name>{"|".join(params_1d)}): {float_re}')
+    case_rex = re.compile("^DEBUG .* bayesian.log_likelihood_windemuth_et_al: In a case")
     ignore_params = 1
     if kind > 1:
         ignore_params = 2
-        initial_ecc_rex = re.compile(
-            "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
-            f"Initial eccentricity: {float_re}"
-        )
-        final_ecc_rex = re.compile(
-            "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
-            f"Final eccentricity: {float_re}"
-        )
+    initial_ecc_rex = re.compile(
+        "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
+        f"Initial eccentricity: {float_re}"
+    )
+    final_ecc_rex = re.compile(
+        "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
+        f"Final eccentricity: {float_re}"
+    )
     initial_porb_rex = re.compile(
         "^DEBUG .* general_purpose_python_modules.solve_for_initial_values: "
         f"Initial period: {float_re}"
@@ -102,21 +103,35 @@ def parse(log_fname, data_fname, label_fname, kind):
                 for _ in range(len(params_1d) - ignore_params):
                     param_match = find(param_rex, (sample_rex,), log_file)
                     params[param_match["name"]] = param_match["value"]
-                # porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
-                # if kind == 3:
-                #     ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
-                if kind == 3:
-                    print('initial the_match get')
-                    the_match = find(initial_ecc_rex, (sample_rex,), log_file)
-                    print(the_match)
-                    print(the_match["value"])
-                else:
-                    the_match = find(initial_porb_rex, (sample_rex,), log_file)
-                while the_match:
-                    # porb_initial = porb_initial_match["value"]
-                    # if kind == 3:
-                    #     porb_initial = ecc_initial_match["value"]
-                    match_initial = the_match["value"]
+
+                if kind > 1:
+                    find(case_rex, (sample_rex,), log_file)
+
+                ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
+                while ecc_initial_match:
+                    if kind > 1:
+                        try:
+                            final_ecc_match = find(
+                                final_ecc_rex,
+                                (sample_rex,),
+                                log_file,
+                            )
+                            if final_ecc_match is None:
+                                break
+                            else:
+                                params["final_eccentricity"] = final_ecc_match["value"]
+                        except SkipParams as exc:
+                            raise
+
+                    porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
+                    try:
+                        if kind == 3:
+                            match_initial = ecc_initial_match["value"]
+                        else:
+                            match_initial = porb_initial_match["value"]
+                    except TypeError:
+                        break
+                    
                     try:
                         final_porb_match = find(
                             final_porb_rex,
@@ -129,29 +144,10 @@ def parse(log_fname, data_fname, label_fname, kind):
                             params["final_orbital_period"] = final_porb_match["value"]
                     except SkipParams as exc:
                         if exc.index == 0 and kind != 3:
-                            # print('A possible issue',exc.match["value"])
-                            the_match = exc.match
+                            porb_initial_match = exc.match
                             continue
                         else:
                             raise
-                    if kind > 1:
-                        try:
-                            final_ecc_match = find(
-                                final_ecc_rex,
-                                (initial_porb_rex, sample_rex),
-                                log_file,
-                            )
-                            if final_ecc_match is None:
-                                break
-                            else:
-                                params["final_eccentricity"] = final_ecc_match["value"]
-                        except SkipParams as exc:
-                            if exc.index == 0 and kind == 3:
-                                print('B possible issue',exc.match["value"])
-                                the_match = exc.match
-                                continue
-                            else:
-                                raise
 
                     param_line = ",".join(params[name] for name in params_1d)
                     test_line_number = get_line_number(param_line, data_fname)
@@ -169,13 +165,8 @@ def parse(log_fname, data_fname, label_fname, kind):
                             f"{get_line(test_line_number, label_fname)!r} != "
                             f"{match_initial!r} for {params!r}"
                         )
-                    # porb_initial_match = find(initial_porb_rex, (sample_rex,), log_file)
-                    # if kind == 3:
-                    #     ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
-                    if kind == 3:
-                        the_match = find(initial_ecc_rex, (sample_rex,), log_file)
-                    else:
-                        the_match = find(initial_porb_rex, (sample_rex,), log_file)
+                    
+                    ecc_initial_match = find(initial_ecc_rex, (sample_rex,), log_file)
             except SkipParams:
                 pass
     return num_tested, max_tested_line
