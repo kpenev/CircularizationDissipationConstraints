@@ -493,7 +493,10 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         print('likelihood = %s' % (repr(likelihood)))
         print('log(likelihood) = %s' % (repr(numpy.log(likelihood))))
 
-        assert likelihood >= 0
+        if likelihood < 0:
+            logger.warning('!!!!!LIKELIHOOD NEGATIVE. INVESTIGATE!!!!!: %s',repr(likelihood))
+            return -numpy.inf
+
         if likelihood == 0:
             return -numpy.inf
 
