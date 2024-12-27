@@ -161,11 +161,11 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
                 reverse = numpy.polynomial.polynomial.Polynomial((-ehat_approx.coef[0]/ehat_approx.coef[1],1/ehat_approx.coef[1]))
                 inverse_e = reverse(e)
         else:
-            raise ValueError('ehat_approx should be a polynomial of order 1 or 2. Something is wrong with ehat_approx: %s',repr(ehat_approx))
+            raise ValueError('ehat_approx should be a polynomial of order 1 or 2. Something is wrong with ehat_approx: ' + repr(ehat_approx), 0)
         
         if inverse_e > 0.8 or inverse_e < 0:
-            logger.error('inverse_e(e) is outside range: %s(%s)',repr(inverse_e),repr(e))
-            raise ValueError('inverse_e should not be outside range: %s',repr(inverse_e))
+            logger.error('@@@inverse_e(e) is outside range: %s(%s)@@@',repr(inverse_e),repr(e))
+            raise ValueError('inverse_e should not be outside range: ' + repr(inverse_e), 1)
         
         ehat_prime_result = ehat_prime(inverse_e)
         if ehat_prime_result < 0 and report_negative_ehat_prime:
@@ -183,7 +183,20 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             logger.warning('ehat_prime is negative: %s',repr(ehat_prime.coef[0]))
         specific_integrand = partial(self._likelihood_integrand,ehat_approx=ehat_approx,
                                      e_to_be_near = e_to_be_near, report_negative_ehat_prime = report)
-        I = scipy.integrate.quad(specific_integrand, e_min, e_max, points=breakPoint)[0]
+        try:
+            I = scipy.integrate.quad(specific_integrand, e_min, e_max, points=breakPoint)[0]
+        except ValueError as err:
+            logger.error('scipy.integrate.quad returned a ValueError: %s',repr(err))
+            try:
+                length_of_args = len(err.args)
+                return_neginf = err.args[1]
+            except:
+                # If that doesn't work then it's not one of our custom errors, so something weird happened
+                logger.exception('err.args had no len()')
+                return_neginf = 0
+            if return_neginf == 1:
+                return -numpy.inf
+            raise
         return I
     
     def _get_ai_carepackage(self,parameters):
