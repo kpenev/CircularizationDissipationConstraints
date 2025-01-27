@@ -27,6 +27,8 @@ from general_purpose_python_modules.combined_mcmc_constraint import \
     CombinedMCMCConstraint
 from general_purpose_python_modules.visuals import make_corner_plot
 
+import traceback
+
 #Interface specified by argparse module.
 #pylint: disable=too-few-public-methods
 class ParseGrid(ArgparseAction):
@@ -93,7 +95,7 @@ def add_frequency_dependence_plot_config(parser, disable=()):
     if 'lgQ_grid' not in disable:
         parser.add_argument(
             '--lgQ-grid',
-            default=list(numpy.linspace(4, 12, 100)),
+            default=numpy.linspace(4, 12, 100),
             action=ParseGrid,
             nargs=3,
             metavar=('MIN_LGQ', 'MAX_LGQ', 'RES'),
@@ -138,7 +140,7 @@ def add_frequency_dependence_plot_config(parser, disable=()):
         parser.add_argument(
             '--ptide-grid',
             nargs=4,
-            default=list(numpy.logspace(0.0, numpy.log10(50.0), 100)),
+            default=numpy.logspace(0.0, numpy.log10(50.0), 100),
             action=ParseGrid,
             metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES', 'GRID_TYPE'),
             help='Set the range and resolution of the tidal period to include '
@@ -979,11 +981,12 @@ def main(config):
             if config.frequency_dependence_plot_fname:
                 frequency_dependence_plotter.add_chain(
                     samples,
-                    system_name.replace('_', ' ')
+                    str(system_name).replace('_', ' ')
                 )
             if config.errorbar_plot:
                 add_errorbar(samples, config)
         except RuntimeError:
+            traceback.print_exc()
             print('Empty chain in %s, skipping!' % samples_fname)
 
     pyplot.ylim(4.0, 12.0)

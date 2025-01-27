@@ -851,7 +851,7 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
     elif isinstance(binary, str) and binary.startswith('M35_'):
         lgq_range[0] = (4.0, 11.0)
     else:
-        lgq_range = (5.0, 11)
+        lgq_range = (4.0, 11)
     orig_lgq_grid = config.lgQ_grid
     config.lgQ_grid = numpy.linspace(*lgq_range, 50)
     frequency_dependence_plotter = FrequencyDependencePlotter(1, config)
@@ -1471,7 +1471,7 @@ def save_individual_data_behind_figure(data, plot_type, binary, config):
     mrt_filename = config.mrt_fname.format(
         collection=config.collection,
         method=config.method,
-        binary=binary,
+        binary=str(binary),
         plot_type=plot_type
     )
     if path.exists(mrt_filename):
@@ -2186,11 +2186,11 @@ def plot_tightest_constraints(plot_data,
 def main(config):
     """Avoid polluting global namespace."""
 
-    if not uname().nodename.endswith('tacc.utexas.edu'):
-        download_latest_samples(config.download_from,
-                                config.samples_dir,
-                                config.collection,
-                                config.method)
+    # if not uname().nodename.endswith('tacc.utexas.edu'):
+    #     download_latest_samples(config.download_from,
+    #                             config.samples_dir,
+    #                             config.collection,
+    #                             config.method)
 
     plot_data = get_sampling_data(config)
     combined_quantiles = None
