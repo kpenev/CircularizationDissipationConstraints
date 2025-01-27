@@ -216,7 +216,9 @@ def compare_chain_configuration(config, chain_group):
         else:
             try:
                 len(config_value)
-                if (numpy.array(config_value) != saved_value).any():
+                _logger.debug('%s',repr(config_value))
+                _logger.debug('%s',repr((numpy.array(config_value) != saved_value)))
+                if numpy.array(numpy.array(config_value) != saved_value).any():
                     _logger.debug(
                         'Parameter %s (%s) in chain %s does not match %s',
                         param,
