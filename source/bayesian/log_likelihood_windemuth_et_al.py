@@ -307,6 +307,8 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
         De_min,De_max = self._de.support()
 
         print('envelope_eccentricity = %s' % (repr(self.envelope_eccentricity)))
+        print('max_final_eccentricity = %s' % (repr(max_final_eccentricity)))
+        print('De range = %s' % (repr((De_min,De_max))))
 
         # Heaviside
         if (
