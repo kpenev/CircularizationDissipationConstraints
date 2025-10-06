@@ -83,7 +83,7 @@ def prepare_sampling(config):
         period_search_factor=config.initial_period_search_factor,
         scaled_period_guess=config.initial_period_scaled_guess,
         prior_only=(config.sampling == 'prior'),
-        de_distro=W19EccentricityDistribution(config.system,pickle_fname='/home/vortebo/ctime/CircularizationDissipationConstraints/windemuth_eccentricity_distros.pkl'),
+        de_distro=W19EccentricityDistribution(config.system,pickle_fname='/work/08402/vortebo/ls6/distro_pkl/windemuth_eccentricity_distros_'+str(config.system)+'.pkl'),
         pe_distro=scipy.stats.uniform(loc=0,scale=0.8),
         system_eccentricity=e,
         system_name = config.system,

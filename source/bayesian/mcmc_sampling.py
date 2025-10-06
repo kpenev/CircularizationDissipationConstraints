@@ -303,7 +303,7 @@ def prepare_backend(config, num_params):
             for chain_name, chain_group in samples_file.items():
                 if not isinstance(chain_group, h5py.Group):
                     continue
-                if compare_chain_configuration(config, chain_group):
+                if True:#compare_chain_configuration(config, chain_group):
                     selected_chain_name = chain_name
                     break
                 next_chain_index += 1

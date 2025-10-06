@@ -56,6 +56,7 @@ class LogLikelihoodBinaryStars(LogLikelihoodBase, metaclass=ABCMeta):
                 ])
                 star_dissipation['reference_phase_lags'] *= numpy.power(
                     star_dissipation['tidal_frequency_breaks'][0]
+                    #2.0 * numpy.pi / 50.0
                     /
                     star_dissipation['tidal_frequency_breaks'][1],
                     powerlaw
