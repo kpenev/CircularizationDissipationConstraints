@@ -54,9 +54,10 @@ for SYS in $SYSTEMS; do
     fi
 done
 
-SLURM_DIR=~/projects/git/CircularizationDissipationConstraints/source/slurm
+SLURM_DIR_1=/home1/08402/vortebo/codebase/CircularizationDissipationConstraints/source/slurm
+SLURM_DIR_2=/home1/08402/vortebo/slurm
 
-mkdir -p ${SLURM_DIR}/${HPC}/${CLUSTER}
+mkdir -p ${SLURM_DIR_2}/${HPC}/${CLUSTER}
 
 sed\
     -e 's%@@CLUSTER@@%'"$CLUSTER"'%g'\
@@ -66,6 +67,6 @@ sed\
     -e 's%@@SAMPLER@@%'"${SAMPLER}"'%g'\
     -e 's%@@HPC@@%'"${HPC}"'%g'\
     -e 's%@@QUEUE@@%'"${QUEUE}"'%g'\
-    ${SLURM_DIR}/${TEMPLATE}\
+    ${SLURM_DIR_1}/${TEMPLATE}\
     >\
-    ${SLURM_DIR}/${HPC}/${CLUSTER}/${JOINED_SYSTEMS}_${SAMPLING_MODE}.slurm
+    ${SLURM_DIR_2}/${HPC}/${CLUSTER}/tf_${JOINED_SYSTEMS}_${SAMPLING_MODE}.slurm

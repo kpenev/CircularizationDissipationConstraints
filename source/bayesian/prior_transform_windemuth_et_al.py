@@ -42,13 +42,21 @@ class PriorTransformWindemuth(PriorTransformBase):
             else:
                 assert (weights >= 0).all()
                 assert weights.sum() > 0
+                logger.debug('quantity is %s', repr(quantity))
+                logger.debug('distrib is \n %s', repr(self._distributions[quantity]))
                 self._distributions[quantity].set_weights(weights)
+                logger.debug('distrib is now \n %s', repr(self._distributions[quantity]))
+                thenextone=next(unit_cube_iter)
+                logger.debug('the nextone %s', repr(thenextone))
                 sampled[quantity] = self._distributions[quantity].ppf(
-                    next(unit_cube_iter)
+                    thenextone
                 )
+                logger.debug('sampled quantity %s',repr(sampled[quantity]))
                 weight_scale = self._distributions[quantity].eval_sample_pdf(
                     sampled[quantity]
                 )
+                logger.debug('weightscale %s',repr(weight_scale))
+                logger.debug('weightscale sum %s',repr(weight_scale.sum()))
                 weights *= weight_scale
                 if weights.sum() == 0:
                     logger.error(

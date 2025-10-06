@@ -172,7 +172,7 @@ def parse(log_fname, data_fname, label_fname, kind):
     return num_tested, max_tested_line
 
 
-def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/output/W19/", datefilter = None, kind = 1):
+def check_all_logs(system = 10031409, base_path = "/scratch/08402/vortebo/ls6/output/W19/", datefilter = None, kind = 1):
     """Check all logs under ``ml_logs``."""
 
     total_max_tested_line = 0
@@ -215,7 +215,7 @@ def check_all_logs(system = 10031409, base_path = "/work/08402/vortebo/ls6/outpu
 
 if __name__ == "__main__":
     systemname = str(sys.argv[1])
-    systempath = "/work/08402/vortebo/ls6/output/W19/"
+    systempath = "/scratch/08402/vortebo/ls6/output/W19/"
     datefilter = None
     kind = 1
     if len(sys.argv) > 2:

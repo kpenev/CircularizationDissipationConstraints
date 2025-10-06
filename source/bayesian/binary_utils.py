@@ -118,7 +118,8 @@ def get_common_binary_star_priors(config):
 def prepare_sampling_common(config):
     """Common sampling initialization steps for all binary star datasets."""
 
-    MESAInterpolator.set_quantity_lower_limit('iconv', 1e-5)
+    MESAInterpolator.set_quantity_lower_limit('iconv', 1e-3)
+    print(config.stellar_evolution_interpolator_dir)
     interpolator = StellarEvolutionManager(
         config.stellar_evolution_interpolator_dir
     ).get_interpolator_by_name(
