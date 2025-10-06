@@ -52,6 +52,8 @@ from bayesian.windemuth_et_al_util import \
 
 from bayesian.cluster_util import select_binary_data
 
+from multiprocessing_util import setup_process
+
 def parse_command_line(quantiles_only=False):
     """Parse command line for plotting configuration."""
 
@@ -237,6 +239,12 @@ def parse_command_line(quantiles_only=False):
         default=r"$\log_{10}Q_\star'$",
         help='The label to use for the tidal dissipation parameter being '
         'constrained.'
+    )
+    parser.add_argument(
+        '--skip-binaries',
+        nargs='+',
+        default=[],
+        help='List of binary TICs to skip. '
     )
 
     if not quantiles_only:
@@ -1198,7 +1206,7 @@ def decorate_subplot(axis,
             axis.set_yticks(yticks)
 
     if isinstance(binary, (int, numpy.int32, numpy.int64)):
-        axis.set_title('TIC %d' % binary, pad=3)
+        axis.set_title('KIC %d' % binary, pad=3)
     elif binary.endswith(' b'):
         axis.set_title(binary[:-2], pad=3)
     else :
@@ -2071,7 +2079,7 @@ def plot_tightest_constraints(plot_data,
         if cluster == 'M35':
             lgq_range = (4.0, 8.0)
         elif cluster == 'W19':
-            lgq_range = (5.0, 10.0)
+            lgq_range = (config.lgQ_grid[0], config.lgQ_grid[-1])
         elif cluster == 'HJ':
             lgq_range = (3.0, 9.0)
         else:
@@ -2183,6 +2191,17 @@ def plot_tightest_constraints(plot_data,
 #pylint: enable=too-many-statements
 #pylint: enable=too-many-locals
 
+def remove_skipped(plot_data, config):
+    """Remove binaries that we're supposed to skip."""
+
+    for system in config.skip_binaries:
+        if int(system) in plot_data.keys():
+            print('Skipping binary ' + repr(system))
+            del plot_data[int(system)]
+        else:
+            print('To-skip system ' + repr(int(system)) + ' not in pickle or directory.')
+    return plot_data
+
 def main(config):
     """Avoid polluting global namespace."""
 
@@ -2193,6 +2212,7 @@ def main(config):
     #                             config.method)
 
     plot_data = get_sampling_data(config)
+    plot_data = remove_skipped(plot_data, config)
     combined_quantiles = None
     plot_individual_constraints(plot_data, config)
     if config.combined_constraint_period_range is not None:
@@ -2227,4 +2247,15 @@ def main(config):
 
 
 if __name__ == '__main__':
+
+    setup_process(
+                    fname_datetime_format='%Y%m%d%H%M%S',
+                    system='letsgraph',
+                    std_out_err_fname='/home/vortebo/results/josh_output/{task}/{system}_{now}_{pid:d}.outerr',
+                    logging_fname='/home/vortebo/results/josh_output/{task}/{system}_{now}_{pid:d}.log',
+                    logging_verbosity='debug',
+                    logging_message_format='%(levelname)s %(asctime)s %(name)s: %(message)s | %(pathname)s.%(funcName)s:%(lineno)d'#,
+                    #logging_datetime_format=config.logging_datetime_format
+                  )
+
     main(parse_command_line())
