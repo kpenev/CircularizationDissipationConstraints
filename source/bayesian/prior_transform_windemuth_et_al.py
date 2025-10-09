@@ -41,13 +41,11 @@ class PriorTransformWindemuth(PriorTransformBase):
                 sampled[quantity] = next(unit_cube_iter)
             else:
                 assert (weights >= 0).all()
-                assert weights.sum() > 0
+                # assert weights.sum() > 0
                 logger.debug('quantity is %s', repr(quantity))
-                logger.debug('distrib is \n %s', repr(self._distributions[quantity]))
                 self._distributions[quantity].set_weights(weights)
-                logger.debug('distrib is now \n %s', repr(self._distributions[quantity]))
                 thenextone=next(unit_cube_iter)
-                logger.debug('the nextone %s', repr(thenextone))
+                logger.debug('quantity is %s the nextone %s', repr(quantity), repr(thenextone))
                 sampled[quantity] = self._distributions[quantity].ppf(
                     thenextone
                 )
@@ -55,8 +53,6 @@ class PriorTransformWindemuth(PriorTransformBase):
                 weight_scale = self._distributions[quantity].eval_sample_pdf(
                     sampled[quantity]
                 )
-                logger.debug('weightscale %s',repr(weight_scale))
-                logger.debug('weightscale sum %s',repr(weight_scale.sum()))
                 weights *= weight_scale
                 if weights.sum() == 0:
                     logger.error(
@@ -64,6 +60,7 @@ class PriorTransformWindemuth(PriorTransformBase):
                         repr(weight_scale),
                         repr(weight_scale.sum())
                     )
+                    raise ValueError('All weights zero')
             logger.debug('Weights have been updated to: %s', repr(weights))
             logger.debug('Weights sum is now: %s', repr(weights.sum()))
 

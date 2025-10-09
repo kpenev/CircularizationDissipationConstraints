@@ -65,24 +65,37 @@ def log_probability(independent_normal_values,
                   repr(unit_cube_values))
     _logger.debug('The max value of unit_cube_values is %s', repr(unit_cube_values.max()))
     _logger.debug('If we add a little bit to it, then it is %s', repr(unit_cube_values.max()+1e-10))
+    issue_parameters = tuple(
+        -numpy.inf if i == 0 else numpy.nan
+        for i in range(
+            len(log_likelihood.parameter_order)
+            -
+            len(exclude_from_blob)
+            +
+            (8 if track_final_eccentricity else 7)
+        )
+    )
     if unit_cube_values.max()+1e-10 >= 1:
         _logger.warning('unit_cube_values is too close to 1')
-        parameters = tuple(
-            -numpy.inf if i == 0 else numpy.nan
-            for i in range(
-                len(log_likelihood.parameter_order)
-                -
-                len(exclude_from_blob)
-                +
-                (8 if track_final_eccentricity else 7)
-            )
-        )
+
         _logger.debug('Final blob with %d parameters: %s.',
-                  len(parameters),
-                  repr(parameters))
-        return parameters
+                  len(issue_parameters),
+                  repr(issue_parameters))
+        return issue_parameters
     log_likelihood_value = norm.logpdf(independent_normal_values).sum()
-    transformed = prior_transform(unit_cube_values)
+    try:
+        transformed = prior_transform(unit_cube_values)
+    except Exception as e:
+        if 'weights zero' in str(e):
+            _logger.warning('ValueError during prior transformation: %s', e)
+            
+            _logger.debug('Final blob with %d parameters: %s.',
+                  len(issue_parameters),
+                  repr(issue_parameters))
+            return issue_parameters
+        else:
+            raise
+
     _logger.debug('Independent normal values: %s', repr(independent_normal_values))
     _logger.debug('Unit cube values: %s', repr(unit_cube_values))
     _logger.debug('Log likelihood value: %s', repr(log_likelihood_value))

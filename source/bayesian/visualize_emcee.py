@@ -241,18 +241,21 @@ def get_chain_name(samples_fname, chain_conditions):
         chain_name = None
         for try_chain_name in chain_file.keys():
             match = True
-            for attr_name, expected_value in chain_conditions:
-                match = (
-                    match
-                    and
-                    (
-                        chain_file[try_chain_name].attrs[attr_name]
-                        ==
-                        numpy.array(float(expected_value))
-                    ).all()
-                    and
-                    chain_file[try_chain_name].attrs['iteration'] > 0
-                )
+            if len(chain_conditions) == 0:
+                match = chain_file[try_chain_name].attrs['iteration'] > 0
+            else:
+                for attr_name, expected_value in chain_conditions:
+                    match = (
+                        match
+                        and
+                        (
+                            chain_file[try_chain_name].attrs[attr_name]
+                            ==
+                            numpy.array(float(expected_value))
+                        ).all()
+                        and
+                        chain_file[try_chain_name].attrs['iteration'] > 0
+                    )
             if match:
                 if chain_name is not None:
                     raise RuntimeError(
@@ -356,6 +359,8 @@ def save_corner_plot(samples, log_probability, config):
 
     samples = samples.flatten()
     log_probability = log_probability.flatten()
+    print('config.corner_plot_params: ' + repr(config.corner_plot_params))
+    print('samples.dtype.names: ' + repr(samples.dtype.names))
     include_params = config.corner_plot_params or [
         param
         for param in samples.dtype.names
