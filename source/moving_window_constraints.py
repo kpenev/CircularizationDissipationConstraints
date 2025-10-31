@@ -1,6 +1,6 @@
 """combine constraints in a moving window."""
 
-import scipy
+import numpy
 import scipy.integrate
 from scipy.stats import norm
 
@@ -21,7 +21,7 @@ class MovingWindowConstraints:
         def window_pdf(y):
             """The combined PDF of given constsraints (unnormalized)."""
 
-            result = scipy.zeros(y.shape, dtype=float)
+            result = numpy.zeros(y.shape, dtype=float)
             for index in range(ymin.size):
                 try:
                     min_sigma = float(ymin_stdev)
@@ -34,16 +34,16 @@ class MovingWindowConstraints:
                     max_sigma = ymax_stdev[index]
 
                 result -= (
-                    scipy.square(
-                        scipy.minimum((y - ymin[index]) / min_sigma, 0.0)
+                    numpy.square(
+                        numpy.minimum((y - ymin[index]) / min_sigma, 0.0)
                     )
                     +
-                    scipy.square(
-                        scipy.minimum((ymax[index] - y) / max_sigma, 0.0)
+                    numpy.square(
+                        numpy.minimum((ymax[index] - y) / max_sigma, 0.0)
                     )
                 )
             print('Log(Window pdf) = ' + repr(result))
-            return scipy.exp(result)
+            return numpy.exp(result)
 
         def solve_linear_interp(y, x_below, y_below, x_above, y_above):
             """Find x at which the line through given points has the given y."""
@@ -69,17 +69,17 @@ class MovingWindowConstraints:
             ]
             print('Bounds data: ' + repr(eval_bounds))
             for bound_ind, bound in enumerate(eval_bounds):
-                finite_bound = scipy.isfinite(bound)
+                finite_bound = numpy.isfinite(bound)
                 if finite_bound.any():
                     eval_bounds[bound_ind] = bound[finite_bound].min()
                 else:
-                    eval_bounds[bound_ind] = scipy.nan
+                    eval_bounds[bound_ind] = numpy.nan
 
             print('First guess bounds: ' + repr(eval_bounds))
 
             result_type = 'two sided'
             for bound_ind, bound in enumerate(eval_bounds):
-                if not scipy.isfinite(bound):
+                if not numpy.isfinite(bound):
                     result_type = 'lower limit' if bound_ind else 'upper limit'
                     eval_bounds[bound_ind] = eval_bounds[1 - bound_ind]
 
@@ -93,14 +93,14 @@ class MovingWindowConstraints:
         print('Selected ymax_stdev: ' + repr(ymax_stdev))
 
         if ymin.size == 0:
-            return -scipy.inf, scipy.inf
+            return -numpy.inf, numpy.inf
 
         eval_bounds, result_type = get_eval_bounds(range_sigma_factor)
         if eval_bounds[0] == eval_bounds[-1]:
             constraint_range = get_eval_bounds(1.0)[0]
         else:
             print('Eval bounds: ' + repr(eval_bounds))
-            eval_y = scipy.linspace(*eval_bounds, pdf_sample_npoints)
+            eval_y = numpy.linspace(*eval_bounds, pdf_sample_npoints)
 
             print('Eval y: ' + repr(eval_y))
 
@@ -116,7 +116,7 @@ class MovingWindowConstraints:
             print('CDF values:  ' + repr(cdf_values))
             print('Target quantiles: ' + repr(range_quantiles))
 
-            limit_indices = scipy.searchsorted(cdf_values, range_quantiles)
+            limit_indices = numpy.searchsorted(cdf_values, range_quantiles)
 
             assert limit_indices[0] > 0
             assert limit_indices[1] > limit_indices[0]
@@ -132,10 +132,10 @@ class MovingWindowConstraints:
         if result_type == 'two sided':
             return constraint_range
         elif result_type == 'lower limit':
-            return constraint_range[0], scipy.inf
+            return constraint_range[0], numpy.inf
         else:
             assert result_type == 'upper limit'
-            return -scipy.inf, constraint_range[1]
+            return -numpy.inf, constraint_range[1]
 
 
     def __init__(self,
@@ -152,15 +152,15 @@ class MovingWindowConstraints:
         def combine_constraints(window_center):
             """Combine the all constraints with x values within a window."""
 
-            selected_points = scipy.logical_and(
+            selected_points = numpy.logical_and(
                 x >= window_center - window_width / 2.0,
                 x <= window_center + window_width / 2.0
             )
-            selected_points = scipy.logical_and(
+            selected_points = numpy.logical_and(
                 selected_points,
-                scipy.logical_or(
-                    scipy.isfinite(ymin),
-                    scipy.isfinite(ymax)
+                numpy.logical_or(
+                    numpy.isfinite(ymin),
+                    numpy.isfinite(ymax)
                 )
             )
             try:
@@ -191,12 +191,12 @@ class MovingWindowConstraints:
         assert x.shape == ymax.shape
 
         self.range_quantiles = range_quantiles
-        self._breaks = scipy.unique(
-            scipy.concatenate([x - window_width / 2.0,
+        self._breaks = numpy.unique(
+            numpy.concatenate([x - window_width / 2.0,
                                x + window_width / 2.0])
         )
 
-        self._constraints = scipy.vectorize(
+        self._constraints = numpy.vectorize(
             combine_constraints
         )(
             0.5 * (self._breaks[1:] + self._breaks[:-1])
@@ -205,26 +205,26 @@ class MovingWindowConstraints:
     def __call__(self, x):
         """Return the contraint interval at the given x value."""
 
-        range_index = scipy.searchsorted(self._break, x) - 1
+        range_index = numpy.searchsorted(self._break, x) - 1
 
         assert range_index >= 0
 
         return (constraint[range_index] for constraint in self._constraints)
 
-    def get_plot_arguments(self, minx=-scipy.inf, maxx=scipy.inf):
+    def get_plot_arguments(self, minx=-numpy.inf, maxx=numpy.inf):
         """Return pyplot.fill_betwen x, y1, and y2 args to show constraint."""
 
 
-        plot_x = scipy.array([self._breaks, self._breaks]).T.flatten()[:-1]
-        selected = scipy.logical_and(plot_x > minx, plot_x < maxx)
+        plot_x = numpy.array([self._breaks, self._breaks]).T.flatten()[:-1]
+        selected = numpy.logical_and(plot_x > minx, plot_x < maxx)
 
         return (
             (plot_x[selected],)
             +
             tuple(
-                scipy.concatenate([
+                numpy.concatenate([
                     constraint[0:1],
-                    scipy.array([constraint, constraint]).T.flatten()
+                    numpy.array([constraint, constraint]).T.flatten()
                 ])[selected]
                 for constraint in self._constraints
             )
