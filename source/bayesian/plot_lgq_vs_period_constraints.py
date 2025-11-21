@@ -11,6 +11,7 @@ import pickle
 from multiprocessing import Pool
 from traceback import print_exc
 import json
+import copy
 
 import matplotlib
 from matplotlib import pyplot, cm, colors, rcParams
@@ -247,6 +248,12 @@ def parse_command_line(quantiles_only=False):
         help='List of binary TICs to skip. '
     )
 
+    parser.add_argument(
+        '--plot-order',
+        default='',
+        help='File containing the order in which to plot the binaries.'
+    )
+
     if not quantiles_only:
         add_frequency_dependence_plot_config(
             parser,
@@ -258,6 +265,15 @@ def parse_command_line(quantiles_only=False):
                          method=result.method)
     result.samples_dir = result.samples_dir.format_map(substitutions)
     result.data_pickle = result.data_pickle.format_map(substitutions)
+    if result.plot_order != '':
+        plot_order_fname = result.plot_order#result.plot_order.format_map(substitutions) 
+        with open(plot_order_fname, 'r') as order_f:
+            result.plot_order = [
+                line.strip() for line in order_f
+                if line.strip() != '' and not line.startswith('#')
+            ]
+    else:
+        result.plot_order = None
     result.combined_quantiles_pickle = (
         result.combined_quantiles_pickle.format_map(substitutions)
     )
@@ -513,9 +529,9 @@ def add_discard_flags(sampling_data, config):
             manual_data = json.load(manual_f)
     for system_id in sampling_data:
         if config.collection == 'w19' and str(system_id) in manual_data:
-            discard = manual_data[str(system_id)]['discard']
-            if discard.lower() == 'none':
-                discard = None
+            discard = None #manual_data[str(system_id)]['discard']
+            # if discard.lower() == 'none':
+            #     discard = None
         elif config.collection == 'hj' and system_id in ['CoRoT-30 b',
                                                          'WASP-59 b',
                                                          'WASP-185 b',
@@ -758,11 +774,11 @@ def get_valid_ptide_indices(quantiles,
     assert not (match_lower and match_upper)
 
     if match_lower:
-        print('Using lower constraint everywhere')
+        # print('Using lower constraint everywhere')
         valid_upper = valid_lower
     if match_upper:
         valid_lower = valid_upper
-        print('Using upper constraint everywhere')
+        # print('Using upper constraint everywhere')
 
     if first_last_only:
         return (
@@ -1303,9 +1319,13 @@ def plot_single_cdfstd_period(binary, system_data, __, axis, config):
     return data_behind
 
 
-def get_plotting_order(plot_data, collection, restrict_to_cluster=None):
+def get_plotting_order(plot_data, collection, restrict_to_cluster=None, order=None):
     """Split the given systems by cluster and order them  by orbital period."""
 
+    
+    if order is not None:
+        return {collection.upper(): [int(item) for item in order]}
+    
     if collection == 'sb1':
         result = dict()
         cluster_list = (
@@ -1495,7 +1515,7 @@ def save_individual_data_behind_figure(data, plot_type, binary, config):
 def plot_individual_constraints(plot_data, config):
     """Create plots showing the lgQ(Ptide) constraint for indivdiual systems."""
 
-    plotting_order = get_plotting_order(plot_data, config.collection)
+    plotting_order = get_plotting_order(plot_data, config.collection, order = config.plot_order)
 
     plot_type_split = dict(
         lgQ_period=[None],
@@ -1701,7 +1721,9 @@ def plot_combined_constraints(plot_data, config):
 
     orig_font_size = rcParams['font.size']
     rcParams['font.size'] = '24'
-    include_binaries = get_plotting_order(plot_data, config.collection)
+    include_binaries = get_plotting_order(plot_data, config.collection, order = config.plot_order)
+    cluster_binaries = include_binaries.get('W19', [])
+    offsets = numpy.zeros(len(config.convergence_ptide_grid), dtype=int)
 
     numpy.set_printoptions(precision=16, floatmode='fixed', linewidth=100)
     #config.lgQ_grid = numpy.linspace(4, 7, 100)
@@ -1759,6 +1781,7 @@ def plot_combined_constraints(plot_data, config):
             config
         )
         for nadded, binary in enumerate(cluster_binaries):
+            binaryworks = True
             burnin = get_burnin(plot_data[binary], config, binary)
             samples = plot_data[binary]['samples']
             valid_ptide_indices = get_valid_ptide_indices(
@@ -1774,6 +1797,9 @@ def plot_combined_constraints(plot_data, config):
                 )
                 for valid_i in valid_ptide_indices
             ]
+
+            old_cluster_plotter = copy.deepcopy(cluster_plotter)
+            old_combined_plotter = copy.deepcopy(all_combined_plotter)
 
             cluster_plotter.add_chain(
                 samples[burnin:],
@@ -1808,16 +1834,43 @@ def plot_combined_constraints(plot_data, config):
             ]:
                 if config.combined_constraint_heat_map is None:
                     continue
+                if not binaryworks:
+                    print('Skipping plot for binary %s since it failed.' % repr(binary))
+                    continue
                 pyplot.figure(figsize=(11, 8.5), dpi=300, tight_layout=True)
                 pyplot.xscale('log')
                 print('    Adding ' + repr(binary))
-                pyplot.ylim(plot_min_lgq[cluster], plot_max_lgq[cluster])
+                pyplot.ylim(config.lgQ_grid[0], config.lgQ_grid[-1])
                 pyplot.xlim(*config.combined_constraint_period_range)
-                plotter.plot_combined_pdf_heat_map(ylabel=config.lgq_label)
-                data_behind = plotter.plot_combined_quantiles(
-                    config.convergence_quantiles,
-                    fmt='-k'
+                lgq_range = (config.lgQ_grid[0], config.lgQ_grid[-1])
+                (
+                    plot_ptide,
+                    cluster_quantiles,
+                    _
+                ) = get_cluster_tightest_plot_data(
+                    plot_data=plot_data,
+                    config=config,
+                    cluster='W19',
+                    cluster_binaries=cluster_binaries,
+                    lgq_range=lgq_range,
+                    offsets=offsets
                 )
+                fmt=dict(markersize=20)
+                plotter.plot_combined_pdf_heat_map(ylabel=config.lgq_label)
+                try:
+                    data_behind = plotter.plot_combined_quantiles(
+                        config.convergence_quantiles,
+                        fmt='-k'
+                    )
+                except Exception as e:
+                    print(e)
+                    print('No!!!! It doesn\' work!!!!! Binary %s doesn\'t work!!!!!!!', repr(binary))
+                    binaryworks = False
+                    cluster_plotter = old_cluster_plotter
+                    all_combined_plotter = old_combined_plotter
+                    pyplot.cla()
+                    pyplot.clf()
+                    continue
 #                pyplot.figlegend(loc='lower center',
 #                                 ncol=2,
 #                                 bbox_to_anchor=(0.5, 1.0))
@@ -1839,6 +1892,14 @@ def plot_combined_constraints(plot_data, config):
 
                 pyplot.colorbar()
                 print('    Plotting')
+                # if nadded == len(cluster_binaries) - 1:
+                cluster_quantiles_copy = copy.deepcopy(cluster_quantiles)
+                while cluster_quantiles_copy.shape[0] > 1:
+                    pyplot.plot(plot_ptide, cluster_quantiles_copy[0], '^b', zorder=98, markeredgecolor='w', **fmt)
+                    pyplot.plot(plot_ptide, cluster_quantiles_copy[-1], 'vr', zorder=99, markeredgecolor='w', **fmt)
+                    fmt['markerfacecolor'] = 'none'
+                    cluster_quantiles_copy = cluster_quantiles_copy[1:-1]
+                    break
                 pyplot.savefig(output_fname,
                                bbox_inches='tight',
                                pad_inches=0.0)
@@ -1850,6 +1911,9 @@ def plot_combined_constraints(plot_data, config):
                 pyplot.cla()
                 pyplot.clf()
 
+            if not binaryworks:
+                print('Skipping updating quantiles since binary %s failed.' % repr(binary))
+                continue
             fully_combined_n += 1
             if cluster == 'HJ':
                 selected_quantiles[cluster + ' excluded 2'] = (
@@ -2072,7 +2136,7 @@ def plot_tightest_constraints(plot_data,
 
     pyplot.figure(figsize=(11, 8.5), dpi=300, tight_layout=True)
 
-    include_binaries = get_plotting_order(plot_data, config.collection)
+    include_binaries = get_plotting_order(plot_data, config.collection, order = config.plot_order)
     offsets = numpy.zeros(len(config.convergence_ptide_grid), dtype=int)
     for cluster, cluster_binaries in include_binaries.items():
         pyplot.xscale('log')
@@ -2194,6 +2258,32 @@ def plot_tightest_constraints(plot_data,
 def remove_skipped(plot_data, config):
     """Remove binaries that we're supposed to skip."""
 
+    # # keepsystems=[10483644,8381592,7125636,5731312,3348093,9892471,11391181,4948863,4839180,11499757]
+    # # keepsystems = [8957954,6227560,5181455,5731312,3348093,4948863,9775253,11232745,11704044]
+    # coldcore=[8957954,11232745,10960995,4815612,7129465,5022440,5181455,8302455,7970629,5802470,6927629,5359678,4285087,8746310,6525196,4380283,9110346] # 9775253,11704044,
+    # weirdcore=[5731312,3348093,8381592,9892471,11391181,11499757,10483644,4839180,7125636,4948863,9775253]
+    # weirdcorePure=[5731312,3348093,8381592,9892471,11391181,11499757,10483644,4839180,7125636,4948863]
+    # quietcore=[11704044]
+    # coldweird=coldcore+weirdcorePure+[11704044,9775253]
+    # betterhot=coldweird+[5288543,10091257,11228612]
+    # abovesevens=[5288543,10091257,11228612,7798259,10268903,11616200,11200773,6962018,6697716,5039441,11252617,7376500]
+    # betterer=coldweird+abovesevens
+    # justthosetwo=coldcore+weirdcorePure+[11704044,9775253,11616200,7798259]
+    # weirdbest=coldcore+quietcore+[9775253]+abovesevens
+    # attempt1=coldcore+quietcore+[9775253]+[5288543,10091257,5039441,11252617,11200773,6962018,6697716,11616200,7798259]
+    # attempt2=coldcore+quietcore+[9775253]+[11200773,6962018,6697716,11616200,7798259]
+    # bettercoldcore=[8957954,10960995,4815612,7129465,5022440,5181455,8302455,7970629,5802470,6927629,5359678,4285087,8746310,6525196,4380283,9110346]
+    # bestcoldcore=[8957954,10960995,4815612,7129465,5022440,5181455,8302455,7970629,5802470,6927629,5359678,4285087,8746310,6525196,9110346]
+    # experiemnt=[7960547,9025914,7200102,6610219,7128918,6546508,8580438,6359798,9532123,9971475,3241344,4579321,4285087,3439031,8618226,7025851,6949550,7377033,3973504,7362852,8229048,5263802,7021177,4947726,3427776,10965963,4276114,7732791,10385682,11071207,6312521,7369523,11403216,3834364,9119652,10935310,7376500,4908495,11252617,11228612,5288543,7798259,5039441,10091257,6697716,6962018,11200773,4380283,11616200]
+    # keepsystems=attempt2#bestcoldcore
+    # keepsystems=experiemnt
+    # delsystems = [system for system in plot_data.keys()]
+    # for system in delsystems:
+    #     if int(system) not in keepsystems:
+    #         print('Skipping binary ' + repr(system))
+    #         del plot_data[int(system)]
+
+    # for system in keepsystems:
     for system in config.skip_binaries:
         if int(system) in plot_data.keys():
             print('Skipping binary ' + repr(system))
@@ -2201,6 +2291,27 @@ def remove_skipped(plot_data, config):
         else:
             print('To-skip system ' + repr(int(system)) + ' not in pickle or directory.')
     return plot_data
+
+def sort_by_lgq(plot_data, config, value, up): #TODO: add a commandline option
+    
+    for system in plot_data.keys():
+        outer_quantile_ind = (numpy.argmin(config.convergence_quantiles),
+                                numpy.argmax(config.convergence_quantiles))
+        outer_quantiles = [
+            numpy.array([
+                entry[ind][0] for entry in plot_data[system]['quantiles']
+            ])
+            for ind in outer_quantile_ind
+        ]
+
+        crunch_ind = (outer_quantiles[1] - outer_quantiles[0]).argmin()
+
+        if up:
+            if outer_quantiles[0][crunch_ind] > value:
+                print(system)
+        else:
+            if outer_quantiles[1][crunch_ind] < value:
+                print(system)
 
 def main(config):
     """Avoid polluting global namespace."""
@@ -2212,6 +2323,7 @@ def main(config):
     #                             config.method)
 
     plot_data = get_sampling_data(config)
+    # # sort_by_lgq(plot_data, config, 6.5, False)
     plot_data = remove_skipped(plot_data, config)
     combined_quantiles = None
     plot_individual_constraints(plot_data, config)
