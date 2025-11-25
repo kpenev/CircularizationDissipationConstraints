@@ -774,11 +774,11 @@ def get_valid_ptide_indices(quantiles,
     assert not (match_lower and match_upper)
 
     if match_lower:
-        # print('Using lower constraint everywhere')
+        print('Using lower constraint everywhere')
         valid_upper = valid_lower
     if match_upper:
         valid_lower = valid_upper
-        # print('Using upper constraint everywhere')
+        print('Using upper constraint everywhere')
 
     if first_last_only:
         return (
