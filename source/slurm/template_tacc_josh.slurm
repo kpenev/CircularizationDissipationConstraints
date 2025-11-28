@@ -10,18 +10,20 @@
 #SBATCH -p @@QUEUE@@
 
 trainsystem() {
-    systemdir=/work/08402/vortebo/@@HPC@@/output/@@CLUSTER@@/nn_data
+    systemdir=/scratch/08402/vortebo/@@HPC@@/output/@@CLUSTER@@/nn_data
     systemname=$1
 
-    cd /home1/08402/vortebo/
+    cd /home1/08402/vortebo/codebase/CircularizationDissipationConstraints/source/bayesian
+    python3 ml_clean.py ${systemname} ${systemdir}
 
+    cd /home1/08402/vortebo/
     python3 trainsystem.py ${systemname} ${systemdir}
 }
 
 run_system() {
     source_dir=/home1/08402/vortebo/codebase/CircularizationDissipationConstraints/source
     config_dir=/home1/08402/vortebo/system_configs
-    output_root=/work/08402/vortebo/@@HPC@@/output/@@CLUSTER@@
+    output_root=/scratch/08402/vortebo/@@HPC@@/output/@@CLUSTER@@
     output_dir=${output_root}/sampling_output
     sysid=$1
 

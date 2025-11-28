@@ -69,4 +69,4 @@ sed\
     -e 's%@@QUEUE@@%'"${QUEUE}"'%g'\
     ${SLURM_DIR_1}/${TEMPLATE}\
     >\
-    ${SLURM_DIR_2}/${HPC}/${CLUSTER}/tf_${JOINED_SYSTEMS}_${SAMPLING_MODE}.slurm
+    ${SLURM_DIR_2}/${HPC}/${CLUSTER}/reduced_${JOINED_SYSTEMS}_${SAMPLING_MODE}.slurm
