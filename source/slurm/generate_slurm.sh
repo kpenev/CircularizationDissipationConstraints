@@ -19,6 +19,9 @@ elif [ "$HPC" == "josh" ]; then
     TEMPLATE=template_tacc_josh.slurm
     EXPECTED_NSYS=8
     HPC="ls6"
+elif [ "$HPC" == "juno" ]; then
+    TEMPLATE=template_juno_josh.slurm
+    EXPECTED_NSYS=8
 else
     if [ "$HPC" != "ls6" ]; then
         echo "Unrecognized HPC cluster: ${HPC}"
