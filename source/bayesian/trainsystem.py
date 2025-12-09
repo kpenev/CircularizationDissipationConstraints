@@ -1,6 +1,6 @@
 import sys
 from POET.solver import poet_solver
-import logging
+from multiprocessing_util import setup_process
 
 def fitall(systemname,systempath):
     params = {
