@@ -16,7 +16,11 @@ elif [ "$HPC" == "stampede" ]; then
     EXPECTED_NSYS=3
     QUEUE="skx-normal"
 elif [ "$HPC" == "josh" ]; then
-    TEMPLATE=template_tacc_josh.slurm
+    if [ "$CLUSTER" == "ML" ]; then
+        TEMPLATE=template_run_tests.slurm
+    else
+        TEMPLATE=template_tacc_josh.slurm
+    fi
     EXPECTED_NSYS=8
     HPC="ls6"
 elif [ "$HPC" == "juno" ]; then
@@ -41,6 +45,9 @@ echo "Generating $CLUSTER slurm script for $HPC"
 if [ "$CLUSTER" == "W19" ]; then
     CONFIG_FNAME="W19"
     SAMPLER="sample_windemuth_et_al.py "
+elif [ "$CLUSTER" == "ML" ]; then
+    CONFIG_FNAME="W19"
+    SAMPLER="time_test.py "
 else
     CONFIG_FNAME="open_cluster"
     SAMPLER="sample_sb1.py ${CLUSTER}_"
