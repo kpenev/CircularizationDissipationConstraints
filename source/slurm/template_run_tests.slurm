@@ -21,14 +21,12 @@ run_system() {
 
     cd /home1/08402/vortebo/
 
-    for (( i=0; i< 10; i++ )); do
-        python3 \
-            ${source_dir}/bayesian/@@SAMPLER@@${sysid} \
-            -c ${config_dir}/'ml_template.cfg'\
-            >\
-            ${output_dir}/sample_@@CLUSTER@@_${sysid}.outerr\
-            2>&1
-    done
+    python3 \
+        ${source_dir}/bayesian/@@SAMPLER@@${sysid} \
+        -c ${config_dir}/'ml_template.cfg'\
+        >\
+        ${output_dir}/sample_@@CLUSTER@@_${sysid}.outerr\
+        2>&1
 }
 
 source /home1/08402/vortebo/module_load_order.txt
