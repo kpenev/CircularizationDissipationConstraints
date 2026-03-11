@@ -1780,6 +1780,7 @@ def plot_combined_constraints(plot_data, config):
             len(cluster_binaries),
             config
         )
+        to_plot=[]
         for nadded, binary in enumerate(cluster_binaries):
             binaryworks = True
             burnin = get_burnin(plot_data[binary], config, binary)
@@ -1871,10 +1872,15 @@ def plot_combined_constraints(plot_data, config):
                     pyplot.cla()
                     pyplot.clf()
                     continue
-#                pyplot.figlegend(loc='lower center',
-#                                 ncol=2,
-#                                 bbox_to_anchor=(0.5, 1.0))
+                # pyplot.figlegend(loc='lower center',
+                #                  ncol=2,
+                #                  bbox_to_anchor=(0.5, 1.0))
 
+                if nadded not in to_plot:
+                    # print('to plot first: ',to_plot)
+                    # print('adding ', nadded)
+                    to_plot.append(nadded)
+                    # print('to plot after: ',to_plot)
                 pyplot.gca().set_xticklabels(
                     [
                         get_nonlog_ticklabel(val)
@@ -1895,8 +1901,15 @@ def plot_combined_constraints(plot_data, config):
                 # if nadded == len(cluster_binaries) - 1:
                 cluster_quantiles_copy = copy.deepcopy(cluster_quantiles)
                 while cluster_quantiles_copy.shape[0] > 1:
-                    pyplot.plot(plot_ptide, cluster_quantiles_copy[0], '^b', zorder=98, markeredgecolor='w', **fmt)
-                    pyplot.plot(plot_ptide, cluster_quantiles_copy[-1], 'vr', zorder=99, markeredgecolor='w', **fmt)
+                    # print('to plot one more time for funsies: ', to_plot)
+                    # print('plot_ptide: ', plot_ptide)
+                    # print('plot_ptide: ', [plot_ptide[x] for x in to_plot])
+                    # print('cluster_quantiles_copy[0]: ', cluster_quantiles_copy[0])
+                    # print('cluster_quantiles_copy[0]: ', [cluster_quantiles_copy[0][x] for x in to_plot])
+                    # print('cluster_quantiles_copy[-1]: ', cluster_quantiles_copy[-1])
+                    # print('cluster_quantiles_copy[-1]: ', [cluster_quantiles_copy[-1][x] for x in to_plot])
+                    pyplot.plot([plot_ptide[x] for x in to_plot], [cluster_quantiles_copy[0][x] for x in to_plot], '^b', zorder=98, markeredgecolor='w', **fmt)
+                    pyplot.plot([plot_ptide[x] for x in to_plot], [cluster_quantiles_copy[-1][x] for x in to_plot], 'vr', zorder=99, markeredgecolor='w', **fmt)
                     fmt['markerfacecolor'] = 'none'
                     cluster_quantiles_copy = cluster_quantiles_copy[1:-1]
                     break
@@ -1911,10 +1924,10 @@ def plot_combined_constraints(plot_data, config):
                 pyplot.cla()
                 pyplot.clf()
 
+            fully_combined_n += 1
             if not binaryworks:
                 print('Skipping updating quantiles since binary %s failed.' % repr(binary))
                 continue
-            fully_combined_n += 1
             if cluster == 'HJ':
                 selected_quantiles[cluster + ' excluded 2'] = (
                     selected_quantiles.get(cluster + ' excluded 1', None)
