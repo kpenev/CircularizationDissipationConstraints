@@ -277,7 +277,7 @@ def get_chain_name(samples_fname, chain_conditions):
         if system_name is None:
             fname, ext = path.splitext(path.basename(samples_fname))
             assert ext in ['.h5', '.hdf5']
-            if fname.startswith('system'):
+            if fname.startswith('system') or fname.startswith('kic'):
                 _, system_name = fname.split('_')
                 system_name = int(system_name)
             else:
