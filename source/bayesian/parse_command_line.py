@@ -1,4 +1,4 @@
-"""Common command line parsing for bayeasian analysis."""
+"""Common command line parsing for bayesian analysis."""
 
 from collections import namedtuple
 import os.path
