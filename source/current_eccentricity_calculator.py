@@ -10,6 +10,8 @@ from general_purpose_python_modules.reproduce_system import \
 
 from io_utilities import pickle_new_result
 
+from josh_scripts import get_dissipation
+
 #This is intended to serve as the callable for multiprocessing pool.
 #pylint: disable=too-few-public-methods
 class CurrentEccentricityCalculator:
@@ -147,26 +149,51 @@ class CurrentEccentricityCalculator:
         else:
             primary_dissipation = None
 
+        lgQ_inertial_boost = 0.0
+        lgQ_inertial_sharpness = 10.0
+        lgQ_break_period = 1.0 * units.day
+        lgQ_powerlaw = 0.0
+        star_dissipation = get_dissipation(lgQ,lgQ_inertial_boost,lgQ_inertial_sharpness,lgQ_break_period,lgQ_powerlaw)
+        primary_wind_strength = 0.17
+        primary_wind_saturation = 2.45
+        primary_core_envelope_coupling_timescale = 0.01# * units.Gyr
+        secondary_disk_lock_period = None
+        secondary_wind_strength = 0.17
+        secondary_wind_saturation = 2.45
+        secondary_core_envelope_coupling_timescale = 0.01# * units.Gyr
         try:
             evolution = find_evolution(
                 system=system,
                 interpolator=self.interpolator,
                 dissipation=dict(
-                    primary=primary_dissipation,
-                    secondary=secondary_dissipation
+                    primary=star_dissipation,
+                    secondary=star_dissipation
                 ),
                 initial_eccentricity=initial_eccentricity,
                 #False positive.
                 #pylint: disable=no-member
                 disk_period=self.disk_period,
                 disk_dissipation_age=self.disk_dissipation_age,
-                max_age=system.age,
+                #
+                primary_wind_strength=primary_wind_strength,
+                primary_wind_saturation=primary_wind_saturation,
+                primary_core_envelope_coupling_timescale=primary_core_envelope_coupling_timescale * units.Gyr,
+                secondary_wind_strength=secondary_wind_strength,
+                secondary_wind_saturation=secondary_wind_saturation,
+                secondary_core_envelope_coupling_timescale=secondary_core_envelope_coupling_timescale * units.Gyr,
+                secondary_disk_period=secondary_disk_lock_period,
+                # max_age=system.age,
+                solve=False,
+                max_iterations=4900,
                 secondary_is_star=(check_if_secondary_is_star(system)
                                    and
                                    system.secondary_mass <= 1.2 * units.M_sun),
+                carepackage = None,
+                precision = 1e-5,
                 #pylint: enable=no-member
+                eccentricity_expansion_fname = '/home/vortebo/eccentricity_expansion_coef_O400.sqlite'.encode('ascii')
             )
-        except RuntimeError:
+        except:
             print('Failed %s, lgQ = %g, e0 = %g' % (system.hostname,
                                                     lgQ,
                                                     initial_eccentricity))

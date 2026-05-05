@@ -324,5 +324,5 @@ if __name__ == '__main__':
 #                ha='left',
 #                va='top',
 #                fontweight='semibold')
-    pyplot.savefig('ngc188_period_eccentricity.pdf')
+    # pyplot.savefig('ngc188_period_eccentricity.pdf')
     #_test_rvk_constraint(3732)

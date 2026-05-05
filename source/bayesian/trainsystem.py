@@ -34,8 +34,8 @@ if __name__ == "__main__":
     setup_process(
                     fname_datetime_format='%Y%m%d%H%M%S',
                     system=systemname,
-                    std_out_err_fname='/scratch/08402/vortebo/ls6/output/W19/nn_data/training_output/{task}/{system}_{now}_{pid:d}.outerr',
-                    logging_fname='/scratch/08402/vortebo/ls6/output/W19/nn_data/training_output/{task}/{system}_{now}_{pid:d}.log',
+                    std_out_err_fname='/home/vortebo/ctime/lazytestdir/2/output/W19/nn_data/training_output/{task}/{system}_{now}_{pid:d}.outerr',
+                    logging_fname='/home/vortebo/ctime/lazytestdir/2/output/W19/nn_data/training_output/{task}/{system}_{now}_{pid:d}.log',
                     logging_verbosity='debug',
                     logging_message_format='%(levelname)s %(asctime)s %(name)s: %(message)s | %(pathname)s.%(funcName)s:%(lineno)d'#,
                     #logging_datetime_format=config.logging_datetime_format
