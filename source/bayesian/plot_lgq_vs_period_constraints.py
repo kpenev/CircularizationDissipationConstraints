@@ -942,6 +942,16 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
     )
     pyplot.sca(orig_axis)
 
+    pyplot.colorbar(
+        # cm.ScalarMappable(
+        #     norm=colors.LogNorm(vmin=config.heat_map_contrast, vmax=1)
+        # ),
+        # ax=axes,
+        # location='bottom',
+        # aspect=40,
+        # pad=0.04 * config.subplot_layout[0] / num_rows
+    )
+
     config.lgQ_grid = orig_lgq_grid
     return data_behind
 

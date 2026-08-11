@@ -306,7 +306,7 @@ def plot_eccentricity_vs_period(plot_fname, available_kic):
     if not plot_fname:
         pyplot.show()
     else:
-        pyplot.xlabel('Orbital period (d)')
+        pyplot.xlabel('Orbital period [d]')
         pyplot.ylabel('Eccentricity')
         pyplot.title('Period-eccentricity envelope')
         pyplot.savefig(plot_fname)
