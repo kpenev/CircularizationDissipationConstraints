@@ -733,7 +733,7 @@ def get_valid_ptide_indices(quantiles,
                              dtype=bool)
     experiment = (discard not in ['lower', 'all']) if (binary not in weird) else False
     if not experiment:
-        print('avril lavigne')
+        print('distinguishing debug output')
         print(binary)
         print((discard not in ['lower', 'all']))
         print((binary not in weird or str(binary) not in weird))
@@ -1809,9 +1809,6 @@ def plot_combined_constraints(plot_data, config):
         )
         to_plot=[]
         for nadded, binary in enumerate(cluster_binaries):
-            # if binary == 7816680 or binary == "7816680":
-            #     print('I DID WHAT I HAD TO DO')
-            #     continue
             binaryworks = True
             burnin = get_burnin(plot_data[binary], config, binary)
             samples = plot_data[binary]['samples']
