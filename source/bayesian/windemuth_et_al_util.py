@@ -273,40 +273,40 @@ def plot_eccentricity_vs_period(plot_fname, available_kic):
             print(f'12356914 plot_data: {plot_data[i:i+1]!r}')
 
 
-    selected = plot_data['Mratio_median'] > 0.5
+    selected = plot_data['Mratio_median'] > -1
     for subplot, yscale in enumerate(['linear']):#, 'log']):
         pyplot.subplot(1, 1, subplot + 1)
 
         pyplot.yscale(yscale)
         pyplot.xscale('log')
 
-        for label in ['q > 0.5', 'q <= 0.5']:
-            pyplot.errorbar(
-                plot_data['P_median'][selected],
-                plot_data['e_median'][selected],
-                numpy.stack((
-                    plot_data['e_median'] - plot_data['e_min'],
-                    plot_data['e_max'] - plot_data['e_median']
-                ))[:, selected],
-                numpy.stack((
-                    plot_data['P_median'] - plot_data['P_min'],
-                    plot_data['P_max'] - plot_data['P_median']
-                ))[:, selected],
-                fmt='o',
-                markerfacecolor='none',
-                label=label
-            )
-            selected = numpy.logical_not(selected)
+        # for label in ['q > 0.5', 'q <= 0.5']:
+        pyplot.errorbar(
+            plot_data['P_median'][selected],
+            plot_data['e_median'][selected],
+            numpy.stack((
+                plot_data['e_median'] - plot_data['e_min'],
+                plot_data['e_max'] - plot_data['e_median']
+            ))[:, selected],
+            numpy.stack((
+                plot_data['P_median'] - plot_data['P_min'],
+                plot_data['P_max'] - plot_data['P_median']
+            ))[:, selected],
+            fmt='o',
+            markerfacecolor='none',
+            label="hi"
+        )
+            # selected = numpy.logical_not(selected)
 
         envelope_x = 10.0**numpy.linspace(-1.0, 3, 1000)
         pyplot.plot(envelope_x,
                     eccentricity_envelope(envelope_x),
                     '-k')
-        pyplot.legend()
+        # pyplot.legend()
     if not plot_fname:
         pyplot.show()
     else:
-        pyplot.xlabel('Orbital period (d)')
+        pyplot.xlabel('Orbital period [d]')
         pyplot.ylabel('Eccentricity')
         pyplot.title('Period-eccentricity envelope')
         pyplot.savefig(plot_fname)

@@ -231,35 +231,22 @@ class LogLikelihoodWindemuth(LogLikelihoodBinaryStars):
             Rsecondary = 0
         )
 
-        for big_term in self.parameter_names_units:
-            if big_term == 'evolution':
-                for i in range(len(self.parameter_names_units[big_term])):
-                    if self.parameter_names_units[big_term][i][0] == 'primary_disk_lock_period':
-                        parameters['disk_period'] = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
-                        continue
-                    elif self.parameter_names_units[big_term][i][0] == 'secondary_disk_lock_period':
-                        continue
-                    parameters[self.parameter_names_units[big_term][i][0]] = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
-            elif big_term == 'system':
-                for i in range(len(self.parameter_names_units[big_term])):
-                    if self.parameter_names_units[big_term][i][0] == 'orbital_period':
-                        parameters['system'].orbital_period = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
-                    elif self.parameter_names_units[big_term][i][0] == 'age':
-                        parameters['system'].age = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
-                    elif self.parameter_names_units[big_term][i][0] == 'primary_mass':
-                        parameters['system'].primary_mass = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
-                    elif self.parameter_names_units[big_term][i][0] == 'secondary_mass':
-                        parameters['system'].secondary_mass = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
-                    elif self.parameter_names_units[big_term][i][0] == 'feh':
-                        parameters['system'].feh = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
-                    elif self.parameter_names_units[big_term][i][0] == 'cmd_primary_radius':
-                        parameters['system'].Rprimary = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
-                    elif self.parameter_names_units[big_term][i][0] == 'cmd_secondary_radius':
-                        parameters['system'].Rsecondary = self.get_parameter_value(encoded_parameters, self.parameter_names_units[big_term][i][0])
-                    else:
-                        continue
-            else:
-                continue
+        for category in self.parameter_names_units:
+            for i in range(len(self.parameter_names_units[category])):
+                sys_prop = self.parameter_names_units[category][i][0]
+                parameter_value = self.get_parameter_value(encoded_parameters, sys_prop)
+                if category == 'evolution':
+                    if sys_prop == 'primary_disk_lock_period':
+                        parameters['disk_period'] = parameter_value
+                    elif sys_prop != 'secondary_disk_lock_period': # We are intentionally skipping secondary disk lock period
+                        parameters[sys_prop] = parameter_value
+                elif category == 'system':
+                    if sys_prop in ('orbital_period', 'age', 'primary_mass', 'secondary_mass', 'feh'):
+                        setattr(parameters['system'], sys_prop, parameter_value)
+                    elif sys_prop == 'cmd_primary_radius':
+                        parameters['system'].Rprimary = parameter_value
+                    elif sys_prop == 'cmd_secondary_radius':
+                        parameters['system'].Rsecondary = parameter_value
         parameters['system'].eccentricity = self.system_eccentricity
         parameters['interpolator'] = interpolator
         #TODO: how should I actually handle these?:

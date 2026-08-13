@@ -722,12 +722,23 @@ def plot_single_diagnostic_period(quantile_data,
 def get_valid_ptide_indices(quantiles,
                             config,
                             discard=None,
-                            first_last_only=False):
+                            first_last_only=False,
+                            binary=''):
     """Find Ptide grid indices with well constrained upper/lower distro."""
+
+    weird=[8957954,11232745,10960995,4815612,7129465,5022440,5181455,11704044,9775253,8302455,7970629,5802470,6927629,5359678,4285087,8746310,6525196,4380283,9110346,8618226,6962018,7025851,9971475,7257373,8414159,3439031,5652260,8580438,6227560,6521542,5039441,4839180,7362852,10031409,9656543,4678171,11228612,10268903,4948863,2445134,7369523,7597703,9881258,5288543,3241344,5263802,12004679,8229048,4753988,6131659,2437452,9892471,11616200,4908495,6029130,10385682,9119652,8984706,10091257,4346875,8364119,6594972,8543278,10483644,7125636,4579321,11403216,7732791,7798259,9762519,7846730,7960547]
 
     valid_upper = numpy.full(len(config.convergence_ptide_grid),
                              discard not in ['upper', 'all'],
                              dtype=bool)
+    experiment = (discard not in ['lower', 'all']) if (binary not in weird) else False
+    if not experiment:
+        print('distinguishing debug output')
+        print(binary)
+        print((discard not in ['lower', 'all']))
+        print((binary not in weird or str(binary) not in weird))
+        print((discard not in ['lower', 'all']) if (binary not in weird or str(binary) not in weird) else False)
+        print(experiment)  # if I really want to re-enable this, put experiment in place of     discard not in ['lower', 'all']
     valid_lower = numpy.full(len(config.convergence_ptide_grid),
                              discard not in ['lower', 'all'],
                              dtype=bool)
@@ -829,7 +840,8 @@ def get_burnin(system_data, config, binary=''):
     valid_ptide_indices = get_valid_ptide_indices(
         system_data['quantiles'],
         config,
-        system_data['discard']
+        system_data['discard'],
+        binary=binary
     )
 
     for quantile_ind, cdf_value in enumerate(config.convergence_quantiles):
@@ -892,7 +904,8 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
         system_data['quantiles'],
         config,
         system_data['discard'],
-        first_last_only=True
+        first_last_only=True,
+        binary=binary
     )
 
     data_behind = plot_single_diagnostic_period(system_data['quantiles'],
@@ -928,6 +941,16 @@ def plot_single_lgq_period(binary, system_data, __, axis, config):
         )
     )
     pyplot.sca(orig_axis)
+
+    pyplot.colorbar(
+        # cm.ScalarMappable(
+        #     norm=colors.LogNorm(vmin=config.heat_map_contrast, vmax=1)
+        # ),
+        # ax=axes,
+        # location='bottom',
+        # aspect=40,
+        # pad=0.04 * config.subplot_layout[0] / num_rows
+    )
 
     config.lgQ_grid = orig_lgq_grid
     return data_behind
@@ -1248,7 +1271,8 @@ def plot_single_burnin_period(binary, system_data, __, axis, config):
         system_data['quantiles'],
         config,
         system_data['discard'],
-        first_last_only=True
+        first_last_only=True,
+        binary=binary
     )
 
     axis.set_yscale('log')
@@ -1293,7 +1317,8 @@ def plot_single_cdfstd_period(binary, system_data, __, axis, config):
         system_data['quantiles'],
         config,
         system_data['discard'],
-        first_last_only=True
+        first_last_only=True,
+        binary=binary
     )
 
     axis.set_yscale('log')
@@ -1321,7 +1346,6 @@ def plot_single_cdfstd_period(binary, system_data, __, axis, config):
 
 def get_plotting_order(plot_data, collection, restrict_to_cluster=None, order=None):
     """Split the given systems by cluster and order them  by orbital period."""
-
     
     if order is not None:
         return {collection.upper(): [int(item) for item in order]}
@@ -1515,7 +1539,10 @@ def save_individual_data_behind_figure(data, plot_type, binary, config):
 def plot_individual_constraints(plot_data, config):
     """Create plots showing the lgQ(Ptide) constraint for indivdiual systems."""
 
-    plotting_order = get_plotting_order(plot_data, config.collection, order = config.plot_order)
+    try:
+        plotting_order = get_plotting_order(plot_data, config.collection, order = config.plot_order)
+    except:
+        plotting_order = get_plotting_order(plot_data, config.collection)
 
     plot_type_split = dict(
         lgQ_period=[None],
@@ -1789,7 +1816,8 @@ def plot_combined_constraints(plot_data, config):
                 plot_data[binary]['quantiles'],
                 config,
                 plot_data[binary]['discard'],
-                first_last_only=True
+                first_last_only=True,
+                binary=binary
             )
             period_range = [
                 (
