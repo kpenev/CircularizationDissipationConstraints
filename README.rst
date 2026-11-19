@@ -1,3 +1,11 @@
+More massive Gaia Gaussian-observation dynamic sampling branch
+=======================================================================
+
+See `README_MASSIVE_STAR_SAMPLING.md <README_MASSIVE_STAR_SAMPLING.md>`_
+for this branch's model, setup and validation. This branch adds package code
+and documentation only; no research samples, target lists or run outputs
+are added. Existing upstream data are unchanged.
+
 ================================================================
 System by system tidal dissipation constraints from eccentricity
 ================================================================

@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import numpy
 from astropy import units
 
-from reproduce_system import find_evolution
+from general_purpose_python_modules.reproduce_system import find_evolution
 from bayesian.evolution_parameters import EvolutionParameters
 
 #Intended to function as callable no need for more public methods
@@ -31,7 +31,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def _get_dissipation(self, parameters):
+    def get_dissipation(self, parameters):
         """Return the dissipation argument for `find_evolution`."""
 
     def _parse_parameters(self, parameters, logger):
@@ -55,7 +55,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             ): self.get_parameter_value(parameters, param_name)
             for param_name, _ in self.parameter_names_units['evolution']
         }
-        kwargs['dissipation'] = self._get_dissipation(parameters)
+        kwargs['dissipation'] = self.get_dissipation(parameters)
         kwargs['max_age'] = system.age
         kwargs['timeout'] = self._evolution_timeout
         kwargs['system'] = system
@@ -113,6 +113,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                  evolution_timeout,
                  period_search_factor,
                  scaled_period_guess,
+                 prior_only=False,
                  **kwargs):
         """
         Set-up the log-likelihood calculator.
@@ -135,6 +136,9 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             scaled_period_guess(float):    See same name argument to
                 :meth:`InitialConditionSolver.__init__`.
 
+            prior_only(bool):    If True, log-likelihood is always zero,
+                thus sampling is done only per the priors.
+
             kwargs:    Arguments in addition to `secondary_is_star` required by
                 the parent's :meth:`__init__()`.
 
@@ -145,6 +149,8 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         self.envelope_eccentricity = envelope_eccentricity
         self._evolution_timeout = evolution_timeout
         self.final_eccentricity = None
+
+        self._prior_only = prior_only
 
         self._find_evolution_kwargs = dict(
             interpolator=interpolator,
@@ -170,8 +176,6 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             float
         """
 
-        #TODO: fix when high-e evoluition is possible
-
         logger = logging.getLogger(__name__)
 
         self.log_parameters('Evaluating log-likelihood for parameters:',
@@ -186,6 +190,16 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                 repr(k) + ':' + repr(v) for k, v in evolve_parameters.items()
             )
         )
+        if (
+                not evolve_parameters['secondary_is_star']
+                and
+                not numpy.isfinite(evolve_parameters['system'].secondary_radius)
+        ):
+            logger.error(
+                'Non-stellar secondary with radius=%s',
+                repr(evolve_parameters['system'].secondary_radius)
+            )
+            return None
 
         while failed and evolve_parameters['initial_eccentricity'] > 0.7:
             try:
@@ -195,7 +209,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
                     **evolve_parameters
                 )
                 #pylint: enable=no-value-for-parameter
-            except AssertionError:
+            except RuntimeError:
                 evolve_parameters['initial_eccentricity'] -= 1e-2
                 logger.warning('Calculating evolution failed, trying e0 = %g.',
                                evolve_parameters['initial_eccentricity'])
@@ -217,24 +231,24 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
 
         #False positive
         #pylint: disable=no-member
-        if numpy.allclose(evolution.age[-1],
+        if numpy.allclose(evolution[0].age[-1],
                           expected_final_age,
                           rtol=1e-10,
                           atol=1e-10):
 
-            self.final_eccentricity = evolution.eccentricity[-1]
+            self.final_eccentricity = evolution[0].eccentricity[-1]
             #pylint: enable=no-member
 
             logger.info(
                 'Successful evolution found: ef = %g',
-                evolution.eccentricity[-1]
+                evolution[0].eccentricity[-1]
             )
 
-            return evolution.eccentricity[-1]
+            return evolution[0].eccentricity[-1]
 
         logger.error(
             'Evolution terminated prematurely at t=%g (< %g) with ef = %g',
-            evolution.age[-1],
+            evolution[0].age[-1],
             expected_final_age,
             (
                 numpy.nan if self.final_eccentricity is None
@@ -261,13 +275,32 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
         self._stash = False
 
     @abstractmethod
-    def calculate_log_likelihood(self, parameters):
-        """Evaluate the log-likelihood at the given model parameters."""
+    def calculate_log_likelihood(self, parameters, **other_args):
+        """
+        Evaluate the log-likelihood at the given model parameters.
 
-    def __call__(self, parameters):
+        Args:
+            paramaters(array):    The parameters for which to evaluate the log
+                likelihood. Must uniquely define the likelihood.
+
+            other_args:    For some applications, terms the likelihood depends
+                on are calculated during the prior transform. This is a
+                mechanism to pass those pre-calculated values. These arguments
+                must be fully determined by the parameter values.
+
+        Returns:
+            float:    The natural logarithm of the posterior probability (not
+                normalized).
+        """
+
+    def __call__(self, parameters, **other_args):
         """Same as :meth:`calculate_log_likelihood` but handles stashing."""
 
-        param_hash = hex(hash(parameters.tostring()))[2:]
+        if self._prior_only:
+            logging.getLogger(__name__).info('Prior only log-likelihood: 0.0')
+            return 0.0
+
+        param_hash = hex(hash(parameters.tobytes()))[2:]
         if param_hash in self._stashed_results:
             result = self._stashed_results[param_hash]
             logging.getLogger(__name__).info(
@@ -276,7 +309,7 @@ class LogLikelihoodBase(EvolutionParameters, metaclass=ABCMeta):
             )
             return result
 
-        result = self.calculate_log_likelihood(parameters)
+        result = self.calculate_log_likelihood(parameters, **other_args)
         logging.getLogger(__name__).info(
             'Calculated log_likelihood: %s',
             repr(result)

@@ -8,7 +8,8 @@ from matplotlib import pyplot#, rcParams
 import pandas
 from scipy import stats
 
-from planetary_system_io import read_cds_pipe_table,read_pipe_table_to_pandas
+from general_purpose_python_modules.planetary_system_io import \
+    read_cds_pipe_table,read_pipe_table_to_pandas
 from command_line_utilities import data_dir
 from cmd_utils import CMDPhotometryInterpolator
 from process_e_Q_grid import LinearEccentricityEnvelope
@@ -33,7 +34,7 @@ def get_photometric_constraint(binary_id,
     selected_photometry = get_photometry_distributions(
         photometry[photometry['ID'] == binary_id]
     )
-    
+
     interpolator = get_photometry_interpolator(binary_id)
     return PhotometricConstraint(
         [interpolator],
@@ -56,7 +57,7 @@ def get_photometry(
 
 def get_photometry_distributions(photometry):
     """Return dictionary of all available photometry as normal distributions."""
-    
+
     return dict(
         V=stats.norm(
             loc=float(photometry['Vmag']),
@@ -77,7 +78,7 @@ def get_photometry_interpolator(binary_id):
         distance_modulus=6.30
         name='CMD_0.7Gyr_isochrone_Av0.08_FeH0.15_UBVRIJHK.dat' #https://ui.adsabs.harvard.edu/abs/2019MNRAS.483.3098S/abstract
                                                                 #https://www.aanda.org/articles/aa/full_html/2018/08/aa32843-18/aa32843-18.html
-    
+
     return CMDPhotometryInterpolator(
         os.path.join(
             data_dir,

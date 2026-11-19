@@ -1,0 +1,60 @@
+"""Define function that actually carries out the sampling."""
+
+import logging
+
+#Fixed module search paths, not intended to provide anything.
+#pylint: disable=unused-import
+import update_search_paths
+#pylint: enable=unused-import
+
+from multiprocessing_util import setup_process
+from bayesian import mcmc_sampling, nesty_sampling
+
+def sample(log_likelihood, prior_transform, config):
+    """
+    Perform the sampling of the given log-likelihood/prior given configuration.
+
+    Args:
+        log_likelihood(LogLikelihoodBase):    The log-likelihood to sample.
+
+        prior_transform(PriorTransformBase):    Transformation that converts a
+            set of iidrv to the arguments required by the log-likelihood.
+
+        config:    Usually the parsed command line.
+
+    Returns:
+        None
+    """
+
+    #set_start_method('forkserver')
+    setup_process(
+                    fname_datetime_format=config.fname_datetime_format,
+                    system=config.system,
+                    sampling=config.sampling,
+                    std_out_err_fname=config.std_out_err_fname,
+                    logging_fname=config.logging_fname,
+                    logging_verbosity=config.logging_verbosity,
+                    logging_message_format=config.logging_message_format,
+                    logging_datetime_format=config.logging_datetime_format,
+                    task='manage'
+                  )
+
+    num_params = prior_transform.count_sampled_parameters()
+
+    logging.info(
+        'Starting %s sampling of binary %s with %d free parameters.',
+        config.sampling,
+        config.system,
+        num_params
+    )
+
+    if config.sampling.lower() == 'nested':
+        nesty_sampling.run(config,
+                           log_likelihood,
+                           prior_transform,
+                           num_params)
+    else:
+        mcmc_sampling.run(config,
+                          log_likelihood,
+                          prior_transform,
+                          num_params)

@@ -1,0 +1,19 @@
+{
+  "prepared_at": "2026-11-19T16:10:06.506026-06:00",
+  "runtime_python_changed": false,
+  "test_fixture_updates": [
+    {
+      "path": "control/test_gaia_adapter.py",
+      "reason": "Use final seven Gaia systems and retained Stock2 covariance fixture instead of removed NGC7209; runtime code unchanged.",
+      "deployed_sha256": "feadffdd7db5bcd980891413f2c81ac78383b3b207082d4c026bb854d27f5d7c",
+      "published_sha256": "bb567664b5b67bc64c6ba6813c7631ee1d07fff742dea7c1115d4b57368956ff"
+    }
+  ],
+  "additions": [
+    "Branch README and source-only provenance",
+    "Observed environment versions",
+    "Generic Slurm launch examples without target lists"
+  ],
+  "deployment_snapshots_preserved": true,
+  "data_and_run_records_included": false
+}
