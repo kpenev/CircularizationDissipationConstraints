@@ -122,3 +122,18 @@ venv.bak/
 
 #MacOS nonsense
 .DS_Store
+
+# Dynamic production runtime products; research inputs stay external.
+*.checkpoint*
+*.worker_journal/
+*.npz
+*.sqlite
+*.outerr
+*.core
+core.*
+/logs/
+/results/
+/solver_data/
+/failed_solutions/
+/cache/
+/tmp/
