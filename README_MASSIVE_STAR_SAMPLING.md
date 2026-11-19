@@ -15,7 +15,9 @@ modifying any running job.
 
 Supply the W19 per-system `thinned_chain` NPZ files and three paper summary
 tables externally in the format expected by `windemuth_et_al_util.py`.
-The conditional KDE prior preserves the joint P/Mtot/Mratio/z/tau dependence;
+These are the Kepler observational inputs; this branch does not use the
+Gaia Gaussian-distribution builder. The conditional KDE prior preserves the
+joint P/Mtot/Mratio/z/tau dependence;
 it does not substitute independent Gaussians. Original component labels,
 including q>1, remain paired with their radius summaries. The native
 `feh_from_z` convention differs from the plotting proxy log10(Z/.0142).
@@ -54,8 +56,11 @@ The default envelope, for orbital period P in days, is
 e_env(P) = min(0.8, 0.06 + 2.55812396483873 * log10(max(P, 7) / 7))
 ```
 
-It passes through Stock2 central+3sigma, e=.46662709057158114 at
-P=10.093766032005036days, with plateau .8 from13.62612999816196days.
+The shared envelope is calibrated to the Stock 2 binary's central eccentricity
+plus 3 sigma: e = 0.46662709057158114 at P = 10.093766032005036 days.
+Stock 2 is a Gaia-sample calibration reference for this common curve, not
+a Kepler observational input or a request to use the Gaia input builder.
+The envelope reaches its 0.8 plateau at P = 13.62612999816196 days.
 The measured-e likelihood and hard population-envelope gate are retained;
 there is no outlier bypass.
 
@@ -100,5 +105,7 @@ finishes. A running Slurm step is not evidence of convergence.
 Never restore checkpoints or worker journals under changed likelihoods,
 priors, envelopes or source fingerprints. `PYTHON_SYNTAX_AUDIT.json` records
 an incomplete historical test excluded from this publication; run the explicit profile tests,
-not indiscriminate legacy test discovery. The original introduction remains
-in `README.rst`; dependency license notices are retained separately.
+not indiscriminate legacy test discovery. `README.rst` is the Kepler branch
+landing page; the original general-project introduction is available in
+Git history and upstream `master`. Dependency license notices are retained
+separately.

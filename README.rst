@@ -1,44 +1,39 @@
-More massive Kepler dynamic sampling branch
-=======================================================================
+Dynamic sampling for more massive Kepler binaries
+================================================
+
+This branch provides the package used to constrain tidal dissipation in
+Kepler binaries with stellar masses in the supported 1.5–3 solar-mass range.
+It uses Windemuth et al. (2019; W19) joint-prior inputs and dynesty dynamic
+nested sampling.
 
 See `README_MASSIVE_STAR_SAMPLING.md <README_MASSIVE_STAR_SAMPLING.md>`_
-for this branch's model, setup and validation. This branch adds package code
-and documentation only; no research samples, target lists or run outputs
-are added. Existing upstream data are unchanged.
+for the physical model, input format, setup, sampling settings, provenance
+and validation limits. Generic allocation scripts are in ``examples/slurm/``.
 
-================================================================
-System by system tidal dissipation constraints from eccentricity
-================================================================
+Kepler inputs and package scope
+------------------------------
 
-The idea is to derive tidal dissipation constraints on the full range of stars 
-and planets for which eccentricity data is available. The argument is as follows:
+Provide the W19 per-system joint chains, summary tables and an explicit
+system-ID list externally. This branch uses the correlated W19 inputs;
+the Gaia Gaussian-distribution builder belongs to the separate
+``DynamicSamplingForMoreMassiveStarsForGaiaWithGuassianDistributionBuilder``
+branch.
 
-    * a lower limit on the dissipation can be derived by requiring that the 
-      measured eccentricity survives to the present age of the system
-      
-    * an upper limit on the dissipation can be derived by noting that under the
-      assumption that initial eccentricity distribution is similar to that at
-      longer orbital periods, an identical system had a probability of starting
-      with large initial eccentricity, and the fact that we do not observe
-      eccentricities above the e(P) envelope means that these systems must be
-      circularized to at least below that envelope.
-      
-This can be applied system by system to exoplanet systems and binary stars and
-can cover a broader range of parameters.
+This branch adds package code, configuration, dependency source/licenses
+and documentation only. It adds no observational samples, target lists,
+posterior samples, checkpoints or run outputs. Existing upstream repository
+data are unchanged. Native libraries and stellar-grid assets must also be
+provisioned separately as described in the detailed guide.
 
-Relevant articles:
+Shared eccentricity envelope
+----------------------------
 
-  * `An efficient approach to extract parameters from star cluster CMDs: fitCMD <https://ui.adsabs.harvard.edu/abs/2019MNRAS.483.2758B>`_:
-    Provides age measurements for some clusters:
-      * NGC 6791
-      * NGC 188
-      * NGC 2682
-      * NGC 2635
-      * NGC 5288
-      * NGC 2323
-  * `WIYN Open Cluster Study. XXXVI. Spectroscopic Binary Orbits in NGC 188 <https://ui.adsabs.harvard.edu/abs/2009AJ....137.3743G>`_
-  * `Age and metallicity calibration of Praesepe and Hyades <https://ui.adsabs.harvard.edu/abs/2017AJ....153..128C>`_
-  
-For planets, `Barnes (2015) <https://ui.adsabs.harvard.edu/abs/2015IJAsB..14..321B>`_ show a method for constraining eccentricyt from transit duration.
+The Kepler model uses the shared population eccentricity envelope. Its
+rising segment is calibrated to the Stock 2 binary's measured eccentricity
+plus three standard deviations. Stock 2 is an envelope-calibration reference,
+not a Kepler observational input. The exact curve and its hard likelihood
+gate are documented in the detailed guide.
 
-Source of data for exoplanet systems is the `NASA exoplanet archive <https://exoplanetarchive.ipac.caltech.edu/>`_
+The original general-project introduction and its cluster/exoplanet article
+list remain available in the repository history and on the upstream
+``master`` branch.
