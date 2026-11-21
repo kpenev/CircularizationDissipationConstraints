@@ -2,6 +2,8 @@
 set -euo pipefail
 : "${PACKAGE_ROOT:?Set PACKAGE_ROOT to a configured package checkout}"
 : "${RUN_ROOT:?Set RUN_ROOT to a new output directory}"
+: "${POET_ROOT:?Set POET_ROOT to the external POET checkout with PythonPackage and lib}"
+: "${GENERAL_PURPOSE_PYTHON_MODULES:?Set the external general_purpose_python_modules directory}"
 : "${MASSIVE_STAR_GRID_ROOT:?Set the validated stellar-grid directory}"
 : "${ECCENTRICITY_COEFFICIENTS:?Set the external coefficient SQLite path}"
 SYSTEM_ID=$1
@@ -9,9 +11,9 @@ SYSTEM_ROOT="$RUN_ROOT/$SYSTEM_ID"
 mkdir -p "$SYSTEM_ROOT"/{logs,cache,failed_solutions,solver_data}
 module load gsl/2.8
 export PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
-export PYTHONPATH="$PACKAGE_ROOT:$PACKAGE_ROOT/source:$PACKAGE_ROOT/control:$PACKAGE_ROOT/general_purpose_python_modules:$PACKAGE_ROOT/poet/PythonPackage"
+export PYTHONPATH="$PACKAGE_ROOT:$PACKAGE_ROOT/source:$PACKAGE_ROOT/control:$GENERAL_PURPOSE_PYTHON_MODULES:$(dirname "$GENERAL_PURPOSE_PYTHON_MODULES"):$POET_ROOT/PythonPackage${PYTHONPATH:+:$PYTHONPATH}"
 BOOST_RUNTIME_DIR=${BOOST_RUNTIME_DIR:-/work/dal205149/nesty_sampling_hpc/runtime_libs/boost-1.71}
-export LD_LIBRARY_PATH="$BOOST_RUNTIME_DIR:$PACKAGE_ROOT/poet/lib:${LD_LIBRARY_PATH:-}"
+export LD_LIBRARY_PATH="$BOOST_RUNTIME_DIR:$POET_ROOT/lib:${LD_LIBRARY_PATH:-}"
 export XDG_CACHE_HOME="$SYSTEM_ROOT/cache" MPLCONFIGDIR="$SYSTEM_ROOT/cache/matplotlib"
 export FAILED_SOLUTIONS_DIR="$SYSTEM_ROOT/failed_solutions"
 TMP_ROOT=${TMP_ROOT:-/tmp}

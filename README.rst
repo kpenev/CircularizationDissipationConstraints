@@ -19,8 +19,8 @@ the Gaia Gaussian-distribution builder belongs to the separate
 ``DynamicSamplingForMoreMassiveStarsForGaiaWithGuassianDistributionBuilder``
 branch.
 
-This branch adds package code, configuration, dependency source/licenses
-and documentation only. It adds no observational samples, target lists,
+This branch adds package code, configuration, and documentation only.
+It adds no observational samples, target lists,
 posterior samples, checkpoints or run outputs. Existing upstream repository
 data are unchanged. Native libraries and stellar-grid assets must also be
 provisioned separately as described in the detailed guide.
@@ -37,3 +37,14 @@ gate are documented in the detailed guide.
 The original general-project introduction and its cluster/exoplanet article
 list remain available in the repository history and on the upstream
 ``master`` branch.
+
+External dependencies and performance
+-------------------------------------
+
+POET and ``general_purpose_python_modules`` must be installed separately;
+their source is not bundled in this branch. See the detailed guide for
+external dependency paths and deployed-source checksums.
+
+In the author's binary-sampling workflow, dynesty is reported to be roughly
+an order of magnitude faster than the previous emcee workflow. This is
+a workload-specific observation; a controlled benchmark is not included.
