@@ -13,6 +13,11 @@ import numpy
 from bayesian.plot_2d_interpolation import Plot2DInterpolation
 from bayesian.picklable import Picklable
 
+from general_purpose_python_modules.approximate_1d_function import\
+    get_new_grid_points,\
+    select_mismatches,\
+    insert_entries
+
 ApproximationConfig = namedtuple(
     'ApproximationConfig',
     [
@@ -88,40 +93,6 @@ class Approximate2DFunction(RectBivariateSpline,
     #pylint: enable=too-many-arguments
 
 
-    def _select_mismatches(self, calculated_values, interpolated_values):
-        """Return x and y grid indices to refine."""
-
-        residuals = numpy.absolute(calculated_values - interpolated_values)
-        if self.configuration.refine_limit:
-            mean_end = -self.configuration.refine_limit + 1
-            if mean_end == 0:
-                mean_end = residuals.size
-            tolerance = max(
-                self.configuration.tolerance,
-                numpy.mean(
-                    numpy.partition(
-                        residuals.flatten(),
-                        (
-                            -self.configuration.refine_limit - 1,
-                            -self.configuration.refine_limit
-                        )
-                    )[
-                        -self.configuration.refine_limit - 1
-                        :
-                        (-self.configuration.refine_limit + 1) or residuals.size
-                    ]
-                )
-            )
-        else:
-            tolerance = self.configuration.tolerance
-
-        result = numpy.nonzero(residuals > tolerance)
-
-        self._logger.debug('Selected %d cells to refine', result[0].size)
-
-        return result
-
-
     def _get_mismatch_indices(self):
         """
         Return indices where interpolating values fails on current grid.
@@ -164,9 +135,11 @@ class Approximate2DFunction(RectBivariateSpline,
                     y_offset=y_offset
                 )
 
-                new_mismatches = self._select_mismatches(
+                new_mismatches = select_mismatches(
                     calculated_values,
                     interpolated_values,
+                    self.configuration.tolerance,
+                    self.configuration.refine_limit
                 )
 
                 max_1d_error[x_offset, y_offset] = numpy.max(
@@ -208,39 +181,6 @@ class Approximate2DFunction(RectBivariateSpline,
             (1-D float array, 1-D int array):
                 Same as above but for the y grid.
         """
-
-        def get_new_grid_points(mismatch_indices, current_grid, min_grid_step):
-            """Return new values to add per the given mismatch indices."""
-
-            if mismatch_indices.size == 0:
-                return None
-
-            below_indices = numpy.unique(
-                numpy.concatenate((
-                    (
-                        mismatch_indices
-                        if mismatch_indices[-1] < current_grid.size - 1 else
-                        mismatch_indices[:-1]
-                    ),
-                    (
-                        mismatch_indices
-                        if mismatch_indices[0] > 0 else
-                        mismatch_indices[1:]
-                    ) - 1
-                ))
-            )
-            valid = (
-                (current_grid[below_indices + 1] - current_grid[below_indices])
-                >
-                2.0 * min_grid_step
-            )
-            below_indices = below_indices[valid]
-            return (
-                0.5 * (current_grid[below_indices]
-                       +
-                       current_grid[below_indices + 1]),
-                below_indices + 1
-            )
 
         mismatch_indices, worse_direction = list(self._get_mismatch_indices())
 
@@ -305,40 +245,6 @@ class Approximate2DFunction(RectBivariateSpline,
 
     def _tune_interpolation(self, workers):
         """Find a grid dense enough to achive desired approximation."""
-
-        def insert_entries(current, new, num_before, destination):
-            """
-            Set destination to new entries inserted among current.
-
-            Args:
-                current:    The current array to add entries to. Not modified.
-
-                new:    The new entries to add.
-
-                num_before:    The number of current entries to precede each
-                    entry in new.
-
-                destination:    The array to fill. Sholud already be
-                    pre-allocated and is completely overwritten.
-
-            Returns:
-                None
-            """
-
-            current_start = 0
-            for new_index, (current_end, new_entry) in enumerate(zip(num_before,
-                                                                     new)):
-                destination[
-                    current_start + new_index
-                    :
-                    current_end + new_index
-                ] = current[current_start : current_end]
-
-                destination[current_end + new_index] = new_entry
-
-                current_start = current_end
-
-            destination[current_start + len(new) : ] = current[current_start : ]
 
         def add_grid_points(grid, new_points, num_smaller):
             """
@@ -600,7 +506,7 @@ class Approximate2DFunction(RectBivariateSpline,
             self._x_grid, self._y_grid = self._get_initial_grid()
             Plot2DInterpolation.__init__(self, debug_plots, plot_labels)
 
-            self._debug_plots = debug_plots or dict()
+            self._debug_plots = debug_plots or {}
             self._converged = False
             with Pool(num_parallel_processes) as workers:
                 self._values = self._calculate_function_values(self._x_grid,

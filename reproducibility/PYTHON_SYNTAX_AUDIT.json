@@ -1,0 +1,12 @@
+{
+  "new_syntax_errors": 0,
+  "note": "The incomplete historical scratch test is omitted from publication; runtime code and explicit profile tests are unaffected.",
+  "excluded_legacy_issues": [
+    {
+      "path": "source/bayesian/test_w19_e_likelihood.py",
+      "line": 17,
+      "message": "expected an indented block after class definition on line 15",
+      "preexisting_in_deployed_snapshot": true
+    }
+  ]
+}

@@ -6,7 +6,9 @@ import numpy
 from scipy import optimize
 from astropy import units, constants
 
-from binary_utils import rv_semi_amplitude_scale, calculate_secondary_mass
+from general_purpose_python_modules.binary_utils import \
+    rv_semi_amplitude_scale, \
+    calculate_secondary_mass
 from sample_binary_masses import SampleBinaryMasses
 
 class SampleSB1Masses(SampleBinaryMasses):
@@ -70,11 +72,14 @@ class SampleSB1Masses(SampleBinaryMasses):
             numpy.linspace(0.01, 0.99, 99)
         )
         rvk_points = rvk_points[
+            #False positive
+            #pylint: disable=no-member
             rvk_points < numpy.cbrt(
                 numpy.pi * constants.G * primary_mass * units.M_sun
                 /
                 (2.0 * self._orbital_period * units.day)
             ).to_value(units.m / units.s)
+            #pylint: enable=no-member
         ]
         return numpy.concatenate(
             (
@@ -98,7 +103,7 @@ class SampleSB1Masses(SampleBinaryMasses):
 
         guess_likelihood = -numpy.inf
         for primary_mass in numpy.vectorize(
-            self.photometric_constraint.primary_mass_ppf
+                self.photometric_constraint.primary_mass_ppf
         )(
             numpy.linspace(0, 1.0, 100)
         ):

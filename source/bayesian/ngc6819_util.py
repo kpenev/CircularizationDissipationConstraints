@@ -4,11 +4,12 @@
 import os.path
 import logging
 
-from matplotlib import pyplot, rcParams
+from matplotlib import pyplot#, rcParams
 import pandas
 from scipy import stats
 
-from planetary_system_io import read_cds_pipe_table
+from general_purpose_python_modules.planetary_system_io import \
+    read_cds_pipe_table
 from command_line_utilities import data_dir
 from cmd_utils import CMDPhotometryInterpolator
 from process_e_Q_grid import LinearEccentricityEnvelope

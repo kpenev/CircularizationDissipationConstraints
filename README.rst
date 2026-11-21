@@ -1,3 +1,11 @@
+More massive Gaia Gaussian-observation dynamic sampling branch
+=======================================================================
+
+See `README_MASSIVE_STAR_SAMPLING.md <README_MASSIVE_STAR_SAMPLING.md>`_
+for this branch's model, setup and validation. This branch adds package code
+and documentation only; no research samples, target lists or run outputs
+are added. Existing upstream data are unchanged.
+
 ================================================================
 System by system tidal dissipation constraints from eccentricity
 ================================================================
@@ -34,3 +42,14 @@ Relevant articles:
 For planets, `Barnes (2015) <https://ui.adsabs.harvard.edu/abs/2015IJAsB..14..321B>`_ show a method for constraining eccentricyt from transit duration.
 
 Source of data for exoplanet systems is the `NASA exoplanet archive <https://exoplanetarchive.ipac.caltech.edu/>`_
+
+External dependencies and performance
+-------------------------------------
+
+POET and ``general_purpose_python_modules`` must be installed separately;
+their source is not bundled in this branch. See the detailed guide for
+external dependency paths and deployed-source checksums.
+
+In the author's binary-sampling workflow, dynesty is reported to be roughly
+an order of magnitude faster than the previous emcee workflow. This is
+a workload-specific observation; a controlled benchmark is not included.

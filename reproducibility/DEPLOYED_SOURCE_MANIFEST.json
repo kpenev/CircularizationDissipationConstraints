@@ -1,0 +1,978 @@
+{
+  "exported_at": "2026-11-19T16:05:29.589075-06:00",
+  "deployed_package": "/work/dal205149/gaia_massive_star_circularization_upper3sigma_20261118",
+  "included": {
+    "source/.gitignore": {
+      "sha256": "b660111b2a6fcaf6f6df5720b2b3e2eb7e8b36c41ebaa1beef3e3580b161a44e",
+      "bytes": 96
+    },
+    "source/bad_binaries.txt": {
+      "sha256": "5b685dda7cb6a41915388edac6334e284ffa5ee74216ac978ead9068988ab22a",
+      "bytes": 2150
+    },
+    "source/bayesian/__init__.py": {
+      "sha256": "f92eb9a793ac77f8379de37194d9b5274341313398ff6115079bb5d5e5cea9c9",
+      "bytes": 144
+    },
+    "source/bayesian/approximate_2d_function.py": {
+      "sha256": "cf10dbc4769d0d806e8a04e1ce03a60b58f2e9041308d8eb201dfef64d2ce128",
+      "bytes": 21084
+    },
+    "source/bayesian/approximate_rv_likelihood.py": {
+      "sha256": "74c656fe6d6aa96e3ed283e432fb2ff4b7bc76d9c30be91d8d7409ec6a1173a1",
+      "bytes": 13683
+    },
+    "source/bayesian/autocorrelation_plots.py": {
+      "sha256": "b968d46200231b57d6968328e9895f3cd2e2601381ca23f096fa46647576f0c6",
+      "bytes": 1360
+    },
+    "source/bayesian/basic_util.py": {
+      "sha256": "d9c5031202ccdc79751d6a449cdb2f4308df82a5b6d70c145f9e70706bdb135d",
+      "bytes": 1001
+    },
+    "source/bayesian/binary_utils.py": {
+      "sha256": "4b58bd235214c012f24abb0c775d6ea8f328b13569598ad1f640d630eada193a",
+      "bytes": 4548
+    },
+    "source/bayesian/check_log_files.sh": {
+      "sha256": "44689535b9887ba251a92b4e1b79b79f4c08bbc3fae9a9ae5e7f3dee72f9cc21",
+      "bytes": 1238
+    },
+    "source/bayesian/cluster_util.py": {
+      "sha256": "a7981288854e77de893d083b091902034f223b162af4df247547c8184e4419fb",
+      "bytes": 13896
+    },
+    "source/bayesian/conditional_secondary_mass_distribution.py": {
+      "sha256": "6044ecf9dc2906cf6c277f7494f18fdf823d96865dccacff46492743cbbc5304",
+      "bytes": 2712
+    },
+    "source/bayesian/convert_samples_u_to_n.py": {
+      "sha256": "b4013a576e517f2a6299649153174e398a8f9783e42a97687304f3226145c865",
+      "bytes": 1377
+    },
+    "source/bayesian/custom_logger_adapter.py": {
+      "sha256": "590572fb376343135544ccb2125538bb767d78768fc5cfa767bacea9068a41c1",
+      "bytes": 459
+    },
+    "source/bayesian/dynesty_worker_journal.py": {
+      "sha256": "56e37b487a57aaed783c595175574a5cdce29ce4346eab5eee0194f5f75cf239",
+      "bytes": 8870
+    },
+    "source/bayesian/evolution_parameters.py": {
+      "sha256": "0e75a762d9c5f2400d42368464169ef41dd4d53782ed158556863cde2ec3d9ab",
+      "bytes": 4523
+    },
+    "source/bayesian/final_initial_eccentricity_dependence.py": {
+      "sha256": "60e8b277d2b1fd7e9b155807c829702c41589d59ed0408b103c3e2267031e85d",
+      "bytes": 24194
+    },
+    "source/bayesian/final_initial_eccentricity_dependence.sh": {
+      "sha256": "23e00da1078f221ae753efea00b9b9a017b6beb68b2d8aec40c4056b589ede8b",
+      "bytes": 465
+    },
+    "source/bayesian/gaia_log_likelihood.py": {
+      "sha256": "144d883d0de48b0d02fc8d25782a068e108e7fe2689f049c3bc8a5927c8e4070",
+      "bytes": 1398
+    },
+    "source/bayesian/gaia_observations.py": {
+      "sha256": "30760622a73e3c591bcb5da52d3133d9519147956871e63df8976663c8727ed6",
+      "bytes": 3798
+    },
+    "source/bayesian/gaia_prior_transform.py": {
+      "sha256": "41c7f40fbe29e82b6665d808ebce37ec06e821f7a0381c26d4da1b1c79632c3c",
+      "bytes": 3598
+    },
+    "source/bayesian/hacked_emcee_hdf5_backend.py": {
+      "sha256": "2c7fe6f1487dbedd06c0b8f29d59a66b2a795368d7194fc506f890bcfa9fda6d",
+      "bytes": 11314
+    },
+    "source/bayesian/hyadespraesepe_util.py": {
+      "sha256": "ac86c4cc4ffc158ec8658e7c72a3a12d927ee15032316754449921e6017bc88b",
+      "bytes": 4551
+    },
+    "source/bayesian/log_likelihood_base.py": {
+      "sha256": "18aea1569ec477afd64b9326ac49b8ca1513d6daef92b03b4b9a0224e7119c04",
+      "bytes": 11127
+    },
+    "source/bayesian/log_likelihood_binary_stars.py": {
+      "sha256": "d6ceebe4de42ac3a7615e160f3f3abe789a4f7856319d8777c54d86a694eb434",
+      "bytes": 4617
+    },
+    "source/bayesian/log_likelihood_sb1.py": {
+      "sha256": "795afd300637601a82b86abb98e8c3efc70cb81c410f638056990eacd6a702e1",
+      "bytes": 1799
+    },
+    "source/bayesian/log_likelihood_windemuth_et_al.py": {
+      "sha256": "f2e9dfc95e4a5eee6c10d0124219ffdb537b3be24f7bb21daa4c284634be3f0c",
+      "bytes": 35644
+    },
+    "source/bayesian/m35_util.py": {
+      "sha256": "aa8448903cad4120864f8db9d15b6062e74cc6ba1b1f742f888d7d35ea38e80a",
+      "bytes": 5918
+    },
+    "source/bayesian/make_plots.sh": {
+      "sha256": "647fb82d680dfce781b35a1820cac4a63b2b5bd164a6c6553a44dc0ab6c43617",
+      "bytes": 4564
+    },
+    "source/bayesian/massive_prior_transform.py": {
+      "sha256": "946800ce9a4c3e39a6a5e3279d188f4d07e02cc65558a6a70c3cb884aab80f1b",
+      "bytes": 980
+    },
+    "source/bayesian/massive_star_policy.py": {
+      "sha256": "3555e77de81628b1c01c98174815ad2286fc40492b6898b204db0a79594aad4e",
+      "bytes": 5064
+    },
+    "source/bayesian/mcmc_sampling.py": {
+      "sha256": "60782777f432eb12a1a4f76f48bb7854dc505eb82d5b154e3ba314f7b626798e",
+      "bytes": 31507
+    },
+    "source/bayesian/ml_sanity_check.py": {
+      "sha256": "12bac314ad774425bcdf5919980cf853fa18e9aa70ed78a94165d7566bae8150",
+      "bytes": 8138
+    },
+    "source/bayesian/nesty_sampling.py": {
+      "sha256": "fc32f88daeb4d60fa79b9990ba78d3aa377fb2e7a529a87b913386322a77ac7f",
+      "bytes": 67768
+    },
+    "source/bayesian/ngc188_util.py": {
+      "sha256": "7775794ae5978b55d3d65749a90c573d54f52e1d0cf690204c4055af2e08c671",
+      "bytes": 9826
+    },
+    "source/bayesian/ngc6819_util.py": {
+      "sha256": "d26907c5711ff1d3f229b88ca259fcb8b6fc565a479e13accd5ecb65781d8a43",
+      "bytes": 4663
+    },
+    "source/bayesian/paper_eccentricity_envelope.py": {
+      "sha256": "eb811981e617fe788a427e0a1c0e3e73f70d9cfd0fe49c6daeaa5ac5da7ab9b1",
+      "bytes": 1081
+    },
+    "source/bayesian/parse_command_line.py": {
+      "sha256": "1236bf0b33242a8e67435f4ffed5883f70fe29cadac0e1fd07c3cbb44bc2691f",
+      "bytes": 23202
+    },
+    "source/bayesian/photometric_constraint.py": {
+      "sha256": "272dec8c79540746db14904a008fc8dc32bfcb06eb611709f9d26cfc043d909f",
+      "bytes": 17356
+    },
+    "source/bayesian/picklable.py": {
+      "sha256": "b1c0ea2d3d6e0f6cc3a804de7d221611f66a0a5c98ad7ccb5b51adf6df4ffa71",
+      "bytes": 3340
+    },
+    "source/bayesian/plot_2d_interpolation.py": {
+      "sha256": "2a1a4f826a9dffe08ebc2958b90154964ac5b4a4aafea3942d65a9a2a4aa02f7",
+      "bytes": 9695
+    },
+    "source/bayesian/plot_lgq_vs_period_constraints.py": {
+      "sha256": "793291df79906e0cba3a23dd92cae7a51878bf05d80da9a59cad903df0741720",
+      "bytes": 80224
+    },
+    "source/bayesian/plot_sampled_phase_lag.py": {
+      "sha256": "86a020a8db8087321f8dd0dcb6a1359776262213055ef85ee2924fcac8b8bf03",
+      "bytes": 7591
+    },
+    "source/bayesian/posterior_cdf_uncertainty.py": {
+      "sha256": "93505df3549fa76c814f467e43f38feb82ab447f5ab8fc4e6ef0af78e92f3144",
+      "bytes": 9555
+    },
+    "source/bayesian/prepare_sampling.py": {
+      "sha256": "7fb44c6c50df1e81fb7202e88fd39b0026890047d8ec6a3145dfe904f1517cce",
+      "bytes": 1516
+    },
+    "source/bayesian/prior_transform_base.py": {
+      "sha256": "b9f9d700c9302f0e9199baca07f02c500a324c7b38b882e9a6e0dff14b1c4bed",
+      "bytes": 8588
+    },
+    "source/bayesian/prior_transform_sb1.py": {
+      "sha256": "95a6a3be7a138dd91e4f17da04bd5358e37bdc6a0910168e3529bc011ea5f368",
+      "bytes": 2460
+    },
+    "source/bayesian/prior_transform_windemuth_et_al.py": {
+      "sha256": "2637b65cb3e7af065c257aef4fa2e06801a2eba5d2ab8586010f74215cd094c6",
+      "bytes": 16631
+    },
+    "source/bayesian/sample.py": {
+      "sha256": "5622c4b53a3938657050a8051963a82dbc2b37a8c17042b28f101950e3624432",
+      "bytes": 1999
+    },
+    "source/bayesian/sample_binary_masses.py": {
+      "sha256": "b0630b7cce090cd014c7ada9cfd1e318c55a67136814e512488145cc448de639",
+      "bytes": 8064
+    },
+    "source/bayesian/sample_gaia.py": {
+      "sha256": "435e268234513d498b253af7e0e98e861adb451e1e11dc019954db1a6adbabb0",
+      "bytes": 2662
+    },
+    "source/bayesian/sample_sb1.py": {
+      "sha256": "0cefbeb0772295c744e41bdcf35197c2fdd32b6e2d94e380b4b3357097e825d4",
+      "bytes": 6321
+    },
+    "source/bayesian/sample_sb1_masses.py": {
+      "sha256": "09cb82b425231b61bb6be526317e346ad780ba51e025647ae0851e4655c07af2",
+      "bytes": 6963
+    },
+    "source/bayesian/sample_windemuth_et_al.py": {
+      "sha256": "e10bb9d0fee4cfc258741136942e513a02b85106fdf75ddfba744211ba64b6fa",
+      "bytes": 6407
+    },
+    "source/bayesian/stellar_param_sampling/__init__.py": {
+      "sha256": "3c9ec6a5c4ea59b3d52cbc86309aff31b2f4bbb7bbee3126b531b7aeeea58212",
+      "bytes": 432
+    },
+    "source/bayesian/stellar_param_sampling/config_util.py": {
+      "sha256": "62c4cb3584d3a8f4521cad6c000847a312d141a9994e4e05beabbfad11e700ab",
+      "bytes": 4729
+    },
+    "source/bayesian/stellar_param_sampling/continous_max_age.py": {
+      "sha256": "90f60246b571f61273ce22c42a2475f96851b2f2c0f3aeaa049ba4187a86167b",
+      "bytes": 3556
+    },
+    "source/bayesian/stellar_param_sampling/feh_conditional_likelihood_base.py": {
+      "sha256": "28379a0a85bb14b3809f1ad45cf3bf067c1852784d2f064b26b96642f13984c3",
+      "bytes": 7923
+    },
+    "source/bayesian/stellar_param_sampling/gaussian_likelihood.py": {
+      "sha256": "e071dea2a1e1cab1ca069e5921bacfe4c540557bdbf8f95a9c7d86a2a76a2db1",
+      "bytes": 1754
+    },
+    "source/bayesian/stellar_param_sampling/marginalized_parameter_distribution.py": {
+      "sha256": "12715ec9cabec49c7718a33dcca7210ff86d62a1b48da26682c60a72abe6c4d3",
+      "bytes": 3883
+    },
+    "source/bayesian/stellar_param_sampling/output": {
+      "sha256": "df2c7cecbefeb18c22357b5cfb8be305a63b0ef4d7b6cd3ccd04ca242ed2eaa9",
+      "bytes": 22460
+    },
+    "source/bayesian/stellar_param_sampling/poet_interp_likelihood.py": {
+      "sha256": "df4e71f9aba1f296156433190ede15ebfc4e3502dccdffdc41f1282c4cd869f4",
+      "bytes": 2812
+    },
+    "source/bayesian/stellar_param_sampling/prepare.py": {
+      "sha256": "2c192b64739a01c9a901cb3b334f4549aac96e16874ed7f18b8826fcc4365e64",
+      "bytes": 7518
+    },
+    "source/bayesian/stellar_param_sampling/star_sampler.py": {
+      "sha256": "9b69cff5c7526af2bebdfb2065e55dbe3cf00565ca1bf84ab211f32a78d7daeb",
+      "bytes": 32443
+    },
+    "source/bayesian/test_single_system_lgq_evolution.py": {
+      "sha256": "022f954d1e37592ec491e5dc52a02add7c7a70458ffb2bdf61b7e95bf3c2589e",
+      "bytes": 101686
+    },
+    "source/bayesian/visualize_emcee.py": {
+      "sha256": "54dd72279746e3a3734e05828a9f39d7750a74a60315608d66f725ddb5329a72",
+      "bytes": 36161
+    },
+    "source/bayesian/windemuth_eccentricity_distribution.py": {
+      "sha256": "801219a362d793c037063d2074b03f94763fb187f0e2acc92b8ee5db7929f5ae",
+      "bytes": 23337
+    },
+    "source/bayesian/windemuth_et_al_util.py": {
+      "sha256": "b4b7b7e3a61272c518cf1b0fc4c53b09e0f08fc8f091108fffbdc8fb7d6e6946",
+      "bytes": 15977
+    },
+    "source/calculate_e_Q_grid.py": {
+      "sha256": "47f0a27dc273c79ae0f8425cc45ca74258b10e55027d8f52a494a15031cc55f2",
+      "bytes": 14637
+    },
+    "source/cmd_utils/__init__.py": {
+      "sha256": "f19fb6f2ad3b2b41105a12ab32f6a2d03f0d6850cd5465f6610513538f40276f",
+      "bytes": 266
+    },
+    "source/cmd_utils/cmd_isochrone_interpolator.py": {
+      "sha256": "424124ce2145d0315c5e972212dc03222a9c4ece39ce9b8cb455e853de5b13c5",
+      "bytes": 6689
+    },
+    "source/cmd_utils/cmd_photometry_interpolator.py": {
+      "sha256": "9ae931d8a9620a0f972c0f2406ebce13e254d0690d3fb84d77590bd46d37309d",
+      "bytes": 5877
+    },
+    "source/cmd_utils/cmd_query.py": {
+      "sha256": "08915937a28a313d68e399a4a78c7a88e2c1409735890d20508cd0e46bf4d648",
+      "bytes": 3896
+    },
+    "source/cmd_utils/cmd_usno_photometry_interpolator.py": {
+      "sha256": "f8fd07c53b55ad281ceb0ae4630bd04a818fc2b4396fc80eea0e277bc402c02a",
+      "bytes": 3545
+    },
+    "source/command_line_utilities.py": {
+      "sha256": "9fde7173fcb77ba0cb313b736a69b7226d17ad919af6807d43d9558f559a2936",
+      "bytes": 6119
+    },
+    "source/current_eccentricity_calculator.py": {
+      "sha256": "2719f9123a03f2f065761859eaf2942801f40c4ab3468e6fc857c9084b37d9de",
+      "bytes": 7508
+    },
+    "source/eccentricity_expansion_coef.txt": {
+      "sha256": "e8e6efdf93f0b34cc3491532e774b464561a38d0a8dcc92defc70d83a614cbaa",
+      "bytes": 1517780
+    },
+    "source/fit_ngc6819_masses.py": {
+      "sha256": "d7d507877078f6e5b43f1a082cbfca176463d2b7bb73952e79f0152eb0d424b6",
+      "bytes": 3418
+    },
+    "source/io_utilities.py": {
+      "sha256": "e474307832066faedc9e18ff61e58405f49624ba03a3d61047087d6cbf3906a7",
+      "bytes": 23066
+    },
+    "source/manual_lgq_limit_fixes.py": {
+      "sha256": "5b71046a9c256ea724941cf5945b91a8ccd8c65932ab62f03b8b8cacc3017bf3",
+      "bytes": 679
+    },
+    "source/mass_fitting.py": {
+      "sha256": "aee8432bb260da5ce48bfb5a1267fd1d72d9eadca8bc6c638aba92a6f48ba63a",
+      "bytes": 22338
+    },
+    "source/matplotlibrc": {
+      "sha256": "eaf62a9347c10b0bfa4a3a976057a399c01e4b9ee11e5d6fe2cd15b5b165f86c",
+      "bytes": 39896
+    },
+    "source/moving_window_constraints.py": {
+      "sha256": "0dc517ba17d73590f411865c85e1c615d4d06fef0e081f2217d91f69887d4b91",
+      "bytes": 8072
+    },
+    "source/ngc6819_mass_fit_plots.py": {
+      "sha256": "988b2d37598198e203faf9a60954a5a13b63113c9f5719acfef97fd79f2a9edb",
+      "bytes": 6475
+    },
+    "source/period_eccentricity_envelope/__init__.py": {
+      "sha256": "ef768561ae01ef9f619dd2fd3bd34f529d3626a0b007d91a0845a61e7a333521",
+      "bytes": 127
+    },
+    "source/period_eccentricity_envelope/envelope_residual_base.py": {
+      "sha256": "16f541b49c9f3edbec7fdc4b098bdc777f83c64a5e7a5dc7d7e5f14a72fbb765",
+      "bytes": 4111
+    },
+    "source/period_eccentricity_envelope/explore_envelope.py": {
+      "sha256": "881410b2d642c5e7651c6af4b930c23aaa71d0b6a8b20474050a18ecae463d10",
+      "bytes": 8373
+    },
+    "source/period_eccentricity_envelope/mm05_envelope.py": {
+      "sha256": "5da6f89f03f6fd8b923b5bd24bca40d38f9c23d52db9f1718aabefd679794dc1",
+      "bytes": 611
+    },
+    "source/period_eccentricity_envelope/plot_envelope_evolution.py": {
+      "sha256": "dab0d1cf01fa62b84853146106c2ff2e103de3047266187db100d45139b6e3bf",
+      "bytes": 16282
+    },
+    "source/period_eccentricity_envelope/unpickle_data.py": {
+      "sha256": "f246cf7a2a6ba6ec61762a408cbe7b202d23a2f9d75db786761b7f24d4a4593f",
+      "bytes": 1908
+    },
+    "source/plot_ruskin.sh": {
+      "sha256": "b89f6eb6d7db84925ae3013884af853d2a0078fd9b2cfdc94f0ef577b35fe8a4",
+      "bytes": 372
+    },
+    "source/plots.py": {
+      "sha256": "bd4f9186c1791b6d52cb5350b4996c433f1894317f33e762a119f66412fcc103",
+      "bytes": 56486
+    },
+    "source/praesepe_hyades_calculation.sh": {
+      "sha256": "70354ff4fd16403670d25854c00a1d45a6f9700454142600f19c2d5481457140",
+      "bytes": 410
+    },
+    "source/process_e_Q_grid.py": {
+      "sha256": "3367fedc3b35d4f6fc66dc1d40875d3263259463b88580cf53272713998f1933",
+      "bytes": 5644
+    },
+    "source/report_sampling.sh": {
+      "sha256": "20cf850167bb2db6c8b97ea5cb6671cd479263e72c552ee0b76b211368821105",
+      "bytes": 474
+    },
+    "source/reproduce_hyasepe_results.py": {
+      "sha256": "691eb4fbe5f084f4adaf5bcab8b76dd1e83b4c34816cd40c129ebf04460cb025",
+      "bytes": 13955
+    },
+    "source/reproduce_ngc188_results.py": {
+      "sha256": "46d478675296211002922a1204ba520d97fd57c9b6a4aa0451b69b4dbbb41f25",
+      "bytes": 12392
+    },
+    "source/sampling_config/Gaia_massive_rc_env.cfg": {
+      "sha256": "a58434a9b407dc57e190eb5eae6e79b6bc62e17caf76f2b21b0625174d10449b",
+      "bytes": 649
+    },
+    "source/sampling_config/W19_massive_rc_env.cfg": {
+      "sha256": "476e6a38d6553eaa1e1d721b16aefbb97edbfbabfc889aef7cdf3e114b694ebe",
+      "bytes": 586
+    },
+    "source/sampling_config/W19_powerlaw.cfg": {
+      "sha256": "5ac7b6a89b8822a57140c53740838c619706a04e5246ddfe80e74aed236ce22e",
+      "bytes": 354
+    },
+    "source/sampling_config/W19_powerlaw_break5.cfg": {
+      "sha256": "c75fe5c8f42a2b7c1d35da0bdcf345850d1e70d3f34917871a9801023760cd9d",
+      "bytes": 353
+    },
+    "source/sampling_config/W19_powerlaw_disklock5.cfg": {
+      "sha256": "13a27c2d3f8b0f55950be6d9dcac536fe5053e40dc643e06c6c6ee2a0faeab56",
+      "bytes": 352
+    },
+    "source/sampling_config/W19_powerlaw_disklock5_w64.cfg": {
+      "sha256": "fafb3b91f33ccccfd3aaae771147d4e2d056733413ee8775da52b73dcc326fb7",
+      "bytes": 352
+    },
+    "source/sampling_config/W19_powerlaw_inertia.cfg": {
+      "sha256": "a7bee8ef3a47517fcbacdff1de72ae699a7d5625694d993096ba9a9eae4cf662",
+      "bytes": 327
+    },
+    "source/sampling_config/open_cluster_constQ_nolock.cfg": {
+      "sha256": "ed90d2acc6ceb89c8d5a672df5a03b4b9d48a2fb9ca659a4bc22ea22cad30a97",
+      "bytes": 493
+    },
+    "source/sampling_config/open_cluster_powerlaw_alllock.cfg": {
+      "sha256": "57cca5edf6811704fd66025f5996499ea4239fb5ffac4af0b0db12742eb6106e",
+      "bytes": 552
+    },
+    "source/sampling_config/open_cluster_powerlaw_alllock_early.cfg": {
+      "sha256": "49bd3ec29ba584ccfa86de2e962fa45c21004ef15aabb575997a44709d9122fb",
+      "bytes": 550
+    },
+    "source/sampling_config/test_ganymede.cfg": {
+      "sha256": "82db787bb029c071f6999124e69cc9cda4483ce15205fd1e0de4f9863b5ab5ac",
+      "bytes": 833
+    },
+    "source/sampling_config/test_hyape.cfg": {
+      "sha256": "9c332fc64a7728a3275501ed21c8cdef8275f0c9c9652e3a5331be85bf26f965",
+      "bytes": 1289
+    },
+    "source/sampling_config/windemuth_template.cfg": {
+      "sha256": "aa39bffa9383caa822dde663353829e809d67236e9bf8f5f4b4f67e8e87c826c",
+      "bytes": 894
+    },
+    "source/test.py": {
+      "sha256": "decb5ebc936212cc057f5962aa8681f17260e0bfd77d5ea70e632a308f453730",
+      "bytes": 3982
+    },
+    "source/update_search_paths.py": {
+      "sha256": "4a7654590c93276afc70df395678653231f51d4bfcdbd51a9cbdc6d4feed1aae",
+      "bytes": 275
+    },
+    "source/webda/cluster.py": {
+      "sha256": "f5604013095e04a46eea79180e162cab4bb0ec97d4ed6113b45400493e5ad1de",
+      "bytes": 13425
+    },
+    "source/webda/read_table.py": {
+      "sha256": "f0d0aaf58abb24f5be0f376c8454c31c7d6912ffccce78fbb627b0af41507686",
+      "bytes": 4248
+    },
+    "control/check_gaia_native_inputs.py": {
+      "sha256": "88f0a4a10c46d27726476b40ff6ed246c274384a87aa06836e1b8b5bc9339ad6",
+      "bytes": 4838
+    },
+    "control/finalize_gaia_validation.py": {
+      "sha256": "e379d0ab46d9bf42cd411bb2a6e72bade7ae9d245edb692ce008da8e824e4562",
+      "bytes": 3845
+    },
+    "control/gaia_launcher.py": {
+      "sha256": "5b4d747baf690a5fea4bc397fce0f60ccda005398191b70c856fe9cbb1b685bc",
+      "bytes": 1742
+    },
+    "control/install_gaia_copy.py": {
+      "sha256": "dad4772f12837a7e2ba1a0795bdb59331eaa3018d1194000f97c2451e2c27c13",
+      "bytes": 3986
+    },
+    "control/install_paper_envelope.py": {
+      "sha256": "6c75fdfdd1ccd3b573587215967e1fd7675c384f5514289d6c4c3c7dfbc38516",
+      "bytes": 1606
+    },
+    "control/install_profile.py": {
+      "sha256": "f5a07ea030ac1288c756cedf85559068952ebdd1c50c3b30852ff1a7e88b5045",
+      "bytes": 10086
+    },
+    "control/install_zams_spin.py": {
+      "sha256": "3eb1319a6bd516cf7b0ae5315f954261562dc7e7355544908fab44c1fc85e126",
+      "bytes": 4645
+    },
+    "control/massive_launcher.py": {
+      "sha256": "aa027b4c0443679d2f08451e793a76c3ba1192a7a42732ad7b423d14d0cd56c0",
+      "bytes": 1649
+    },
+    "control/smoke_zams_spin.py": {
+      "sha256": "2123cfb73f9a430500d75eea87f6334a7693d2ad43c81d7decce7549b605045b",
+      "bytes": 7129
+    },
+    "control/test_gaia_adapter.py": {
+      "sha256": "feadffdd7db5bcd980891413f2c81ac78383b3b207082d4c026bb854d27f5d7c",
+      "bytes": 3859
+    },
+    "control/test_massive_policy.py": {
+      "sha256": "83bc53aaa7d4e059dc352860b1a642e9a7ff0f6cbbb96855b2e86b26cccbc402",
+      "bytes": 4099
+    },
+    "control/validate_native_profile.py": {
+      "sha256": "74cdf5d62c502233e17746a7ac7d5071c608c38d2da49f3b4e2f6f25316e68e6",
+      "bytes": 8601
+    },
+    "control/validate_profile.sbatch": {
+      "sha256": "91a4cef0f67b4c5166989d927ce069ce40a07f1097400bc66fe92eb198fedb18",
+      "bytes": 920
+    },
+    "control/zams_age.py": {
+      "sha256": "1f8626cde019bfdf942290dc1d02325d76cbf8b178e1521e01270d920f21dc9d",
+      "bytes": 10017
+    },
+    "baseline_dlogz_policy.py": {
+      "sha256": "dee0b05fb68b7db1642527e054f936ec75ddbc77ba6cd096a3a801a402ec0afc",
+      "bytes": 920
+    },
+    "cdf_paper_range_policy.py": {
+      "sha256": "c7f1e6c3d0a0b71f891cf009097fc8b0dbf8083e100e6338911f18ffeb450206",
+      "bytes": 6592
+    },
+    "cdf_grid100_launcher.py": {
+      "sha256": "8388bc336204cef3dd16bf88d3c8b7732028d6cdeb8bb8574239bd848e693382",
+      "bytes": 787
+    },
+    "reproducibility/legacy_gaia/paper_eccentricity_envelope.py": {
+      "sha256": "b9d028bca3a3c01536ea54eccd4dee00d673115b741e0ae9a3ad5dcb9f1c9001",
+      "bytes": 1052
+    }
+  },
+  "external_native_assets": {
+    "poet/lib/libdirent.so": {
+      "reason": "native dependency; install externally",
+      "sha256": "6c06e786c5186808d5bc8dc3e3252ed537042f493a457cf5a27936ac093caa51",
+      "bytes": 14992
+    },
+    "poet/lib/libevolve.so": {
+      "reason": "native dependency; install externally",
+      "sha256": "71f8112a412b118766e00d814cf5f5f19e35bf0a5cffd15ccbf2dfe25abd19a1",
+      "bytes": 3944168
+    },
+    "poet/lib/libplanet.so": {
+      "reason": "native dependency; install externally",
+      "sha256": "a98578ab757b3711e7be7ba46f9b648aa982b695cd122c92a7fd07797627068f",
+      "bytes": 3663320
+    },
+    "poet/lib/libsingleTermNonEvolvingBody.so": {
+      "reason": "native dependency; install externally",
+      "sha256": "5d51eb85ee76b8e7728a3cab58386d311caf47702dd39966195034e9f19a7133",
+      "bytes": 3664248
+    },
+    "poet/lib/libstar.so": {
+      "reason": "native dependency; install externally",
+      "sha256": "c0fcc95f42d65902fdeff7298e5d3fea3765d08089700e8280bd48498a983fb9",
+      "bytes": 3726584
+    },
+    "poet/lib/libstellarEvolution.so": {
+      "reason": "native dependency; install externally",
+      "sha256": "70e39d9a0cda7145571f0e308b6b1f78605e09eaf79ee805f9af1b0d24590e14",
+      "bytes": 3878288
+    }
+  },
+  "exclusions": "No research data, observation tables, joint chains, target lists, run records, checkpoints, results, solver caches, compiled binaries, backup files, or credentials.",
+  "source_snapshot_only": true,
+  "running_package_modified": false,
+  "code_only_publication": true,
+  "excluded_legacy_run_scripts": true,
+  "excluded_legacy_research_products": true,
+  "excluded_incomplete_legacy_tests": [
+    "source/bayesian/test_w19_e_likelihood.py"
+  ],
+  "external_dependency_sources": {
+    "general_purpose_python_modules/.gitignore": {
+      "sha256": "2f80bb5b1a46271b39920f71f2043d0ee7d1d037acc385ff7e7e574787720818",
+      "bytes": 1234
+    },
+    "general_purpose_python_modules/.pylintrc": {
+      "sha256": "56fc3f967ec5c092143185b3bb57abb26d3cd172178f0bfd8791e2d604fdd6b7",
+      "bytes": 16354
+    },
+    "general_purpose_python_modules/LICENSE": {
+      "sha256": "320ca323e2259fc03f29de23bb9c9358342b433e2ba7dbf73f5103d510912243",
+      "bytes": 1070
+    },
+    "general_purpose_python_modules/README.md": {
+      "sha256": "5b78c25ea39c496bbdf304601832f5b8343754ba0b5e3b4e5be6372f338d11a4",
+      "bytes": 102
+    },
+    "general_purpose_python_modules/__init__.py": {
+      "sha256": "1f7872a4133da1cd5a1951c2fc59cfd3b4101c394e768b80be569be820132c81",
+      "bytes": 374
+    },
+    "general_purpose_python_modules/approximate_1d_function.py": {
+      "sha256": "a8dbe3c047162a614a8ba35bc5848e9cb8b6d170701a2fa1fa758bd537a75885",
+      "bytes": 6843
+    },
+    "general_purpose_python_modules/binary_utils.py": {
+      "sha256": "a87f828a5d46832f1bfdfef42f7ad0acbd11b1a1ef17f1b93a5f0a6efb2632cd",
+      "bytes": 3374
+    },
+    "general_purpose_python_modules/bounded_powerlaw_distribution.py": {
+      "sha256": "f2a6fbc829f408434293b8df69c3f823a41a02e29bdddd131df9d860fa4d2d2f",
+      "bytes": 3828
+    },
+    "general_purpose_python_modules/cmd_utils/__init__.py": {
+      "sha256": "2021920c30dc4e44528cbe8fb8e880fc696b1434a5d5e28ed375e06cde9e562f",
+      "bytes": 298
+    },
+    "general_purpose_python_modules/cmd_utils/a.py": {
+      "sha256": "f95eb0c6cf085028f4c0d2b805b740edae5d4f9e5ce56f8a13cdf544e56389b8",
+      "bytes": 858
+    },
+    "general_purpose_python_modules/cmd_utils/backup.py": {
+      "sha256": "cd2350e0d009f02d0ff29ea7e8812c39f11b31f814f7a8e471ce29c5f60875e1",
+      "bytes": 12833
+    },
+    "general_purpose_python_modules/cmd_utils/claret_interpolator.py": {
+      "sha256": "d657e521b9fd8c778b5d70f0b138a4015524a65498da9c93c31fc2fd318032da",
+      "bytes": 4239
+    },
+    "general_purpose_python_modules/cmd_utils/cmd_isochrone_interpolator.py": {
+      "sha256": "6717d5188c3d1dd2665efa5cdd5395f4cb929d97a35ed2ee532b9252a74919d3",
+      "bytes": 12996
+    },
+    "general_purpose_python_modules/cmd_utils/cmd_photometry_interpolator.py": {
+      "sha256": "145bf9619b03e56dfaad49389f67e1c3e5fc8e40605df427923209a7efd109cb",
+      "bytes": 3701
+    },
+    "general_purpose_python_modules/cmd_utils/cmd_query.py": {
+      "sha256": "8d558f9cc0eaf32e0bde24b4924bb9e421b20b6a9ec803a3c94d2424567723b0",
+      "bytes": 5351
+    },
+    "general_purpose_python_modules/cmd_utils/cmd_usno_photometry_interpolator.py": {
+      "sha256": "b66732f0d96054cc156bc605f9cf29a35e942daf426f37270105f2f4dfc1eed5",
+      "bytes": 1567
+    },
+    "general_purpose_python_modules/cmd_utils/modified_cmd_isochrone_interpolator.py": {
+      "sha256": "76f7c051e463a7044bb9acd98bb6fae048054ec4f2485f3acbd0c73293fd12d7",
+      "bytes": 12983
+    },
+    "general_purpose_python_modules/combined_mcmc_constraint.py": {
+      "sha256": "e461306952c0bd5ab0a7436c3f57fd8040a9017226012df07b01ddf2a9e660e6",
+      "bytes": 6065
+    },
+    "general_purpose_python_modules/discrete_markov.py": {
+      "sha256": "68ce0bcedbff6376b72d1bb2fe39684c14b2183f07d65cd6b9cdae9fcd078426",
+      "bytes": 9164
+    },
+    "general_purpose_python_modules/eccentricity_kde_distro_gen.py": {
+      "sha256": "ee54434060326298b46917cea75d766daba91fbe623118b5424356912dd28a14",
+      "bytes": 14691
+    },
+    "general_purpose_python_modules/emcee_autocorrelation.py": {
+      "sha256": "567128c0153109ea87e701695805a4e76327dd8d8c2de51893469b7e296df2b0",
+      "bytes": 4196
+    },
+    "general_purpose_python_modules/emcee_quantile_convergence.py": {
+      "sha256": "d51996f4d1606926b658835eb9c3fab6e73a429cb5e4aa0de55c0468d9266f00",
+      "bytes": 13717
+    },
+    "general_purpose_python_modules/emcee_util.py": {
+      "sha256": "6ac7125f31c363ede7cc20b1d1741cede45b316ade7ec5d1e7a8d61798eedaab",
+      "bytes": 5015
+    },
+    "general_purpose_python_modules/grid_tracks_interpolate.py": {
+      "sha256": "235d0cf2d6d7c39f927cd13951447b898f50ad2df0018976a0c246d902a033ae",
+      "bytes": 4175
+    },
+    "general_purpose_python_modules/kde.py": {
+      "sha256": "b35bd8baf74df248622bdc6f624a958d55bf473de56487c3c581232138a0479b",
+      "bytes": 3663
+    },
+    "general_purpose_python_modules/kelly_colors.py": {
+      "sha256": "b33b554a2a130eadf6d314f2df6a4e1c933625a9fb51a7bc1df67910f1432af2",
+      "bytes": 654
+    },
+    "general_purpose_python_modules/kepler_angles.py": {
+      "sha256": "92c5c6298708d121add3d54dd65e265882dfad9c5f9fba5de4279bbb89af4b85",
+      "bytes": 10389
+    },
+    "general_purpose_python_modules/latex.py": {
+      "sha256": "99e8cb2fcd865e4209ff3dcfdb661ea4e3fdc472d63a6fc0b4742e240f89169f",
+      "bytes": 1804
+    },
+    "general_purpose_python_modules/magnitude_transformations.py": {
+      "sha256": "d08f4db1548ceee9783bd0a398c5cfa6db88c482a9f19649bc1ab3e216c30410",
+      "bytes": 2786
+    },
+    "general_purpose_python_modules/manual_exoplanet_data.py": {
+      "sha256": "ff3a950796443ac30dada7e3459474bfe17934a43afc735d279c651bb7190e45",
+      "bytes": 11242
+    },
+    "general_purpose_python_modules/mcmc_quantile_convergence.py": {
+      "sha256": "8b5b4323d42a518b00f54107dc19c2d20ab3c8c6156126c8bdaa2ee8dd05dbda",
+      "bytes": 10787
+    },
+    "general_purpose_python_modules/multi_pickle.py": {
+      "sha256": "4f7da8ec8645ea6154e3319b2a6b92457aff3cc154627c80d8d0d3158e7ca61e",
+      "bytes": 8599
+    },
+    "general_purpose_python_modules/multiprocessing_util.py": {
+      "sha256": "f79a550c86e39d08fcea4baf66bd623ccd312afe482104b02df8fe95236256de",
+      "bytes": 8058
+    },
+    "general_purpose_python_modules/period_solver_wrapper.py": {
+      "sha256": "1a47330f02f592c98a8bf116b215a94a17557821764b903bc1a56e7dfee58354",
+      "bytes": 29008
+    },
+    "general_purpose_python_modules/planetary_system_io.py": {
+      "sha256": "114863c3bebeccd48fdc758d93097cc12b6d75b281453b88b2a8c3885be53e4d",
+      "bytes": 27684
+    },
+    "general_purpose_python_modules/plot_unexpected_circularization.py": {
+      "sha256": "0af7b0cff18fb85dc900aabab482d7b35f894a561a1d41f079ad7d7d8139a304",
+      "bytes": 709
+    },
+    "general_purpose_python_modules/reproduce_system.py": {
+      "sha256": "759322e6737807923db3a988eaf040dbae000fd24ad1f38921fae6cf947568fb",
+      "bytes": 60743
+    },
+    "general_purpose_python_modules/rice_distribution_utils.py": {
+      "sha256": "d27fd56417f9f19a1ef1414266ba52d7981eb6c69f5f346ce39abcb2d681bceb",
+      "bytes": 3687
+    },
+    "general_purpose_python_modules/solve_for_initial_values.py": {
+      "sha256": "e61d67c51edd33d9957fc39d845b5787f3d05c656ffd35d68f6f7435b20d99ca",
+      "bytes": 41194
+    },
+    "general_purpose_python_modules/spin_calculation.py": {
+      "sha256": "c61d99bad293fb6b5c593c9e2be88822d2254e67f7c81e651e45d67c7a669b55",
+      "bytes": 10137
+    },
+    "general_purpose_python_modules/split_normal_distribution.py": {
+      "sha256": "15e346f4c3faae8985d26e0cf051dc275f013abba83224ea0dc0cbb179523d30",
+      "bytes": 6272
+    },
+    "general_purpose_python_modules/unit_tests/test_discrete_markov.py": {
+      "sha256": "6458bb215220716ba7f648a7235521b959b758fb48257ed394685b760c59498b",
+      "bytes": 13497
+    },
+    "general_purpose_python_modules/unit_tests/test_quantile_convergence.py": {
+      "sha256": "5c667d6ee4cae391601db28d6bdf7663c9d317f52521817eab53aea548af3a21",
+      "bytes": 1086
+    },
+    "general_purpose_python_modules/visuals.py": {
+      "sha256": "cbd26e778a416b60322af8ded4c3fc04293e24ad290e7c93038217827cdee2d8",
+      "bytes": 1141
+    },
+    "poet/PythonPackage/.gitignore": {
+      "sha256": "ef8a1af1847c80dc4ac41ea50ada2a9a0b41db1a599d6339dfd42c978c08fe58",
+      "bytes": 12
+    },
+    "poet/PythonPackage/LICENSE": {
+      "sha256": "650d952eacd9fbdb50d029786985977cf416b8bee716bf02d8e3b89322b24724",
+      "bytes": 1070
+    },
+    "poet/PythonPackage/POET/__init__.py": {
+      "sha256": "6d6f70a04a27e0aefd092944869c7162b6b8bd94f36517c70f6ced547fb7ad33",
+      "bytes": 55
+    },
+    "poet/PythonPackage/POET/solver.py": {
+      "sha256": "f732b9318417611f884b05b61c45e7d0a9f44993ff07db960c5893097d73eac4",
+      "bytes": 635
+    },
+    "poet/PythonPackage/README.md": {
+      "sha256": "9d69cc075bb7197880e83f270da1bd856e9d4cb27e14d103d587b70b43548b8a",
+      "bytes": 224
+    },
+    "poet/PythonPackage/basic_utils.py": {
+      "sha256": "29ddb85bb5be1c40acbfa913b90b9ddda01eac3deb5176daa49403e0f8030a80",
+      "bytes": 4393
+    },
+    "poet/PythonPackage/evolution_cmdline_args.py": {
+      "sha256": "200e61051278f8ba33b8e7e19d2f9c5426be37fa1999e95a4c76e71a446fe026",
+      "bytes": 4827
+    },
+    "poet/PythonPackage/orbital_evolution/__init__.py": {
+      "sha256": "5f0a57bdc62720a15161f1770025f2f3ed6cc4382f0f8cca71e85556247033f0",
+      "bytes": 646
+    },
+    "poet/PythonPackage/orbital_evolution/binary.py": {
+      "sha256": "f39720cd2fa4ec8466ebb843232d875a8f59cdf4d1c6c9f133345c94a51baff0",
+      "bytes": 25208
+    },
+    "poet/PythonPackage/orbital_evolution/c_interface_util.py": {
+      "sha256": "59ec7bfddb110063108a140397abc493d4331bac956b163795ddc8e4fee60dab",
+      "bytes": 820
+    },
+    "poet/PythonPackage/orbital_evolution/calculate_evolution_template.cpp": {
+      "sha256": "98ab8dfeaeb77117b632f9e0ec62679e1a93801111ca99262422bf8ca99b23d4",
+      "bytes": 14101
+    },
+    "poet/PythonPackage/orbital_evolution/command_line_util.py": {
+      "sha256": "d3a30800e2ced97fd6f25ea577e1fda7d25e21c0ed656777f2a0044cf191122b",
+      "bytes": 26193
+    },
+    "poet/PythonPackage/orbital_evolution/dissipating_body.py": {
+      "sha256": "479dba97da7a095e37540616d674eff49cbdd59a4d85cbca070eda0f60431dfc",
+      "bytes": 3550
+    },
+    "poet/PythonPackage/orbital_evolution/evolve_interface.py": {
+      "sha256": "0463893bfa12299b983f27b514269829ba89e1c35b427b0dcdcb26dc390b9749",
+      "bytes": 23046
+    },
+    "poet/PythonPackage/orbital_evolution/initial_condition_solver.py": {
+      "sha256": "8c0bdcffc002aa921fa96b1563816ef2d51a568c1d1dcecc774b12106261a059",
+      "bytes": 23484
+    },
+    "poet/PythonPackage/orbital_evolution/learning_ic_solver.py": {
+      "sha256": "9f8a30cb7c1a048181a783f12820bf661469f00f88ab51bf1aa064fcbd98884f",
+      "bytes": 11053
+    },
+    "poet/PythonPackage/orbital_evolution/planet_interface.py": {
+      "sha256": "7c3399525ab448386f4015ffb1c0d084a2a062a61575b14962bd84736fd63245",
+      "bytes": 5596
+    },
+    "poet/PythonPackage/orbital_evolution/single_term_interface.py": {
+      "sha256": "893fc33574689db1f3a8c58d8c4833ad3f097bcc01411a7b7f5e3326b5b63e89",
+      "bytes": 3637
+    },
+    "poet/PythonPackage/orbital_evolution/star_interface.py": {
+      "sha256": "a773b37421f958fa77762ace7ca8a4ac3744e790ebef01a5292347f20e1f8e17",
+      "bytes": 25397
+    },
+    "poet/PythonPackage/orbital_evolution/transformations.py": {
+      "sha256": "ee24cb270b21cba8018c5f42de0f714ece4b274fec424baffc668666a77b5959",
+      "bytes": 605
+    },
+    "poet/PythonPackage/requirements.txt": {
+      "sha256": "cd6250ac455d4f6ad4bb512f039fea424f0013d0c72ffb91ecec45780824622e",
+      "bytes": 70
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/MISTv2_docker/compile/Dockerfile": {
+      "sha256": "8bfc0f96a6e9a4be92533f00433616c94e0c16640242016393b85e0d2a7f4df7",
+      "bytes": 164
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/MISTv2_docker/download/Dockerfile": {
+      "sha256": "4a4467815eb022ffc7fc80bda821458a854719b36adc09f73ac348d47f34bd63",
+      "bytes": 297
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/MISTv2_replacables.txt": {
+      "sha256": "7ef0d1ce4789e1b5ea7cc9baf6272549f5c4efdecc8ea60a13442767ee31be30",
+      "bytes": 223
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/build_model.py": {
+      "sha256": "4b84d036d070cba598105a0a8ba8402874dc5455a6bb416f79fad29cb7de0a73",
+      "bytes": 15537
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/feh_vs_zbase.txt": {
+      "sha256": "f026039b5385b5d0d8d884656009762fcf5ec6a6c971666193fc5e7a8abe09c7",
+      "bytes": 247
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir/clean": {
+      "sha256": "68ffd36a53a4579839917073255724d5a4d9f697d1e8e79e1057665b4c05355e",
+      "bytes": 87
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir/history_columns.list": {
+      "sha256": "26266fa32ff39b7b13f01b94b5bf1979b6f3aae8595712061adcc5005d90a202",
+      "bytes": 4227
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir/inlist": {
+      "sha256": "652e304b1f4be71cb8ffcea006df63032089cfb5bf9c0b2dcf937f6fb9b0150b",
+      "bytes": 5806
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir/make/makefile": {
+      "sha256": "98d1e437c678321b781a91d83d53ac8f5d08df6a206fc19bdf73858ecc87de1e",
+      "bytes": 61
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir/mk": {
+      "sha256": "862ae5b08d094d65901cfcf8742fd99b9e4c12f07ff5096b28361d0cb94793b7",
+      "bytes": 185
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir/profile_columns.list": {
+      "sha256": "b3b01b23503a5fb7a868e826a1b07d103c8851eef9a4c4382136a6087ad67671",
+      "bytes": 26640
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir/re": {
+      "sha256": "dfa41f2a12c2319a0ac05ce994490d0ccbe794b3c9d987e58cd8931c1b3052ae",
+      "bytes": 309
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir/rn": {
+      "sha256": "922f687f9a2f5d684c8032b9919b156117fd6dc21da6688056f1573949575579",
+      "bytes": 246
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir/src/run.f": {
+      "sha256": "d8b483c547cc56c5017fc60c10341c02e4ffa9b4942dc88175fb5968d2a2fe45",
+      "bytes": 408
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir/src/run_star_extras.f": {
+      "sha256": "e83646f8680804090fda3b265e68f8adf281db5e8852d5ee51d61c3c1017a1ab",
+      "bytes": 26548
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir_template/.gitignore": {
+      "sha256": "685b39f996eaa6f3918c4245da42279cec0d5500a44ceafffa930ee91007e74a",
+      "bytes": 5
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir_template/README.rst": {
+      "sha256": "ef804c26cb0a474422827512a38cf153b9bb46ccfb292a78f96404eb9aef4d43",
+      "bytes": 116
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir_template/clean": {
+      "sha256": "68ffd36a53a4579839917073255724d5a4d9f697d1e8e79e1057665b4c05355e",
+      "bytes": 87
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir_template/history_columns.list": {
+      "sha256": "26266fa32ff39b7b13f01b94b5bf1979b6f3aae8595712061adcc5005d90a202",
+      "bytes": 4227
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir_template/inlist_template": {
+      "sha256": "b2d47371ca5296f3e4356a4b0ce922b69cde094f4a3230c2d741c3db12a46695",
+      "bytes": 5974
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir_template/make/makefile": {
+      "sha256": "98d1e437c678321b781a91d83d53ac8f5d08df6a206fc19bdf73858ecc87de1e",
+      "bytes": 61
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir_template/mk": {
+      "sha256": "862ae5b08d094d65901cfcf8742fd99b9e4c12f07ff5096b28361d0cb94793b7",
+      "bytes": 185
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir_template/profile_columns.list": {
+      "sha256": "b3b01b23503a5fb7a868e826a1b07d103c8851eef9a4c4382136a6087ad67671",
+      "bytes": 26640
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir_template/re": {
+      "sha256": "dfa41f2a12c2319a0ac05ce994490d0ccbe794b3c9d987e58cd8931c1b3052ae",
+      "bytes": 309
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir_template/rn_template": {
+      "sha256": "3d742ac0a9f685cec3d22a70c65de5bb5581a0530f27180fcff2170044cebcec",
+      "bytes": 260
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir_template/src/run.f": {
+      "sha256": "d8b483c547cc56c5017fc60c10341c02e4ffa9b4942dc88175fb5968d2a2fe45",
+      "bytes": 408
+    },
+    "poet/PythonPackage/stellar_evolution/MIST_realtime/mesa_workdir_template/src/run_star_extras.f": {
+      "sha256": "e83646f8680804090fda3b265e68f8adf281db5e8852d5ee51d61c3c1017a1ab",
+      "bytes": 26548
+    },
+    "poet/PythonPackage/stellar_evolution/__init__.py": {
+      "sha256": "f522ad8e9252a7e55560bd9895b659ed878a4a2b6ad8bac179e4f4d8e88e64f6",
+      "bytes": 489
+    },
+    "poet/PythonPackage/stellar_evolution/basic_utils.py": {
+      "sha256": "1f561e192f2d1ebce017bc73d9be7909fc4ff7b96cbff5a4b8ea24c02b5594ae",
+      "bytes": 737
+    },
+    "poet/PythonPackage/stellar_evolution/change_variables.py": {
+      "sha256": "c977d7ef014ee145a235f9bbc5dd3b118854ee716824dfa0011bc2a02c01d2d2",
+      "bytes": 20122
+    },
+    "poet/PythonPackage/stellar_evolution/derived_stellar_quantities.py": {
+      "sha256": "8fecc35a5c399926e5bc15ba17cd7bfc1a6d492a7da34aaf7cac88ccccb75809",
+      "bytes": 4090
+    },
+    "poet/PythonPackage/stellar_evolution/library_interface.py": {
+      "sha256": "5645dece2923bc3640d8441cea8eae568f311ff1885a0062f57c285e9a0b8351",
+      "bytes": 17081
+    },
+    "poet/PythonPackage/stellar_evolution/managed_interpolator.py": {
+      "sha256": "d8c39abbfc3f9182c359fc89a255b85ef97fdd5c8d5b80211ce040be0c38d5f1",
+      "bytes": 16524
+    },
+    "poet/PythonPackage/stellar_evolution/manager.py": {
+      "sha256": "0c5008f1cf71bdd27250397d14eb1be68647c80e68af4ababc51350a4c8fb3db",
+      "bytes": 25371
+    },
+    "poet/PythonPackage/stellar_evolution/manager_data_model.py": {
+      "sha256": "3996c94ee99cf40e0d9535e626d85785f68e9e6ea667be9dd0694e6941b60deb",
+      "bytes": 11019
+    },
+    "poet/LICENSE": {
+      "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+      "bytes": 16725
+    }
+  },
+  "external_dependency_note": "POET and general_purpose_python_modules are external dependencies, not bundled package source. These hashes identify the dependency source used in the deployed snapshot; install compatible external copies separately."
+}

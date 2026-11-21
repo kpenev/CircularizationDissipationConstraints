@@ -599,32 +599,6 @@ def plot_single_lgQ_vs_e(system,
     pyplot.plot([low_e_lgQ], [low_eccentricity], 'or')
     pyplot.plot([envelope_e_lgQ], [envelope_eccentricity], 'ob')
 
-    rplanet = getattr(system, 'db_planet_radius', numpy.nan)
-    if numpy.isfinite(rplanet):
-        rplanet = rplanet.to_value('R_jup')
-
-    mplanet = getattr(system, 'db_planet_mass', numpy.nan)
-    if numpy.isfinite(mplanet):
-        mplanet = mplanet.to_value('M_jup')
-
-    pyplot.title(
-        str(system.hostname)
-        +
-        r'($R_p=%g R_j$, $M_p=%g M_j$, $P_{orb}=%g\,d$)'
-        %
-        (
-            rplanet,
-            mplanet,
-            system.orbital_period.to_value('day')
-        )
-    )
-    pyplot.xlabel(get_axis_label('lgQ', '', True))
-    pyplot.ylabel(get_axis_label('eccentricity', '', True))
-    if plot_fname is None:
-        pyplot.show()
-    elif save_plot:
-        pyplot.savefig(plot_fname)
-        pyplot.cla()
 #pylint: enable=invalid-name
 
 #No reasonable way to simplify
@@ -723,7 +697,11 @@ def get_system_list(cmdline_args, interpolator=None):
 
 #Simplifies command line arguments.
 #pylint: disable=invalid-name
-def plot_lgQ_vs_e(progress, cmdline_args, plot_fname=None, **_):
+def plot_lgQ_vs_e(progress,
+                  second_progress,
+                  cmdline_args,
+                  plot_fname=None,
+                  **kwargs):
     """Show sequentially plots of lgQ vs e for all systems."""
 
     systems = get_system_list(cmdline_args)
@@ -740,6 +718,45 @@ def plot_lgQ_vs_e(progress, cmdline_args, plot_fname=None, **_):
                 eccentricity_envelope,
                 plot_fname
             )
+            if (
+                second_progress is not None
+                and
+                plot_sys.hostname in second_progress
+            ):
+                plot_single_lgQ_vs_e(
+                    plot_sys,
+                    second_progress,
+                    eccentricity_envelope,
+                    plot_fname
+                )
+
+            rplanet = getattr(plot_sys, 'db_planet_radius', numpy.nan)
+            if numpy.isfinite(rplanet):
+                rplanet = rplanet.to_value('R_jup')
+
+            mplanet = getattr(plot_sys, 'db_planet_mass', numpy.nan)
+            if numpy.isfinite(mplanet):
+                mplanet = mplanet.to_value('M_jup')
+
+            pyplot.title(
+                str(plot_sys.hostname)
+                +
+                r'($R_p=%g R_j$, $M_p=%g M_j$, $P_{orb}=%g\,d$)'
+                %
+                (
+                    rplanet,
+                    mplanet,
+                    plot_sys.orbital_period.to_value('day')
+                )
+            )
+            pyplot.xlabel(get_axis_label('lgQ', '', True))
+            pyplot.ylabel(get_axis_label('eccentricity', '', True))
+            if plot_fname is None:
+                pyplot.show()
+            elif save_plot:
+                pyplot.savefig(plot_fname)
+                pyplot.cla()
+
 
 #TODO: look into simplyfying
 #pylint: disable=too-many-locals
@@ -1503,6 +1520,8 @@ def main():
 
     if getattr(cmdline_args, 'second_progress_pickle', None):
         second_progress = load_progress(cmdline_args.second_progress_pickle)[1]
+    else:
+        second_progress = None
 
     if pickled_cmdline_args is not None:
         interpolator = StellarEvolutionManager(
@@ -1546,7 +1565,7 @@ def main():
                              interpolator=interpolator,
                              plot_fname=plot_fname,
                              label=get_dataset_label(plot_cmdline_args))
-            if plot_type == 'lgQ_change_vs':
+            if plot_type in ['lgQ_change_vs', 'lgQ_vs_e'] :
                 arguments['second_progress'] = second_progress
 
             globals()['plot_' + plot_type](

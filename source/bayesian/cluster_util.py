@@ -8,12 +8,13 @@ import numpy
 from astropy import units
 
 from bayesian.approximate_rv_likelihood import ApproximateRVLikelihood
-from binary_utils import rv_semi_amplitude_scale
+from general_purpose_python_modules.binary_utils import rv_semi_amplitude_scale
 from sample_sb1_masses import SampleSB1Masses
 
 _logger = logging.getLogger(__name__)
 
-def get_rv_likelihood(observed_orbit,
+def get_rv_likelihood(*,
+                      observed_orbit,
                       eccentricity_envelope,
                       num_parallel_processes,
                       interpolation_accuracy=1e-4,
