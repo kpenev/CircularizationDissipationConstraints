@@ -3,6 +3,7 @@
 """Create plots of emcee sampling results."""
 
 import logging
+from os import path
 
 import matplotlib
 from matplotlib import pyplot
@@ -11,16 +12,22 @@ from configargparse import\
     DefaultsFormatter,\
     Action as ArgparseAction
 import numpy
+from numpy.lib import recfunctions
 import emcee
 import h5py
 import pandas
 from scipy import stats
 from asteval import Interpreter
 from astropy.table import Table
+from astropy import constants
 
-from combined_mcmc_constraint import CombinedMCMCConstraint
+from orbital_evolution.transformations import lgQ
 
-from visuals import make_corner_plot
+from general_purpose_python_modules.combined_mcmc_constraint import \
+    CombinedMCMCConstraint
+from general_purpose_python_modules.visuals import make_corner_plot
+
+import traceback
 
 #Interface specified by argparse module.
 #pylint: disable=too-few-public-methods
@@ -30,15 +37,30 @@ class ParseGrid(ArgparseAction):
     def __call__(self, parser, namespace, values, option_string=None):
         """Parse a grid option to a numpy.arary()."""
 
+        if len(values) == 3:
+            expander = numpy.linspace
+        else:
+            assert len(values) == 4
+            expander = getattr(numpy, values[3])
         setattr(namespace,
                 self.dest,
-                numpy.linspace(float(values[0]),
-                               float(values[1]),
-                               int(values[2])))
+                expander(float(values[0]),
+                         float(values[1]),
+                         int(values[2])))
 #pylint: enable=too-few-public-methods
 
-def add_frequency_dependence_plot_config(parser):
+def add_frequency_dependence_plot_config(parser, disable=()):
     """Add command line arguments configuring the frequence dependence plots."""
+
+    for entry in disable:
+        assert entry in ['hatch',
+                         'bounds',
+                         'lgQ_grid',
+                         'ptide_grid',
+                         'heat_map',
+                         'kernel',
+                         'confidence',
+                         'lines']
 
     parser.add_argument(
         '--chain-condition',
@@ -54,75 +76,84 @@ def add_frequency_dependence_plot_config(parser):
         'exactly in the order specified. By default, plots the first chain in '
         'the input file.'
     )
-    parser.add_argument(
-        '--frequency-dependence-hatch',
-        default=False,
-        help='If specified frequency dependent plots use hatching as well as '
-        'color to distinguish between constraints from different systems.'
-    )
-    parser.add_argument(
-        '--frequency-dependence-bounds',
-        default=False,
-        action='store_true',
-        help='If specified frequency dependent plots draw lines to indicate the'
-        ' bounds of the specified confidence intervals.'
-    )
-    parser.add_argument(
-        '--combined-constraint-lgQ-grid',
-        default=numpy.linspace(4, 12, 100),
-        action=ParseGrid,
-        nargs=3,
-        metavar=('MIN_LGQ', 'MAX_LGQ', 'RES'),
-        help='Set the range and resolution in log10(Q) on which to calculate '
-        'cobined constraints.'
-    )
-    parser.add_argument(
-        '--combined-constraint-heat-map',
-        default=None,
-        choices=('log', 'lin'),
-        help='Plot a heat map of the combined (log-)likelihood in the frequnecy'
-        ' dependence plot. If enabled, the confidence interval is shown using '
-        'lines only (not filled).'
-    )
-    parser.add_argument(
-        '--heat-map-contrast',
-        default=1e-3,
-        type=float,
-        help='The smallest value to plot on the heat map is this factor times '
-        'the maximum value.'
-    )
-
-    parser.add_argument(
-        '--combined-constraint-kernel-width',
-        default=0.2,
-        type=float,
-        help='The width of the kernel that gets convolved with the samples for '
-        'calculating combined constraints.'
-    )
-    parser.add_argument(
-        '--plot-confidence',
-        type=float,
-        nargs='*',
-        default=[stats.norm.cdf(2.0) - stats.norm.cdf(-2.0)],
-        help='Specify the confidence to display in the dissipation vs tidal '
-        'frequency plot (see --frequency-dependence-plot-fname argument).'
-    )
-    parser.add_argument(
-        '--ptide-grid',
-        nargs=3,
-        default=numpy.logspace(0.0, numpy.log10(50.0), 100),
-        action=ParseGrid,
-        metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES'),
-        help='Set the range and resolution of the tidal period to include in '
-        'the frequency dependence plot (see --frequency-dependence-plot-fname '
-        'argument).'
-    )
-    parser.add_argument(
-        '--frequency-dependence-plot-no-lines',
-        action='store_true',
-        help='If passed, the frequency dependence plot will not include '
-        'individual lines.'
-    )
+    if 'hatch' not in disable:
+        parser.add_argument(
+            '--frequency-dependence-hatch',
+            default=False,
+            help='If specified frequency dependent plots use hatching as well '
+            'as color to distinguish between constraints from different '
+            'systems.'
+        )
+    if 'bounds' not in disable:
+        parser.add_argument(
+            '--frequency-dependence-bounds',
+            default=False,
+            action='store_true',
+            help='If specified frequency dependent plots draw lines to indicate'
+            ' the bounds of the specified confidence intervals.'
+        )
+    if 'lgQ_grid' not in disable:
+        parser.add_argument(
+            '--lgQ-grid',
+            default=numpy.linspace(4, 12, 100),
+            action=ParseGrid,
+            nargs=3,
+            metavar=('MIN_LGQ', 'MAX_LGQ', 'RES'),
+            help='Set the range and resolution in log10(Q) on which to '
+            'calculate cobined constraints.'
+        )
+    if 'heat_map' not in disable:
+        parser.add_argument(
+            '--combined-constraint-heat-map',
+            default='log',
+            choices=('log', 'lin'),
+            help='Plot a heat map of the combined (log-)likelihood in the '
+            'frequnecy dependence plot. If enabled, the confidence interval is '
+            'shown using lines only (not filled).'
+        )
+        parser.add_argument(
+            '--heat-map-contrast',
+            default=1e-3,
+            type=float,
+            help='The smallest value to plot on the heat map is this factor '
+            'times the maximum value.'
+        )
+    if 'kernel' not in disable:
+        parser.add_argument(
+            '--kernel-width',
+            default=0.2,
+            type=float,
+            help='The width of the kernel that gets convolved with the samples '
+            'for calculating combined constraints. If not specified, a combined'
+            ' cosntraint is not generated.'
+        )
+    if 'confidence' not in disable:
+        parser.add_argument(
+            '--plot-confidence',
+            type=float,
+            nargs='*',
+            default=[stats.norm.cdf(2.0) - stats.norm.cdf(-2.0)],
+            help='Specify the confidence to display in the dissipation vs tidal'
+            ' frequency plot (see --frequency-dependence-plot-fname argument).'
+        )
+    if 'ptide_grid' not in disable:
+        parser.add_argument(
+            '--ptide-grid',
+            nargs=4,
+            default=numpy.logspace(0.0, numpy.log10(50.0), 100),
+            action=ParseGrid,
+            metavar=('MIN_PERIOD', 'MAX_PERIOD', 'RES', 'GRID_TYPE'),
+            help='Set the range and resolution of the tidal period to include '
+            'in the frequency dependence plot (see '
+            '--frequency-dependence-plot-fname argument).'
+        )
+    if 'lines' not in disable:
+        parser.add_argument(
+            '--frequency-dependence-plot-no-lines',
+            action='store_true',
+            help='If passed, the frequency dependence plot will not include '
+            'individual lines.'
+        )
 
 def parse_command_line():
     """Parse the command line for what and how to plot."""
@@ -144,7 +175,7 @@ def parse_command_line():
     parser.add_argument(
         '--corner-plot-fname', '--corner-plot', '--corner',
         default=None,
-        help='If specified, a coner plot is created and saved with the given '
+        help='If specified, a corner plot is created and saved with the given '
         'filename.'
     )
     parser.add_argument(
@@ -177,7 +208,7 @@ def parse_command_line():
         '--corner-plot-params',
         default=None,
         nargs='+',
-        help='If specified, only the listed parameters are included the corner '
+        help='If specified, only the listed parameters are included in the corner '
         'plot.'
     )
     parser.add_argument(
@@ -205,22 +236,26 @@ def parse_command_line():
 def get_chain_name(samples_fname, chain_conditions):
     """Return the name of the chain satisfying the given conditions."""
 
+    system_name = None
     with h5py.File(samples_fname, 'r') as chain_file:
         chain_name = None
         for try_chain_name in chain_file.keys():
             match = True
-            for attr_name, expected_value in chain_conditions:
-                match = (
-                    match
-                    and
-                    (
-                        chain_file[try_chain_name].attrs[attr_name]
-                        ==
-                        numpy.array(float(expected_value))
-                    ).all()
-                    and
-                    chain_file[try_chain_name].attrs['iteration'] > 0
-                )
+            if len(chain_conditions) == 0:
+                match = chain_file[try_chain_name].attrs['iteration'] > 0
+            else:
+                for attr_name, expected_value in chain_conditions:
+                    match = (
+                        match
+                        and
+                        (
+                            chain_file[try_chain_name].attrs[attr_name]
+                            ==
+                            numpy.array(float(expected_value))
+                        ).all()
+                        and
+                        chain_file[try_chain_name].attrs['iteration'] > 0
+                    )
             if match:
                 if chain_name is not None:
                     raise RuntimeError(
@@ -235,9 +270,20 @@ def get_chain_name(samples_fname, chain_conditions):
                         )
                     )
                 chain_name = try_chain_name
-                system_name = chain_file[chain_name].attrs['system']
+                if 'system' in chain_file[chain_name].attrs:
+                    system_name = chain_file[chain_name].attrs['system']
         if chain_name is None:
             return None, None
+        if system_name is None:
+            fname, ext = path.splitext(path.basename(samples_fname))
+            assert ext in ['.h5', '.hdf5']
+            if fname.startswith('system'):
+                _, system_name = fname.split('_')
+                system_name = int(system_name)
+            else:
+                system_name, fname_end = fname.split('_', 1)
+                assert system_name.endswith(' b')
+                assert fname_end == 'mcmc_progress'
         return chain_name, system_name
 
 
@@ -245,6 +291,8 @@ def get_backend(samples_fname, chain_conditions):
     """Return the chain to plot."""
 
     chain_name, system_name = get_chain_name(samples_fname, chain_conditions)
+    print('{system:s} chain name: {chain:s}'.format(system=str(system_name),
+                                                  chain=str(chain_name)))
     backend = emcee.backends.HDFBackend(samples_fname,
                                         name=chain_name,
                                         read_only=True)
@@ -311,6 +359,8 @@ def save_corner_plot(samples, log_probability, config):
 
     samples = samples.flatten()
     log_probability = log_probability.flatten()
+    print('config.corner_plot_params: ' + repr(config.corner_plot_params))
+    print('samples.dtype.names: ' + repr(samples.dtype.names))
     include_params = config.corner_plot_params or [
         param
         for param in samples.dtype.names
@@ -419,7 +469,7 @@ class FrequencyDependencePlotter:
             1.0 / (len(config.plot_confidence)
                    *
                    num_chains)
-            if config.plot_confidence else None
+            if getattr(config, 'plot_confidence', None) else None
         )
         self._constraint_index = 0
         self._hatch_list = ['\\\\',
@@ -442,9 +492,10 @@ class FrequencyDependencePlotter:
                             'tab:gray',
                             'tab:olive',
                             'tab:cyan']
-        self.combined_pdf = CombinedMCMCConstraint(
-            config.combined_constraint_lgQ_grid,
-            config.combined_constraint_kernel_width
+        self.combined_pdf = (
+            None if config.kernel_width is None
+            else CombinedMCMCConstraint(config.lgQ_grid,
+                                        config.kernel_width)
         )
 
 
@@ -452,20 +503,48 @@ class FrequencyDependencePlotter:
                   samples,
                   label,
                   prior_range=(-numpy.inf, numpy.inf),
-                  period_range=(-numpy.inf, numpy.inf)):
-        """Overplot another chain of samples."""
+                  period_range=None):
+        """
+        Overplot another chain of samples and update combined constraint.
+
+        Args:
+            samples(array):    The samples of tidal dissipation parameters to
+                add.
+
+            label(str):    How to label the area per the new samples added to
+                the plot.
+
+            prior_range(2-tuple):    Upper and lower limit on the evaluated
+                lg(Q) values beyond which the PDF distribution is replaced by
+                the value at those boundaries.
+
+            period_range(None or 2x2 iterable):    If not None, specifies a
+                range of periods for which the distribution above and below the
+                50-th percentile is considered valid. The invalid part of the
+                bistribution is not folded into the combined constraint.
+        """
 
         evaluated_lgq = evaluate_lgq(samples, self.config.ptide_grid)
 
         assert numpy.isfinite(evaluated_lgq).all()
-        self.combined_pdf.add_samples(
-            evaluated_lgq,
-            prior_range,
-            numpy.logical_and(
-                self.config.ptide_grid >= period_range[0],
-                self.config.ptide_grid <= period_range[1],
-            )
-        )
+        if self.combined_pdf is not None:
+            if period_range is None:
+                self.combined_pdf.add_samples(
+                    evaluated_lgq,
+                    prior_range,
+                )
+            else:
+                for (min_period, max_period), ignore_side in zip(period_range,
+                                                                 [-1, 1]):
+                    self.combined_pdf.add_samples(
+                        samples=evaluated_lgq,
+                        prior_range=prior_range,
+                        include_samples=numpy.logical_and(
+                            self.config.ptide_grid >= min_period,
+                            self.config.ptide_grid <= max_period,
+                        ),
+                        ignore_past_quantile=(0.5, ignore_side)
+                    )
 
 
         if not self.config.frequency_dependence_plot_no_lines:
@@ -479,7 +558,7 @@ class FrequencyDependencePlotter:
             )
 
         for conf_index, confidence in enumerate(
-                self.config.plot_confidence
+                getattr(self.config, 'plot_confidence', [])
         ):
             min_lgq, max_lgq = get_confidence_interval(evaluated_lgq,
                                                        confidence)
@@ -547,11 +626,12 @@ class FrequencyDependencePlotter:
                 cdf_slice[:lower_indices[-1] + 1]+ confidence
             )
             selected = numpy.argmin(upper_indices - lower_indices)
-            lower_bound, upper_bound = self.config.combined_constraint_lgQ_grid[
+            lower_bound, upper_bound = self.config.lgQ_grid[
                 [lower_indices[selected], upper_indices[selected]]
             ]
             return lower_bound, upper_bound
 
+        assert self.combined_pdf is not None
         pdf = self.combined_pdf()
         cdf = numpy.cumsum(pdf, 0) - 0.5 * pdf
 
@@ -619,7 +699,9 @@ class FrequencyDependencePlotter:
             pyplot.colorbar()
 
 
-    def plot_combined_pdf_heat_map(self, xlabel=True, ylabel=True):
+    def plot_combined_pdf_heat_map(self,
+                                   xlabel='Tidal Period [d]',
+                                   ylabel=r"$\log_{10}Q_\star'$"):
         """
         Create a 2-D plot of lgQ vs Ptide color coding KDE of PDF.
 
@@ -630,15 +712,17 @@ class FrequencyDependencePlotter:
             None
         """
 
+        assert self.combined_pdf is not None
+
         period_boundaries = numpy.empty(self.config.ptide_grid.size + 1)
         lgq_boundaries = numpy.empty(
-            self.config.combined_constraint_lgQ_grid.size
+            self.config.lgQ_grid.size
             +
             1
         )
         for boundaries, grid in [
                 (period_boundaries, self.config.ptide_grid),
-                (lgq_boundaries, self.config.combined_constraint_lgQ_grid)
+                (lgq_boundaries, self.config.lgQ_grid)
         ]:
             boundaries[1:-1] = 0.5 * (grid[1:] + grid[:-1])
             boundaries[0] = 1.5 * grid[0] - 0.5 * grid[1]
@@ -652,7 +736,7 @@ class FrequencyDependencePlotter:
         plot_args = dict(shading='flat', cmap='viridis', zorder=10)
 
         if self.config.combined_constraint_heat_map == 'log':
-            with numpy.errstate(divide = 'ignore'):
+            with numpy.errstate(divide='ignore'):
                 plot_z = numpy.log10(plot_z)
             plot_args['vmin'] = numpy.log10(plot_z_min)
         else:
@@ -667,9 +751,9 @@ class FrequencyDependencePlotter:
             **plot_args
         )
         if xlabel:
-            pyplot.xlabel('Tidal Period [d]')
+            pyplot.xlabel(xlabel)
         if ylabel:
-            pyplot.ylabel(r"$\log_{10}Q_\star'$")
+            pyplot.ylabel(ylabel)
 
 
     def plot_combined_quantiles(self,
@@ -677,6 +761,8 @@ class FrequencyDependencePlotter:
                                 fmt='-',
                                 label_fmt='CDF={0:.3f}'):
         """Plot the specified percentiles."""
+
+        assert self.combined_pdf is not None
 
         data_behind = Table(
             [self.config.ptide_grid],
@@ -749,15 +835,123 @@ def add_errorbar(samples, config):
         line_width += 2
 #pylint: enable=too-many-locals
 
-def get_plot_data(samples_fname, burn_in, chain_condition):
+
+def ensure_uniform_blob_columns(blobs):
+    """Ensure output blobs have correct columns for analysis."""
+
+    if blobs.dtype == float:
+        blobs = recfunctions.unstructured_to_structured(
+            blobs,
+            names=['primary_mass',
+                   'age',
+                   'secondary_radius',
+                   'feh',
+                   'secondary_mass',
+                   'initial_star_period',
+                   'lgQ_min',
+                   'lgQ_break_period',
+                   'lgQ_powerlaw',
+                   'lgQ_star',
+                   'e_now',
+                   'log-likelihood']
+        )
+        blobs['secondary_radius'] *= constants.R_earth.to_value('R_jup')
+        blobs['secondary_mass'] *= constants.M_earth.to_value('M_jup')
+
+    blob_columns = list(blobs.dtype.names)
+    if 'lgQ_min' not in blob_columns:
+        blobs['break_period'] = 2.0 * numpy.pi / blobs['break_period']
+        phase_lag_max = blobs['phase_lag_max']
+        two_breaks = blobs['alpha'] > 0
+        phase_lag_max[two_breaks] *= numpy.power(
+            50.0 / blobs['break_period'][two_breaks],
+            blobs['alpha'][two_breaks]
+        )
+        blobs['phase_lag_max'] = lgQ(phase_lag_max)
+
+        rename_columns = [('phase_lag_max', 'lgQ_min'),
+                          ('alpha', 'lgQ_powerlaw'),
+                          ('break_period', 'lgQ_break_period')]
+        if 'm_sum' in blob_columns and 'mass_ratio' in blob_columns:
+            rename_columns.extend([('m_sum', 'primary_mass'),
+                                   ('mass_ratio', 'secondary_mass')])
+            primary_mass = blobs['m_sum'] / (1.0 + blobs['mass_ratio'])
+            blobs['m_sum'] = primary_mass
+            blobs['mass_ratio'] *= primary_mass
+        if 'metallicity' in blob_columns:
+            rename_columns.append(('metallicity', 'feh'))
+
+        for from_col, to_col in rename_columns:
+            blob_columns[blob_columns.index(from_col)] = to_col
+
+        blobs.dtype.names = tuple(blob_columns)
+#        if 'Wdisk' not in blob_columns:
+#            return recfunctions.append_fields(
+#                blobs.flatten(),
+#                'Wdisk',
+#                numpy.full(blobs['lgQ_min'].size, numpy.nan),
+#                float
+#            ).reshape(blobs.shape)
+    return blobs
+
+
+def get_plot_data(samples_fname_list, burn_in, chain_condition):
     """Return the samples to use for plotting for a single system."""
 
-    backend, system_name = get_backend(samples_fname, chain_condition)
-    assert backend is not None
+    combined_blobs = None
+    combined_logprob = None
+    for samples_fname in samples_fname_list:
+        backend, system_name = get_backend(samples_fname, chain_condition)
+        assert backend is not None
+        blobs = backend.get_blobs()
+        print('Blobs: ' + repr(blobs))
+        blobs = ensure_uniform_blob_columns(blobs)
+        logprob = backend.get_log_prob()
+
+        if combined_blobs is None:
+            assert combined_logprob is None
+            combined_blobs = blobs
+            combined_logprob = logprob
+        else:
+            print('Adding %s steps to %s old ones' % (blobs.shape,
+                                                      combined_blobs.shape))
+            final_shape = (combined_blobs.shape[0] + blobs.shape[0],
+                           combined_blobs.shape[1])
+            combined_blobs = recfunctions.stack_arrays(
+                (combined_blobs, blobs)
+            ).reshape(final_shape)
+            combined_logprob = numpy.concatenate((combined_logprob, logprob))
+            print('Ended up with %s steps' % (combined_blobs.shape,))
+
+    nan_indices = numpy.nonzero(
+        numpy.logical_not(numpy.isfinite(combined_logprob))
+    )[0]
+    if nan_indices.size:
+        last_nan = nan_indices.max()
+    else:
+        last_nan = -1
+    for colname in combined_blobs.dtype.names:
+        if colname == 'Wdisk':
+            continue
+        nan_indices = numpy.nonzero(
+            numpy.logical_not(numpy.isfinite(combined_blobs[colname]))
+        )[0]
+        if nan_indices.size:
+            last_nan = max(
+                last_nan,
+                nan_indices.max()
+            )
+            print('Last nan for %s: %d' % (colname, nan_indices.max()))
+
+    print('Discarding %d leading nan steps' % (last_nan + 1))
+    print('There are %d burn-in steps' % burn_in)
+    combined_blobs = combined_blobs[last_nan + burn_in + 1:]
+    combined_logprob = combined_logprob[last_nan + burn_in + 1:]
+
     return (
         system_name,
-        backend.get_blobs(discard=burn_in),
-        backend.get_log_prob(discard=burn_in)
+        combined_blobs,
+        combined_logprob
     )
 
 def main(config):
@@ -778,7 +972,7 @@ def main(config):
 
         try:
             system_name, samples, log_probability = get_plot_data(
-                samples_fname,
+                [samples_fname],
                 burn_in,
                 config.chain_condition
             )
@@ -792,11 +986,12 @@ def main(config):
             if config.frequency_dependence_plot_fname:
                 frequency_dependence_plotter.add_chain(
                     samples,
-                    system_name.replace('_', ' ')
+                    str(system_name).replace('_', ' ')
                 )
             if config.errorbar_plot:
                 add_errorbar(samples, config)
         except RuntimeError:
+            traceback.print_exc()
             print('Empty chain in %s, skipping!' % samples_fname)
 
     pyplot.ylim(4.0, 12.0)

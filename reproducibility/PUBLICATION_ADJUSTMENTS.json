@@ -1,0 +1,24 @@
+{
+  "prepared_at": "2026-11-19T16:10:06.280993-06:00",
+  "runtime_python_changed": false,
+  "test_fixture_updates": [
+    {
+      "path": "control/test_massive_policy.py",
+      "reason": "Update obsolete test to the deployed Kepler selection policy; runtime code unchanged.",
+      "deployed_sha256": "83bc53aaa7d4e059dc352860b1a642e9a7ff0f6cbbb96855b2e86b26cccbc402",
+      "published_sha256": "8bd4d2e0dd139fbfaff4fbdf2bc01f858fc75c2a4107a0967b44d31ce8dee9d4"
+    }
+  ],
+  "additions": [
+    "Branch README and source-only provenance",
+    "Observed environment versions",
+    "Generic Slurm launch examples without target lists"
+  ],
+  "deployment_snapshots_preserved": true,
+  "data_and_run_records_included": false,
+  "externalized_dependencies": [
+    "poet",
+    "general_purpose_python_modules"
+  ],
+  "externalization_note": "Removed bundled dependency copies; retained their source hashes in the manifest and updated documentation and generic Slurm paths. Deployed sampling packages and scientific model code are unchanged."
+}

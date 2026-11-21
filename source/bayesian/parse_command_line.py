@@ -6,8 +6,10 @@ import os.path
 import numpy
 from configargparse import ArgumentParser, DefaultsFormatter
 
-from split_normal_distribution import split_normal
-from planetary_system_io import read_cds_pipe_table
+from general_purpose_python_modules.split_normal_distribution import \
+    split_normal
+from general_purpose_python_modules.planetary_system_io import \
+    read_cds_pipe_table
 
 #False positive (hanhdled in __init__.py).
 #pylint: disable=import-error
@@ -17,6 +19,7 @@ from command_line_utilities import data_dir
 from bayesian import m35_util
 from bayesian import hyadespraesepe_util
 from bayesian.basic_util import default_logging_format
+from bayesian.windemuth_et_al_util import get_available_kic
 #pylint: enable=import-error
 
 RandomQuantity = namedtuple('RandomQuantity', ['distribution', 'units'])
@@ -80,12 +83,21 @@ def add_dissipation_args(parser):
         '--lgQ-inertial-boost',
         nargs=2,
         type=float,
-        default=(1.0, 1.0),
+        default=(0.0, 0.0),
         help='The range to assume for log10(`boost`) dissipation argument '
         '(boost of dissipation in inertial mode range). If not specified, '
         'dissipation is not enhanced in the inertial mode range (i.e. `boost` '
         'is always equal to 1).'
     )
+    dissipation.add_argument(
+        '--lgQ-inertial-sharpness',
+        nargs=2,
+        type=float,
+        default=(10.0, 10.0),
+        help='The sharpness parameter determining how quickly dissipation '
+        'switches between in vs out of inertial mode range.'
+    )
+
 
 
 def add_cluster_args(parser):
@@ -221,7 +233,7 @@ def add_primary_args(parser, properties):
                       'possibly asymmetric.')
             )
 
-def get_binary_ids():
+def get_cluster_binary_ids():
     """Return dictionary indexed by cluster containing binary IDs."""
 
     binaries = dict()
@@ -271,20 +283,27 @@ def get_binary_ids():
     return binaries
 
 
-def add_binary_selection_args(parser):
-    """Add an argument to parses to choose a binary system to process."""
+def add_binary_selection_args(parser, collection):
+    """Add an argument to parser to choose a cluster system to process."""
 
-    binaries = get_binary_ids()
-
-    parser.add_argument(
-        'system',
-        choices=list(
+    if collection == 'cluster':
+        binaries = get_cluster_binary_ids()
+        choices = list(
             cluster_name + '_' + str(system)
             for cluster_name, cluster_systems in binaries.items()
             for system in cluster_systems
-        ),
+        )
+    else:
+        assert collection == 'w19'
+        choices = numpy.loadtxt('/work/dal205149/kepler_massive_star_circularization_20261118/runs/kepler13_cdf002_upper3sigma_20261118/systems_all.txt', dtype=int, ndmin=1)
+
+    parser.add_argument(
+        'system',
+        choices=choices,
+        type=type(choices[0]),
         help='Select the system to analyze.'
     )
+
 
 def add_sampling_parameters(parser):
     """Add parameters configuring how to perform the sampling."""
@@ -297,7 +316,7 @@ def add_sampling_parameters(parser):
         '--initial-eccentricity',
         type=float,
         nargs=2,
-        default=(0.5, 0.5),
+        default=(0.8, 0.8),
         help='The range to use for the uniform prior on initial eccentricity.'
     )
     parser.add_argument(
@@ -310,9 +329,15 @@ def add_sampling_parameters(parser):
     sampling.add_argument(
         '--mcmc-nwalkers',
         type=int,
-        default=12,
+        default=64,
         help='The number of walkers in the MCMC ensemble. Ignored if nested '
         'sampling is used.'
+    )
+    sampling.add_argument(
+        '--dynesty-nlive',
+        type=int,
+        default=500,
+        help='Number of Dynesty live points. Ignored by emcee sampling.'
     )
     sampling.add_argument(
         '--mcmc-nsteps',
@@ -476,22 +501,29 @@ def add_output_parameters(parser):
         'documentation for details.'
     )
 
-def parse_command_line(description,
-                       config_fname,
-                       *,
-                       dissipation=False,
-                       cluster=False,
-                       primary_properties=(),
-                       choose_binary=False,
-                       spindown=0):
+def use_parser(parser,
+               *,
+               sampling=True,
+               output=True,
+               dissipation=False,
+               cluster=False,
+               primary_properties=(),
+               choose_binary=None,
+               spindown=0):
     """
-    Parse the command line for a Bayesian run.
+    Add the selected arguments to the given parser and parse the command line.
 
     Args:
-        description(str):    The description to display in command line help
-            message of the tool using the parsed command line.
+        parser(ArgumentParser):    The parser to add arguments to.
 
-        config_fname(str):    The name of the default config file.
+        sampling(bool):    Should parameters be added that configure how
+            sampling should be performed?
+
+        output(bool):    Should parameters be added that configure the output to
+            generate.
+
+        dissipation(bool):    Whether to include command line arguments to
+            define the dissipation.
 
         cluster(bool):    Whether to include command line arguments to select a
             an open cluster, and specify age and metallicity distributions to
@@ -503,24 +535,45 @@ def parse_command_line(description,
             properties supported.
             .
 
-        choose_binary(bool):    Whether to add argument for selecting a
-            particular binary by name.
+        choose_binary(str or None):    Whether to add argument for selecting a
+            particular binary by name. Should be one of 'cluster' or 'w19'
+            triggering the selection of a binary from an open cluster or from
+            the Windemuth et. al. (2019) collection.
 
         spindown(int):    For how many components should spindown parameters be
             added (0, 1, or 2).
 
-    Returns:
-        argparse.Namespace:
-            The parsed command line options.
     """
 
-    parser = ArgumentParser(
-        description=description,
-        default_config_files=[config_fname],
-        args_for_writing_out_config_file=['--generate-config-file'],
-        args_for_setting_config_path=['--config-file', '-c'],
-        formatter_class=DefaultsFormatter,
-        ignore_unknown_config_file_keys=True
+    parser.add_argument(
+        '--nn-data-dir',
+        default=os.path.expanduser('~/projects/git/poet/nn_data'),
+        help='Directory for legacy PNN data and hybrid warm-start data.'
+    )
+    parser.add_argument(
+        '--disable-warm-start',
+        action='store_true',
+        help='Record complete solves but use only the traditional solver.'
+    )
+    parser.add_argument(
+        '--warm-start-period-gate',
+        type=float,
+        default=0.25,
+        help='Maximum relative period residual accepted after the one-shot '
+             'POET warm-start validation.'
+    )
+    parser.add_argument(
+        '--warm-start-eccentricity-gate',
+        type=float,
+        default=0.1,
+        help='Maximum absolute eccentricity residual accepted after the '
+             'one-shot POET warm-start validation.'
+    )
+    parser.add_argument(
+        '--use-legacy-pnn',
+        action='store_true',
+        help='Enable the historical autoencoder/PNN fallback for reproduction '
+             'only.'
     )
     parser.add_argument(
         '--stellar-evolution-interpolator-dir', '--interpolator-dir',
@@ -549,8 +602,10 @@ def parse_command_line(description,
         'that we don\'t have time to fix.'
     )
 
-    add_sampling_parameters(parser)
-    add_output_parameters(parser)
+    if sampling:
+        add_sampling_parameters(parser)
+    if output:
+        add_output_parameters(parser)
     if dissipation:
         add_dissipation_args(parser)
     if cluster:
@@ -560,5 +615,36 @@ def parse_command_line(description,
     if spindown:
         add_stellar_spindown_args(parser, spindown)
     if choose_binary:
-        add_binary_selection_args(parser)
+        add_binary_selection_args(parser, choose_binary)
+
     return parser.parse_args()
+
+
+def parse_command_line(description,
+                       config_fname,
+                       **arg_selection):
+    """
+    Parse the command line for a Bayesian run.
+
+    Args:
+        description(str):    The description to display in command line help
+            message of the tool using the parsed command line.
+
+        config_fname(str):    The name of the default config file.
+
+        **arg_selection:    Flags indicating which arguments to include (see
+            add_parser_arguments().
+    Returns:
+        argparse.Namespace:
+            The parsed command line options.
+    """
+
+    parser = ArgumentParser(
+        description=description,
+        default_config_files=[config_fname],
+        args_for_writing_out_config_file=['--generate-config-file'],
+        args_for_setting_config_path=['--config-file', '-c'],
+        formatter_class=DefaultsFormatter,
+        ignore_unknown_config_file_keys=True
+    )
+    return use_parser(parser, **arg_selection)

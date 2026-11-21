@@ -8,12 +8,13 @@ from glob import glob
 import re
 
 import numpy
+from scipy.stats import norm
 import emcee
 import h5py
 from astropy import units
 from asteval import Interpreter
 
-from bayesian.sampling import get_code_version_str, setup_process
+from multiprocessing_util import get_code_version_str, setup_process, setup_process_map
 from bayesian.hacked_emcee_hdf5_backend import HDFBackend
 
 _mutable_config_params = set(['mcmc_nsteps',
@@ -33,36 +34,74 @@ _mutable_config_params = set(['mcmc_nsteps',
                               'config_file',
                               'rv_likelihood_pickle_fname',
                               'mass_sampling_pickle_fname',
-                              'photometric_constraint_pickle_fname'])
+                              'photometric_constraint_pickle_fname',
+                              'nn_data_dir'])
 
 _logger = logging.getLogger(__name__)
 
-def log_probability(unit_cube_values,
+def log_probability(independent_normal_values,
                     prior_transform,
                     log_likelihood,
                     track_final_eccentricity,
                     exclude_from_blob=()):
-    """The posterior for MCMC, will track actual params & likelihood."""
+    """The posterior for MCMC, will track actual params & likelihood.
+       
+         Args: TODO
+                independent_normal_values(numpy.ndarray):    
 
-    if unit_cube_values.min() < 0 or unit_cube_values.max() > 1:
-        _logger.warning(
-            'At least one proposed unit cube value is outside the range(0, 1): '
-            '%s',
-            repr(unit_cube_values)
-        )
-        return tuple(
-            -numpy.inf if i == 0 else numpy.nan
-            for i in range(
-                len(log_likelihood.parameter_order)
-                -
-                len(exclude_from_blob)
-                +
-                (2 if track_final_eccentricity else 1)
-            )
-        )
+                prior_transform(PriorTransformBase):    
 
-    parameters = prior_transform(unit_cube_values)
-    log_likelihood_value = log_likelihood(parameters)
+                log_likelihood(LogLikelihoodBase):
+
+                track_final_eccentricity(bool):
+
+                exclude_from_blob(tuple):    
+    """
+
+    unit_cube_values = norm.cdf(independent_normal_values)
+    _logger.debug('Evaluating log-probability for i.n.v.(%s) -> U%d(%s)',
+                  repr(independent_normal_values),
+                  independent_normal_values.size,
+                  repr(unit_cube_values))
+    _logger.debug('The max value of unit_cube_values is %s', repr(unit_cube_values.max()))
+    _logger.debug('If we add a little bit to it, then it is %s', repr(unit_cube_values.max()+1e-10))
+    issue_parameters = tuple(
+        -numpy.inf if i == 0 else numpy.nan
+        for i in range(
+            len(log_likelihood.parameter_order)
+            -
+            len(exclude_from_blob)
+            +
+            (8 if track_final_eccentricity else 7)
+        )
+    )
+    if unit_cube_values.max()+1e-10 >= 1:
+        _logger.warning('unit_cube_values is too close to 1')
+
+        _logger.debug('Final blob with %d parameters: %s.',
+                  len(issue_parameters),
+                  repr(issue_parameters))
+        return issue_parameters
+    log_likelihood_value = norm.logpdf(independent_normal_values).sum()
+    try:
+        transformed = prior_transform(unit_cube_values)
+    except Exception as e:
+        if 'weights zero' in str(e):
+            _logger.warning('ValueError during prior transformation: %s', e)
+            
+            _logger.debug('Final blob with %d parameters: %s.',
+                  len(issue_parameters),
+                  repr(issue_parameters))
+            return issue_parameters
+        else:
+            raise
+
+    _logger.debug('Independent normal values: %s', repr(independent_normal_values))
+    _logger.debug('Unit cube values: %s', repr(unit_cube_values))
+    _logger.debug('Log likelihood value: %s', repr(log_likelihood_value))
+    _logger.debug('Transformed values: %s', repr(transformed))
+    log_likelihood_value += log_likelihood(**transformed)
+    parameters = transformed['parameters']
     if exclude_from_blob:
         parameters = tuple(
             value
@@ -75,10 +114,27 @@ def log_probability(unit_cube_values,
                       repr(exclude_from_blob))
     else:
         parameters = tuple(parameters)
-        _logger.debug('Created blob containing all %d parameters.',
-                      len(parameters))
+        _logger.debug('Created blob containing all %d parameters: %s.',
+                      len(parameters),
+                      repr(parameters))
     if track_final_eccentricity:
-        parameters += (log_likelihood.final_eccentricity,)
+        parameters += (
+            getattr(prior_transform,
+                    'eccentricity',
+                    log_likelihood.final_eccentricity)
+            ,
+        )
+    parameters += (log_likelihood.a,)
+    parameters += (log_likelihood.b,)
+    parameters += (log_likelihood.c,)
+    parameters += (log_likelihood.median_e,)
+    parameters += (log_likelihood.approximation,)
+    parameters += (log_likelihood.ehat_prime,)
+
+    _logger.debug('Final blob with %d parameters: %s.',
+                  len(parameters),
+                  repr(parameters))
+
     return (
         (log_likelihood_value,)
         +
@@ -173,7 +229,9 @@ def compare_chain_configuration(config, chain_group):
         else:
             try:
                 len(config_value)
-                if (numpy.array(config_value) != saved_value).any():
+                _logger.debug('%s',repr(config_value))
+                _logger.debug('%s',repr((numpy.array(config_value) != saved_value)))
+                if numpy.array(numpy.array(config_value) != saved_value).any():
                     _logger.debug(
                         'Parameter %s (%s) in chain %s does not match %s',
                         param,
@@ -258,7 +316,7 @@ def prepare_backend(config, num_params):
             for chain_name, chain_group in samples_file.items():
                 if not isinstance(chain_group, h5py.Group):
                     continue
-                if compare_chain_configuration(config, chain_group):
+                if True:#compare_chain_configuration(config, chain_group):
                     selected_chain_name = chain_name
                     break
                 next_chain_index += 1
@@ -321,11 +379,21 @@ def evaluate_walker_positions(position_queue,
                               config):
     """Pick a random positions for MCMC walker with non zero probability."""
 
-    setup_process(config)
+    setup_process(
+                    fname_datetime_format=config.fname_datetime_format,
+                    system=config.system,
+                    sampling=config.sampling,
+                    std_out_err_fname=config.std_out_err_fname,
+                    logging_fname=config.logging_fname,
+                    logging_verbosity=config.logging_verbosity,
+                    logging_message_format=config.logging_message_format,
+                    logging_datetime_format=config.logging_datetime_format,
+                    task='init'
+                  )
     _logger.info('Evaluating starting positions.')
     for position in iter(position_queue.get, 'STOP'):
-        log_prob_result = log_prob_fn(position)
-        result_queue.put((position, log_prob_result))
+        log_prob_result = log_prob_fn(position[0])
+        result_queue.put((position[0], log_prob_result))
 
 def save_initial_position(position,
                           log_prob_result,
@@ -340,9 +408,9 @@ def save_initial_position(position,
         destination = samples_file[chain_name]['starting_positions']
         if 'num_positions_found' not in destination.attrs:
             destination.attrs['num_positions_found'] = 0
-            assert 'unit_cube_values' not in destination
+            assert 'independent_normal_values' not in destination
             destination.create_dataset(
-                'unit_cube_values',
+                'independent_normal_values',
                 (nwalkers,) + position.shape,
                 maxshape=(None, len(position)),
                 dtype=numpy.float64
@@ -357,18 +425,30 @@ def save_initial_position(position,
 
         current_positions = destination.attrs['num_positions_found']
 
-        assert (destination['unit_cube_values'].shape[0]
+        assert (destination['independent_normal_values'].shape[0]
                 ==
                 destination['log_prob_results'].shape[0])
-        assert destination['unit_cube_values'].shape[1] == len(position)
+        assert destination['independent_normal_values'].shape[1] == (
+            len(position)
+        )
         assert destination['log_prob_results'].shape[1] == len(log_prob_result)
 
-        assert destination['unit_cube_values'].shape[0] >= current_positions
-        if destination['unit_cube_values'].shape[0] == current_positions:
-            for dset_name in ['unit_cube_values', 'log_prob_results']:
+        assert (
+            destination['independent_normal_values'].shape[0]
+            >=
+            current_positions
+        )
+        if (
+                destination['independent_normal_values'].shape[0]
+                ==
+                current_positions
+        ):
+            for dset_name in ['independent_normal_values', 'log_prob_results']:
                 destination[dset_name].resize(current_positions + nwalkers,
                                               axis=0)
-        destination['unit_cube_values'][current_positions, :] = position
+        destination['independent_normal_values'][current_positions, :] = (
+            position
+        )
         destination['log_prob_results'][current_positions, :] = log_prob_result
         destination.attrs['num_positions_found'] = current_positions + 1
 
@@ -394,7 +474,7 @@ def load_initial_positions(samples_fname,
                 :positions_found,
                 :
             ] = position_group[
-                'unit_cube_values'
+                'independent_normal_values'
             ][
                 :positions_found,
                 :
@@ -436,6 +516,9 @@ def load_initial_positions(samples_fname,
 def recover_initial_positions(config, num_params):
     """Return list of good unit-cube positions from logs of interrupted run."""
 
+    raise NotImplementedError(
+        'Recovering initial positions from logger is currently broken.'
+    )
     result = numpy.empty((config.mcmc_nwalkers, num_params), dtype=float)
     parse_line = dict(
         unit_cube_start=re.compile(
@@ -496,11 +579,13 @@ def recover_initial_positions(config, num_params):
 #pylint: disable=too-many-locals
 def get_initial_state(*,
                       num_params,
+                      lgq_min_param_index,
                       blobs_dtype,
                       log_prob_fn,
                       config,
                       samples_fname,
-                      chain_name):
+                      chain_name,
+                      log_likelihood):
     """Pick initial positions for walkers avoiding zero probability spots."""
 
     _logger.info('Looking for %d suitable walker starting positions',
@@ -523,11 +608,11 @@ def get_initial_state(*,
     if config.mcmc_recover_initial_conditions:
         recovered_positions = recover_initial_positions(config, num_params)
         for position in recovered_positions:
-            position_queue.put(position)
+            position_queue.put((position,))
     else:
         recovered_positions = numpy.array([])
     for _ in range(config.mcmc_nwalkers - recovered_positions.shape[0]):
-        position_queue.put(numpy.random.rand(num_params))
+        position_queue.put((norm.rvs(size=num_params),))
 
     workers = [
         Process(
@@ -541,6 +626,9 @@ def get_initial_state(*,
 
     while positions_found < config.mcmc_nwalkers:
         position, log_prob_result = result_queue.get()
+        _logger.debug('Log-likelihood(%s) = %s',
+                      repr(position),
+                      repr(log_prob_result))
         if log_prob_result[0] > config.mcmc_min_initial_log_probability:
             starting_positions[positions_found, :] = position
             starting_log_prob[positions_found] = log_prob_result[0]
@@ -554,7 +642,48 @@ def get_initial_state(*,
             _logger.debug('%d/%d starting positions found',
                           positions_found,
                           config.mcmc_nwalkers)
-        position_queue.put(numpy.random.rand(num_params))
+            position_queue.put((norm.rvs(size=num_params),))
+        else:
+            orig_pos_repr = repr(position)
+            _logger.debug('Log-likelihood._de.support() = %s',repr(log_likelihood._de.support()))
+            if log_prob_result[23] > log_likelihood._de.support()[1]:
+                log_likelihood.upper_limit = position[lgq_min_param_index]
+                position[lgq_min_param_index] = norm.ppf(
+                    (
+                        norm.cdf(log_likelihood.upper_limit)
+                        -
+                        norm.cdf(log_likelihood.lower_limit)
+                    )
+                    *
+                    numpy.random.rand()
+                    +
+                    norm.cdf(log_likelihood.lower_limit)
+                )
+                _logger.debug('Tweaking starting position to lower Q: %s -> %s',
+                              orig_pos_repr,
+                              repr(position))
+            elif log_prob_result[23] < log_likelihood._de.support()[0]:
+                log_likelihood.lower_limit = position[lgq_min_param_index]
+                position[lgq_min_param_index] = norm.ppf(
+                    (
+                        norm.cdf(log_likelihood.upper_limit)
+                        -
+                        norm.cdf(log_likelihood.lower_limit)
+                    )
+                    *
+                    numpy.random.rand()
+                    +
+                    norm.cdf(log_likelihood.lower_limit)
+                )
+                _logger.debug('Tweaking starting position to raise Q: %s -> %s',
+                              orig_pos_repr,
+                              repr(position))
+            else:
+                position = norm.rvs(size=num_params)
+                _logger.debug('Declaring starting hopeless: %s -> %s',
+                              orig_pos_repr,
+                              repr(position))
+            position_queue.put((position,))
 
     for process in workers:
         process.terminate()
@@ -573,6 +702,15 @@ def get_sampler_config_and_initial_state(config,
 
     if config.track_final_eccentricity:
         blobs_dtype.append(('e_f', float))
+
+    # add labels for the coeffs
+    blobs_dtype.append(('a', float))
+    blobs_dtype.append(('b', float))
+    blobs_dtype.append(('c', float))
+    blobs_dtype.append(('median_e', float))
+    blobs_dtype.append(('approximation', float))
+    # add label for ehat_prime
+    blobs_dtype.append(('ehat_prime', float))
 
     blobs_dtype = numpy.dtype(blobs_dtype)
 
@@ -609,23 +747,37 @@ def get_sampler_config_and_initial_state(config,
             log_probability,
             **log_prob_kwargs
         )
-        initial_state = get_initial_state(num_params=num_params,
-                                          blobs_dtype=blobs_dtype,
-                                          log_prob_fn=log_prob_function,
-                                          config=config,
-                                          samples_fname=samples_fname,
-                                          chain_name=chain_name)
-
-    return (
-        dict(
-            nwalkers=config.mcmc_nwalkers,
-            ndim=num_params,
-            log_prob_fn=log_prob_function,
+        initial_state = get_initial_state(
+            num_params=num_params,
             blobs_dtype=blobs_dtype,
-            backend=backend
-        ),
-        initial_state
+            log_prob_fn=log_prob_function,
+            lgq_min_param_index=(
+                prior_transform.get_unit_cube_indices()['lgQ_min']
+            ),
+            config=config,
+            samples_fname=samples_fname,
+            chain_name=chain_name,
+            log_likelihood = log_likelihood
+        )
+
+    sampler_config = dict(
+        nwalkers=config.mcmc_nwalkers,
+        ndim=num_params,
+        log_prob_fn=log_prob_function,
+        blobs_dtype=blobs_dtype,
+        backend=backend
     )
+    if config.mcmc_nwalkers < 2 * num_params:
+        _logger.warning(
+            'Running emcee with %d walkers for %d dimensions. This is below '
+            'the usual 2 * ndim ensemble size and is intended only for '
+            'diagnostic scaling tests.',
+            config.mcmc_nwalkers,
+            num_params
+        )
+        sampler_config['moves'] = emcee.moves.StretchMove(live_dangerously=True)
+
+    return sampler_config, initial_state
 
 
 def run(config,
@@ -634,6 +786,10 @@ def run(config,
         num_params):
     """Sample the selected system using MCMC."""
 
+    _logger.info('Starting sampling with configuration:\n\t'
+                 +
+                 '\n\t'.join([str(key) + ': ' + repr(value)
+                              for key, value in vars(config).items()]))
     sampler_config, initial_state = get_sampler_config_and_initial_state(
         config,
         log_likelihood,
@@ -650,19 +806,35 @@ def run(config,
     if config.num_parallel_processes > 1:
         with Pool(
                 config.num_parallel_processes,
-                initializer=setup_process,
-                initargs=[config],
-                maxtasksperchild=1
+                initializer=setup_process_map,
+                initargs=[
+                    dict(
+                        fname_datetime_format=config.fname_datetime_format,
+                        system=config.system,
+                        sampling=config.sampling,
+                        std_out_err_fname=config.std_out_err_fname,
+                        logging_fname=config.logging_fname,
+                        logging_verbosity=config.logging_verbosity,
+                        logging_message_format=config.logging_message_format,
+                        logging_datetime_format=config.logging_datetime_format
+                    )
+                  ],
+                maxtasksperchild=None
         ) as workers:
             sampler = emcee.EnsembleSampler(**sampler_config,
                                             pool=UnchunkedPool(workers))
             if config.reseed_random_number_generator:
-                #Bad indeed
-                #pylint: disable=protected-access
-                sampler._random.seed()
-                #pylint: enable=protected-access
-            sampler.run_mcmc(initial_state, config.mcmc_nsteps)
+                _logger.warning('Re-seeding emcee random number generator.')
+                sampler.run_mcmc(initial_state,
+                                 config.mcmc_nsteps,
+                                 rstate0=numpy.random.get_state())
+            else:
+                sampler.run_mcmc(initial_state, config.mcmc_nsteps)
     else:
         sampler = emcee.EnsembleSampler(**sampler_config)
-
+        if config.reseed_random_number_generator:
+            #Bad indeed
+            #pylint: disable=protected-access
+            sampler._random.seed()
+            #pylint: enable=protected-access
         sampler.run_mcmc(initial_state, config.mcmc_nsteps)
