@@ -15,5 +15,10 @@
     "Generic Slurm launch examples without target lists"
   ],
   "deployment_snapshots_preserved": true,
-  "data_and_run_records_included": false
+  "data_and_run_records_included": false,
+  "externalized_dependencies": [
+    "poet",
+    "general_purpose_python_modules"
+  ],
+  "externalization_note": "Removed bundled dependency copies; retained their source hashes in the manifest and updated documentation and generic Slurm paths. Deployed sampling packages and scientific model code are unchanged."
 }

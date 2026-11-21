@@ -510,6 +510,65 @@
       "sha256": "1f8626cde019bfdf942290dc1d02325d76cbf8b178e1521e01270d920f21dc9d",
       "bytes": 10017
     },
+    "baseline_dlogz_policy.py": {
+      "sha256": "dee0b05fb68b7db1642527e054f936ec75ddbc77ba6cd096a3a801a402ec0afc",
+      "bytes": 920
+    },
+    "cdf_paper_range_policy.py": {
+      "sha256": "c7f1e6c3d0a0b71f891cf009097fc8b0dbf8083e100e6338911f18ffeb450206",
+      "bytes": 6592
+    },
+    "cdf_grid100_launcher.py": {
+      "sha256": "8388bc336204cef3dd16bf88d3c8b7732028d6cdeb8bb8574239bd848e693382",
+      "bytes": 787
+    },
+    "reproducibility/legacy_gaia/paper_eccentricity_envelope.py": {
+      "sha256": "b9d028bca3a3c01536ea54eccd4dee00d673115b741e0ae9a3ad5dcb9f1c9001",
+      "bytes": 1052
+    }
+  },
+  "external_native_assets": {
+    "poet/lib/libdirent.so": {
+      "reason": "native dependency; install externally",
+      "sha256": "6c06e786c5186808d5bc8dc3e3252ed537042f493a457cf5a27936ac093caa51",
+      "bytes": 14992
+    },
+    "poet/lib/libevolve.so": {
+      "reason": "native dependency; install externally",
+      "sha256": "71f8112a412b118766e00d814cf5f5f19e35bf0a5cffd15ccbf2dfe25abd19a1",
+      "bytes": 3944168
+    },
+    "poet/lib/libplanet.so": {
+      "reason": "native dependency; install externally",
+      "sha256": "a98578ab757b3711e7be7ba46f9b648aa982b695cd122c92a7fd07797627068f",
+      "bytes": 3663320
+    },
+    "poet/lib/libsingleTermNonEvolvingBody.so": {
+      "reason": "native dependency; install externally",
+      "sha256": "5d51eb85ee76b8e7728a3cab58386d311caf47702dd39966195034e9f19a7133",
+      "bytes": 3664248
+    },
+    "poet/lib/libstar.so": {
+      "reason": "native dependency; install externally",
+      "sha256": "c0fcc95f42d65902fdeff7298e5d3fea3765d08089700e8280bd48498a983fb9",
+      "bytes": 3726584
+    },
+    "poet/lib/libstellarEvolution.so": {
+      "reason": "native dependency; install externally",
+      "sha256": "70e39d9a0cda7145571f0e308b6b1f78605e09eaf79ee805f9af1b0d24590e14",
+      "bytes": 3878288
+    }
+  },
+  "exclusions": "No research data, observation tables, joint chains, target lists, run records, checkpoints, results, solver caches, compiled binaries, backup files, or credentials.",
+  "source_snapshot_only": true,
+  "running_package_modified": false,
+  "code_only_publication": true,
+  "excluded_legacy_run_scripts": true,
+  "excluded_legacy_research_products": true,
+  "excluded_incomplete_legacy_tests": [
+    "source/bayesian/test_w19_e_likelihood.py"
+  ],
+  "external_dependency_sources": {
     "general_purpose_python_modules/.gitignore": {
       "sha256": "2f80bb5b1a46271b39920f71f2043d0ee7d1d037acc385ff7e7e574787720818",
       "bytes": 1234
@@ -910,66 +969,10 @@
       "sha256": "3996c94ee99cf40e0d9535e626d85785f68e9e6ea667be9dd0694e6941b60deb",
       "bytes": 11019
     },
-    "baseline_dlogz_policy.py": {
-      "sha256": "dee0b05fb68b7db1642527e054f936ec75ddbc77ba6cd096a3a801a402ec0afc",
-      "bytes": 920
-    },
-    "cdf_paper_range_policy.py": {
-      "sha256": "c7f1e6c3d0a0b71f891cf009097fc8b0dbf8083e100e6338911f18ffeb450206",
-      "bytes": 6592
-    },
-    "cdf_grid100_launcher.py": {
-      "sha256": "8388bc336204cef3dd16bf88d3c8b7732028d6cdeb8bb8574239bd848e693382",
-      "bytes": 787
-    },
     "poet/LICENSE": {
       "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
       "bytes": 16725
-    },
-    "reproducibility/legacy_gaia/paper_eccentricity_envelope.py": {
-      "sha256": "b9d028bca3a3c01536ea54eccd4dee00d673115b741e0ae9a3ad5dcb9f1c9001",
-      "bytes": 1052
     }
   },
-  "external_native_assets": {
-    "poet/lib/libdirent.so": {
-      "reason": "native dependency; install externally",
-      "sha256": "6c06e786c5186808d5bc8dc3e3252ed537042f493a457cf5a27936ac093caa51",
-      "bytes": 14992
-    },
-    "poet/lib/libevolve.so": {
-      "reason": "native dependency; install externally",
-      "sha256": "71f8112a412b118766e00d814cf5f5f19e35bf0a5cffd15ccbf2dfe25abd19a1",
-      "bytes": 3944168
-    },
-    "poet/lib/libplanet.so": {
-      "reason": "native dependency; install externally",
-      "sha256": "a98578ab757b3711e7be7ba46f9b648aa982b695cd122c92a7fd07797627068f",
-      "bytes": 3663320
-    },
-    "poet/lib/libsingleTermNonEvolvingBody.so": {
-      "reason": "native dependency; install externally",
-      "sha256": "5d51eb85ee76b8e7728a3cab58386d311caf47702dd39966195034e9f19a7133",
-      "bytes": 3664248
-    },
-    "poet/lib/libstar.so": {
-      "reason": "native dependency; install externally",
-      "sha256": "c0fcc95f42d65902fdeff7298e5d3fea3765d08089700e8280bd48498a983fb9",
-      "bytes": 3726584
-    },
-    "poet/lib/libstellarEvolution.so": {
-      "reason": "native dependency; install externally",
-      "sha256": "70e39d9a0cda7145571f0e308b6b1f78605e09eaf79ee805f9af1b0d24590e14",
-      "bytes": 3878288
-    }
-  },
-  "exclusions": "No research data, observation tables, joint chains, target lists, run records, checkpoints, results, solver caches, compiled binaries, backup files, or credentials.",
-  "source_snapshot_only": true,
-  "running_package_modified": false,
-  "code_only_publication": true,
-  "excluded_legacy_run_scripts": true,
-  "excluded_legacy_research_products": true,
-  "excluded_incomplete_legacy_tests": [
-    "source/bayesian/test_w19_e_likelihood.py"
-  ]
+  "external_dependency_note": "POET and general_purpose_python_modules are external dependencies, not bundled package source. These hashes identify the dependency source used in the deployed snapshot; install compatible external copies separately."
 }

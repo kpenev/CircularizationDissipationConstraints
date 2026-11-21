@@ -90,6 +90,13 @@ uncertainty tolerance=.02** with128 realizations and the existing100-period
 1–50 day informative-range policy. Physical-parameter CDFs are diagnostic
 only; the maximum dynamic batch count is 200.
 
+## Performance
+
+In the author's binary-sampling workflow, dynesty is reported to be
+approximately **an order of magnitude (about 10 times) faster than the
+previous emcee workflow**. This is a workload-specific observation; a
+controlled benchmark with matched convergence criteria is not included.
+
 ## Setup, provenance and limitations
 
 This is **package code and documentation only**. No observational tables,
@@ -99,20 +106,27 @@ Existing upstream repository data are unchanged.
 
 Provision research inputs separately, plus the validated generated grid,
 ZAMS JSON and `rc_env` native interpolator; compatible POET shared libraries
-in `poet/lib/`; the O30-from-O400 eccentricity-coefficient SQLite table;
+in the external POET checkout's `lib/`; the O30-from-O400 eccentricity-coefficient SQLite table;
 GSL 2.8 and the production Boost runtime. Deployed paths remain in the source
 and config and must be adapted for another installation. Never update a
 running deployment in place.
 
-Vendored Python dependencies and their licenses are included. Exact included
-source hashes and required external library hashes are in
+POET and `general_purpose_python_modules` are external dependencies and are
+not bundled in this branch. Install compatible copies separately, retaining
+their licenses. External copies must provide the deployed massive-star and
+ZAMS-spin support identified by the manifest. Exact package-source hashes, external dependency-source
+hashes from the deployed snapshot, and required native library hashes are in
 `reproducibility/DEPLOYED_SOURCE_MANIFEST.json`. Observed Python 3.12 package
 versions are recorded separately; this is not a complete portable environment
-lock. `PUBLICATION_ADJUSTMENTS.json` records test-fixture-only updates.
+lock. `PUBLICATION_ADJUSTMENTS.json` records publication-only test-fixture and
+dependency-packaging changes.
 The active production model code is unchanged from its deployed snapshot.
 
 `examples/slurm/` contains generic scripts without target lists. Provide
-`PACKAGE_ROOT`, `RUN_ROOT`, `SYSTEMS_FILE` and an appropriate node allocation.
+`PACKAGE_ROOT`, `RUN_ROOT`, `SYSTEMS_FILE`, `POET_ROOT` (containing
+`PythonPackage/` and `lib/`), `GENERAL_PURPOSE_PYTHON_MODULES` (the external
+module directory), and an appropriate node allocation. The node launcher
+adds these external locations to `PYTHONPATH` and `LD_LIBRARY_PATH`.
 The examples set short TMPDIR, isolated outputs and CDF=.02 and do not
 submit automatic continuation jobs.
 
@@ -126,4 +140,4 @@ Never restore checkpoints or worker journals under changed likelihoods,
 priors, envelopes or source fingerprints. `PYTHON_SYNTAX_AUDIT.json` records
 an incomplete historical test excluded from this publication; run the explicit profile tests,
 not indiscriminate legacy test discovery. The original introduction remains
-in `README.rst`; dependency license notices are retained separately.
+in `README.rst`; consult each external dependency checkout for its license notices.
